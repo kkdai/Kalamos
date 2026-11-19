@@ -9,17 +9,27 @@ import "./styles/themes/melan.css";
 import "./styles/editor.css";
 
 import { createEditor, type KalamosEditor } from "./editor";
+import {
+  insertImageMarkdown,
+  isImageFilePath,
+  imageExtFromMime,
+  readFileAsBase64,
+} from "./editor/images";
 import { bindWindowShortcuts } from "./editor/keymaps";
 import {
   jumpToHeadingSlug,
   resolveRelativeMarkdownPath,
 } from "./editor/lists";
 import {
+  allowAssetDir,
   askDiscardChanges,
   clearRecovery,
   DEFAULT_SETTINGS,
   getSettings,
+  importImage,
+  importImageBytes,
   listRecovery,
+  onFileDrop,
   onWindowCloseRequested,
   openFile,
   pickOpenFilePath,
@@ -40,6 +50,7 @@ import {
 
 export const NAMED_AUTOSAVE_DELAY_MS = 1000;
 export const UNTITLED_RECOVERY_INTERVAL_MS = 5000;
+export const SAVE_BEFORE_IMAGE_MESSAGE = "請先儲存文件，才能插入圖片";
 
 export function applyTheme(theme: string): void {
   if (typeof document === "undefined") return;
@@ -90,6 +101,11 @@ export interface KalamosApp {
   saveDocument: () => Promise<boolean>;
   saveDocumentAs: (explicitPath?: string) => Promise<boolean>;
   newDocument: () => Promise<boolean>;
+  dropImageFiles: (
+    paths: string[],
+    position?: { x: number; y: number },
+  ) => Promise<boolean>;
+  insertPastedImages: (files: File[], pos: number) => Promise<boolean>;
   restoreRecovery: () => Promise<boolean>;
   discardRecovery: () => Promise<boolean>;
   flushBeforeClose: () => Promise<void>;
@@ -130,6 +146,16 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
     }
   }
 
+  let syncedDocPath: string | null = null;
+  function syncDocumentPath(): void {
+    if (syncedDocPath === currentPath) return;
+    syncedDocPath = currentPath;
+    editor.setDocumentPath(currentPath);
+    if (currentPath !== null) {
+      void allowAssetDir(currentPath).catch(() => null);
+    }
+  }
+
   function clearAutosaveTimer(): void {
     if (autosaveTimer !== null) {
       clearTimeout(autosaveTimer);
@@ -153,6 +179,7 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
       setStatus("", false);
       if (docId === targetDocId) {
         currentPath = targetPath;
+        syncDocumentPath();
         editor.markClean(contentToSave);
         await clearRecovery(targetDocId).catch(() => null);
         if (editor.isDirty() && currentPath !== null) {
@@ -263,6 +290,9 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
         jumpToHeadingSlug(view, slug);
       }
     },
+    onPasteImages: async (files, view) => {
+      await insertPastedImages(files, view.state.selection.main.head);
+    },
   });
 
   const windowHandlers = {
@@ -294,12 +324,14 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
       if (currentPath === null) return;
       if (currentPath === from) {
         currentPath = to;
+        syncDocumentPath();
         sidebar.setActiveFile(currentPath);
         if (editor.isDirty()) {
           scheduleNamedAutosave();
         }
       } else if (currentPath.startsWith(`${from}/`)) {
         currentPath = `${to}${currentPath.slice(from.length)}`;
+        syncDocumentPath();
         sidebar.setActiveFile(currentPath);
         if (editor.isDirty()) {
           scheduleNamedAutosave();
@@ -314,6 +346,7 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
       ) {
         clearAutosaveTimer();
         currentPath = null;
+        syncDocumentPath();
         editor.markDirty();
         sidebar.setActiveFile(null);
         setStatus("檔案已移到垃圾桶，內容保留為未命名文件", false);
@@ -367,6 +400,81 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
     }
   }, UNTITLED_RECOVERY_INTERVAL_MS);
 
+  async function insertImportedImages(
+    pos: number,
+    importers: Array<(docPath: string) => Promise<string>>,
+  ): Promise<boolean> {
+    const docPath = currentPath;
+    if (docPath === null) {
+      setStatus(SAVE_BEFORE_IMAGE_MESSAGE, true);
+      return false;
+    }
+    const relativePaths: string[] = [];
+    let lastError: unknown = null;
+    for (const run of importers) {
+      try {
+        relativePaths.push(await run(docPath));
+      } catch (err) {
+        lastError = err;
+      }
+    }
+    if (relativePaths.length === 0) {
+      if (lastError !== null) {
+        setStatus(formatErrorMessage("插入圖片失敗", lastError), true);
+      }
+      return false;
+    }
+    if (currentPath !== docPath) return false;
+    const { view } = editor;
+    const anchor = Math.min(pos, view.state.doc.length);
+    insertImageMarkdown(view, anchor, relativePaths);
+    if (lastError !== null) {
+      setStatus(formatErrorMessage("部分圖片插入失敗", lastError), true);
+    } else {
+      setStatus("", false);
+    }
+    return true;
+  }
+
+  async function dropImageFiles(
+    paths: string[],
+    position?: { x: number; y: number },
+  ): Promise<boolean> {
+    const imagePaths = paths.filter((p) => isImageFilePath(p));
+    if (imagePaths.length === 0) return false;
+    const { view } = editor;
+    let pos: number | null = null;
+    if (position) {
+      try {
+        pos = view.posAtCoords(position);
+      } catch {
+        pos = null;
+      }
+    }
+    if (pos === null) pos = view.state.selection.main.head;
+    return insertImportedImages(
+      pos,
+      imagePaths.map(
+        (sourcePath) => async (docPath: string) =>
+          (await importImage(docPath, sourcePath)).relativePath,
+      ),
+    );
+  }
+
+  async function insertPastedImages(files: File[], pos: number): Promise<boolean> {
+    return insertImportedImages(
+      pos,
+      files.map((file) => async (docPath: string) => {
+        const ext = imageExtFromMime(file.type) ?? "png";
+        const bytes = await readFileAsBase64(file);
+        return (await importImageBytes(docPath, bytes, ext)).relativePath;
+      }),
+    );
+  }
+
+  let unlistenFileDrop: (() => void) | null = null;
+  let destroyed = false;
+
   async function openDocument(explicitPath?: string): Promise<boolean> {
     if (!(await prepareBeforeSwitchDocument())) {
       return false;
@@ -385,6 +493,7 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
       currentPath = selectedPath;
       docId = generateDocId();
       editor.setContent(content, { dirty: false });
+      syncDocumentPath();
       sidebar.setActiveFile(currentPath);
       setStatus("", false);
       return true;
@@ -425,6 +534,7 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
     currentPath = null;
     docId = generateDocId();
     editor.setContent("", { dirty: false });
+    syncDocumentPath();
     sidebar.setActiveFile(null);
     setStatus("", false);
     return true;
@@ -439,6 +549,7 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
     docId = entry.docId;
     currentPath = entry.path;
     editor.setContent(entry.content, { dirty: true });
+    syncDocumentPath();
     await clearRecovery(entry.docId).catch(() => null);
     if (currentPath !== null) {
       scheduleNamedAutosave();
@@ -482,6 +593,14 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
     unlistenClose = await onWindowCloseRequested(async () => {
       await flushBeforeClose();
     });
+    const unlistenDrop = await onFileDrop(async ({ paths, position }) => {
+      await dropImageFiles(paths, position);
+    }).catch(() => null);
+    if (destroyed) {
+      unlistenDrop?.();
+    } else {
+      unlistenFileDrop = unlistenDrop;
+    }
     const settings = await getSettings().catch(() => null);
     if (settings) {
       currentSettings = { ...settings };
@@ -503,7 +622,10 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
   }
 
   function destroy(): void {
+    destroyed = true;
     clearAutosaveTimer();
+    unlistenFileDrop?.();
+    unlistenFileDrop = null;
     clearInterval(recoveryInterval);
     unbindShortcuts();
     window.removeEventListener("keydown", onSidebarKeydown);
@@ -532,6 +654,8 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
     saveDocument,
     saveDocumentAs,
     newDocument,
+    dropImageFiles,
+    insertPastedImages,
     restoreRecovery,
     discardRecovery,
     flushBeforeClose,

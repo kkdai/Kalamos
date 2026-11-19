@@ -102,13 +102,21 @@ pub fn save_file_impl(path: &str, content: &str) -> Result<FileMeta, AppError> {
 }
 
 #[tauri::command]
-pub fn open_file(path: String) -> Result<String, AppError> {
-    open_file_impl(&path)
+pub fn open_file(app: tauri::AppHandle, path: String) -> Result<String, AppError> {
+    let content = open_file_impl(&path)?;
+    crate::images::allow_parent_dir(&app, &path);
+    Ok(content)
 }
 
 #[tauri::command]
-pub fn save_file(path: String, content: String) -> Result<FileMeta, AppError> {
-    save_file_impl(&path, &content)
+pub fn save_file(
+    app: tauri::AppHandle,
+    path: String,
+    content: String,
+) -> Result<FileMeta, AppError> {
+    let meta = save_file_impl(&path, &content)?;
+    crate::images::allow_parent_dir(&app, &path);
+    Ok(meta)
 }
 
 #[cfg(test)]

@@ -1,6 +1,7 @@
 pub mod error;
 pub mod files;
 pub mod fsops;
+pub mod images;
 pub mod recovery;
 pub mod settings;
 pub mod themes;
@@ -29,6 +30,9 @@ pub fn run() {
             settings::set_settings,
             themes::list_themes,
             themes::read_theme_css,
+            images::import_image,
+            images::import_image_bytes,
+            images::allow_asset_dir,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
