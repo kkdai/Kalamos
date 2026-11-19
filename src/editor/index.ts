@@ -4,14 +4,29 @@ import { languages } from "@codemirror/language-data";
 import { Annotation, Compartment, EditorState } from "@codemirror/state";
 import { EditorView, keymap } from "@codemirror/view";
 import { createFileKeymap, type FileCommandHandlers } from "./keymaps";
+import { createSourceModeController } from "./source-mode";
 
 const ExternalLoadAnnotation = Annotation.define<boolean>();
+
+export interface KalamosTestApi {
+  getDoc: () => string;
+  setCursor: (pos: number) => void;
+  isSourceMode: () => boolean;
+}
+
+declare global {
+  interface Window {
+    __kalamos?: KalamosTestApi;
+  }
+}
 
 export interface CreateEditorOptions {
   parent: HTMLElement;
   initialContent?: string;
+  initialSourceMode?: boolean;
   handlers: FileCommandHandlers;
   onUserChange?: (content: string) => void;
+  onSourceModeChange?: (sourceMode: boolean) => void;
 }
 
 export interface SetContentOptions {
@@ -22,6 +37,10 @@ export interface KalamosEditor {
   view: EditorView;
   getContent: () => string;
   setContent: (content: string, options?: SetContentOptions) => void;
+  setCursor: (pos: number) => void;
+  isSourceMode: () => boolean;
+  setSourceMode: (enabled: boolean, notify?: boolean) => void;
+  toggleSourceMode: () => boolean;
   isDirty: () => boolean;
   markClean: (savedContent: string) => void;
   markDirty: () => void;
@@ -45,9 +64,23 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
 
   const initialSep = detectLineSeparator(initialContent);
 
+  const sourceModeController = createSourceModeController({
+    initialSourceMode: options.initialSourceMode,
+    onSourceModeChange: options.onSourceModeChange,
+  });
+
+  const combinedHandlers: FileCommandHandlers = {
+    ...options.handlers,
+    onToggleSourceMode: async () => {
+      toggleSourceMode();
+      await options.handlers.onToggleSourceMode?.();
+    },
+  };
+
   const state = EditorState.create({
     doc: initialContent,
     extensions: [
+      EditorView.editorAttributes.of({ "data-testid": "editor" }),
       lineSeparatorCompartment.of(
         initialSep === "\r\n" ? EditorState.lineSeparator.of("\r\n") : [],
       ),
@@ -57,8 +90,9 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
         base: markdownLanguage,
         codeLanguages: languages,
       }),
+      sourceModeController.extension,
       keymap.of([
-        ...createFileKeymap(options.handlers),
+        ...createFileKeymap(combinedHandlers),
         ...defaultKeymap,
         ...historyKeymap,
       ]),
@@ -108,6 +142,25 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
     });
   }
 
+  function setCursor(pos: number): void {
+    const clamped = Math.max(0, Math.min(pos, view.state.doc.length));
+    view.dispatch({
+      selection: { anchor: clamped, head: clamped },
+    });
+  }
+
+  function isSourceMode(): boolean {
+    return sourceModeController.isSourceMode();
+  }
+
+  function setSourceMode(enabled: boolean, notify = false): void {
+    sourceModeController.setSourceMode(view, enabled, notify);
+  }
+
+  function toggleSourceMode(): boolean {
+    return sourceModeController.toggleSourceMode(view);
+  }
+
   function isDirty(): boolean {
     return dirty;
   }
@@ -130,10 +183,22 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
     view.destroy();
   }
 
+  if (typeof window !== "undefined") {
+    window.__kalamos = {
+      getDoc: () => getContent(),
+      setCursor: (pos: number) => setCursor(pos),
+      isSourceMode: () => isSourceMode(),
+    };
+  }
+
   return {
     view,
     getContent,
     setContent,
+    setCursor,
+    isSourceMode,
+    setSourceMode,
+    toggleSourceMode,
     isDirty,
     markClean,
     markDirty,
