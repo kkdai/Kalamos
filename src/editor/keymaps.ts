@@ -1,5 +1,15 @@
 import type { EditorState } from "@codemirror/state";
 import type { EditorView, KeyBinding } from "@codemirror/view";
+import {
+  copyHeadingBookmark,
+  handleListBackspace,
+  handleListEnter,
+  indentListItem,
+  outdentListItem,
+  toggleBulletList,
+  toggleOrderedList,
+  toggleTaskList,
+} from "./lists";
 
 export interface FileCommandHandlers {
   onOpenFile: () => void | Promise<void>;
@@ -171,6 +181,22 @@ export function toggleLink(view: EditorView): boolean {
 export function createFileKeymap(handlers: FileCommandHandlers): KeyBinding[] {
   return [
     {
+      key: "Enter",
+      run: (view) => handleListEnter(view),
+    },
+    {
+      key: "Backspace",
+      run: (view) => handleListBackspace(view),
+    },
+    {
+      key: "Tab",
+      run: (view) => indentListItem(view),
+    },
+    {
+      key: "Shift-Tab",
+      run: (view) => outdentListItem(view),
+    },
+    {
       key: "Mod-o",
       preventDefault: true,
       run: () => {
@@ -235,6 +261,36 @@ export function createFileKeymap(handlers: FileCommandHandlers): KeyBinding[] {
       preventDefault: true,
       run: (view) => toggleLink(view),
     },
+    {
+      key: "Mod-Shift-[",
+      preventDefault: true,
+      run: (view) => toggleOrderedList(view),
+    },
+    {
+      key: "Mod-{",
+      preventDefault: true,
+      run: (view) => toggleOrderedList(view),
+    },
+    {
+      key: "Mod-Shift-]",
+      preventDefault: true,
+      run: (view) => toggleBulletList(view),
+    },
+    {
+      key: "Mod-}",
+      preventDefault: true,
+      run: (view) => toggleBulletList(view),
+    },
+    {
+      key: "Mod-Shift-x",
+      preventDefault: true,
+      run: (view) => toggleTaskList(view),
+    },
+    {
+      key: "Mod-Shift-c",
+      preventDefault: true,
+      run: (view) => copyHeadingBookmark(view) !== null,
+    },
   ];
 }
 
@@ -290,6 +346,35 @@ export function bindWindowShortcuts(
       if (view) {
         event.preventDefault();
         toggleLink(view);
+      }
+    } else if (
+      event.shiftKey &&
+      (event.key === "[" || event.key === "{" || event.code === "BracketLeft")
+    ) {
+      const view = getView?.();
+      if (view) {
+        event.preventDefault();
+        toggleOrderedList(view);
+      }
+    } else if (
+      event.shiftKey &&
+      (event.key === "]" || event.key === "}" || event.code === "BracketRight")
+    ) {
+      const view = getView?.();
+      if (view) {
+        event.preventDefault();
+        toggleBulletList(view);
+      }
+    } else if (key === "x" && event.shiftKey) {
+      const view = getView?.();
+      if (view) {
+        event.preventDefault();
+        toggleTaskList(view);
+      }
+    } else if (key === "c" && event.shiftKey) {
+      const view = getView?.();
+      if (view && copyHeadingBookmark(view) !== null) {
+        event.preventDefault();
       }
     }
   };

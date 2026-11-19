@@ -1,0 +1,16 @@
+.k-bullet-marker {
+  display: inline-block;
+  color: var(--k-accent);
+  font-weight: 600;
+  user-select: none;
+}
+
+.k-task-checkbox {
+  appearance: auto;
+  width: 1em;
+  height: 1em;
+  margin: 0 0.35em 0 0;
+  vertical-align: middle;
+  accent-color: var(--k-accent);
+  cursor: pointer;
+}
