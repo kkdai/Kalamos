@@ -337,11 +337,19 @@ export function readDiagramTheme(): DiagramTheme {
     colors.divider = read("--k-divider", colors.divider);
     fontFamily = root.getPropertyValue("--k-font-body").trim();
   }
+  return diagramThemeFromColors(colors, fontFamily);
+}
+
+/** A diagram theme from explicit colors (used for the PDF export's print theme). */
+export function diagramThemeFromColors(
+  colors: DiagramTheme["colors"],
+  fontFamily = "",
+): DiagramTheme {
   const dark = isDarkColor(colors.bg);
   return {
     key: JSON.stringify([dark, colors, fontFamily]),
     dark,
-    colors,
+    colors: { ...colors },
     fontFamily,
   };
 }

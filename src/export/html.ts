@@ -23,6 +23,9 @@ import { collectDocumentHeadings } from "../editor/lists";
 import { cjkEmphasisExtension } from "../editor/cjk-emphasis";
 import { footnoteExtension } from "../editor/footnotes";
 import { ensureMathJaxLoaded, mathMarkdownExtension } from "../editor/math";
+import { resolveDiagramKind } from "../editor/diagrams";
+import type { DiagramRenderResult } from "../editor/diagrams";
+import { type DiagramFence, diagramErrorTitle, renderExportDiagrams } from "./diagrams";
 import { PRINT_CSS as printCss } from "./print-css";
 
 export interface ExportHeading {
@@ -196,6 +199,8 @@ class Renderer {
     private readonly footnotes: FootnoteIndex,
     private readonly root: SyntaxNode,
     private readonly imageRoot: string | null = null,
+    /** Rendered diagrams by FencedCode node start. */
+    private readonly diagrams: ReadonlyMap<number, DiagramRenderResult> = new Map(),
   ) {}
 
   private footnoteReference(node: SyntaxNode): string {
@@ -512,7 +517,8 @@ class Renderer {
     return pos - lineStart;
   }
 
-  private fencedCode(node: SyntaxNode): string {
+  /** Info string, body (dedented) and whether the fence is closed. */
+  fenceParts(node: SyntaxNode): { infoString: string; code: string; closed: boolean } {
     const info = node.getChild("CodeInfo");
     const infoString = info ? this.slice(info.from, info.to).trim() : "";
     const marks = node.getChildren("CodeMark");
@@ -526,9 +532,23 @@ class Renderer {
       bodyTo = Math.max(bodyFrom, closeLineStart - 1);
     }
     const code = this.dedent(this.slice(bodyFrom, bodyTo), this.columnOf(node.from));
+    return { infoString, code, closed: close !== null && close.from >= bodyFrom };
+  }
+
+  private fencedCode(node: SyntaxNode): string {
+    const { infoString, code } = this.fenceParts(node);
     const lang = infoString.split(/\s+/)[0] ?? "";
     const langAttr = lang ? ` data-lang="${escapeHtml(lang)}"` : "";
-    return `<pre class="k-code"${langAttr}><code>${this.highlight(code, infoString)}</code></pre>\n`;
+    const pre = `<pre class="k-code"${langAttr}><code>${this.highlight(code, infoString)}</code></pre>\n`;
+    const diagram = this.diagrams.get(node.from);
+    if (!diagram) return pre;
+    if (diagram.svg) {
+      return `<figure class="k-diagram" data-kind="${escapeHtml(lang.toLowerCase())}">${diagram.svg}</figure>\n`;
+    }
+    const detail = (diagram.error ?? "").split("\n")[0].slice(0, 200);
+    return `${pre}<p class="k-diagram-error">${escapeHtml(diagramErrorTitle(diagram))}${
+      detail ? `：${escapeHtml(detail)}` : ""
+    }</p>\n`;
   }
 
   private indentedCode(node: SyntaxNode): string {
@@ -673,6 +693,21 @@ export async function buildExportHtml(
     options.docPath,
     options.imageRootDir ?? null,
   );
+  // Diagrams: collect closed mermaid / flow / sequence fences, render them in order.
+  const probe = new Renderer(doc, headings, options.docPath, highlight, math, footnotes, tree.topNode);
+  const fenceNodes: Array<{ from: number; fence: DiagramFence }> = [];
+  tree.iterate({
+    enter: (ref) => {
+      if (ref.name !== "FencedCode") return undefined;
+      const { infoString, code, closed } = probe.fenceParts(ref.node);
+      const kind = resolveDiagramKind(infoString);
+      if (kind && closed) fenceNodes.push({ from: ref.from, fence: { kind, source: code } });
+      return false;
+    },
+  });
+  const rendered = await renderExportDiagrams(fenceNodes.map((f) => f.fence));
+  const diagrams = new Map(fenceNodes.map((f, i) => [f.from, rendered[i]] as const));
+
   const renderer = new Renderer(
     doc,
     headings,
@@ -682,6 +717,7 @@ export async function buildExportHtml(
     footnotes,
     tree.topNode,
     imageRoot,
+    diagrams,
   );
   const body = renderer.block(tree.topNode) + renderer.footnoteSection();
 

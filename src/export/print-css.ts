@@ -172,6 +172,26 @@ img { max-width: 100%; break-inside: avoid; page-break-inside: avoid; }
 }
 
 .k-math-block svg { max-width: 100%; }
+
+figure.k-diagram {
+  margin: 0.9em 0;
+  text-align: center;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+/* Mermaid's inline max-width keeps the natural size; wider diagrams shrink
+   to the page through width="100%" + viewBox. */
+figure.k-diagram svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.k-diagram-error {
+  margin: -0.3em 0 0.8em;
+  color: var(--k-link);
+  font-size: 9pt;
+}
 .k-math-error { color: var(--k-link); }
 
 sup.k-fn-ref { font-size: 0.75em; line-height: 0; }
