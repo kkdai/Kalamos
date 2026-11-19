@@ -77,6 +77,30 @@ e2e 慣例：
 | 規格：行內 `$…$`、語法錯誤紅字 | e2e「#8 spec: inline $...$ …」（**fixme BUG-4**） | — |
 | 規格：MathJax 打包離線（mhchem / bbox） | e2e「#8 spec: math works offline …」（**fixme BUG-4**） | M-8 |
 
+## EX-01 匯出 PDF（#10）
+
+| 條目 | 自動 | 手動 |
+| --- | --- | --- |
+| 驗收：PDF 書籤與大綱一致 | cargo `export::tests::outline_parents_*`（層級 / 跳級）、`duplicate_headings_map_to_successive_occurrences`、`missing_heading_points_at_previous_heading`、`folded_search_ignores_whitespace_case_and_compat_forms`；實機 `examples/export_pdf_smoke.rs`（真的產生 PDF 並用 PDFKit 讀回頁數 / 書籤） | M-EX1 |
+| 規格：HTML 產生（標題 id、表格、任務清單、程式碼 span、數學 SVG、跳脫） | vitest `src/export/html.test.ts` | — |
+| 規格：Cmd+Shift+E、預設檔名、status「匯出中…」→ 路徑 / 失敗訊息、未命名可匯出 | vitest `src/export/export-app.test.ts` | M-EX1 |
+
+實機 smoke（不需開 app）：
+
+```sh
+# 1) 用前端產生 HTML 與 headings（任一 .md）
+cat > /tmp/gen.ts <<'TS'
+import { readFileSync, writeFileSync } from "node:fs";
+import { buildExportHtml } from "/src/export/html.ts";
+const [md, out] = process.argv.slice(2);
+const r = await buildExportHtml(readFileSync(md, "utf8"), { title: "smoke", docPath: md });
+writeFileSync(`${out}/page.html`, r.html); writeFileSync(`${out}/headings.json`, JSON.stringify(r.headings));
+TS
+npx vite-node /tmp/gen.ts ~/kalamos-qa/long.md /tmp
+# 2) 實際列印成 PDF 兩次，印出頁數 / 書籤樹 / 殘留隱藏視窗數（應為 0）
+cargo run --manifest-path src-tauri/Cargo.toml --example export_pdf_smoke -- /tmp/page.html /tmp/headings.json /tmp/out.pdf 2
+```
+
 ## 手動步驟（需真實 Tauri 視窗 / 磁碟）
 
 前置：`npm run tauri dev`（或 `npm run tauri build` 後開 `Kalamos.app`）。準備資料夾 `~/kalamos-qa/`。
@@ -91,6 +115,7 @@ e2e 慣例：
 - **M-9 真實輸入法**：以注音與拼音輸入法在 `**粗體**` 後、表格儲存格內、`$$` 區塊內組字，選字前畫面不跳動、選字後內容正確。
 - **M-11 外部檔案變動**：Cmd+Shift+O 開 `~/kalamos-qa/`，在 Finder / 終端 `touch a.md`、`mv a.md b.md`、`rm b.md`，側欄 1 秒內反映。
 - **M-13 自訂主題**：將 `forest.css` 放入 app data `themes/`，重啟後選單出現並可套用；重啟後仍維持上次選的主題。
+- **M-EX1 匯出 PDF**：開一份含 h1–h3（含跳級 h1→h3、重複標題、中英混排標題）、表格、程式碼、公式、本機圖片、超過 3 頁的文件，按 Cmd+Shift+E。存檔對話框預設檔名＝文件名 `.pdf`、預設在文件同資料夾；確認後 status 先顯示「匯出中…」，完成後顯示「已匯出 PDF：<路徑>」。用「預覽程式」開啟：A4、四邊留白、頁首頁尾無 URL / 日期；側邊欄「目錄」書籤樹與 app 大綱一致，點每個書籤跳到該標題所在頁；標題 / 表格 / 程式碼不被分頁切斷；圖片與公式正常。再連續匯出兩次（覆蓋同檔），都成功、資料夾內不留 `.*.kalamos-*.pdf` 暫存檔、Mission Control 看不到多出的視窗。Cmd+N 未命名文件也能匯出（預設檔名 `未命名.pdf`）。匯出到唯讀資料夾時 status 顯示「匯出 PDF 失敗：…」且之後可再次匯出。
 - **M-15 實機效能**：在 Tauri 視窗開 `npm run bench` 用的 1 萬行文件（可用 `node -e` 呼叫 `buildDoc` 輸出），在頂部、中段、表格、程式碼、公式內連續打字，主觀無卡頓。
 
 ## CI

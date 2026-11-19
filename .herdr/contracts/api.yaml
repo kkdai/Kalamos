@@ -196,6 +196,32 @@ paths:
       responses:
         '200': { description: allowed, content: { application/json: { schema: { type: 'null' } } } }
         default: { $ref: '#/components/responses/Error' }
+  /invoke/export_pdf:
+    post:
+      summary: |
+        EX-01 (macOS). Render a standalone HTML page (built by src/export/html.ts; no scripts — the
+        export WebView runs with JavaScript disabled, local images as file:// URLs) to an A4 PDF
+        (margins 18 mm top/bottom, 20 mm left/right; no header/footer) at `outPath`, then add
+        bookmarks: one per heading, nested by level (a skipped level nests under the nearest
+        shallower heading), pointing at the page where the heading text appears (matched in order,
+        so repeated titles map to successive occurrences; not found → previous heading's page).
+        Written to a temp file next to `outPath` and renamed into place. Only one export runs at a
+        time (a second call fails with kind=Io); the whole export times out after 60 s (kind=Io).
+        Fails with kind=InvalidPath (empty path / directory) or NotFound (parent folder missing).
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [html, outPath, headings]
+              properties:
+                html: { type: string, description: complete HTML document }
+                outPath: { type: string }
+                headings: { type: array, items: { $ref: '#/components/schemas/ExportHeading' }, description: document order }
+            example: { html: "<!DOCTYPE html><html>…</html>", outPath: /tmp/notes/a.pdf, headings: [{ level: 1, text: Title, id: title }] }
+      responses:
+        '200': { description: exported, content: { application/json: { schema: { $ref: '#/components/schemas/FileMeta' } } } }
+        default: { $ref: '#/components/responses/Error' }
 components:
   schemas:
     PathArg: { type: object, required: [path], properties: { path: { type: string } } }
@@ -233,6 +259,13 @@ components:
       type: object
       required: [relativePath]
       properties: { relativePath: { type: string, description: "'/'-separated, relative to the document folder, e.g. assets/cat.png" } }
+    ExportHeading:
+      type: object
+      required: [level, text, id]
+      properties:
+        level: { type: integer, minimum: 1, maximum: 6 }
+        text: { type: string, description: plain heading text (markup stripped), used as bookmark label and to locate the page }
+        id: { type: string, description: 'GitHub-style slug, same as #5 heading links (duplicates get -1, -2…)' }
     ThemeInfo:
       type: object
       required: [id, name, builtin]
