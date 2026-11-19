@@ -5,3 +5,10 @@ src-tauri/gen/
 .DS_Store
 *.log
 .env
+.env.*
+!.env.example
+*.pem
+*-key.json
+service-account*.json
+credentials*.json
+.herdr/local/
