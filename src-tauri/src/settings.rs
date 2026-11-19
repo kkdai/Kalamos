@@ -38,6 +38,10 @@ pub struct Settings {
     pub upload_args: Vec<String>,
     /// IM-05: upload pasted / dropped images right after importing them.
     pub upload_on_insert: bool,
+    /// ED-09: auto-close ( [ { " ' and full-width pairs (Cmd+Opt+P).
+    pub auto_pair_brackets: bool,
+    /// ED-09: auto-close Markdown * _ ` ~ (Cmd+Opt+Shift+P).
+    pub auto_pair_markdown: bool,
 }
 
 impl Default for Settings {
@@ -56,6 +60,8 @@ impl Default for Settings {
             upload_command: None,
             upload_args: Vec::new(),
             upload_on_insert: false,
+            auto_pair_brackets: true,
+            auto_pair_markdown: false,
         }
     }
 }
@@ -151,6 +157,8 @@ mod tests {
         assert!(v["uploadCommand"].is_null());
         assert_eq!(v["uploadArgs"], serde_json::json!([]));
         assert_eq!(v["uploadOnInsert"], false);
+        assert_eq!(v["autoPairBrackets"], true);
+        assert_eq!(v["autoPairMarkdown"], false);
     }
 
     #[test]
@@ -171,6 +179,8 @@ mod tests {
             upload_command: None,
             upload_args: Vec::new(),
             upload_on_insert: true,
+            auto_pair_brackets: false,
+            auto_pair_markdown: true,
         };
         set_settings_in(dir.path(), &updated).expect("set_settings");
         let loaded = get_settings_in(dir.path()).expect("get_settings");
@@ -327,6 +337,31 @@ mod tests {
             serde_json::from_str(&fs::read_to_string(&settings_path).unwrap()).unwrap();
         assert_eq!(raw["focusMode"], true);
         assert_eq!(raw["typewriterMode"], false);
+        assert_eq!(get_settings_in(dir.path()).unwrap(), loaded);
+    }
+
+    #[test]
+    fn reads_settings_without_auto_pair_keys_with_pairing_defaults() {
+        let dir = tempdir().expect("tempdir");
+        let settings_path = dir.path().join("settings.json");
+        // A settings file written before ED-09 existed.
+        fs::write(
+            &settings_path,
+            r#"{ "theme": "papyros", "focusMode": true, "typewriterMode": false }"#,
+        )
+        .expect("write settings.json");
+        let mut loaded = get_settings_in(dir.path()).expect("load settings");
+        assert!(loaded.focus_mode);
+        assert!(loaded.auto_pair_brackets, "brackets default on");
+        assert!(!loaded.auto_pair_markdown, "markdown pairs default off");
+
+        loaded.auto_pair_brackets = false;
+        loaded.auto_pair_markdown = true;
+        set_settings_in(dir.path(), &loaded).expect("save settings");
+        let raw: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(&settings_path).unwrap()).unwrap();
+        assert_eq!(raw["autoPairBrackets"], false);
+        assert_eq!(raw["autoPairMarkdown"], true);
         assert_eq!(get_settings_in(dir.path()).unwrap(), loaded);
     }
 

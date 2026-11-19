@@ -27,6 +27,10 @@ export interface FileCommandHandlers {
   onToggleMathAutoNumber?: () => void | Promise<void>;
   onToggleFocusMode?: () => void | Promise<void>;
   onToggleTypewriterMode?: () => void | Promise<void>;
+  /** ED-09: Cmd+Opt+P. */
+  onToggleAutoPairBrackets?: () => void | Promise<void>;
+  /** ED-09: Cmd+Opt+Shift+P. */
+  onToggleAutoPairMarkdown?: () => void | Promise<void>;
 }
 
 type SymmetricMarker = "**" | "*" | "`";
@@ -323,6 +327,22 @@ export function createFileKeymap(handlers: FileCommandHandlers): KeyBinding[] {
       },
     },
     {
+      key: "Mod-Alt-p",
+      preventDefault: true,
+      run: () => {
+        void handlers.onToggleAutoPairBrackets?.();
+        return true;
+      },
+    },
+    {
+      key: "Mod-Alt-Shift-p",
+      preventDefault: true,
+      run: () => {
+        void handlers.onToggleAutoPairMarkdown?.();
+        return true;
+      },
+    },
+    {
       key: "F8",
       preventDefault: true,
       run: () => {
@@ -376,6 +396,13 @@ export function bindWindowShortcuts(
     }
 
     const key = event.key.toLowerCase();
+    // ED-09 (event.code: Option changes event.key on macOS).
+    if (event.altKey && event.code === "KeyP") {
+      event.preventDefault();
+      if (event.shiftKey) void handlers.onToggleAutoPairMarkdown?.();
+      else void handlers.onToggleAutoPairBrackets?.();
+      return;
+    }
     if (event.altKey && !event.shiftKey) {
       if (key === "l" || event.code === "KeyL") {
         event.preventDefault();

@@ -363,6 +363,8 @@ components:
         uploadCommand: { type: [string, 'null'], default: null, description: 'IM-05 image upload program (absolute path or a name in PATH); null = not configured. Read-only for the app: only set by editing settings.json (set_settings keeps the stored value)' }
         uploadArgs: { type: array, items: { type: string }, default: [], description: 'IM-05 fixed arguments placed before the image paths. Read-only for the app, like uploadCommand' }
         uploadOnInsert: { type: boolean, default: false, description: 'IM-05 upload pasted / dropped images right after importing them' }
+        autoPairBrackets: { type: boolean, default: true, description: 'ED-09 auto-close ( [ { " '' and full-width 「」『』（）【】《》“”‘’ (Cmd+Opt+P)' }
+        autoPairMarkdown: { type: boolean, default: false, description: 'ED-09 auto-close Markdown * _ ` ~ (Cmd+Opt+Shift+P)' }
     UploadResult:
       type: object
       required: [urls]
