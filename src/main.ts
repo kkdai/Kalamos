@@ -9,7 +9,21 @@ import "./styles/themes/melan.css";
 import "./styles/editor.css";
 
 import { createEditor, type KalamosEditor } from "./editor";
+import { pickExportFormat } from "./export/format-picker";
 import { buildExportHtml } from "./export/html";
+import {
+  defaultExportPath,
+  ensureExportExtension,
+  EXPORTING_MESSAGE,
+  exportedMessage,
+  formatInfo,
+  importedMessage,
+  IMPORTING_MESSAGE,
+  PANDOC_IMPORT_EXTENSIONS,
+  PANDOC_MISSING_MESSAGE,
+  type PandocFormat,
+  prepareMarkdownForPandoc,
+} from "./export/pandoc";
 import {
   defaultPdfPath,
   documentTitle,
@@ -36,8 +50,13 @@ import {
   isAssetDirTooBroadError,
   clearRecovery,
   DEFAULT_SETTINGS,
+  exportPandoc,
   exportPdf,
   getSettings,
+  importPandoc,
+  pandocStatus,
+  pickImportPath,
+  pickSaveExportPath,
   importImage,
   importImageBytes,
   listRecovery,
@@ -125,6 +144,11 @@ export interface KalamosApp {
   /** IM-04: set (path) or clear (null, Cmd+Opt+Shift+R) the image root folder. */
   setImageRootDir: (path: string | null) => Promise<void>;
   getImageRootDir: () => string | null;
+  /** EX-02: export via Pandoc (Cmd+Opt+E); asks for the format / path when omitted. */
+  exportDocumentAs: (format?: PandocFormat, explicitPath?: string) => Promise<boolean>;
+  isExportingPandoc: () => boolean;
+  /** EX-03: import a DOCX / ODT / EPUB / LaTeX / HTML / MediaWiki file as a new untitled document (Cmd+Opt+I). */
+  importDocument: (explicitPath?: string) => Promise<boolean>;
   /** EX-01: export the current document to PDF (Cmd+Shift+E). */
   exportDocumentPdf: (explicitPath?: string) => Promise<boolean>;
   isExportingPdf: () => boolean;
@@ -492,6 +516,132 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
   };
   window.addEventListener("keydown", onImageRootKeydown);
 
+  async function isPandocAvailable(): Promise<boolean> {
+    const status = await pandocStatus().catch(() => null);
+    if (status?.available) return true;
+    setStatus(PANDOC_MISSING_MESSAGE, true);
+    return false;
+  }
+
+  function pandocErrorMessage(prefix: string, err: unknown): string {
+    const e = err as { kind?: unknown; message?: unknown } | null;
+    if (e?.kind === "NotFound" && e.message === PANDOC_MISSING_MESSAGE) {
+      return PANDOC_MISSING_MESSAGE;
+    }
+    return formatErrorMessage(prefix, err);
+  }
+
+  let exportingPandoc = false;
+
+  async function exportDocumentAs(
+    format?: PandocFormat,
+    explicitPath?: string,
+  ): Promise<boolean> {
+    if (exportingPandoc) return false;
+    exportingPandoc = true;
+    try {
+      if (!(await isPandocAvailable())) return false;
+      const chosen = format ?? (await pickExportFormat());
+      if (!chosen) return false;
+      const info = formatInfo(chosen);
+      const docPath = currentPath;
+      let outPath: string | null;
+      try {
+        outPath =
+          explicitPath ??
+          (await pickSaveExportPath(defaultExportPath(docPath, chosen), info.label, info.ext));
+      } catch (err) {
+        setStatus(formatErrorMessage("匯出失敗", err), true);
+        return false;
+      }
+      if (!outPath) return false;
+      outPath = ensureExportExtension(outPath, chosen);
+      setStatus(EXPORTING_MESSAGE, false);
+      try {
+        const prepared = prepareMarkdownForPandoc(
+          editor.getContent(),
+          docPath,
+          editor.getImageRootDir(),
+        );
+        const meta = await exportPandoc({
+          docPath,
+          markdown: prepared.markdown,
+          format: chosen,
+          outPath,
+          imageRoot: prepared.imageRoot,
+          toc: prepared.toc,
+        });
+        setStatus(exportedMessage(chosen, meta.path), false);
+        return true;
+      } catch (err) {
+        setStatus(pandocErrorMessage("匯出失敗", err), true);
+        return false;
+      }
+    } finally {
+      exportingPandoc = false;
+    }
+  }
+
+  let importing = false;
+
+  async function importDocument(explicitPath?: string): Promise<boolean> {
+    if (importing) return false;
+    importing = true;
+    try {
+      if (!(await isPandocAvailable())) return false;
+      let source: string | null;
+      try {
+        source = explicitPath ?? (await pickImportPath(PANDOC_IMPORT_EXTENSIONS));
+      } catch (err) {
+        setStatus(formatErrorMessage("匯入失敗", err), true);
+        return false;
+      }
+      if (!source) return false;
+      setStatus(IMPORTING_MESSAGE, false);
+      let markdown: string;
+      try {
+        const result = await importPandoc(source);
+        markdown = result.markdown;
+        if (result.mediaDir) {
+          await allowAssetDir(result.mediaDir).catch(() => null);
+        }
+      } catch (err) {
+        setStatus(pandocErrorMessage("匯入失敗", err), true);
+        return false;
+      }
+      // Convert first, then switch: a failed import leaves the current document alone.
+      if (!(await prepareBeforeSwitchDocument())) {
+        setStatus("", false);
+        return false;
+      }
+      clearAutosaveTimer();
+      currentPath = null;
+      docId = generateDocId();
+      editor.setContent(markdown, { dirty: true });
+      syncDocumentPath();
+      sidebar.setActiveFile(null);
+      setStatus(importedMessage(source), false);
+      return true;
+    } finally {
+      importing = false;
+    }
+  }
+
+  // EX-02 / EX-03: Cmd+Opt+E export via Pandoc, Cmd+Opt+I import.
+  // event.code is used because Option changes event.key on macOS.
+  const onPandocKeydown = (event: KeyboardEvent) => {
+    if (event.defaultPrevented) return;
+    if (!(event.metaKey || event.ctrlKey) || !event.altKey || event.shiftKey) return;
+    if (event.code === "KeyE") {
+      event.preventDefault();
+      void exportDocumentAs();
+    } else if (event.code === "KeyI") {
+      event.preventDefault();
+      void importDocument();
+    }
+  };
+  window.addEventListener("keydown", onPandocKeydown);
+
   const recoveryInterval = setInterval(() => {
     if (currentPath === null && editor.isDirty()) {
       const content = editor.getContent();
@@ -772,6 +922,7 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
     unbindShortcuts();
     window.removeEventListener("keydown", onSidebarKeydown);
     window.removeEventListener("keydown", onImageRootKeydown);
+    window.removeEventListener("keydown", onPandocKeydown);
     if (unlistenClose) {
       unlistenClose();
       unlistenClose = null;
@@ -802,6 +953,9 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
     pickImageRootDir,
     setImageRootDir,
     getImageRootDir: () => editor.getImageRootDir(),
+    exportDocumentAs,
+    isExportingPandoc: () => exportingPandoc,
+    importDocument,
     exportDocumentPdf,
     isExportingPdf: () => exportingPdf,
     dropImageFiles,

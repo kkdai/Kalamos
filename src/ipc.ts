@@ -295,6 +295,10 @@ export function resetMockState(): void {
   mockFileDropListeners.clear();
   mockPdfExports.length = 0;
   mockExportPdfHandler = null;
+  mockPandocStatus = { ...DEFAULT_MOCK_PANDOC_STATUS };
+  mockPandocExports.length = 0;
+  mockPandocExportHandler = null;
+  mockPandocImportHandler = null;
   seedDemoFolder();
   seedDefaultCustomThemes();
 }
@@ -1159,4 +1163,168 @@ export function getMockPdfExports(): MockPdfExport[] {
 
 export function setMockExportPdfHandler(handler: MockExportPdfHandler | null): void {
   mockExportPdfHandler = handler;
+}
+
+// ---------------------------------------------------------------------------
+// EX-02 / EX-03: Pandoc export / import (#16)
+// ---------------------------------------------------------------------------
+
+export interface PandocStatus {
+  available: boolean;
+  path: string | null;
+  version: string | null;
+}
+
+export interface PandocExportRequest {
+  docPath: string | null;
+  markdown: string;
+  format: string;
+  outPath: string;
+  imageRoot?: string | null;
+  toc?: boolean;
+}
+
+export interface PandocImportResult {
+  markdown: string;
+  /** Folder embedded images were extracted to (absolute paths in `markdown`). */
+  mediaDir: string | null;
+}
+
+const DEFAULT_MOCK_PANDOC_STATUS: PandocStatus = {
+  available: true,
+  path: "/opt/homebrew/bin/pandoc",
+  version: "3.1.11 (mock)",
+};
+let mockPandocStatus: PandocStatus = { ...DEFAULT_MOCK_PANDOC_STATUS };
+const mockPandocExports: PandocExportRequest[] = [];
+type MockPandocExportHandler = (req: PandocExportRequest) => FileMeta | Promise<FileMeta>;
+type MockPandocImportHandler = (path: string) => PandocImportResult | Promise<PandocImportResult>;
+let mockPandocExportHandler: MockPandocExportHandler | null = null;
+let mockPandocImportHandler: MockPandocImportHandler | null = null;
+
+const PANDOC_FORMATS_MOCK = ["docx", "odt", "latex", "mediawiki", "epub"];
+const PANDOC_IMPORT_EXTS_MOCK = ["docx", "odt", "epub", "tex", "latex", "html", "htm", "wiki", "mediawiki"];
+const PANDOC_MISSING = "找不到 Pandoc：請先安裝（brew install pandoc）";
+const PANDOC_TOO_OLD_FOR_IMPORT = "Pandoc 版本過舊，匯入需要 2.15 以上";
+
+/** Like Rust `supports_sandbox`: imports need pandoc ≥ 2.15 (`--sandbox`). */
+function mockSupportsSandbox(version: string | null): boolean {
+  const m = /^(?:pandoc\s+)?(\d+)(?:\.(\d+))?/.exec((version ?? "").trim());
+  if (!m) return false;
+  const major = Number(m[1]);
+  const minor = Number(m[2] ?? 0);
+  return major > 2 || (major === 2 && minor >= 15);
+}
+
+/** Canned Markdown the mock returns for an import. */
+export const MOCK_PANDOC_IMPORT_MARKDOWN =
+  "# 匯入的標題\n\n## 第二層\n\n### 第三層\n\n- 項目一\n- 項目二\n\n| a | b |\n| - | - |\n| 1 | 2 |\n";
+
+/** Whether pandoc is installed (`recheck` forces a new lookup). */
+export async function pandocStatus(recheck = false): Promise<PandocStatus> {
+  if (isTauri()) {
+    return invoke<PandocStatus>("pandoc_status", { recheck });
+  }
+  return { ...mockPandocStatus };
+}
+
+/** Convert `markdown` with pandoc to `format`, written atomically to `outPath`. */
+export async function exportPandoc(req: PandocExportRequest): Promise<FileMeta> {
+  if (isTauri()) {
+    return invoke<FileMeta>("export_pandoc", {
+      docPath: req.docPath,
+      markdown: req.markdown,
+      format: req.format,
+      outPath: req.outPath,
+      imageRoot: req.imageRoot ?? null,
+      toc: Boolean(req.toc),
+    });
+  }
+  if (!mockPandocStatus.available) throw createAppError("NotFound", PANDOC_MISSING);
+  if (!req.outPath || !req.outPath.trim()) {
+    throw createAppError("InvalidPath", "Path must not be empty");
+  }
+  if (!PANDOC_FORMATS_MOCK.includes(req.format)) {
+    throw createAppError("InvalidPath", `不支援的匯出格式：${req.format}`);
+  }
+  const job: PandocExportRequest = { ...req, outPath: normalizePath(req.outPath) };
+  if (mockPandocExportHandler) return mockPandocExportHandler(job);
+  mockPandocExports.push(job);
+  return {
+    path: job.outPath,
+    mtimeMs: nextMockTimestampMs(),
+    size: new TextEncoder().encode(req.markdown).byteLength,
+  };
+}
+
+/** Convert a DOCX / ODT / EPUB / LaTeX / HTML / MediaWiki file to Markdown. */
+export async function importPandoc(path: string): Promise<PandocImportResult> {
+  if (isTauri()) {
+    return invoke<PandocImportResult>("import_pandoc", { path });
+  }
+  if (!path || !path.trim()) throw createAppError("InvalidPath", "Path must not be empty");
+  const ext = path.slice(path.lastIndexOf(".") + 1).toLowerCase();
+  if (!path.includes(".") || !PANDOC_IMPORT_EXTS_MOCK.includes(ext)) {
+    throw createAppError("InvalidPath", `不支援匯入的檔案類型：.${ext}`);
+  }
+  if (!mockPandocStatus.available) throw createAppError("NotFound", PANDOC_MISSING);
+  if (!mockSupportsSandbox(mockPandocStatus.version)) {
+    throw createAppError("Io", PANDOC_TOO_OLD_FOR_IMPORT);
+  }
+  if (mockPandocImportHandler) return mockPandocImportHandler(normalizePath(path));
+  return { markdown: MOCK_PANDOC_IMPORT_MARKDOWN, mediaDir: null };
+}
+
+/** Save dialog for an export (`defaultPath` = suggested path, `ext` = format extension). */
+export async function pickSaveExportPath(
+  defaultPath: string,
+  label: string,
+  ext: string,
+): Promise<string | null> {
+  if (isTauri()) {
+    const selected = await saveDialog({
+      defaultPath,
+      filters: [{ name: label, extensions: [ext] }],
+    });
+    return selected ?? null;
+  }
+  if (mockSaveDialogHandler) return await mockSaveDialogHandler(defaultPath);
+  return null;
+}
+
+/** Open dialog for a file to import. */
+export async function pickImportPath(extensions: string[]): Promise<string | null> {
+  if (isTauri()) {
+    const selected = await openDialog({
+      multiple: false,
+      directory: false,
+      filters: [{ name: "可匯入的文件", extensions }],
+    });
+    return typeof selected === "string" ? selected : null;
+  }
+  if (mockOpenDialogHandler) return await mockOpenDialogHandler();
+  return null;
+}
+
+export function setMockPandocAvailable(available: boolean): void {
+  mockPandocStatus = available
+    ? { ...DEFAULT_MOCK_PANDOC_STATUS }
+    : { available: false, path: null, version: null };
+}
+
+/** Pretend a specific pandoc version is installed (e.g. "2.14.2" to test the import refusal). */
+export function setMockPandocVersion(version: string | null): void {
+  mockPandocStatus = { ...DEFAULT_MOCK_PANDOC_STATUS, version };
+}
+
+export function getMockPandocExports(): PandocExportRequest[] {
+  return mockPandocExports.slice();
+}
+
+export function setMockPandocExportHandler(handler: MockPandocExportHandler | null): void {
+  mockPandocExportHandler = handler;
+}
+
+export function setMockPandocImportHandler(handler: MockPandocImportHandler | null): void {
+  mockPandocImportHandler = handler;
 }

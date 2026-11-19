@@ -222,8 +222,83 @@ paths:
       responses:
         '200': { description: exported, content: { application/json: { schema: { $ref: '#/components/schemas/FileMeta' } } } }
         default: { $ref: '#/components/responses/Error' }
+  /invoke/pandoc_status:
+    post:
+      summary: |
+        EX-02/03. Whether Pandoc is installed. Looks up `pandoc` in PATH, then /opt/homebrew/bin and
+        /usr/local/bin (GUI apps on macOS do not get the shell PATH). The result is cached;
+        `recheck: true` forces a new lookup. Never fails.
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, properties: { recheck: { type: boolean, default: false } } }
+      responses:
+        '200': { description: status, content: { application/json: { schema: { $ref: '#/components/schemas/PandocStatus' } } } }
+  /invoke/export_pandoc:
+    post:
+      summary: |
+        EX-02. Convert `markdown` with Pandoc (argument vector, no shell; Markdown on stdin;
+        `-f markdown+tex_math_dollars+footnotes+yaml_metadata_block+pipe_tables+task_lists -t <writer>`,
+        `--resource-path=<doc folder>:<imageRoot>` so relative images are embedded, `--standalone` for
+        latex / mediawiki, `--toc` when `toc`). The frontend sends the document with local image paths
+        made absolute, `<img>` tags turned into `![](){width=…}` and `[TOC]` lines removed
+        (src/export/pandoc.ts). Written to a temp file next to `outPath` and renamed into place;
+        killed after 120 s (kind=Io). Pandoc missing → kind=NotFound ("找不到 Pandoc：請先安裝（brew install pandoc）");
+        non-zero exit → kind=Io with the stderr tail; unknown format / empty path / directory →
+        InvalidPath; parent folder missing → NotFound.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [docPath, markdown, format, outPath]
+              properties:
+                docPath: { type: [string, 'null'] }
+                markdown: { type: string }
+                format: { $ref: '#/components/schemas/PandocFormat' }
+                outPath: { type: string }
+                imageRoot: { type: [string, 'null'], default: null, description: IM-04 root in effect (setting or typora-root-url) }
+                toc: { type: boolean, default: false }
+            example: { docPath: /tmp/notes/a.md, markdown: "# Title", format: docx, outPath: /tmp/notes/a.docx, imageRoot: null, toc: false }
+      responses:
+        '200': { description: exported, content: { application/json: { schema: { $ref: '#/components/schemas/FileMeta' } } } }
+        default: { $ref: '#/components/responses/Error' }
+  /invoke/import_pandoc:
+    post:
+      summary: |
+        EX-03. Convert a .docx / .odt / .epub / .tex / .html(.htm) / .wiki(.mediawiki) file (reader chosen
+        from the extension) to Markdown (`--sandbox -t gfm+tex_math_dollars+footnotes --wrap=none`; the
+        sandbox stops a downloaded file from pulling other local files in via \input / <img src=…>, so
+        pandoc ≥ 2.15 is required — older or unknown versions fail with kind=Io
+        "Pandoc 版本過舊，匯入需要 2.15 以上" without running pandoc). Embedded
+        images are extracted to a new temp folder (`mediaDir`); the Markdown references them by
+        absolute path. The frontend opens the result as a new, dirty, untitled document.
+        Errors: unsupported extension / empty path → InvalidPath; file or Pandoc missing → NotFound;
+        non-zero exit or 120 s timeout → Io; non-UTF-8 output → Parse.
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PathArg' }
+            example: { path: /tmp/notes/report.docx }
+      responses:
+        '200': { description: converted, content: { application/json: { schema: { $ref: '#/components/schemas/PandocImport' } } } }
+        default: { $ref: '#/components/responses/Error' }
 components:
   schemas:
+    PandocFormat: { type: string, enum: [docx, odt, latex, mediawiki, epub] }
+    PandocStatus:
+      type: object
+      required: [available, path, version]
+      properties:
+        available: { type: boolean }
+        path: { type: [string, 'null'], description: absolute path of the pandoc binary found }
+        version: { type: [string, 'null'], example: 3.1.11 }
+    PandocImport:
+      type: object
+      required: [markdown, mediaDir]
+      properties:
+        markdown: { type: string }
+        mediaDir: { type: [string, 'null'], description: temp folder holding extracted images, if any }
     PathArg: { type: object, required: [path], properties: { path: { type: string } } }
     FileMeta:
       type: object

@@ -101,6 +101,14 @@ npx vite-node /tmp/gen.ts ~/kalamos-qa/long.md /tmp
 cargo run --manifest-path src-tauri/Cargo.toml --example export_pdf_smoke -- /tmp/page.html /tmp/headings.json /tmp/out.pdf 2
 ```
 
+## EX-02 / EX-03 Pandoc 匯出 / 匯入（#16）
+
+| 條目 | 自動 | 手動 |
+| --- | --- | --- |
+| 驗收：各格式保留標題、清單、表格、圖片 | cargo `pandoc::tests::*`（假 pandoc script：各格式 argv、`--resource-path`、無 shell、原子 rename、逾時 kill、缺少 pandoc、stderr 對應）；`real_pandoc_roundtrip_if_installed`（有裝 pandoc 才跑）；vitest `src/export/pandoc.test.ts`（圖片絕對路徑 / 根目錄 / `<img>` 尺寸 / `[TOC]`） | M-EX2 |
+| 驗收：匯入 DOCX 標題層級正確 | cargo `import_reads_stdout_and_extracts_media`；e2e `tests/e2e/pandoc.spec.ts`（mock） | M-EX3 |
+| 規格：Cmd+Opt+E 格式選單 → 存檔對話框（`<doc>.<ext>`）→「匯出中…」→「已匯出 <格式>：<路徑>」；無 pandoc 顯示安裝提示、不開對話框；Cmd+Opt+I 開成未命名、dirty 文件 | vitest `src/export/pandoc.test.ts`、e2e `tests/e2e/pandoc.spec.ts` | M-EX2、M-EX3 |
+
 ## 手動步驟（需真實 Tauri 視窗 / 磁碟）
 
 前置：`npm run tauri dev`（或 `npm run tauri build` 後開 `Kalamos.app`）。準備資料夾 `~/kalamos-qa/`。
@@ -116,6 +124,8 @@ cargo run --manifest-path src-tauri/Cargo.toml --example export_pdf_smoke -- /tm
 - **M-11 外部檔案變動**：Cmd+Shift+O 開 `~/kalamos-qa/`，在 Finder / 終端 `touch a.md`、`mv a.md b.md`、`rm b.md`，側欄 1 秒內反映。
 - **M-13 自訂主題**：將 `forest.css` 放入 app data `themes/`，重啟後選單出現並可套用；重啟後仍維持上次選的主題。
 - **M-EX1 匯出 PDF**：開一份含 h1–h3（含跳級 h1→h3、重複標題、中英混排標題）、表格、程式碼、公式、本機圖片、超過 3 頁的文件，按 Cmd+Shift+E。存檔對話框預設檔名＝文件名 `.pdf`、預設在文件同資料夾；確認後 status 先顯示「匯出中…」，完成後顯示「已匯出 PDF：<路徑>」。用「預覽程式」開啟：A4、四邊留白、頁首頁尾無 URL / 日期；側邊欄「目錄」書籤樹與 app 大綱一致，點每個書籤跳到該標題所在頁；標題 / 表格 / 程式碼不被分頁切斷；圖片與公式正常。再連續匯出兩次（覆蓋同檔），都成功、資料夾內不留 `.*.kalamos-*.pdf` 暫存檔、Mission Control 看不到多出的視窗。Cmd+N 未命名文件也能匯出（預設檔名 `未命名.pdf`）。匯出到唯讀資料夾時 status 顯示「匯出 PDF 失敗：…」且之後可再次匯出。
+- **M-EX2 Pandoc 匯出（需真實 pandoc：`brew install pandoc`）**：先在未安裝 pandoc 時按 Cmd+Opt+E，status 顯示「找不到 Pandoc：請先安裝（brew install pandoc）」且不出現對話框；安裝後（不必重開 app）再按。準備含 h1–h3、巢狀清單、任務清單、表格、相對路徑圖片、`/img/x.png`（設定圖片根目錄後）、`<img width="200">`、腳註、公式、`[TOC]` 的文件。依序匯出 DOCX / ODT / LaTeX / MediaWiki / EPUB：格式選單可用方向鍵與 Esc；存檔對話框預設為文件同資料夾的 `<文件名>.<docx|odt|tex|wiki|epub>`；status「匯出中…」→「已匯出 <格式>：<路徑>」。分別用 Word / LibreOffice、`pdflatex`（或任一 TeX 編輯器）、MediaWiki 預覽（或文字檢視）、Apple Books 開啟：標題層級、清單、表格、圖片（含根目錄與 `<img>` 寬度）都在，有 `[TOC]` 的 DOCX / ODT / EPUB 有目錄。資料夾內不留 `.*.kalamos-pandoc-*` 暫存檔。圖片路徑錯誤時 status 顯示「匯出失敗：Pandoc 執行失敗（exit …）：…」。
+- **M-EX3 Pandoc 匯入**：準備一份 Word 文件，含標題 1–3、清單、表格與一張內嵌圖片，存成 `.docx`。Cmd+Opt+I 選它：status「匯入中…」→「已匯入：<檔名>」，開成未命名、未存檔（dirty）文件；`#` / `##` / `###` 層級與 Word 一致，清單與表格正確，圖片可顯示（來自暫存資料夾）。另以 `.odt`、`.html`、`.epub` 各匯入一次。匯入時目前文件若有未存變更，未命名文件會先詢問是否捨棄；取消則保留原文件。
 - **M-15 實機效能**：在 Tauri 視窗開 `npm run bench` 用的 1 萬行文件（可用 `node -e` 呼叫 `buildDoc` 輸出），在頂部、中段、表格、程式碼、公式內連續打字，主觀無卡頓。
 
 ## CI
