@@ -9,6 +9,14 @@ import "./styles/themes/melan.css";
 import "./styles/editor.css";
 
 import { createEditor, type KalamosEditor } from "./editor";
+import { buildExportHtml } from "./export/html";
+import {
+  defaultPdfPath,
+  documentTitle,
+  ensurePdfExtension,
+  EXPORTING_PDF_MESSAGE,
+  exportedPdfMessage,
+} from "./export/pdf";
 import {
   insertImageMarkdown,
   isImageFilePath,
@@ -25,6 +33,7 @@ import {
   askDiscardChanges,
   clearRecovery,
   DEFAULT_SETTINGS,
+  exportPdf,
   getSettings,
   importImage,
   importImageBytes,
@@ -34,6 +43,7 @@ import {
   openFile,
   pickOpenFilePath,
   pickSaveFilePath,
+  pickSavePdfPath,
   saveFile,
   setSettings,
   writeRecovery,
@@ -101,6 +111,9 @@ export interface KalamosApp {
   saveDocument: () => Promise<boolean>;
   saveDocumentAs: (explicitPath?: string) => Promise<boolean>;
   newDocument: () => Promise<boolean>;
+  /** EX-01: export the current document to PDF (Cmd+Shift+E). */
+  exportDocumentPdf: (explicitPath?: string) => Promise<boolean>;
+  isExportingPdf: () => boolean;
   dropImageFiles: (
     paths: string[],
     position?: { x: number; y: number },
@@ -385,6 +398,9 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
     } else if (key === "t") {
       event.preventDefault();
       void themeMenu.cycleTheme();
+    } else if (key === "e" || event.code === "KeyE") {
+      event.preventDefault();
+      void exportDocumentPdf();
     }
   };
   window.addEventListener("keydown", onSidebarKeydown);
@@ -540,6 +556,41 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
     return true;
   }
 
+  let exportingPdf = false;
+
+  async function exportDocumentPdf(explicitPath?: string): Promise<boolean> {
+    if (exportingPdf) return false;
+    exportingPdf = true;
+    try {
+      const docPath = currentPath;
+      let outPath: string | null = null;
+      try {
+        outPath = explicitPath ?? (await pickSavePdfPath(defaultPdfPath(docPath)));
+      } catch (err) {
+        setStatus(formatErrorMessage("匯出 PDF 失敗", err), true);
+        return false;
+      }
+      if (!outPath) return false;
+      outPath = ensurePdfExtension(outPath);
+      setStatus(EXPORTING_PDF_MESSAGE, false);
+      try {
+        const { html, headings } = await buildExportHtml(editor.getContent(), {
+          title: documentTitle(docPath),
+          docPath,
+          mathAutoNumber: editor.isMathAutoNumber(),
+        });
+        const meta = await exportPdf(html, outPath, headings);
+        setStatus(exportedPdfMessage(meta.path), false);
+        return true;
+      } catch (err) {
+        setStatus(formatErrorMessage("匯出 PDF 失敗", err), true);
+        return false;
+      }
+    } finally {
+      exportingPdf = false;
+    }
+  }
+
   async function restoreRecovery(): Promise<boolean> {
     if (!pendingRecovery) return false;
     const entry = pendingRecovery;
@@ -654,6 +705,8 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
     saveDocument,
     saveDocumentAs,
     newDocument,
+    exportDocumentPdf,
+    isExportingPdf: () => exportingPdf,
     dropImageFiles,
     insertPastedImages,
     restoreRecovery,

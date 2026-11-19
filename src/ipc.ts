@@ -284,6 +284,8 @@ export function resetMockState(): void {
   mockAssetFiles.clear();
   mockAllowedAssetDirs.clear();
   mockFileDropListeners.clear();
+  mockPdfExports.length = 0;
+  mockExportPdfHandler = null;
   seedDemoFolder();
   seedDefaultCustomThemes();
 }
@@ -1054,4 +1056,71 @@ export async function triggerMockFileDrop(payload: FileDropPayload): Promise<voi
   for (const listener of Array.from(mockFileDropListeners)) {
     await listener(payload);
   }
+}
+
+// ---------------------------------------------------------------------------
+// PDF export (EX-01)
+// ---------------------------------------------------------------------------
+
+export interface PdfHeading {
+  level: number;
+  text: string;
+  id: string;
+}
+
+export interface MockPdfExport {
+  outPath: string;
+  html: string;
+  headings: PdfHeading[];
+}
+
+const mockPdfExports: MockPdfExport[] = [];
+type MockExportPdfHandler = (job: MockPdfExport) => FileMeta | Promise<FileMeta>;
+let mockExportPdfHandler: MockExportPdfHandler | null = null;
+
+/** Save dialog for the exported PDF (`defaultPath` = suggested file path or name). */
+export async function pickSavePdfPath(defaultPath: string): Promise<string | null> {
+  if (isTauri()) {
+    const selected = await saveDialog({
+      defaultPath,
+      filters: [{ name: "PDF", extensions: ["pdf"] }],
+    });
+    return selected ?? null;
+  }
+  if (mockSaveDialogHandler) {
+    return await mockSaveDialogHandler(defaultPath);
+  }
+  return null;
+}
+
+/** Render `html` to an A4 PDF at `outPath` with bookmarks built from `headings`. */
+export async function exportPdf(
+  html: string,
+  outPath: string,
+  headings: PdfHeading[],
+): Promise<FileMeta> {
+  if (isTauri()) {
+    return invoke<FileMeta>("export_pdf", { html, outPath, headings });
+  }
+  if (!outPath || !outPath.trim()) {
+    throw createAppError("InvalidPath", "Path must not be empty");
+  }
+  const job: MockPdfExport = { outPath: normalizePath(outPath), html, headings };
+  if (mockExportPdfHandler) {
+    return mockExportPdfHandler(job);
+  }
+  mockPdfExports.push(job);
+  return {
+    path: job.outPath,
+    mtimeMs: nextMockTimestampMs(),
+    size: new TextEncoder().encode(html).byteLength,
+  };
+}
+
+export function getMockPdfExports(): MockPdfExport[] {
+  return mockPdfExports.slice();
+}
+
+export function setMockExportPdfHandler(handler: MockExportPdfHandler | null): void {
+  mockExportPdfHandler = handler;
 }

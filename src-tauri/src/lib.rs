@@ -1,4 +1,5 @@
 pub mod error;
+pub mod export;
 pub mod files;
 pub mod fsops;
 pub mod images;
@@ -33,6 +34,7 @@ pub fn run() {
             images::import_image,
             images::import_image_bytes,
             images::allow_asset_dir,
+            export::export_pdf,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

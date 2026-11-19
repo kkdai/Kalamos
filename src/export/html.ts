@@ -1,0 +1,589 @@
+/**
+ * EX-01: turn the current Markdown document into a standalone, print-ready
+ * HTML page (rendered to PDF by the Rust `export_pdf` command).
+ *
+ * The document is parsed with the same @lezer/markdown configuration as the
+ * editor (GFM + math), heading ids are the #5 GitHub-style slugs, code is
+ * highlighted with @lezer/highlight and math is rendered to SVG by the
+ * editor's MathJax engine. Every piece of document text is HTML-escaped; raw
+ * HTML in the document is shown as text, never interpreted.
+ */
+import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
+import { ensureSyntaxTree, syntaxTree } from "@codemirror/language";
+import { EditorState } from "@codemirror/state";
+import type { SyntaxNode } from "@lezer/common";
+import { highlightCode } from "@lezer/highlight";
+import { papyrosHighlightStyle, resolveCodeLanguage } from "../editor/code-blocks";
+import { resolveImageSrc } from "../editor/images";
+import { collectDocumentHeadings } from "../editor/lists";
+import { ensureMathJaxLoaded, mathMarkdownExtension } from "../editor/math";
+import { PRINT_CSS as printCss } from "./print-css";
+
+export interface ExportHeading {
+  level: number;
+  text: string;
+  id: string;
+}
+
+export interface ExportHtmlOptions {
+  /** Shown as the HTML <title> (and the PDF document title). */
+  title: string;
+  /** Path of the document (null = untitled); resolves relative image paths. */
+  docPath: string | null;
+  /** Number display equations like the editor's auto-number mode. */
+  mathAutoNumber?: boolean;
+}
+
+export interface ExportHtmlResult {
+  html: string;
+  headings: ExportHeading[];
+}
+
+const HEADING_LEVELS: Record<string, number> = {
+  ATXHeading1: 1,
+  ATXHeading2: 2,
+  ATXHeading3: 3,
+  ATXHeading4: 4,
+  ATXHeading5: 5,
+  ATXHeading6: 6,
+  SetextHeading1: 1,
+  SetextHeading2: 2,
+};
+
+/** Syntax nodes whose text is markup, never content. */
+const MARK_NODES = new Set([
+  "HeaderMark",
+  "EmphasisMark",
+  "CodeMark",
+  "LinkMark",
+  "QuoteMark",
+  "ListMark",
+  "TaskMarker",
+  "StrikethroughMark",
+  "SubscriptMark",
+  "SuperscriptMark",
+  "InlineMathMark",
+  "BlockMathMark",
+  "URL",
+  "LinkTitle",
+  "LinkLabel",
+  "CodeInfo",
+  "TableDelimiter",
+  "Comment",
+  "ProcessingInstruction",
+]);
+
+export function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+/** Local file path → file:// URL (the export WebView may read local files). */
+export function fileUrlFromPath(path: string): string {
+  return `file://${path
+    .split("/")
+    .map((segment) => encodeURIComponent(segment))
+    .join("/")}`;
+}
+
+function isSafeHref(href: string): boolean {
+  return /^(https?:|mailto:|#)/i.test(href.trim());
+}
+
+function unwrapDestination(raw: string): string {
+  const trimmed = raw.trim();
+  if (trimmed.startsWith("<") && trimmed.endsWith(">")) {
+    return trimmed.slice(1, -1).trim();
+  }
+  return trimmed;
+}
+
+function unquoteTitle(raw: string): string {
+  const t = raw.trim();
+  return t.length >= 2 ? t.slice(1, -1) : t;
+}
+
+function children(node: SyntaxNode): SyntaxNode[] {
+  const out: SyntaxNode[] = [];
+  for (let c = node.firstChild; c; c = c.nextSibling) out.push(c);
+  return out;
+}
+
+interface CodeHighlighter {
+  (code: string, info: string): string;
+}
+
+/** Load every language used by a fenced block, then return a sync highlighter. */
+async function prepareCodeHighlighter(infos: string[]): Promise<CodeHighlighter> {
+  const parsers = new Map<string, import("@lezer/common").Parser>();
+  for (const info of new Set(infos)) {
+    const desc = resolveCodeLanguage(info);
+    if (!desc) continue;
+    try {
+      const support = desc.support ?? (await desc.load());
+      parsers.set(info, support.language.parser);
+    } catch {
+      // Unknown / failed language: plain text.
+    }
+  }
+  return (code, info) => {
+    const parser = parsers.get(info);
+    if (!parser) return escapeHtml(code);
+    let out = "";
+    highlightCode(
+      code,
+      parser.parse(code),
+      papyrosHighlightStyle,
+      (text, classes) => {
+        out += classes
+          ? `<span class="${escapeHtml(classes)}">${escapeHtml(text)}</span>`
+          : escapeHtml(text);
+      },
+      () => {
+        out += "\n";
+      },
+    );
+    return out;
+  };
+}
+
+type MathRenderer = (tex: string, display: boolean) => string;
+
+async function prepareMathRenderer(
+  hasMath: boolean,
+  autoNumber: boolean,
+): Promise<MathRenderer> {
+  const engine = hasMath ? await ensureMathJaxLoaded().catch(() => null) : null;
+  let equationCount = 0;
+  return (tex, display) => {
+    const source = escapeHtml(display ? `$$${tex}$$` : `$${tex}$`);
+    if (!engine) return `<code class="k-math-error">${source}</code>`;
+    const result = engine.render(tex, display, autoNumber, equationCount + 1);
+    if (result.error || !result.svgHtml) {
+      return `<code class="k-math-error" title="${escapeHtml(result.error ?? "")}">${source}</code>`;
+    }
+    equationCount += result.equationNumbers.length;
+    return display
+      ? `<div class="k-math-block">${result.svgHtml}</div>`
+      : `<span class="k-math-inline">${result.svgHtml}</span>`;
+  };
+}
+
+class Renderer {
+  private headingIndex = 0;
+
+  constructor(
+    private readonly doc: string,
+    private readonly headings: ExportHeading[],
+    private readonly docPath: string | null,
+    private readonly highlight: CodeHighlighter,
+    private readonly math: MathRenderer,
+  ) {}
+
+  private slice(from: number, to: number): string {
+    return this.doc.slice(from, to);
+  }
+
+  /** Inline content of `node` between `from` and `to`, skipping markup nodes. */
+  inline(node: SyntaxNode, from = node.from, to = node.to): string {
+    let out = "";
+    let pos = from;
+    for (const child of children(node)) {
+      if (child.to <= from || child.from >= to) continue;
+      if (child.from > pos) out += this.text(pos, child.from);
+      out += this.inlineNode(child);
+      pos = Math.max(pos, child.to);
+    }
+    if (pos < to) out += this.text(pos, to);
+    return out;
+  }
+
+  private text(from: number, to: number): string {
+    return escapeHtml(this.slice(from, to));
+  }
+
+  private inlineNode(node: SyntaxNode): string {
+    const name = node.name;
+    if (MARK_NODES.has(name)) return "";
+    switch (name) {
+      case "Emphasis":
+        return `<em>${this.inline(node)}</em>`;
+      case "StrongEmphasis":
+        return `<strong>${this.inline(node)}</strong>`;
+      case "Strikethrough":
+        return `<del>${this.inline(node)}</del>`;
+      case "Subscript":
+        return `<sub>${this.inline(node)}</sub>`;
+      case "Superscript":
+        return `<sup>${this.inline(node)}</sup>`;
+      case "InlineCode":
+        return `<code>${this.inline(node)}</code>`;
+      case "Escape":
+        return escapeHtml(this.slice(node.from + 1, node.to));
+      case "Entity": {
+        const raw = this.slice(node.from, node.to);
+        return /^&(#\d{1,7}|#x[0-9a-f]{1,6}|[a-z][a-z0-9]{1,31});$/i.test(raw)
+          ? raw
+          : escapeHtml(raw);
+      }
+      case "HardBreak":
+        return "<br>";
+      case "HTMLTag": {
+        const raw = this.slice(node.from, node.to);
+        return /^<br\s*\/?>$/i.test(raw) ? "<br>" : escapeHtml(raw);
+      }
+      case "InlineMath": {
+        const marks = node.getChildren("InlineMathMark");
+        const tex =
+          marks.length >= 2
+            ? this.slice(marks[0].to, marks[marks.length - 1].from)
+            : this.slice(node.from + 1, node.to - 1);
+        return this.math(tex, false);
+      }
+      case "Link":
+        return this.link(node);
+      case "Image":
+        return this.image(node);
+      case "Autolink": {
+        const url = node.getChild("URL");
+        const href = url ? this.slice(url.from, url.to) : "";
+        const label = escapeHtml(href);
+        return isSafeHref(href)
+          ? `<a href="${escapeHtml(href)}">${label}</a>`
+          : label;
+      }
+      default:
+        // URL (bare GFM autolink) is in MARK_NODES only inside links; a
+        // top-level unknown node is rendered as its (escaped) content.
+        return this.inline(node);
+    }
+  }
+
+  private linkParts(node: SyntaxNode): {
+    labelFrom: number;
+    labelTo: number;
+    href: string;
+    title: string;
+  } {
+    const marks = node.getChildren("LinkMark");
+    const labelFrom = marks[0]?.to ?? node.from;
+    const labelTo = marks[1]?.from ?? node.to;
+    const url = node.getChild("URL");
+    const title = node.getChild("LinkTitle");
+    return {
+      labelFrom,
+      labelTo,
+      href: url ? unwrapDestination(this.slice(url.from, url.to)) : "",
+      title: title ? unquoteTitle(this.slice(title.from, title.to)) : "",
+    };
+  }
+
+  private link(node: SyntaxNode): string {
+    const { labelFrom, labelTo, href, title } = this.linkParts(node);
+    const label = this.inline(node, labelFrom, labelTo);
+    if (!href || !isSafeHref(href)) return `<span class="k-link">${label}</span>`;
+    const titleAttr = title ? ` title="${escapeHtml(title)}"` : "";
+    return `<a href="${escapeHtml(href)}"${titleAttr}>${label}</a>`;
+  }
+
+  private image(node: SyntaxNode): string {
+    const { labelFrom, labelTo, href, title } = this.linkParts(node);
+    const alt = this.slice(labelFrom, labelTo).replace(/[*_`~]/g, "").trim();
+    const resolved = resolveImageSrc(href, this.docPath, fileUrlFromPath);
+    const src =
+      resolved.kind === "remote" || resolved.kind === "data" || resolved.kind === "local"
+        ? resolved.url
+        : null;
+    if (!src) {
+      return `<span class="k-image-missing">[${escapeHtml(alt || href)}]</span>`;
+    }
+    const titleAttr = title ? ` title="${escapeHtml(title)}"` : "";
+    return `<img src="${escapeHtml(src)}" alt="${escapeHtml(alt)}"${titleAttr}>`;
+  }
+
+  block(node: SyntaxNode): string {
+    const name = node.name;
+    const level = HEADING_LEVELS[name];
+    if (level !== undefined) return this.heading(node, level);
+    switch (name) {
+      case "Document":
+        return children(node)
+          .map((c) => this.block(c))
+          .join("");
+      case "Paragraph":
+        return `<p>${this.inline(node).trim()}</p>\n`;
+      case "Blockquote":
+        return `<blockquote>\n${this.blocks(node)}</blockquote>\n`;
+      case "BulletList":
+        return `<ul>\n${this.blocks(node)}</ul>\n`;
+      case "OrderedList": {
+        const firstMark = node.firstChild?.getChild("ListMark");
+        const start = firstMark
+          ? Number.parseInt(this.slice(firstMark.from, firstMark.to), 10)
+          : 1;
+        const startAttr = Number.isFinite(start) && start !== 1 ? ` start="${start}"` : "";
+        return `<ol${startAttr}>\n${this.blocks(node)}</ol>\n`;
+      }
+      case "ListItem":
+        return this.listItem(node);
+      case "Task":
+        return this.task(node);
+      case "FencedCode":
+        return this.fencedCode(node);
+      case "CodeBlock":
+        return this.indentedCode(node);
+      case "HorizontalRule":
+        return "<hr>\n";
+      case "Table":
+        return this.table(node);
+      case "BlockMath": {
+        const marks = node.getChildren("BlockMathMark");
+        const tex =
+          marks.length >= 2
+            ? this.slice(marks[0].to, marks[marks.length - 1].from)
+            : this.slice(node.from, node.to).replace(/^\s*\$\$|\$\$\s*$/g, "");
+        return `${this.math(tex, true)}\n`;
+      }
+      case "HTMLBlock":
+        return `<pre class="k-raw-html">${this.text(node.from, node.to)}</pre>\n`;
+      case "LinkReference":
+      case "CommentBlock":
+      case "ProcessingInstructionBlock":
+        return "";
+      default:
+        if (MARK_NODES.has(name)) return "";
+        return `<p>${this.inline(node).trim()}</p>\n`;
+    }
+  }
+
+  private blocks(node: SyntaxNode): string {
+    return children(node)
+      .filter((c) => !MARK_NODES.has(c.name))
+      .map((c) => this.block(c))
+      .join("");
+  }
+
+  private heading(node: SyntaxNode, level: number): string {
+    const entry = this.headings[this.headingIndex++];
+    const idAttr = entry ? ` id="${escapeHtml(entry.id)}"` : "";
+    let to = node.to;
+    if (node.name.startsWith("Setext")) {
+      const marks = node.getChildren("HeaderMark");
+      const underline = marks[marks.length - 1];
+      if (underline) to = underline.from;
+    }
+    return `<h${level}${idAttr}>${this.inline(node, node.from, to).trim()}</h${level}>\n`;
+  }
+
+  private listItem(node: SyntaxNode): string {
+    const task = node.getChild("Task");
+    const body = this.blocks(node);
+    if (task) return `<li class="k-task">${body}</li>\n`;
+    return `<li>${body}</li>\n`;
+  }
+
+  private task(node: SyntaxNode): string {
+    const marker = node.getChild("TaskMarker");
+    const checked = marker
+      ? /x/i.test(this.slice(marker.from, marker.to))
+      : false;
+    const box = `<span class="k-task-box" data-checked="${checked}">${checked ? "✓" : ""}</span>`;
+    return `${box}<span class="k-task-text">${this.inline(node).trim()}</span>`;
+  }
+
+  /** Strip up to `indent` leading spaces from every line (list-nested code). */
+  private dedent(code: string, indent: number): string {
+    if (indent <= 0) return code;
+    const re = new RegExp(`^ {0,${indent}}`);
+    return code
+      .split("\n")
+      .map((line) => line.replace(re, ""))
+      .join("\n");
+  }
+
+  private columnOf(pos: number): number {
+    const lineStart = this.doc.lastIndexOf("\n", pos - 1) + 1;
+    return pos - lineStart;
+  }
+
+  private fencedCode(node: SyntaxNode): string {
+    const info = node.getChild("CodeInfo");
+    const infoString = info ? this.slice(info.from, info.to).trim() : "";
+    const marks = node.getChildren("CodeMark");
+    const open = marks[0];
+    const close = marks.length >= 2 ? marks[marks.length - 1] : null;
+    const openLineEnd = this.doc.indexOf("\n", open ? open.to : node.from);
+    const bodyFrom = openLineEnd < 0 || openLineEnd >= node.to ? node.to : openLineEnd + 1;
+    let bodyTo = node.to;
+    if (close && close.from >= bodyFrom) {
+      const closeLineStart = this.doc.lastIndexOf("\n", close.from - 1) + 1;
+      bodyTo = Math.max(bodyFrom, closeLineStart - 1);
+    }
+    const code = this.dedent(this.slice(bodyFrom, bodyTo), this.columnOf(node.from));
+    const lang = infoString.split(/\s+/)[0] ?? "";
+    const langAttr = lang ? ` data-lang="${escapeHtml(lang)}"` : "";
+    return `<pre class="k-code"${langAttr}><code>${this.highlight(code, infoString)}</code></pre>\n`;
+  }
+
+  private indentedCode(node: SyntaxNode): string {
+    const code = this.slice(node.from, node.to)
+      .split("\n")
+      .map((line, i) => (i === 0 ? line : line.replace(/^( {4}|\t)/, "")))
+      .join("\n");
+    return `<pre class="k-code"><code>${escapeHtml(code)}</code></pre>\n`;
+  }
+
+  private table(node: SyntaxNode): string {
+    const rows = children(node);
+    const delimiterRow = rows.find(
+      (c) => c.name === "TableDelimiter" && /-/.test(this.slice(c.from, c.to)),
+    );
+    const aligns = delimiterRow
+      ? this.splitRowText(this.slice(delimiterRow.from, delimiterRow.to)).map((cell) => {
+          const t = cell.trim();
+          const left = t.startsWith(":");
+          const right = t.endsWith(":");
+          if (left && right) return "center";
+          if (right) return "right";
+          if (left) return "left";
+          return "";
+        })
+      : [];
+    const header = rows.find((c) => c.name === "TableHeader");
+    const body = rows.filter((c) => c.name === "TableRow");
+    const columnCount = Math.max(aligns.length, header ? this.rowCells(header).length : 0, 1);
+
+    const renderRow = (row: SyntaxNode, tag: "th" | "td") => {
+      const cells = this.rowCells(row);
+      let out = "<tr>";
+      for (let i = 0; i < columnCount; i++) {
+        const align = aligns[i] ? ` style="text-align:${aligns[i]}"` : "";
+        out += `<${tag}${align}>${cells[i] ?? ""}</${tag}>`;
+      }
+      return `${out}</tr>\n`;
+    };
+
+    let out = '<table class="k-table">\n';
+    if (header) out += `<thead>\n${renderRow(header, "th")}</thead>\n`;
+    if (body.length > 0) {
+      out += `<tbody>\n${body.map((r) => renderRow(r, "td")).join("")}</tbody>\n`;
+    }
+    return `${out}</table>\n`;
+  }
+
+  private splitRowText(text: string): string[] {
+    let t = text.trim();
+    if (t.startsWith("|")) t = t.slice(1);
+    if (t.endsWith("|") && !t.endsWith("\\|")) t = t.slice(0, -1);
+    return t.split(/(?<!\\)\|/);
+  }
+
+  /** Cells of a table row as rendered HTML, split at the row's `|` delimiters. */
+  private rowCells(row: SyntaxNode): string[] {
+    const kids = children(row);
+    const pipes = kids.filter((c) => c.name === "TableDelimiter");
+    const bounds: number[] = [];
+    const lineText = this.slice(row.from, row.to);
+    const leading = lineText.trimStart().startsWith("|");
+    if (!leading) bounds.push(row.from);
+    for (const p of pipes) bounds.push(p.from, p.to);
+    const trailing = lineText.trimEnd().endsWith("|") && pipes.length > 0;
+    if (!trailing) bounds.push(row.to);
+    // bounds: [segStart?, pipeFrom, pipeTo, pipeFrom, pipeTo, ..., segEnd?]
+    const segments: Array<[number, number]> = [];
+    let cursor: number | null = leading ? null : row.from;
+    let i = leading ? 0 : 1;
+    for (; i < bounds.length; i += 2) {
+      const pipeFrom = bounds[i];
+      const pipeTo = bounds[i + 1];
+      if (cursor !== null) segments.push([cursor, pipeFrom]);
+      if (pipeTo === undefined) break;
+      cursor = pipeTo;
+    }
+    return segments.map(([from, to]) => {
+      const cell = kids.find(
+        (c) => c.name === "TableCell" && c.from >= from && c.to <= to,
+      );
+      return cell ? this.inline(cell).trim() : "";
+    });
+  }
+}
+
+function createParseState(content: string): EditorState {
+  return EditorState.create({
+    doc: content,
+    extensions: [
+      markdown({
+        base: markdownLanguage,
+        addKeymap: false,
+        extensions: [mathMarkdownExtension],
+      }),
+    ],
+  });
+}
+
+/** Headings (level, text, slug id) of a Markdown document, in document order. */
+export function collectExportHeadings(content: string): ExportHeading[] {
+  return collectDocumentHeadings(createParseState(content)).map((h) => ({
+    level: h.level,
+    text: h.text,
+    id: h.slug,
+  }));
+}
+
+export async function buildExportHtml(
+  content: string,
+  options: ExportHtmlOptions,
+): Promise<ExportHtmlResult> {
+  const state = createParseState(content);
+  const tree = ensureSyntaxTree(state, state.doc.length, 10_000) ?? syntaxTree(state);
+  const doc = state.doc.toString();
+  const headings = collectDocumentHeadings(state).map((h) => ({
+    level: h.level,
+    text: h.text,
+    id: h.slug,
+  }));
+
+  const codeInfos: string[] = [];
+  let hasMath = false;
+  tree.iterate({
+    enter: (ref) => {
+      if (ref.name === "FencedCode") {
+        const info = ref.node.getChild("CodeInfo");
+        if (info) codeInfos.push(doc.slice(info.from, info.to).trim());
+      } else if (ref.name === "InlineMath" || ref.name === "BlockMath") {
+        hasMath = true;
+      }
+    },
+  });
+
+  const [highlight, math] = await Promise.all([
+    prepareCodeHighlighter(codeInfos),
+    prepareMathRenderer(hasMath, Boolean(options.mathAutoNumber)),
+  ]);
+  const renderer = new Renderer(doc, headings, options.docPath, highlight, math);
+  const body = renderer.block(tree.topNode);
+
+  const csp =
+    "default-src 'none'; img-src file: data: https: http:; style-src 'unsafe-inline'; font-src file: data:";
+  const html = [
+    "<!DOCTYPE html>",
+    '<html lang="zh-Hant">',
+    "<head>",
+    '<meta charset="utf-8">',
+    `<meta http-equiv="Content-Security-Policy" content="${csp}">`,
+    `<title>${escapeHtml(options.title)}</title>`,
+    `<style>\n${printCss}\n</style>`,
+    "</head>",
+    "<body>",
+    `<article class="k-export">\n${body}</article>`,
+    "</body>",
+    "</html>",
+    "",
+  ].join("\n");
+  return { html, headings };
+}
