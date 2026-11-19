@@ -79,15 +79,23 @@
 
 桌面 app，不上 GCP。「部署」= PM 在 main 上跑 `npm run tauri build`，產出 `Kalamos.app`（未簽章，自用）。CI（GitHub Actions，macos-latest）：`npm ci && npm test && cargo test --manifest-path src-tauri/Cargo.toml`。
 
-## Task split（M1a）
+## 協作方式（/herdr-coder）
 
-| 角色 | 負責 | 依賴 / mock |
+- Reviewer（Claude Code）：寫 spec、review diff、跑測試、把修改意見丟回 coder，最後 commit、push、開 PR、merge。
+- 兩個 coder（agy）：`kalamos-a`、`kalamos-b`，各在自己的 git worktree（`../Kalamos.wt/a`、`../Kalamos.wt/b`）平行做一個功能 issue。coder 不碰 git。
+- 每個功能 issue 一個 branch、一個 PR（`Closes #N`）。
+
+## 執行波次（M1）
+
+兩個 coder 同一波做的 issue 盡量不碰同樣的檔案。
+
+| 波次 | kalamos-a | kalamos-b |
 | --- | --- | --- |
-| BE | `src-tauri/` 全部、api.yaml 內所有 command 與 event | 不需前端即可 `cargo test` |
-| FE | `src/`、根目錄前端設定、`index.html`、主題 CSS、編輯器、側欄 | 透過 `ipc.ts` mock 先開發，BE 好了再接真的 |
-| QA | `tests/e2e/`（Playwright 對 Vite dev server + mock ipc）、`tests/bench/`、`harness/run.sh`、`.github/workflows/ci.yml`、`.herdr/qa/harness-plan.md` | 依 AC 1–15 對應測試 |
-
-檔案所有權不重疊：`package.json` 歸 FE；QA 需要的 devDependencies（`@playwright/test`）在 QA 的 PR 加，合併時 PM 處理衝突。
+| W0 | #1 專案骨架（Tauri + Vite + CM6）、開檔存檔、自動儲存與救回 | #2 Papyros / Melan 主題與排版（只動 `src/styles/`） |
+| W1 | #3 即時預覽核心 ED-01/02/03 | #4 檔案樹與檔案列表 NV-01 |
+| W2 | #5 清單、任務清單、連結 ED-04/05 | #6 大綱 NV-02 + 主題切換 / 自訂 CSS TH-01 |
+| W3 | #7 表格 BL-01 | #8 程式碼區塊 BL-02 + 數學 BL-03 |
+| W4 | #9 圖片 IM-01/02 | M1 驗收與修 bug |
 
 ## Out of scope / risks
 
