@@ -300,8 +300,7 @@ test("AC9 composing on a decorated line keeps its markers stable", async ({ page
   expect(await getDoc(page)).toBe("## 標題中");
 });
 
-// BUG-3: math.ts has no composition guard — kept failing on purpose (see report).
-test.fixme("AC9 math live preview does not re-render during IME composition [BUG-3]", async ({ page }) => {
+test("AC9 math live preview does not re-render during IME composition", async ({ page }) => {
   // Cursor inside a $$ block shows source + live preview below (#8). Each
   // pinyin step must not re-typeset the preview while composing.
   const src = "$$\nx+\n$$\n\nend";
