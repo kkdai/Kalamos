@@ -1,0 +1,67 @@
+/**
+ * Kalamos Diagrams Styles (BL-04)
+ * Mermaid (and translated flowchart.js / js-sequence-diagrams) SVG widgets.
+ */
+
+.k-diagram {
+  display: flex;
+  justify-content: center;
+  margin: 0.75em 0;
+  padding: 0.85em 1.25em;
+  border-radius: 6px;
+  background-color: color-mix(in srgb, var(--k-surface) 55%, transparent);
+  color: var(--k-text);
+  overflow-x: auto;
+  cursor: pointer;
+  min-height: 2em;
+}
+
+.k-diagram-preview {
+  margin-top: 0.35em;
+  margin-bottom: 0.85em;
+  border: 1px dashed var(--k-divider);
+  background-color: var(--k-surface);
+  cursor: default;
+}
+
+.k-diagram-svg {
+  max-width: 100%;
+}
+
+.k-diagram-svg svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+}
+
+.k-diagram-pending {
+  color: var(--k-text-muted);
+  font-size: 0.85em;
+  align-self: center;
+}
+
+.k-diagram-error {
+  align-self: stretch;
+  width: 100%;
+  color: var(--k-link);
+  background-color: color-mix(in srgb, var(--k-link) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--k-link) 45%, transparent);
+  border-radius: 4px;
+  padding: 6px 10px;
+  font-size: 0.85em;
+  cursor: text;
+}
+
+.k-diagram-error-title {
+  font-weight: 600;
+}
+
+.k-diagram-error-detail {
+  margin: 4px 0 0;
+  font-family: var(--k-font-mono);
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: inherit;
+  background: none;
+}

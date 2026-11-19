@@ -444,3 +444,99 @@ test.describe("#8 math", () => {
     expect(external).toEqual([]);
   });
 });
+
+test.describe("#11 diagrams", () => {
+  test("#11 spec: a mermaid flowchart renders as SVG; editing shows source + live preview", async ({ page }) => {
+    const external: string[] = [];
+    page.on("request", (req) => {
+      const url = new URL(req.url());
+      if (url.hostname !== "localhost" && url.protocol.startsWith("http")) external.push(req.url());
+    });
+    const src = "```mermaid\nflowchart TD\n  A[開始] --> B{判斷}\n  B -->|是| C[結束]\n```\n\nend";
+    await setDoc(page, src, src.length);
+    const diagram = page.getByTestId("diagram");
+    await expect(diagram).toHaveCount(1);
+    await expect(diagram).toHaveAttribute("data-state", "rendered", { timeout: 20_000 });
+    const svg = diagram.locator("svg").first();
+    await expect(svg).toBeVisible();
+    await expect(svg).toContainText("判斷");
+    expect(await diagram.locator("script, foreignObject").count()).toBe(0);
+    await expect(page.getByTestId("diagram-error")).toHaveCount(0);
+
+    // Cursor inside: source lines are visible, preview follows edits.
+    await setCursor(page, src.indexOf("C[結束]") + "C[結束]".length);
+    await expect(page.getByTestId("diagram")).toHaveCount(0);
+    const preview = page.getByTestId("diagram-preview");
+    await expect(preview).toHaveCount(1);
+    await expect(page.locator(".cm-line").filter({ hasText: "flowchart TD" })).toHaveCount(1);
+    await page.keyboard.type("\n  C --> D[新增節點]");
+    await expect(preview.locator("svg").first()).toContainText("新增節點", { timeout: 10_000 });
+    expect(external).toEqual([]);
+  });
+
+  test("#11 AC: a syntax error shows a red message with a line number, not a blank", async ({ page }) => {
+    const src = "```mermaid\nflowchart TD\n  A --> B\n  B --> --> C\n```\n\nend";
+    await setDoc(page, src, src.length);
+    const err = page.getByTestId("diagram-error");
+    await expect(err).toHaveCount(1, { timeout: 20_000 });
+    await expect(err).toBeVisible();
+    await expect(err).toHaveAttribute("data-line", /\d+/);
+    await expect(err).toContainText("第");
+    const color = await err.evaluate((e) => getComputedStyle(e).color);
+    const [r, g, b] = color.match(/\d+/g)!.map(Number);
+    expect(r).toBeGreaterThan(g + 40);
+    expect(r).toBeGreaterThan(b + 40);
+    // Mermaid's own error SVG ("Syntax error in text") never lands in the page.
+    expect(await page.locator("body").innerText()).not.toMatch(/Syntax error in text/);
+    expect(await page.locator("svg[aria-roledescription=error]").count()).toBe(0);
+  });
+
+  test("#11 spec: flow / sequence blocks are translated and rendered by Mermaid", async ({ page }) => {
+    const src =
+      "```flow\nst=>start: 開始\ne=>end: 結束\nst->e\n```\n\n" +
+      "```sequence\nAlice->Bob: 你好\nBob-->Alice: 嗨\n```\n\nend";
+    await setDoc(page, src, src.length);
+    const diagrams = page.getByTestId("diagram");
+    await expect(diagrams).toHaveCount(2);
+    await expect(diagrams.nth(0)).toHaveAttribute("data-state", "rendered", { timeout: 20_000 });
+    await expect(diagrams.nth(1)).toHaveAttribute("data-state", "rendered", { timeout: 20_000 });
+    await expect(diagrams.nth(0).locator("svg").first()).toContainText("開始");
+    await expect(diagrams.nth(1).locator("svg").first()).toContainText("你好");
+  });
+
+  test("#11 spec: sequence / gantt / class / state diagrams render with their labels", async ({ page }) => {
+    const cases: Array<[string, string]> = [
+      ["sequenceDiagram\n  Alice->>Bob: 問候", "問候"],
+      ["gantt\n  dateFormat YYYY-MM-DD\n  section 階段\n  任務甲 :a1, 2026-01-01, 3d", "任務甲"],
+      ["classDiagram\n  class 動物 {\n    +吃()\n  }", "動物"],
+      ["stateDiagram-v2\n  [*] --> 待命\n  待命 --> [*]", "待命"],
+    ];
+    const src = cases.map(([code]) => "```mermaid\n" + code + "\n```").join("\n\n") + "\n\nend";
+    await setDoc(page, src, src.length);
+    const diagrams = page.getByTestId("diagram");
+    await expect(diagrams).toHaveCount(cases.length);
+    for (let i = 0; i < cases.length; i++) {
+      await expect(diagrams.nth(i)).toHaveAttribute("data-state", "rendered", { timeout: 20_000 });
+      await expect(diagrams.nth(i).locator("svg").first()).toContainText(cases[i][1]);
+    }
+  });
+  test("#11 spec: switching Papyros -> Melan re-renders diagrams with the new palette", async ({ page }) => {
+    await page.evaluate(() => document.documentElement.setAttribute("data-theme", "papyros"));
+    const src = "```mermaid\nflowchart TD\n  A[甲] --> B[乙]\n```\n\nend";
+    await setDoc(page, src, src.length);
+    const diagram = page.getByTestId("diagram");
+    await expect(diagram).toHaveAttribute("data-state", "rendered", { timeout: 20_000 });
+    const light = await diagram.locator("svg").first().innerHTML();
+    await page.evaluate(() => document.documentElement.setAttribute("data-theme", "melan"));
+    await expect
+      .poll(async () => diagram.locator("svg").first().innerHTML(), { timeout: 10_000 })
+      .not.toBe(light);
+    const textFill = await diagram
+      .locator("svg .nodeLabel, svg text")
+      .first()
+      .evaluate((e) => getComputedStyle(e).fill);
+    const [r, g, b] = textFill.match(/\d+/g)!.map(Number);
+    // Melan text is light on a dark background.
+    expect((r + g + b) / 3).toBeGreaterThan(128);
+  });
+});
