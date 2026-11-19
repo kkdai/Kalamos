@@ -302,8 +302,7 @@ test.describe("#8 code blocks", () => {
 });
 
 test.describe("#8 math", () => {
-  // BUG-4: MathJax never loads (eval("require") in mathjax-full version.js).
-  test.fixme("#8 AC: block math renders live as SVG [BUG-4]", async ({ page }) => {
+  test("#8 AC: block math renders live as SVG", async ({ page }) => {
     const src = "$$\nE=mc^2\n$$\n\nend";
     await setDoc(page, src, src.length);
     const block = page.getByTestId("math-block");
@@ -319,8 +318,7 @@ test.describe("#8 math", () => {
     await expect(preview.locator("svg").first()).toBeVisible();
   });
 
-  // BUG-4: MathJax never loads (eval("require") in mathjax-full version.js).
-  test.fixme("#8 AC: with auto-numbering on, block equations are numbered consecutively [BUG-4]", async ({ page }) => {
+  test("#8 AC: with auto-numbering on, block equations are numbered consecutively", async ({ page }) => {
     const src = "$$\na=1\n$$\n\n文字\n\n$$\nb=2\n$$\n\n$$\nc=3\n$$\n\nend";
     await setDoc(page, src, src.length);
     await expect(page.getByTestId("math-eq-number")).toHaveCount(0);
@@ -332,8 +330,7 @@ test.describe("#8 math", () => {
     await expect(nums).toHaveCount(0);
   });
 
-  // BUG-4: MathJax never loads (eval("require") in mathjax-full version.js).
-  test.fixme("#8 spec: inline $...$ renders as SVG; syntax errors show a red message [BUG-4]", async ({ page }) => {
+  test("#8 spec: inline $...$ renders as SVG; syntax errors show a red message", async ({ page }) => {
     const src = "質能 $E=mc^2$ 公式\n\n$$\n\\frac{1}{\n$$\n\nend";
     await setDoc(page, src, src.length);
     const inline = page.getByTestId("math-inline");
@@ -347,8 +344,7 @@ test.describe("#8 math", () => {
     expect(r).toBeGreaterThan(b + 40);
   });
 
-  // BUG-4: MathJax never loads (eval("require") in mathjax-full version.js).
-  test.fixme("#8 spec: math works offline (no network requests while typesetting) [BUG-4]", async ({ page }) => {
+  test("#8 spec: math works offline (no network requests while typesetting)", async ({ page }) => {
     const external: string[] = [];
     page.on("request", (req) => {
       const url = new URL(req.url());

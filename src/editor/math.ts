@@ -2,12 +2,14 @@ import "./math.css";
 
 import { ensureSyntaxTree, syntaxTree } from "@codemirror/language";
 import {
+  type EditorSelection,
   type EditorState,
   type Extension,
   Facet,
   type Range,
   StateEffect,
   StateField,
+  type Transaction,
 } from "@codemirror/state";
 import {
   Decoration,
@@ -17,6 +19,7 @@ import {
   type ViewUpdate,
   WidgetType,
 } from "@codemirror/view";
+import type { SyntaxNode } from "@lezer/common";
 import { tags } from "@lezer/highlight";
 import type { BlockContext, InlineContext, Line, MarkdownConfig } from "@lezer/markdown";
 import { isSelectionTouchingRange } from "./live-preview";
@@ -410,22 +413,54 @@ export function renderTeXSync(
   );
 }
 
+export function isMathEngineLoaded(): boolean {
+  return mathEngineInstance !== null;
+}
+
+/**
+ * Equation-number count per display formula (auto-numbering only). Lets the
+ * decoration pass assign numbers without re-typesetting every formula; the
+ * value is filled in the first time a formula is rendered.
+ */
+const equationCountCache = new Map<string, number>();
+const MAX_EQUATION_COUNT_ENTRIES = 20_000;
+
+function equationCountFor(tex: string, startEquationNumber: number): number {
+  const key = tex.trim();
+  const known = equationCountCache.get(key);
+  if (known !== undefined) return known;
+  const result = renderTeXSync(tex, true, true, startEquationNumber);
+  if (!result) return 0;
+  const count = result.equationNumbers.length;
+  if (equationCountCache.size >= MAX_EQUATION_COUNT_ENTRIES) {
+    equationCountCache.clear();
+  }
+  equationCountCache.set(key, count);
+  return count;
+}
+
+function widgetPos(view: EditorView, dom: HTMLElement): number | null {
+  try {
+    return view.posAtDOM(dom);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Inline `$...$` widget. Typesetting happens lazily in `toDOM`, so only
+ * formulas CodeMirror actually draws (the viewport) are ever rendered.
+ */
 class InlineMathWidget extends WidgetType {
   constructor(
     readonly tex: string,
-    readonly result: MathRenderResult | null,
-    readonly sourceFrom: number,
+    readonly engineReady: boolean,
   ) {
     super();
   }
 
   eq(other: InlineMathWidget): boolean {
-    return (
-      this.tex === other.tex &&
-      this.sourceFrom === other.sourceFrom &&
-      this.result?.svgHtml === other.result?.svgHtml &&
-      this.result?.error === other.result?.error
-    );
+    return this.tex === other.tex && this.engineReady === other.engineReady;
   }
 
   toDOM(view: EditorView): HTMLElement {
@@ -434,23 +469,26 @@ class InlineMathWidget extends WidgetType {
     span.dataset.testid = "math-inline";
     span.dataset.tex = this.tex;
 
-    if (!this.result) {
+    const result = renderTeXSync(this.tex, false, false, 1);
+    if (!result) {
       span.textContent = this.tex;
-    } else if (this.result.error) {
+    } else if (result.error) {
       const errEl = document.createElement("span");
       errEl.className = "k-math-error";
       errEl.dataset.testid = "math-error";
       errEl.setAttribute("role", "alert");
-      errEl.textContent = this.result.error;
+      errEl.textContent = result.error;
       span.appendChild(errEl);
     } else {
-      span.innerHTML = this.result.svgHtml;
+      span.innerHTML = result.svgHtml;
     }
 
     span.addEventListener("mousedown", (e) => {
       e.preventDefault();
       e.stopPropagation();
-      const targetPos = Math.min(this.sourceFrom + 1, view.state.doc.length);
+      const pos = widgetPos(view, span);
+      if (pos === null) return;
+      const targetPos = Math.min(pos + 1, view.state.doc.length);
       view.dispatch({
         selection: { anchor: targetPos, head: targetPos },
       });
@@ -464,9 +502,10 @@ class InlineMathWidget extends WidgetType {
 class BlockMathWidget extends WidgetType {
   constructor(
     readonly tex: string,
-    readonly result: MathRenderResult | null,
-    readonly sourceFrom: number,
     readonly isPreview: boolean,
+    readonly engineReady: boolean,
+    readonly autoNumber: boolean,
+    readonly startEquationNumber: number,
   ) {
     super();
   }
@@ -474,12 +513,11 @@ class BlockMathWidget extends WidgetType {
   eq(other: BlockMathWidget): boolean {
     return (
       this.tex === other.tex &&
-      this.sourceFrom === other.sourceFrom &&
       this.isPreview === other.isPreview &&
-      this.result?.svgHtml === other.result?.svgHtml &&
-      this.result?.error === other.result?.error &&
-      (this.result?.equationNumbers.join(",") ?? "") ===
-        (other.result?.equationNumbers.join(",") ?? "")
+      this.engineReady === other.engineReady &&
+      this.autoNumber === other.autoNumber &&
+      (!this.autoNumber ||
+        this.startEquationNumber === other.startEquationNumber)
     );
   }
 
@@ -493,30 +531,37 @@ class BlockMathWidget extends WidgetType {
       : "math-block";
     container.dataset.tex = this.tex;
 
-    if (this.result && this.result.equationNumbers.length > 0) {
-      container.dataset.equationNumber = this.result.equationNumbers.join(",");
+    const result = renderTeXSync(
+      this.tex,
+      true,
+      this.autoNumber,
+      this.startEquationNumber,
+    );
+
+    if (result && result.equationNumbers.length > 0) {
+      container.dataset.equationNumber = result.equationNumbers.join(",");
     }
 
-    if (!this.result) {
+    if (!result) {
       container.textContent = this.tex;
-    } else if (this.result.error) {
+    } else if (result.error) {
       const errEl = document.createElement("span");
       errEl.className = "k-math-error";
       errEl.dataset.testid = "math-error";
       errEl.setAttribute("role", "alert");
-      errEl.textContent = this.result.error;
+      errEl.textContent = result.error;
       container.appendChild(errEl);
     } else {
       const contentWrap = document.createElement("div");
       contentWrap.className = "k-math-svg-wrap";
-      contentWrap.innerHTML = this.result.svgHtml;
+      contentWrap.innerHTML = result.svgHtml;
       container.appendChild(contentWrap);
 
-      if (this.result.equationNumbers.length > 0) {
+      if (result.equationNumbers.length > 0) {
         const eqBadge = document.createElement("span");
         eqBadge.className = "k-math-eq-number";
         eqBadge.dataset.testid = "math-eq-number";
-        eqBadge.textContent = this.result.equationNumbers
+        eqBadge.textContent = result.equationNumbers
           .map((n) => `(${n})`)
           .join(" ");
         container.appendChild(eqBadge);
@@ -527,7 +572,9 @@ class BlockMathWidget extends WidgetType {
       container.addEventListener("mousedown", (e) => {
         e.preventDefault();
         e.stopPropagation();
-        const targetPos = Math.min(this.sourceFrom + 2, view.state.doc.length);
+        const pos = widgetPos(view, container);
+        if (pos === null) return;
+        const targetPos = Math.min(pos + 2, view.state.doc.length);
         view.dispatch({
           selection: { anchor: targetPos, head: targetPos },
         });
@@ -548,12 +595,29 @@ export interface MathFormulaNode {
   closeMark: { from: number; to: number } | null;
 }
 
-export function collectMathFormulas(state: EditorState): MathFormulaNode[] {
-  const tree =
-    ensureSyntaxTree(state, state.doc.length, 100) ?? syntaxTree(state);
+/**
+ * Math formulas in the document, or only those overlapping `[from, to]`.
+ * The range form is what the incremental decoration pass uses.
+ */
+export function collectMathFormulas(
+  state: EditorState,
+  from = 0,
+  to: number = state.doc.length,
+): MathFormulaNode[] {
+  return collectMathFormulasWithTree(state, from, to).formulas;
+}
+
+function collectMathFormulasWithTree(
+  state: EditorState,
+  from: number,
+  to: number,
+): { formulas: MathFormulaNode[]; parsedTo: number } {
+  const tree = ensureSyntaxTree(state, to, 100) ?? syntaxTree(state);
   const formulas: MathFormulaNode[] = [];
 
   tree.iterate({
+    from,
+    to,
     enter: (nodeRef) => {
       if (
         nodeRef.name === "FencedCode" ||
@@ -610,18 +674,129 @@ export function collectMathFormulas(state: EditorState): MathFormulaNode[] {
     },
   });
 
-  return formulas;
+  return { formulas, parsedTo: tree.length };
 }
 
-export function buildMathDecorations(state: EditorState): DecorationSet {
-  const formulas = collectMathFormulas(state);
-  if (formulas.length === 0) {
-    return Decoration.none;
+/** Decorations for one formula. `startEquationNumber` only matters with auto-numbering. */
+function decorateFormula(
+  state: EditorState,
+  formula: MathFormulaNode,
+  out: Array<Range<Decoration>>,
+  autoNumber: boolean,
+  startEquationNumber: number,
+): void {
+  const engineReady = mathEngineInstance !== null;
+  if (formula.kind === "inline") {
+    const active = isSelectionTouchingRange(
+      state.selection,
+      formula.from,
+      formula.to,
+    );
+    if (active) {
+      out.push(
+        Decoration.mark({ class: "k-mark" }).range(
+          formula.openMark.from,
+          formula.openMark.to,
+        ),
+      );
+      if (formula.closeMark && formula.closeMark.from > formula.openMark.to) {
+        out.push(
+          Decoration.mark({ class: "k-math-source" }).range(
+            formula.openMark.to,
+            formula.closeMark.from,
+          ),
+        );
+        out.push(
+          Decoration.mark({ class: "k-mark" }).range(
+            formula.closeMark.from,
+            formula.closeMark.to,
+          ),
+        );
+      }
+    } else {
+      out.push(
+        Decoration.replace({
+          widget: new InlineMathWidget(formula.tex, engineReady),
+        }).range(formula.from, formula.to),
+      );
+    }
+    return;
   }
 
-  // Trigger dynamic MathJax load if not yet loaded
-  if (!mathEngineInstance) {
-    void ensureMathJaxLoaded();
+  const startLine = state.doc.lineAt(formula.from);
+  const endLine = state.doc.lineAt(formula.to);
+  const active = isSelectionTouchingRange(
+    state.selection,
+    startLine.from,
+    endLine.to,
+  );
+
+  if (active) {
+    for (let lineNo = startLine.number; lineNo <= endLine.number; lineNo++) {
+      const line = state.doc.line(lineNo);
+      out.push(
+        Decoration.line({ class: "k-math-block-source-line" }).range(line.from),
+      );
+    }
+    out.push(
+      Decoration.mark({ class: "k-mark" }).range(
+        formula.openMark.from,
+        formula.openMark.to,
+      ),
+    );
+    if (formula.closeMark) {
+      out.push(
+        Decoration.mark({ class: "k-mark" }).range(
+          formula.closeMark.from,
+          formula.closeMark.to,
+        ),
+      );
+    }
+    out.push(
+      Decoration.widget({
+        widget: new BlockMathWidget(
+          formula.tex,
+          true,
+          engineReady,
+          autoNumber,
+          startEquationNumber,
+        ),
+        block: true,
+        side: 1,
+      }).range(endLine.to),
+    );
+  } else {
+    out.push(
+      Decoration.replace({
+        widget: new BlockMathWidget(
+          formula.tex,
+          false,
+          engineReady,
+          autoNumber,
+          startEquationNumber,
+        ),
+        block: true,
+      }).range(startLine.from, endLine.to),
+    );
+  }
+}
+
+/** Full rebuild: every formula in the document (typesetting stays lazy). */
+export function buildMathDecorations(state: EditorState): DecorationSet {
+  return buildAllMathDecorations(state).decorations;
+}
+
+function buildAllMathDecorations(state: EditorState): {
+  decorations: DecorationSet;
+  parsedTo: number;
+} {
+  const { formulas, parsedTo } = collectMathFormulasWithTree(
+    state,
+    0,
+    state.doc.length,
+  );
+  if (formulas.length === 0) {
+    return { decorations: Decoration.none, parsedTo };
   }
 
   const autoNumber = state.facet(mathAutoNumberFacet);
@@ -629,158 +804,269 @@ export function buildMathDecorations(state: EditorState): DecorationSet {
   let nextEquationNumber = 1;
 
   for (const formula of formulas) {
-    if (formula.kind === "inline") {
-      const active = isSelectionTouchingRange(
-        state.selection,
-        formula.from,
-        formula.to,
-      );
-      if (active) {
-        decorations.push(
-          Decoration.mark({ class: "k-mark" }).range(
-            formula.openMark.from,
-            formula.openMark.to,
-          ),
-        );
-        if (
-          formula.closeMark &&
-          formula.closeMark.from > formula.openMark.to
-        ) {
-          decorations.push(
-            Decoration.mark({ class: "k-math-source" }).range(
-              formula.openMark.to,
-              formula.closeMark.from,
-            ),
-          );
-          decorations.push(
-            Decoration.mark({ class: "k-mark" }).range(
-              formula.closeMark.from,
-              formula.closeMark.to,
-            ),
-          );
-        }
-      } else {
-        const result = renderTeXSync(formula.tex, false, false, 1);
-        decorations.push(
-          Decoration.replace({
-            widget: new InlineMathWidget(formula.tex, result, formula.from),
-          }).range(formula.from, formula.to),
-        );
-      }
-    } else {
-      const startLine = state.doc.lineAt(formula.from);
-      const endLine = state.doc.lineAt(formula.to);
-      const active = isSelectionTouchingRange(
-        state.selection,
-        startLine.from,
-        endLine.to,
-      );
-      const result = renderTeXSync(
-        formula.tex,
-        true,
-        autoNumber,
-        nextEquationNumber,
-      );
-      if (result && result.equationNumbers.length > 0) {
-        const maxNum = Math.max(...result.equationNumbers);
-        nextEquationNumber = Math.max(
-          nextEquationNumber + result.equationNumbers.length,
-          maxNum + 1,
-        );
-      }
-
-      if (active) {
-        for (let lineNo = startLine.number; lineNo <= endLine.number; lineNo++) {
-          const line = state.doc.line(lineNo);
-          decorations.push(
-            Decoration.line({ class: "k-math-block-source-line" }).range(
-              line.from,
-            ),
-          );
-        }
-        decorations.push(
-          Decoration.mark({ class: "k-mark" }).range(
-            formula.openMark.from,
-            formula.openMark.to,
-          ),
-        );
-        if (formula.closeMark) {
-          decorations.push(
-            Decoration.mark({ class: "k-mark" }).range(
-              formula.closeMark.from,
-              formula.closeMark.to,
-            ),
-          );
-        }
-        decorations.push(
-          Decoration.widget({
-            widget: new BlockMathWidget(
-              formula.tex,
-              result,
-              startLine.from,
-              true,
-            ),
-            block: true,
-            side: 1,
-          }).range(endLine.to),
-        );
-      } else {
-        decorations.push(
-          Decoration.replace({
-            widget: new BlockMathWidget(
-              formula.tex,
-              result,
-              startLine.from,
-              false,
-            ),
-            block: true,
-          }).range(startLine.from, endLine.to),
-        );
-      }
+    decorateFormula(state, formula, decorations, autoNumber, nextEquationNumber);
+    if (formula.kind === "block" && autoNumber && mathEngineInstance) {
+      nextEquationNumber += equationCountFor(formula.tex, nextEquationNumber);
     }
   }
 
-  return Decoration.set(decorations, true);
+  return { decorations: Decoration.set(decorations, true), parsedTo };
 }
 
-export const mathStateField = StateField.define<DecorationSet>({
+interface PosRange {
+  from: number;
+  to: number;
+}
+
+export interface MathFieldValue {
+  decorations: DecorationSet;
+  /** Ranges edited during IME composition, rebuilt once composition ends. */
+  dirty: readonly PosRange[];
+  /** A full rebuild was requested during composition. */
+  dirtyAll: boolean;
+  /** Extent of the syntax tree when decorations were last built. */
+  parsedTo: number;
+}
+
+/** Re-render the math decorations (dispatched on compositionend). */
+export const mathRefreshEffect = StateEffect.define<null>();
+
+// Lines containing these may re-structure the document far beyond the edit
+// (opening/closing a `$$` block or a code fence), so they force a full rebuild.
+const STRUCTURAL_MARKERS = /\$\$|```|~~~/;
+
+function lineSpanText(state: EditorState, from: number, to: number): string {
+  const start = state.doc.lineAt(from).from;
+  const end = state.doc.lineAt(Math.min(to, state.doc.length)).to;
+  return state.sliceDoc(start, end);
+}
+
+function isStructuralChange(tr: Transaction): boolean {
+  let structural = false;
+  tr.changes.iterChangedRanges((fromA, toA, fromB, toB) => {
+    if (structural) return;
+    if (
+      STRUCTURAL_MARKERS.test(lineSpanText(tr.startState, fromA, toA)) ||
+      STRUCTURAL_MARKERS.test(lineSpanText(tr.state, fromB, toB))
+    ) {
+      structural = true;
+    }
+  });
+  return structural;
+}
+
+/** Expands `[from, to]` to whole top-level blocks (paragraph, `$$` block, list…). */
+function expandToBlocks(state: EditorState, from: number, to: number): PosRange {
+  const tree = syntaxTree(state);
+  const topLevelAt = (pos: number, side: -1 | 1): PosRange | null => {
+    let node: SyntaxNode | null = tree.resolveInner(pos, side);
+    while (node && node.parent && node.parent.parent) {
+      node = node.parent;
+    }
+    if (!node || !node.parent) return null;
+    return { from: node.from, to: node.to };
+  };
+  let start = state.doc.lineAt(from).from;
+  let end = state.doc.lineAt(Math.min(to, state.doc.length)).to;
+  const a = topLevelAt(from, 1);
+  const b = topLevelAt(Math.min(to, state.doc.length), -1);
+  if (a && a.from <= from && a.to >= from) start = Math.min(start, a.from);
+  if (b && b.from <= to && b.to >= to) end = Math.max(end, b.to);
+  start = state.doc.lineAt(start).from;
+  end = state.doc.lineAt(end).to;
+  return { from: start, to: end };
+}
+
+function mergeRanges(ranges: PosRange[]): PosRange[] {
+  const sorted = [...ranges].sort((x, y) => x.from - y.from);
+  const merged: PosRange[] = [];
+  for (const r of sorted) {
+    const last = merged[merged.length - 1];
+    if (last && r.from <= last.to + 1) {
+      last.to = Math.max(last.to, r.to);
+    } else {
+      merged.push({ ...r });
+    }
+  }
+  return merged;
+}
+
+/** Rebuilds decorations only inside `regions`; everything else is kept (already mapped). */
+function rebuildRegions(
+  state: EditorState,
+  decorations: DecorationSet,
+  regions: PosRange[],
+): DecorationSet {
+  const expanded = mergeRanges(
+    regions.map((r) =>
+      expandToBlocks(
+        state,
+        Math.max(0, Math.min(r.from, state.doc.length)),
+        Math.max(0, Math.min(r.to, state.doc.length)),
+      ),
+    ),
+  );
+  let result = decorations;
+  for (const region of expanded) {
+    const formulas = collectMathFormulas(state, region.from, region.to);
+    let from = region.from;
+    let to = region.to;
+    for (const f of formulas) {
+      from = Math.min(from, state.doc.lineAt(f.from).from);
+      to = Math.max(to, state.doc.lineAt(f.to).to);
+    }
+    const add: Array<Range<Decoration>> = [];
+    for (const f of formulas) {
+      decorateFormula(state, f, add, false, 1);
+    }
+    result = result.update({
+      filterFrom: from,
+      filterTo: to,
+      filter: (f, t) => !((f >= from && t <= to) || (f < to && t > from)),
+      add,
+      sort: true,
+    });
+  }
+  return result;
+}
+
+function selectionRanges(selection: EditorSelection): PosRange[] {
+  return selection.ranges.map((r) => ({ from: r.from, to: r.to }));
+}
+
+function fullValue(state: EditorState): MathFieldValue {
+  const { decorations, parsedTo } = buildAllMathDecorations(state);
+  return { decorations, dirty: [], dirtyAll: false, parsedTo };
+}
+
+export const mathStateField = StateField.define<MathFieldValue>({
   create(state) {
-    return buildMathDecorations(state);
+    return fullValue(state);
   },
   update(value, tr) {
     const engineLoaded = tr.effects.some((e) => e.is(mathEngineLoadedEffect));
-    if (
-      tr.docChanged ||
-      tr.selection ||
-      tr.reconfigured ||
-      engineLoaded ||
-      syntaxTree(tr.startState) !== syntaxTree(tr.state)
-    ) {
-      return buildMathDecorations(tr.state);
+    const refresh = tr.effects.some((e) => e.is(mathRefreshEffect));
+    const composing = tr.isUserEvent("input.type.compose");
+    const autoNumber = tr.state.facet(mathAutoNumberFacet);
+
+    // IME composition (AC9): never re-render while composing; just map.
+    if (composing) {
+      const dirty: PosRange[] = value.dirty.map((r) => ({
+        from: tr.changes.mapPos(r.from, -1),
+        to: tr.changes.mapPos(r.to, 1),
+      }));
+      tr.changes.iterChangedRanges((_fa, _ta, fromB, toB) => {
+        dirty.push({ from: fromB, to: toB });
+      });
+      return {
+        decorations: value.decorations.map(tr.changes),
+        dirty,
+        dirtyAll:
+          value.dirtyAll || (tr.docChanged && isStructuralChange(tr)),
+        parsedTo: value.parsedTo,
+      };
     }
-    return value;
+
+    const pendingDirty = value.dirty.length > 0 || value.dirtyAll;
+    const treeChanged = syntaxTree(tr.startState) !== syntaxTree(tr.state);
+    if (
+      !tr.docChanged &&
+      !tr.selection &&
+      !tr.reconfigured &&
+      !engineLoaded &&
+      !treeChanged &&
+      !(refresh && pendingDirty)
+    ) {
+      return value;
+    }
+
+    // Auto-numbering makes every block depend on all blocks before it, so
+    // keep the simple full rebuild there. Same for engine load / reconfigure
+    // and edits that open or close a `$$` block or code fence.
+    if (
+      engineLoaded ||
+      tr.reconfigured ||
+      value.dirtyAll ||
+      autoNumber ||
+      (tr.docChanged && isStructuralChange(tr))
+    ) {
+      return fullValue(tr.state);
+    }
+
+    let decorations = value.decorations.map(tr.changes);
+    const regions: PosRange[] = value.dirty.map((r) => ({
+      from: tr.changes.mapPos(r.from, -1),
+      to: tr.changes.mapPos(r.to, 1),
+    }));
+    tr.changes.iterChangedRanges((_fa, _ta, fromB, toB) => {
+      regions.push({ from: fromB, to: toB });
+    });
+    if (tr.selection || tr.docChanged) {
+      // Only formulas under the old and new selection change active state.
+      for (const r of selectionRanges(tr.startState.selection)) {
+        regions.push({
+          from: tr.changes.mapPos(r.from, -1),
+          to: tr.changes.mapPos(r.to, 1),
+        });
+      }
+      regions.push(...selectionRanges(tr.state.selection));
+    }
+
+    // Background parsing reached text that had no tree yet: decorate it.
+    const parsedNow = syntaxTree(tr.state).length;
+    let parsedTo = tr.changes.mapPos(value.parsedTo, 1);
+    if (parsedNow > parsedTo) {
+      regions.push({ from: parsedTo, to: parsedNow });
+      parsedTo = parsedNow;
+    }
+
+    if (regions.length > 0) {
+      decorations = rebuildRegions(tr.state, decorations, regions);
+    }
+    return { decorations, dirty: [], dirtyAll: false, parsedTo };
   },
-  provide: (field) => EditorView.decorations.from(field),
+  provide: (field) => EditorView.decorations.from(field, (v) => v.decorations),
 });
 
 export const mathLoaderPlugin = ViewPlugin.fromClass(
   class {
-    constructor(view: EditorView) {
-      if (!mathEngineInstance && collectMathFormulas(view.state).length > 0) {
-        void ensureMathJaxLoaded(view);
+    constructor(readonly view: EditorView) {
+      this.maybeLoad(view.state);
+    }
+
+    maybeLoad(state: EditorState): void {
+      if (mathEngineInstance) return;
+      const value = state.field(mathStateField, false);
+      if (value && value.decorations.size > 0) {
+        void ensureMathJaxLoaded(this.view);
       }
     }
 
     update(update: ViewUpdate): void {
-      if (
-        !mathEngineInstance &&
-        (update.docChanged ||
-          syntaxTree(update.startState) !== syntaxTree(update.state)) &&
-        collectMathFormulas(update.state).length > 0
-      ) {
-        void ensureMathJaxLoaded(update.view);
+      if (update.docChanged || update.transactions.length > 0) {
+        this.maybeLoad(update.state);
       }
     }
+
+    destroy(): void {
+      pendingViews.delete(this.view);
+    }
+  },
+  {
+    eventHandlers: {
+      compositionend(_event, view) {
+        // Composition finished: render what was typed (deferred so the final
+        // composition transaction has been applied first).
+        queueMicrotask(() => {
+          if (view.composing) return;
+          const value = view.state.field(mathStateField, false);
+          if (value && (value.dirty.length > 0 || value.dirtyAll)) {
+            view.dispatch({ effects: mathRefreshEffect.of(null) });
+          }
+        });
+        return false;
+      },
+    },
   },
 );
 

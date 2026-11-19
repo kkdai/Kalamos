@@ -14,11 +14,12 @@
  *   (rAF + MessageChannel ≈ "frame presented"). Keystrokes are spread over the
  *   top / middle / bottom of the document and inside a table, a code block and
  *   a list.
- * - Scenario "mathjax-shim" defines window.PACKAGE_VERSION before load to work
- *   around BUG-4 (MathJax fails to load) so math typesetting cost is included.
+ * - Single scenario "as-is": MathJax loads without any shim (BUG-4 fixed via
+ *   Vite `define`), so math typesetting cost is included. The run fails if
+ *   math did not actually render or if the page logged errors.
  *
  * Output: one JSON object on stdout. Logs go to stderr.
- * Exit code 1 if any scenario's p95 input latency ≥ budget (50 ms).
+ * Exit code 1 if p95 input latency ≥ budget (50 ms) or math did not render.
  *
  * Usage: node tests/bench/run.mjs [--keys 40] [--opens 5] [--lines 10000]
  */
@@ -79,16 +80,11 @@ function summarize(values) {
   };
 }
 
-async function runScenario(browser, baseURL, doc, { name, mathjaxShim }) {
+async function runScenario(browser, baseURL, doc, { name }) {
   const context = await browser.newContext({ viewport: { width: 1200, height: 800 } });
   const page = await context.newPage();
   const pageErrors = [];
   page.on("pageerror", (e) => pageErrors.push(e.message));
-  if (mathjaxShim) {
-    await page.addInitScript(() => {
-      window.PACKAGE_VERSION = "3.2.2";
-    });
-  }
   await page.goto(baseURL);
   await page.waitForFunction(() => Boolean(window.__kalamos));
   await page.waitForFunction(async () => Boolean((await import("/src/main.ts")).getActiveApp()));
@@ -193,12 +189,11 @@ async function runScenario(browser, baseURL, doc, { name, mathjaxShim }) {
   const input = summarize(all);
   return {
     name,
-    mathjaxShim,
     mathRendered,
     lines: lineCount,
     openToFirstRenderMs: { runs: openTimes.map((v) => Math.round(v * 100) / 100), ...summarize(openTimes) },
     inputLatencyMs: { ...input, perSpot },
-    pass: input.p95 !== null && input.p95 < BUDGET_MS,
+    pass: input.p95 !== null && input.p95 < BUDGET_MS && mathRendered && pageErrors.length === 0,
     pageErrors: [...new Set(pageErrors)],
   };
 }
@@ -218,10 +213,7 @@ async function main() {
   const browserVersion = browser.version();
   const results = [];
   try {
-    for (const scenario of [
-      { name: "as-is", mathjaxShim: false },
-      { name: "mathjax-shim", mathjaxShim: true },
-    ]) {
+    for (const scenario of [{ name: "as-is" }]) {
       log(`scenario ${scenario.name} …`);
       results.push(await runScenario(browser, baseURL, doc, scenario));
     }
