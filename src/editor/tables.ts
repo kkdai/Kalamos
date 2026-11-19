@@ -15,6 +15,8 @@ import {
   WidgetType,
 } from "@codemirror/view";
 import type { SyntaxNode } from "@lezer/common";
+import type { MarkdownParser } from "@lezer/markdown";
+import { cjkEmphasisExtension } from "./cjk-emphasis";
 import {
   isSelectionTouchingRange,
   navigateMarkdownLink,
@@ -862,6 +864,14 @@ function renderLezerChildrenToDom(
   }
 }
 
+let cellParser: MarkdownParser | null = null;
+
+/** Parser for table cell contents; shares the editor's CJK emphasis rule. */
+function cellInlineParser(): MarkdownParser {
+  cellParser ??= (markdownLanguage.parser as MarkdownParser).configure([cjkEmphasisExtension]);
+  return cellParser;
+}
+
 export function renderCellInlineMarkdownToFragment(
   rawCellText: string,
 ): DocumentFragment {
@@ -869,7 +879,7 @@ export function renderCellInlineMarkdownToFragment(
   const text = unescapeTableCellText(rawCellText);
   if (!text) return fragment;
 
-  const tree = markdownLanguage.parser.parse(text);
+  const tree = cellInlineParser().parse(text);
   renderLezerChildrenToDom(tree.topNode, text, 0, text.length, fragment);
   return fragment;
 }

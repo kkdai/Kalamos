@@ -7,6 +7,7 @@ import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { languages } from "@codemirror/language-data";
 import { Annotation, Compartment, EditorState } from "@codemirror/state";
 import { EditorView, keymap } from "@codemirror/view";
+import { cjkEmphasisExtension } from "./cjk-emphasis";
 import { codeLineNumbersFacet } from "./code-blocks";
 import {
   imageDocPathField,
@@ -139,7 +140,7 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
         base: markdownLanguage,
         codeLanguages: languages,
         addKeymap: false,
-        extensions: [mathMarkdownExtension],
+        extensions: [mathMarkdownExtension, cjkEmphasisExtension],
       }),
       sourceModeController.extension,
       keymap.of([

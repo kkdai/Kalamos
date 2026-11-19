@@ -223,26 +223,38 @@ describe("Live Preview (ED-01), Source Mode (ED-02), Shortcuts (ED-03) & IME", (
     ).toBe("粗體");
   });
 
-  it("documents current CommonMark flanking behavior on CJK full-width punctuation inside bold (`中文**「粗體」**中文`, `中文**粗體。**中文`)", async () => {
+  it("parses bold whose inner side is full-width punctuation next to CJK (`中文**「粗體」**中文`) [#22]", async () => {
     app = createKalamosApp(document);
     await app.init();
 
-    // Under standard CommonMark delimiter flanking rules in @lezer/markdown:
-    // Full-width punctuation (`「`, `」`, `。`) matches Unicode \p{P} while
-    // adjacent CJK characters (`文`, `中`) are neither whitespace nor punctuation,
-    // so `**` fails left-flanking / right-flanking checks and is not parsed as StrongEmphasis.
-    app.editor.setContent("中文**「粗體」**中文\n第二行");
-    app.editor.setCursor(app.editor.view.state.doc.length);
-    expect(collectLivePreviewSpecs(app.editor.view.state)).toEqual([]);
-
-    app.editor.setContent("中文**粗體。**中文\n第二行");
-    app.editor.setCursor(app.editor.view.state.doc.length);
-    expect(collectLivePreviewSpecs(app.editor.view.state)).toEqual([]);
+    const doc = "中文**「粗體」**中文\n第二行";
+    app.editor.setContent(doc);
+    app.editor.setCursor(doc.length);
+    expect(collectLivePreviewSpecs(app.editor.view.state)).toEqual([
+      { from: 2, to: 4, className: "k-mark-hidden" },
+      { from: 4, to: 8, className: "k-strong" },
+      { from: 8, to: 10, className: "k-mark-hidden" },
+    ]);
+    expect(app.editor.view.contentDOM.querySelector(".k-strong")?.textContent).toBe("「粗體」");
+    // Parse/render only: the text is untouched.
+    expect(app.editor.getContent()).toBe(doc);
   });
 
-  it.todo(
-    "supports CJK full-width punctuation inside bold delimiters (`中文**「粗體」**中文`, `中文**粗體。**中文`) via custom CJK flanking rule",
-  );
+  it("parses bold ending in full-width punctuation before CJK (`中文**粗體。**中文`) [#22]", async () => {
+    app = createKalamosApp(document);
+    await app.init();
+
+    const doc = "中文**粗體。**中文\n第二行";
+    app.editor.setContent(doc);
+    app.editor.setCursor(doc.length);
+    expect(collectLivePreviewSpecs(app.editor.view.state)).toEqual([
+      { from: 2, to: 4, className: "k-mark-hidden" },
+      { from: 4, to: 7, className: "k-strong" },
+      { from: 7, to: 9, className: "k-mark-hidden" },
+    ]);
+    expect(app.editor.view.contentDOM.querySelector(".k-strong")?.textContent).toBe("粗體。");
+    expect(app.editor.getContent()).toBe(doc);
+  });
 
   it("rebuilds decorations in < 16ms on a 10,000-line document by only iterating visibleRanges", async () => {
     app = createKalamosApp(document);
