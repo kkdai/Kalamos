@@ -11,6 +11,10 @@ import "./styles/editor.css";
 import { createEditor, type KalamosEditor } from "./editor";
 import { bindWindowShortcuts } from "./editor/keymaps";
 import {
+  jumpToHeadingSlug,
+  resolveRelativeMarkdownPath,
+} from "./editor/lists";
+import {
   askDiscardChanges,
   clearRecovery,
   DEFAULT_SETTINGS,
@@ -219,6 +223,17 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
     },
     onSourceModeChange: (sourceMode) => {
       void persistSourceMode(sourceMode);
+    },
+    onOpenRelativeLink: async (relativePath, slug, view) => {
+      if (currentPath === null) {
+        setStatus("請先儲存目前文件，才能開啟相對路徑連結", true);
+        return;
+      }
+      const targetPath = resolveRelativeMarkdownPath(currentPath, relativePath);
+      const opened = await openDocument(targetPath);
+      if (opened && slug) {
+        jumpToHeadingSlug(view, slug);
+      }
     },
   });
 

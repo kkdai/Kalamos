@@ -1,5 +1,10 @@
 import { syntaxTree } from "@codemirror/language";
-import type { EditorSelection, EditorState, Range } from "@codemirror/state";
+import {
+  type EditorSelection,
+  type EditorState,
+  Facet,
+  type Range,
+} from "@codemirror/state";
 import {
   Decoration,
   type DecorationSet,
@@ -9,11 +14,27 @@ import {
 } from "@codemirror/view";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { isTauri } from "../ipc";
+import {
+  BulletMarkerWidget,
+  jumpToHeadingSlug,
+  parseRelativeMarkdownLink,
+  TaskCheckboxWidget,
+} from "./lists";
+
+export type RelativeLinkHandler = (
+  relativePath: string,
+  slug: string | null,
+  view: EditorView,
+) => void | Promise<void>;
+
+export const relativeLinkHandlerFacet = Facet.define<RelativeLinkHandler>();
 
 export interface DecorationSpec {
   from: number;
   to: number;
   className: string;
+  widgetType?: "bullet" | "task";
+  checked?: boolean;
 }
 
 const HEADING_LEVEL_BY_NODE: Record<string, number> = {
@@ -94,13 +115,84 @@ export function collectLivePreviewSpecsInRanges(
         const headingLevel = HEADING_LEVEL_BY_NODE[name];
         const inlineInfo = INLINE_CLASS_BY_NODE[name];
         const isLink = name === "Link";
-        if (headingLevel === undefined && inlineInfo === undefined && !isLink) {
+        const isListItem = name === "ListItem";
+        if (
+          headingLevel === undefined &&
+          inlineInfo === undefined &&
+          !isLink &&
+          !isListItem
+        ) {
           return;
         }
 
         const nodeKey = `${name}:${from}:${to}`;
         if (seenNodes.has(nodeKey)) return;
         seenNodes.add(nodeKey);
+
+        if (isListItem) {
+          const syntaxNode = nodeRef.node;
+          const listMark = syntaxNode.getChild("ListMark");
+          if (!listMark || listMark.from >= listMark.to) return;
+
+          const line = state.doc.lineAt(listMark.from);
+          const activeOnLine = isSelectionTouchingRange(
+            selection,
+            line.from,
+            line.to,
+          );
+          const isOrdered = syntaxNode.parent?.name === "OrderedList";
+          const taskNode = syntaxNode.getChild("Task");
+          const taskMarker = taskNode?.getChild("TaskMarker") ?? null;
+
+          if (activeOnLine) {
+            specs.push({
+              from: listMark.from,
+              to: listMark.to,
+              className: "k-mark k-list-marker",
+            });
+            if (taskMarker && taskMarker.from < taskMarker.to) {
+              specs.push({
+                from: taskMarker.from,
+                to: taskMarker.to,
+                className: "k-mark",
+              });
+            }
+          } else {
+            if (taskMarker && taskMarker.from < taskMarker.to) {
+              specs.push({
+                from: listMark.from,
+                to: taskMarker.from,
+                className: "k-mark-hidden",
+              });
+              const markerText = state.sliceDoc(
+                taskMarker.from,
+                taskMarker.to,
+              );
+              const checked = /^\[[xX]\]$/.test(markerText);
+              specs.push({
+                from: taskMarker.from,
+                to: taskMarker.to,
+                className: "k-task-checkbox",
+                widgetType: "task",
+                checked,
+              });
+            } else if (isOrdered) {
+              specs.push({
+                from: listMark.from,
+                to: listMark.to,
+                className: "k-list-marker",
+              });
+            } else {
+              specs.push({
+                from: listMark.from,
+                to: listMark.to,
+                className: "k-list-marker",
+                widgetType: "bullet",
+              });
+            }
+          }
+          return;
+        }
 
         if (headingLevel !== undefined) {
           const syntaxNode = nodeRef.node;
@@ -239,9 +331,22 @@ export function buildLivePreviewDecorations(view: EditorView): DecorationSet {
   const visibleRanges =
     view.visibleRanges.length > 0 ? view.visibleRanges : [view.viewport];
   const specs = collectLivePreviewSpecsInRanges(view.state, visibleRanges);
-  const ranges: Array<Range<Decoration>> = specs.map((spec) =>
-    Decoration.mark({ class: spec.className }).range(spec.from, spec.to),
-  );
+  const ranges: Array<Range<Decoration>> = specs.map((spec) => {
+    if (spec.widgetType === "bullet") {
+      return Decoration.replace({
+        widget: new BulletMarkerWidget(),
+      }).range(spec.from, spec.to);
+    }
+    if (spec.widgetType === "task") {
+      return Decoration.replace({
+        widget: new TaskCheckboxWidget(Boolean(spec.checked)),
+      }).range(spec.from, spec.to);
+    }
+    return Decoration.mark({ class: spec.className }).range(
+      spec.from,
+      spec.to,
+    );
+  });
   return Decoration.set(ranges, true);
 }
 
@@ -335,7 +440,32 @@ export const livePreviewPlugin = ViewPlugin.fromClass(
           view.state,
           checkPos ?? view.state.selection.main.head,
         );
-        if (!url || !isAllowedExternalUrl(url)) return false;
+        if (!url) return false;
+
+        // 1. Heading anchor `#slug`
+        if (url.startsWith("#")) {
+          event.preventDefault();
+          jumpToHeadingSlug(view, url.slice(1));
+          return true;
+        }
+
+        // 2. Relative `.md` / `.markdown` link (with optional `#slug`)
+        const relativeTarget = parseRelativeMarkdownLink(url);
+        if (relativeTarget) {
+          event.preventDefault();
+          const handler = view.state.facet(relativeLinkHandlerFacet)[0];
+          if (handler) {
+            void handler(
+              relativeTarget.pathPart,
+              relativeTarget.slugPart,
+              view,
+            );
+          }
+          return true;
+        }
+
+        // 3. External `http:` / `https:` / `mailto:` link
+        if (!isAllowedExternalUrl(url)) return false;
         event.preventDefault();
         if (isTauri()) {
           void openUrl(url).catch(() => null);

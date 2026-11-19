@@ -1,9 +1,15 @@
+import "./editor-blocks.css";
+
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { languages } from "@codemirror/language-data";
 import { Annotation, Compartment, EditorState } from "@codemirror/state";
 import { EditorView, keymap } from "@codemirror/view";
 import { createFileKeymap, type FileCommandHandlers } from "./keymaps";
+import {
+  type RelativeLinkHandler,
+  relativeLinkHandlerFacet,
+} from "./live-preview";
 import { createSourceModeController } from "./source-mode";
 
 const ExternalLoadAnnotation = Annotation.define<boolean>();
@@ -27,6 +33,7 @@ export interface CreateEditorOptions {
   handlers: FileCommandHandlers;
   onUserChange?: (content: string) => void;
   onSourceModeChange?: (sourceMode: boolean) => void;
+  onOpenRelativeLink?: RelativeLinkHandler;
 }
 
 export interface SetContentOptions {
@@ -84,11 +91,15 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
       lineSeparatorCompartment.of(
         initialSep === "\r\n" ? EditorState.lineSeparator.of("\r\n") : [],
       ),
+      ...(options.onOpenRelativeLink
+        ? [relativeLinkHandlerFacet.of(options.onOpenRelativeLink)]
+        : []),
       history(),
       EditorView.lineWrapping,
       markdown({
         base: markdownLanguage,
         codeLanguages: languages,
+        addKeymap: false,
       }),
       sourceModeController.extension,
       keymap.of([
