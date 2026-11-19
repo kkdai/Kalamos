@@ -10,7 +10,10 @@ import {
   handleTableShiftTab,
   handleTableTab,
   reorderTableBodyRow,
+  formatParsedTable,
+  parseTableInRange,
   splitTableCellsWithRanges,
+  tableCellMatrix,
   tableColumnWidthsMap,
   tablePreviewStateField,
 } from "./tables";
@@ -185,16 +188,24 @@ describe("Tables (BL-01) — block widget, alignment, CJK width, Tab navigation,
 
     const stateBefore = view.state.field(tablePreviewStateField);
 
-    const midLine = view.state.doc.line(250);
-    const start = performance.now();
-    app.editor.setCursor(midLine.from + 2);
-    const elapsedMs = performance.now() - start;
+    // Warm up (first dispatch pays for lazy parsing / JIT), then take the
+    // median of several cursor moves outside tables. A single wall-clock
+    // sample was flaky under load (#32).
+    app.editor.setCursor(view.state.doc.line(100).from);
+    const samples: number[] = [];
+    for (let i = 0; i < 9; i++) {
+      const line = view.state.doc.line(200 + i * 20);
+      const start = performance.now();
+      app.editor.setCursor(line.from + 2);
+      samples.push(performance.now() - start);
+    }
+    samples.sort((a, b) => a - b);
+    const medianMs = samples[Math.floor(samples.length / 2)];
 
     const stateAfter = view.state.field(tablePreviewStateField);
     // When moving cursor outside tables, StateField returns the exact same cached state & DecorationSet
     expect(stateAfter).toBe(stateBefore);
-    // Target < 5ms (< 25ms allowed in jsdom if GC/DOM layout intervenes)
-    expect(elapsedMs).toBeLessThan(5);
+    expect(medianMs).toBeLessThan(5);
   });
 
   it("calculates CJK East Asian Width = 2 and formats tables with aligned columns while preserving escaped pipes \\|", () => {
@@ -286,12 +297,23 @@ describe("Tables (BL-01) — block widget, alignment, CJK width, Tab navigation,
       view.state.doc.lineAt(view.state.selection.main.head).number,
     ).toBe(4);
 
-    // Enter on row 4 -> inserts another row (line 5)
+    // Fill row 4, then Enter -> inserts another row (line 5)
+    view.dispatch(view.state.replaceSelection("鉛筆"));
     expect(handleTableEnter(view)).toBe(true);
     expect(view.state.doc.lines).toBe(5);
     expect(
       view.state.doc.lineAt(view.state.selection.main.head).number,
     ).toBe(5);
+
+    // Enter on the empty last row (5) -> leaves the table (#32): the empty row
+    // is removed and the cursor sits in a new paragraph after a blank line.
+    expect(handleTableEnter(view)).toBe(true);
+    const lines = view.state.doc.toString().split("\n");
+    expect(lines).toHaveLength(6);
+    expect(lines[3]).toMatch(/^\| 鉛筆 +\| +\|$/);
+    expect(lines[4]).toBe("");
+    expect(lines[5]).toBe("");
+    expect(view.state.doc.lineAt(view.state.selection.main.head).number).toBe(6);
   });
 
   it("inserts a 3x3 default table via Cmd+Opt+T with cursor in the first header cell", async () => {
@@ -389,5 +411,144 @@ describe("Tables (BL-01) — block widget, alignment, CJK width, Tab navigation,
     );
     expect(undo(view)).toBe(true);
     expect(app.editor.getContent()).toBe(initialDoc);
+  });
+});
+
+describe("Tables — #32 extra cells, exit on empty row, re-align on leave", () => {
+  let app: KalamosApp | null = null;
+
+  beforeEach(() => {
+    resetMockState();
+    clearTableColumnWidths();
+    setupDom();
+  });
+
+  afterEach(() => {
+    app?.destroy();
+    app = null;
+  });
+
+  async function boot(content: string, cursor: number) {
+    app = createKalamosApp(document);
+    await app.init();
+    app.editor.setContent(content);
+    app.editor.setCursor(cursor);
+    return app.editor.view;
+  }
+
+  const flush = () => new Promise<void>((r) => queueMicrotask(() => r()));
+
+  it("keeps extra non-empty cells by widening the header; trailing empty extras are dropped", async () => {
+    const src = "| a | b |\n| :-- | --: |\n| 1 | 2 | 3 |  |\n| x | y |";
+    const view = await boot(src, 0);
+    const table = parseTableInRange(view.state, 0, src.length)!;
+    expect(table.colCount).toBe(2);
+    expect(table.bodyRows[0].overflowCellTexts).toEqual(["3", ""]);
+
+    const m = tableCellMatrix(table);
+    expect(m.colCount).toBe(3);
+    expect(m.headerCells).toEqual(["a", "b", ""]);
+    expect(m.delimiterStyles).toEqual(["left", "right", "default"]);
+    expect(m.bodyRows).toEqual([
+      ["1", "2", "3"],
+      ["x", "y", ""],
+    ]);
+    expect(formatParsedTable(table)).toBe(
+      [
+        "| a    | b    |     |",
+        "| :--- | ---: | --- |",
+        "| 1    | 2    | 3   |",
+        "| x    | y    |     |",
+      ].join("\n"),
+    );
+  });
+
+  it("Enter after typing a literal `| 1 | 2 |` row keeps both values (BUG-5)", async () => {
+    const src = "| a | b |\n| --- | --- |\n|     |     |";
+    const view = await boot(src, src.indexOf("|     |") + 2);
+    view.dispatch(view.state.replaceSelection("| 1 | 2 |"));
+    expect(handleTableEnter(view)).toBe(true);
+    const doc = view.state.doc.toString();
+    expect(doc).toMatch(/\| 1 +\| 2 +\|/);
+    const rows = doc.split("\n");
+    expect(new Set(rows.map((r) => r.split("|").length)).size).toBe(1);
+  });
+
+  it("Enter on an empty last row exits; a following paragraph stays separated", async () => {
+    const src = "| a | b |\n| --- | --- |\n| 1 | 2 |\n|   |   |\n\nend";
+    const view = await boot(src, src.indexOf("|   |") + 2);
+    expect(handleTableEnter(view)).toBe(true);
+    view.dispatch(view.state.replaceSelection("mid"));
+    expect(view.state.doc.toString()).toBe("| a | b |\n| --- | --- |\n| 1 | 2 |\n\nmid\n\nend");
+  });
+
+  it("Enter on a non-empty last row or on the delimiter row still inserts a row", async () => {
+    const src = "| a | b |\n| --- | --- |";
+    const view = await boot(src, src.length);
+    expect(handleTableEnter(view)).toBe(true);
+    expect(view.state.doc.lines).toBe(3);
+    view.dispatch(view.state.replaceSelection("v"));
+    expect(handleTableEnter(view)).toBe(true);
+    expect(view.state.doc.lines).toBe(4);
+  });
+
+  it("re-aligns an edited table once when the cursor leaves it, as one undo step (BUG-6)", async () => {
+    const aligned = "| name  | qty |\n| ----- | --- |\n| apple | 1   |";
+    const src = `${aligned}\n\nend`;
+    const view = await boot(src, aligned.indexOf("1   |") + 1);
+    view.dispatch(view.state.replaceSelection("2345"));
+    const edited = view.state.doc.toString();
+    expect(edited).toContain("| apple | 12345   |");
+
+    app!.editor.setCursor(view.state.doc.length);
+    await flush();
+    const formatted = view.state.doc.toString();
+    expect(formatted).toBe(
+      "| name  | qty   |\n| ----- | ----- |\n| apple | 12345 |\n\nend",
+    );
+    expect(undo(view)).toBe(true);
+    expect(view.state.doc.toString()).toBe(edited);
+  });
+
+  it("does not touch a table that was only visited (no edits)", async () => {
+    const src = "| a | bbbbbb |\n|---|---|\n| 1 | 2 |\n\nend";
+    const view = await boot(src, src.length);
+    app!.editor.setCursor(3);
+    app!.editor.setCursor(src.length);
+    await flush();
+    expect(view.state.doc.toString()).toBe(src);
+    expect(app!.editor.isDirty()).toBe(false);
+  });
+
+  it("postpones the re-align while an IME composition is active", async () => {
+    const aligned = "| name  | qty |\n| ----- | --- |\n| apple | 1   |";
+    const src = `${aligned}\n\nend`;
+    const view = await boot(src, aligned.indexOf("1   |") + 1);
+    view.dispatch(view.state.replaceSelection("2345"));
+    const edited = view.state.doc.toString();
+
+    let composing = true;
+    Object.defineProperty(view, "composing", { configurable: true, get: () => composing });
+    app!.editor.setCursor(view.state.doc.length);
+    await flush();
+    expect(view.state.doc.toString()).toBe(edited);
+
+    composing = false;
+    view.dispatch({}); // the update CodeMirror issues when composition ends
+    await flush();
+    expect(view.state.doc.toString()).toContain("| apple | 12345 |");
+    delete (view as unknown as Record<string, unknown>).composing;
+  });
+
+  it("source mode unloads the re-align plugin with the table preview", async () => {
+    const aligned = "| name  | qty |\n| ----- | --- |\n| apple | 1   |";
+    const src = `${aligned}\n\nend`;
+    const view = await boot(src, aligned.indexOf("1   |") + 1);
+    app!.editor.setSourceMode(true);
+    view.dispatch(view.state.replaceSelection("2345"));
+    const edited = view.state.doc.toString();
+    app!.editor.setCursor(view.state.doc.length);
+    await flush();
+    expect(view.state.doc.toString()).toBe(edited);
   });
 });
