@@ -1,0 +1,152 @@
+/**
+ * Kalamos Fenced Code Blocks & Low-Saturation Syntax Highlighting (BL-02)
+ * Colors derive strictly from theme tokens (--k-bg, --k-surface, --k-text,
+ * --k-text-muted, --k-accent, --k-link, --k-divider).
+ */
+
+:root,
+:root[data-theme="papyros"],
+[data-theme="papyros"] {
+  --k-syntax-keyword: var(--k-link);
+  --k-syntax-string: var(--k-accent);
+  --k-syntax-comment: var(--k-text-muted);
+  --k-syntax-number: color-mix(in srgb, var(--k-link) 75%, var(--k-text));
+  --k-syntax-function: color-mix(in srgb, var(--k-accent) 70%, var(--k-text));
+  --k-syntax-type: color-mix(in srgb, var(--k-link) 55%, var(--k-accent));
+  --k-syntax-operator: color-mix(in srgb, var(--k-text-muted) 85%, var(--k-text));
+  --k-syntax-property: color-mix(in srgb, var(--k-text) 80%, var(--k-link));
+}
+
+:root[data-theme="melan"],
+[data-theme="melan"] {
+  --k-syntax-keyword: var(--k-link);
+  --k-syntax-string: var(--k-accent);
+  --k-syntax-comment: var(--k-text-muted);
+  --k-syntax-number: color-mix(in srgb, var(--k-link) 80%, var(--k-text));
+  --k-syntax-function: color-mix(in srgb, var(--k-accent) 75%, var(--k-text));
+  --k-syntax-type: color-mix(in srgb, var(--k-accent) 60%, var(--k-link));
+  --k-syntax-operator: color-mix(in srgb, var(--k-text-muted) 85%, var(--k-text));
+  --k-syntax-property: color-mix(in srgb, var(--k-text) 82%, var(--k-link));
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --k-syntax-keyword: var(--k-link);
+    --k-syntax-string: var(--k-accent);
+    --k-syntax-comment: var(--k-text-muted);
+    --k-syntax-number: color-mix(in srgb, var(--k-link) 80%, var(--k-text));
+    --k-syntax-function: color-mix(in srgb, var(--k-accent) 75%, var(--k-text));
+    --k-syntax-type: color-mix(in srgb, var(--k-accent) 60%, var(--k-link));
+    --k-syntax-operator: color-mix(in srgb, var(--k-text-muted) 85%, var(--k-text));
+    --k-syntax-property: color-mix(in srgb, var(--k-text) 82%, var(--k-link));
+  }
+}
+
+.cm-line.k-codeblock-line {
+  position: relative;
+  background-color: var(--k-surface);
+  color: var(--k-text);
+  font-family: var(--k-font-mono);
+  font-size: 0.9em;
+  line-height: 1.6;
+  padding-left: 16px;
+  padding-right: 16px;
+  border-left: 1px solid var(--k-divider);
+  border-right: 1px solid var(--k-divider);
+}
+
+.cm-line.k-codeblock-fence-open {
+  border-top: 1px solid var(--k-divider);
+  border-top-left-radius: 6px;
+  border-top-right-radius: 6px;
+  padding-top: 6px;
+}
+
+.cm-line.k-codeblock-fence-close {
+  border-bottom: 1px solid var(--k-divider);
+  border-bottom-left-radius: 6px;
+  border-bottom-right-radius: 6px;
+  padding-bottom: 6px;
+}
+
+.cm-line.k-codeblock-fence-open.k-codeblock-fence-hidden {
+  min-height: 22px;
+  padding-top: 4px;
+  padding-bottom: 2px;
+}
+
+.cm-line.k-codeblock-fence-close.k-codeblock-fence-hidden {
+  min-height: 6px;
+  height: 6px;
+  padding-top: 0;
+  padding-bottom: 0;
+  overflow: hidden;
+}
+
+.k-code-lang-badge {
+  position: absolute;
+  top: 4px;
+  right: 10px;
+  font-family: var(--k-font-ui);
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--k-text-muted);
+  background-color: color-mix(in srgb, var(--k-bg) 65%, var(--k-surface));
+  border: 1px solid var(--k-divider);
+  border-radius: 4px;
+  padding: 1px 6px;
+  user-select: none;
+  pointer-events: none;
+}
+
+.cm-line.k-codeblock-line-numbered {
+  padding-left: 48px;
+}
+
+.cm-line.k-codeblock-line-numbered::before {
+  content: attr(data-line-number);
+  position: absolute;
+  left: 10px;
+  width: 26px;
+  text-align: right;
+  color: var(--k-text-muted);
+  font-family: var(--k-font-mono);
+  font-size: 0.85em;
+  user-select: none;
+  pointer-events: none;
+}
+
+/* Syntax token classes */
+.k-tok-keyword {
+  color: var(--k-syntax-keyword);
+  font-weight: 600;
+}
+
+.k-tok-string {
+  color: var(--k-syntax-string);
+}
+
+.k-tok-comment {
+  color: var(--k-syntax-comment);
+  font-style: italic;
+}
+
+.k-tok-number {
+  color: var(--k-syntax-number);
+}
+
+.k-tok-function {
+  color: var(--k-syntax-function);
+}
+
+.k-tok-type {
+  color: var(--k-syntax-type);
+}
+
+.k-tok-operator {
+  color: var(--k-syntax-operator);
+}
+
+.k-tok-property {
+  color: var(--k-syntax-property);
+}

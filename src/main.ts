@@ -202,14 +202,19 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
     return true;
   }
 
-  async function persistSourceMode(sourceMode: boolean): Promise<void> {
+  async function persistEditorSettingPatch(
+    patch: Partial<Settings>,
+  ): Promise<void> {
     currentSettings = {
       ...currentSettings,
       theme: themeMenu.getCurrentTheme(),
       sidebarVisible: sidebar.isVisible(),
       sidebarTab: sidebar.getTab(),
       lastFolder: sidebar.getCurrentFolder() ?? currentSettings.lastFolder,
-      sourceMode,
+      sourceMode: editor.isSourceMode(),
+      codeLineNumbers: editor.isCodeLineNumbers(),
+      mathAutoNumber: editor.isMathAutoNumber(),
+      ...patch,
     };
     await setSettings(currentSettings).catch(() => null);
   }
@@ -239,7 +244,13 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
       }
     },
     onSourceModeChange: (sourceMode) => {
-      void persistSourceMode(sourceMode);
+      void persistEditorSettingPatch({ sourceMode });
+    },
+    onCodeLineNumbersChange: (codeLineNumbers) => {
+      void persistEditorSettingPatch({ codeLineNumbers });
+    },
+    onMathAutoNumberChange: (mathAutoNumber) => {
+      void persistEditorSettingPatch({ mathAutoNumber });
     },
     onOpenRelativeLink: async (relativePath, slug, view) => {
       if (currentPath === null) {
@@ -258,6 +269,12 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
     ...handlers,
     onToggleSourceMode: () => {
       editor.toggleSourceMode();
+    },
+    onToggleCodeLineNumbers: () => {
+      editor.toggleCodeLineNumbers();
+    },
+    onToggleMathAutoNumber: () => {
+      editor.toggleMathAutoNumber();
     },
   };
 
@@ -470,6 +487,8 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
       currentSettings = { ...settings };
       applyTheme(settings.theme);
       editor.setSourceMode(Boolean(settings.sourceMode), false);
+      editor.setCodeLineNumbers(Boolean(settings.codeLineNumbers), false);
+      editor.setMathAutoNumber(Boolean(settings.mathAutoNumber), false);
     }
     await themeMenu.init();
     await sidebar.init();

@@ -89,6 +89,8 @@ describe("ipc in-memory mock (api.yaml contract)", () => {
       sidebarVisible: true,
       sidebarTab: "outline" as const,
       sourceMode: true,
+      codeLineNumbers: true,
+      mathAutoNumber: true,
     };
     await setSettings(updated);
     expect(await getSettings()).toEqual(updated);

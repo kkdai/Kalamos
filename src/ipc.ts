@@ -73,6 +73,8 @@ export interface Settings {
   sidebarVisible: boolean;
   sidebarTab: SidebarTab;
   sourceMode: boolean;
+  codeLineNumbers?: boolean;
+  mathAutoNumber?: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -81,6 +83,8 @@ export const DEFAULT_SETTINGS: Settings = {
   sidebarVisible: false,
   sidebarTab: "tree",
   sourceMode: false,
+  codeLineNumbers: false,
+  mathAutoNumber: false,
 };
 
 export const MAX_EXCERPT_CHARS = 120;
@@ -729,6 +733,9 @@ export async function setSettings(settings: Settings): Promise<null> {
     sidebarVisible: settings.sidebarVisible ?? DEFAULT_SETTINGS.sidebarVisible,
     sidebarTab: settings.sidebarTab ?? DEFAULT_SETTINGS.sidebarTab,
     sourceMode: settings.sourceMode ?? DEFAULT_SETTINGS.sourceMode,
+    codeLineNumbers:
+      settings.codeLineNumbers ?? DEFAULT_SETTINGS.codeLineNumbers,
+    mathAutoNumber: settings.mathAutoNumber ?? DEFAULT_SETTINGS.mathAutoNumber,
   };
   return null;
 }

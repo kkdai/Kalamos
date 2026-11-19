@@ -1,10 +1,14 @@
 import { Compartment, type Extension } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
+import { codeBlocksExtension } from "./code-blocks";
 import { livePreviewExtension } from "./live-preview";
+import { mathExtension } from "./math";
 import { tablePreviewStateField } from "./tables";
 
-const activeLivePreviewExtensions = [
-  ...livePreviewExtension,
+const richPreviewExtensions: Extension = [
+  livePreviewExtension,
+  codeBlocksExtension,
+  mathExtension,
   tablePreviewStateField,
 ];
 
@@ -29,9 +33,7 @@ export function createSourceModeController(options?: {
   ): void {
     sourceMode = enabled;
     view.dispatch({
-      effects: compartment.reconfigure(
-        enabled ? [] : activeLivePreviewExtensions,
-      ),
+      effects: compartment.reconfigure(enabled ? [] : richPreviewExtensions),
     });
     if (notify) {
       options?.onSourceModeChange?.(sourceMode);
@@ -44,7 +46,7 @@ export function createSourceModeController(options?: {
   }
 
   return {
-    extension: compartment.of(sourceMode ? [] : activeLivePreviewExtensions),
+    extension: compartment.of(sourceMode ? [] : richPreviewExtensions),
     isSourceMode: () => sourceMode,
     setSourceMode,
     toggleSourceMode,

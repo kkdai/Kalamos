@@ -23,6 +23,8 @@ export interface FileCommandHandlers {
   onSaveFileAs: () => void | Promise<void>;
   onNewFile: () => void | Promise<void>;
   onToggleSourceMode?: () => void | Promise<void>;
+  onToggleCodeLineNumbers?: () => void | Promise<void>;
+  onToggleMathAutoNumber?: () => void | Promise<void>;
 }
 
 type SymmetricMarker = "**" | "*" | "`";
@@ -302,6 +304,22 @@ export function createFileKeymap(handlers: FileCommandHandlers): KeyBinding[] {
       preventDefault: true,
       run: (view) => copyHeadingBookmark(view) !== null,
     },
+    {
+      key: "Mod-Alt-l",
+      preventDefault: true,
+      run: () => {
+        void handlers.onToggleCodeLineNumbers?.();
+        return true;
+      },
+    },
+    {
+      key: "Mod-Alt-n",
+      preventDefault: true,
+      run: () => {
+        void handlers.onToggleMathAutoNumber?.();
+        return true;
+      },
+    },
   ];
 }
 
@@ -328,9 +346,19 @@ export function bindWindowShortcuts(
       return;
     }
 
-    if (event.altKey) return;
-
     const key = event.key.toLowerCase();
+    if (event.altKey && !event.shiftKey) {
+      if (key === "l" || event.code === "KeyL") {
+        event.preventDefault();
+        void handlers.onToggleCodeLineNumbers?.();
+      } else if (key === "n" || event.code === "KeyN") {
+        event.preventDefault();
+        void handlers.onToggleMathAutoNumber?.();
+      }
+      return;
+    }
+
+    if (event.altKey) return;
     if (key === "o" && !event.shiftKey) {
       event.preventDefault();
       void handlers.onOpenFile();
