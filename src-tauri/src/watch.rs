@@ -173,6 +173,7 @@ pub fn watch_folder(
     watcher: tauri::State<'_, WatcherManager>,
     path: String,
 ) -> Result<(), AppError> {
+    let _ = crate::images::allow_dir(&app, Path::new(&path));
     watcher.watch(&path, move |payload| {
         let _ = app.emit(FS_CHANGED_EVENT, payload);
     })

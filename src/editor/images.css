@@ -1,0 +1,42 @@
+/* Inline images (IM-01) */
+
+.k-image {
+  display: inline-block;
+  max-width: 100%;
+  vertical-align: bottom;
+  cursor: pointer;
+}
+
+.k-image-img {
+  display: block;
+  max-width: min(100%, var(--k-max-width, 720px));
+  height: auto;
+  margin: 0.25em 0;
+  border-radius: 2px;
+  opacity: 1;
+  transition: opacity var(--k-transition, 180ms ease-out);
+}
+
+.k-image[data-state="loading"] .k-image-img {
+  opacity: 0;
+}
+
+.k-image-fallback,
+.k-image-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  padding: 0.15em 0.6em;
+  border: 1px dashed var(--k-divider);
+  border-radius: 4px;
+  font-family: var(--k-font-ui);
+  font-size: 0.85em;
+  line-height: 1.6;
+  color: var(--k-text-muted);
+  background-color: var(--k-surface);
+}
+
+.k-image-broken-icon {
+  flex: none;
+  stroke-width: var(--k-icon-stroke-width, 1.5px);
+}

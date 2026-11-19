@@ -1,5 +1,6 @@
-import { invoke } from "@tauri-apps/api/core";
+import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   ask as askDialog,
@@ -100,6 +101,8 @@ const mockRecovery = new Map<string, RecoveryEntry>();
 const mockCustomThemes = new Map<string, string>();
 let mockSettings: Settings = { ...DEFAULT_SETTINGS };
 let mockWatchedFolder: string | null = null;
+const mockAssetFiles = new Set<string>();
+const mockAllowedAssetDirs = new Set<string>();
 let lastMockTimestampMs = 0;
 
 type DialogOpenHandler = () => string | null | Promise<string | null>;
@@ -278,6 +281,9 @@ export function resetMockState(): void {
   mockSaveInterceptor = null;
   mockCloseListeners.clear();
   mockFsChangedListeners.clear();
+  mockAssetFiles.clear();
+  mockAllowedAssetDirs.clear();
+  mockFileDropListeners.clear();
   seedDemoFolder();
   seedDefaultCustomThemes();
 }
@@ -881,5 +887,171 @@ export async function onWindowCloseRequested(
 export async function triggerMockCloseRequested(): Promise<void> {
   for (const listener of Array.from(mockCloseListeners)) {
     await listener();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Images (IM-01 / IM-02)
+// ---------------------------------------------------------------------------
+
+export interface ImportedImage {
+  relativePath: string;
+}
+
+export const IMPORTABLE_IMAGE_EXTS = [
+  "png",
+  "jpg",
+  "jpeg",
+  "gif",
+  "webp",
+  "svg",
+] as const;
+
+export interface FileDropPayload {
+  paths: string[];
+  /** CSS pixel position relative to the webview viewport (absent: insert at the cursor). */
+  position?: { x: number; y: number };
+}
+
+type FileDropListener = (payload: FileDropPayload) => void | Promise<void>;
+const mockFileDropListeners = new Set<FileDropListener>();
+
+function dirnameOf(path: string): string {
+  const norm = normalizePath(path);
+  const idx = norm.lastIndexOf("/");
+  if (idx <= 0) return idx === 0 ? "/" : "";
+  return norm.slice(0, idx);
+}
+
+function encodeMarkdownPath(name: string): string {
+  return name.replace(/[% ()<>]/g, (ch) =>
+    `%${ch.charCodeAt(0).toString(16).toUpperCase().padStart(2, "0")}`,
+  );
+}
+
+function mockImportUnique(docPath: string, stem: string, ext: string): ImportedImage {
+  const dir = dirnameOf(docPath);
+  if (!dir) {
+    throw createAppError("InvalidPath", `Cannot resolve document folder: ${docPath}`);
+  }
+  const assetsDir = `${dir === "/" ? "" : dir}/assets`;
+  for (let n = 0; n < 10000; n++) {
+    const name = n === 0 ? `${stem}.${ext}` : `${stem}-${n}.${ext}`;
+    const full = `${assetsDir}/${name}`;
+    if (mockAssetFiles.has(full) || mockFiles.has(full)) continue;
+    mockAssetFiles.add(full);
+    mockDirs.add(assetsDir);
+    return { relativePath: `assets/${encodeMarkdownPath(name)}` };
+  }
+  throw createAppError("AlreadyExists", `Too many files named ${stem}.${ext}`);
+}
+
+function mockValidateImageExt(ext: string): string {
+  const lower = ext.trim().replace(/^\./, "").toLowerCase();
+  if (!(IMPORTABLE_IMAGE_EXTS as readonly string[]).includes(lower)) {
+    throw createAppError("InvalidPath", `Unsupported image type: .${lower}`);
+  }
+  return lower;
+}
+
+/** Copy an image into `<doc folder>/assets/` and return its Markdown relative path. */
+export async function importImage(
+  docPath: string,
+  sourcePath: string,
+): Promise<ImportedImage> {
+  if (isTauri()) {
+    return invoke<ImportedImage>("import_image", { docPath, sourcePath });
+  }
+  if (!docPath || !docPath.trim()) {
+    throw createAppError("InvalidPath", "Document must be saved before importing images");
+  }
+  const fileName = normalizePath(sourcePath).split("/").pop() ?? "";
+  const dot = fileName.lastIndexOf(".");
+  if (dot <= 0) {
+    throw createAppError("InvalidPath", `Unsupported image type: ${fileName}`);
+  }
+  const ext = mockValidateImageExt(fileName.slice(dot + 1));
+  return mockImportUnique(docPath, fileName.slice(0, dot), ext);
+}
+
+/** Store clipboard image bytes (base64) as `assets/pasted-YYYYMMDD-HHMMSS.<ext>`. */
+export async function importImageBytes(
+  docPath: string,
+  bytes: string,
+  ext: string,
+): Promise<ImportedImage> {
+  if (isTauri()) {
+    return invoke<ImportedImage>("import_image_bytes", { docPath, bytes, ext });
+  }
+  if (!docPath || !docPath.trim()) {
+    throw createAppError("InvalidPath", "Document must be saved before importing images");
+  }
+  const lower = mockValidateImageExt(ext);
+  if (!bytes) {
+    throw createAppError("Parse", "Empty image data");
+  }
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const stamp = `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+  return mockImportUnique(docPath, `pasted-${stamp}`, lower);
+}
+
+/** Allow a folder (or a file's folder) in the asset protocol scope. */
+export async function allowAssetDir(path: string): Promise<null> {
+  if (isTauri()) {
+    return invoke<null>("allow_asset_dir", { path });
+  }
+  if (!path || !path.trim()) {
+    throw createAppError("InvalidPath", "Path must not be empty");
+  }
+  const norm = normalizePath(path);
+  // Like the Rust command: a file path allows its parent folder.
+  mockAllowedAssetDirs.add(mockFiles.has(norm) ? dirnameOf(norm) : norm);
+  return null;
+}
+
+export function getMockAllowedAssetDirs(): string[] {
+  return Array.from(mockAllowedAssetDirs);
+}
+
+export function getMockAssetFiles(): string[] {
+  return Array.from(mockAssetFiles);
+}
+
+/** URL that loads a local file in the WebView (asset protocol under Tauri). */
+export function localFileUrl(path: string): string {
+  if (isTauri()) {
+    return convertFileSrc(path);
+  }
+  return `asset://localhost/${encodeURIComponent(path)}`;
+}
+
+/** Listen for files dropped onto the window (Tauri drag & drop gives real paths). */
+export async function onFileDrop(listener: FileDropListener): Promise<() => void> {
+  if (isTauri()) {
+    return getCurrentWebview().onDragDropEvent((event) => {
+      if (event.payload.type !== "drop") return;
+      const ratio =
+        typeof window !== "undefined" && window.devicePixelRatio > 0
+          ? window.devicePixelRatio
+          : 1;
+      void listener({
+        paths: event.payload.paths,
+        position: {
+          x: event.payload.position.x / ratio,
+          y: event.payload.position.y / ratio,
+        },
+      });
+    });
+  }
+  mockFileDropListeners.add(listener);
+  return () => {
+    mockFileDropListeners.delete(listener);
+  };
+}
+
+export async function triggerMockFileDrop(payload: FileDropPayload): Promise<void> {
+  for (const listener of Array.from(mockFileDropListeners)) {
+    await listener(payload);
   }
 }

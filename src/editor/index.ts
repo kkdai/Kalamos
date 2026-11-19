@@ -1,5 +1,6 @@
 import "./editor-blocks.css";
 import "./tables.css";
+import "./images.css";
 
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
@@ -7,6 +8,12 @@ import { languages } from "@codemirror/language-data";
 import { Annotation, Compartment, EditorState } from "@codemirror/state";
 import { EditorView, keymap } from "@codemirror/view";
 import { codeLineNumbersFacet } from "./code-blocks";
+import {
+  imageDocPathField,
+  imagePasteHandler,
+  type PasteImagesHandler,
+  setImageDocPathEffect,
+} from "./images";
 import { createFileKeymap, type FileCommandHandlers } from "./keymaps";
 import {
   type RelativeLinkHandler,
@@ -41,6 +48,7 @@ export interface CreateEditorOptions {
   onCodeLineNumbersChange?: (enabled: boolean) => void;
   onMathAutoNumberChange?: (enabled: boolean) => void;
   onOpenRelativeLink?: RelativeLinkHandler;
+  onPasteImages?: PasteImagesHandler;
 }
 
 export interface SetContentOptions {
@@ -64,6 +72,8 @@ export interface KalamosEditor {
   isDirty: () => boolean;
   markClean: (savedContent: string) => void;
   markDirty: () => void;
+  /** Path of the current document (null = untitled); used to resolve relative image paths. */
+  setDocumentPath: (path: string | null) => void;
   destroy: () => void;
 }
 
@@ -121,6 +131,8 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
       ...(options.onOpenRelativeLink
         ? [relativeLinkHandlerFacet.of(options.onOpenRelativeLink)]
         : []),
+      imageDocPathField,
+      ...(options.onPasteImages ? [imagePasteHandler(options.onPasteImages)] : []),
       history(),
       EditorView.lineWrapping,
       markdown({
@@ -260,6 +272,11 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
     dirty = true;
   }
 
+  function setDocumentPath(path: string | null): void {
+    if (view.state.field(imageDocPathField) === path) return;
+    view.dispatch({ effects: setImageDocPathEffect.of(path) });
+  }
+
   function destroy(): void {
     view.destroy();
   }
@@ -289,6 +306,7 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
     isDirty,
     markClean,
     markDirty,
+    setDocumentPath,
     destroy,
   };
 }
