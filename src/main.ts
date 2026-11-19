@@ -26,6 +26,7 @@ import {
   type RecoveryEntry,
   type Settings,
 } from "./ipc";
+import { createSidebar, type SidebarController } from "./sidebar/sidebar";
 
 export const NAMED_AUTOSAVE_DELAY_MS = 1000;
 export const UNTITLED_RECOVERY_INTERVAL_MS = 5000;
@@ -58,11 +59,14 @@ function formatErrorMessage(prefix: string, err: unknown): string {
 
 export interface KalamosApp {
   editor: KalamosEditor;
+  sidebar: SidebarController;
   getDocId: () => string;
   getCurrentPath: () => string | null;
   getPendingRecovery: () => RecoveryEntry | null;
   getStatusText: () => string;
   openDocument: (explicitPath?: string) => Promise<boolean>;
+  openFolder: (explicitPath?: string) => Promise<boolean>;
+  toggleSidebar: () => Promise<boolean>;
   saveDocument: () => Promise<boolean>;
   saveDocumentAs: (explicitPath?: string) => Promise<boolean>;
   newDocument: () => Promise<boolean>;
@@ -77,6 +81,14 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
   const editorContainer =
     root.querySelector<HTMLElement>("#editor-container") ??
     (root instanceof HTMLElement ? root : document.body);
+  let sidebarEl = root.querySelector<HTMLElement>("#sidebar");
+  if (!sidebarEl) {
+    sidebarEl = document.createElement("aside");
+    sidebarEl.id = "sidebar";
+    sidebarEl.dataset.testid = "sidebar";
+    sidebarEl.dataset.visible = "false";
+    editorContainer.parentElement?.insertBefore(sidebarEl, editorContainer);
+  }
   const recoveryBanner = root.querySelector<HTMLElement>("#recovery-banner");
   const restoreBtn = root.querySelector<HTMLButtonElement>("#recovery-restore-btn");
   const discardBtn = root.querySelector<HTMLButtonElement>("#recovery-discard-btn");
@@ -171,7 +183,13 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
   }
 
   async function persistSourceMode(sourceMode: boolean): Promise<void> {
-    currentSettings = { ...currentSettings, sourceMode };
+    currentSettings = {
+      ...currentSettings,
+      sidebarVisible: sidebar.isVisible(),
+      sidebarTab: sidebar.getTab(),
+      lastFolder: sidebar.getCurrentFolder() ?? currentSettings.lastFolder,
+      sourceMode,
+    };
     await setSettings(currentSettings).catch(() => null);
   }
 
@@ -217,6 +235,61 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
     () => editor.view,
   );
 
+  const sidebar = createSidebar({
+    element: sidebarEl,
+    onSelectFile: async (path) => {
+      await openDocument(path);
+    },
+    onPathRenamed: (from, to) => {
+      if (currentPath === null) return;
+      if (currentPath === from) {
+        currentPath = to;
+        sidebar.setActiveFile(currentPath);
+        if (editor.isDirty()) {
+          scheduleNamedAutosave();
+        }
+      } else if (currentPath.startsWith(`${from}/`)) {
+        currentPath = `${to}${currentPath.slice(from.length)}`;
+        sidebar.setActiveFile(currentPath);
+        if (editor.isDirty()) {
+          scheduleNamedAutosave();
+        }
+      }
+    },
+    onPathTrashed: (trashedPath) => {
+      if (currentPath === null) return;
+      if (
+        currentPath === trashedPath ||
+        currentPath.startsWith(`${trashedPath}/`)
+      ) {
+        clearAutosaveTimer();
+        currentPath = null;
+        editor.markDirty();
+        sidebar.setActiveFile(null);
+        setStatus("檔案已移到垃圾桶，內容保留為未命名文件", false);
+      }
+    },
+    onError: (prefix, err) => {
+      setStatus(formatErrorMessage(prefix, err), true);
+    },
+  });
+
+  const onSidebarKeydown = (event: KeyboardEvent) => {
+    if (event.defaultPrevented) return;
+    if (!(event.metaKey || event.ctrlKey) || !event.shiftKey || event.altKey) {
+      return;
+    }
+    const key = event.key.toLowerCase();
+    if (key === "l") {
+      event.preventDefault();
+      void sidebar.toggleVisible();
+    } else if (key === "o") {
+      event.preventDefault();
+      void sidebar.openFolder();
+    }
+  };
+  window.addEventListener("keydown", onSidebarKeydown);
+
   const recoveryInterval = setInterval(() => {
     if (currentPath === null && editor.isDirty()) {
       const content = editor.getContent();
@@ -246,6 +319,7 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
       currentPath = selectedPath;
       docId = generateDocId();
       editor.setContent(content, { dirty: false });
+      sidebar.setActiveFile(currentPath);
       setStatus("", false);
       return true;
     } catch (err) {
@@ -285,6 +359,7 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
     currentPath = null;
     docId = generateDocId();
     editor.setContent("", { dirty: false });
+    sidebar.setActiveFile(null);
     setStatus("", false);
     return true;
   }
@@ -347,6 +422,7 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
       applyTheme(settings.theme);
       editor.setSourceMode(Boolean(settings.sourceMode), false);
     }
+    await sidebar.init();
     const entries = await listRecovery().catch(() => []);
     if (entries.length > 0) {
       pendingRecovery = entries[0];
@@ -361,22 +437,27 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
     clearAutosaveTimer();
     clearInterval(recoveryInterval);
     unbindShortcuts();
+    window.removeEventListener("keydown", onSidebarKeydown);
     if (unlistenClose) {
       unlistenClose();
       unlistenClose = null;
     }
     restoreBtn?.removeEventListener("click", onRestoreClick);
     discardBtn?.removeEventListener("click", onDiscardClick);
+    sidebar.destroy();
     editor.destroy();
   }
 
   return {
     editor,
+    sidebar,
     getDocId: () => docId,
     getCurrentPath: () => currentPath,
     getPendingRecovery: () => pendingRecovery,
     getStatusText: () => statusText,
     openDocument,
+    openFolder: (explicitPath?: string) => sidebar.openFolder(explicitPath),
+    toggleSidebar: () => sidebar.toggleVisible(),
     saveDocument,
     saveDocumentAs,
     newDocument,

@@ -1,15 +1,26 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   clearRecovery,
+  createFile,
   DEFAULT_SETTINGS,
   getSettings,
+  listFiles,
   listRecovery,
+  onFsChanged,
   openFile,
+  readTree,
+  renamePath,
   resetMockState,
   saveFile,
+  seedMockDir,
+  seedMockFile,
   setSettings,
+  trashPath,
+  triggerMockFsChanged,
+  watchFolder,
   writeRecovery,
   type AppError,
+  type FsChangedPayload,
 } from "./ipc";
 
 describe("ipc in-memory mock (api.yaml contract)", () => {
@@ -78,5 +89,89 @@ describe("ipc in-memory mock (api.yaml contract)", () => {
     };
     await setSettings(updated);
     expect(await getSettings()).toEqual(updated);
+  });
+
+  it("preloads /demo folder with mixed CJK/English, H1-H6 headings, and a subfolder", async () => {
+    const tree = await readTree("/demo");
+    expect(tree.kind).toBe("dir");
+    expect(tree.path).toBe("/demo");
+    expect(tree.children).toBeDefined();
+
+    // First child is subfolder "guides", followed by markdown files
+    expect(tree.children![0].kind).toBe("dir");
+    expect(tree.children![0].name).toBe("guides");
+    expect(tree.children![0].children).toHaveLength(1);
+    expect(tree.children![0].children![0].path).toBe("/demo/guides/shortcuts.md");
+
+    const welcomeContent = await openFile("/demo/welcome.md");
+    for (const prefix of ["# ", "## ", "### ", "#### ", "##### ", "###### "]) {
+      expect(welcomeContent).toContain(prefix);
+    }
+  });
+
+  it("readTree filters hidden, .git, node_modules, non-md files and sorts dirs first then case-insensitive", async () => {
+    seedMockDir("/work/.git");
+    seedMockFile("/work/.git/config.md", "# git");
+    seedMockFile("/work/node_modules/pkg/readme.md", "# npm");
+    seedMockFile("/work/.hidden.md", "# hidden");
+    seedMockFile("/work/photo.png", "binary");
+    seedMockDir("/work/zeta");
+    seedMockDir("/work/Alpha");
+    seedMockFile("/work/Alpha/doc.MARKDOWN", "# Doc");
+    seedMockFile("/work/beta.md", "# Beta");
+    seedMockFile("/work/apple.md", "# Apple");
+    seedMockFile("/work/Banana.markdown", "# Banana");
+
+    const tree = await readTree("/work");
+    expect(tree.children?.map((c) => `${c.kind}:${c.name}`)).toEqual([
+      "dir:Alpha",
+      "dir:zeta",
+      "file:apple.md",
+      "file:Banana.markdown",
+      "file:beta.md",
+    ]);
+  });
+
+  it("listFiles sorts by mtimeMs desc and truncates excerpt to 120 chars without breaking CJK", async () => {
+    const longCjk = `\n\n  # ${"蘆葦筆莎草紙".repeat(25)}結尾`;
+    seedMockFile("/vault/older.md", "# 舊筆記\n第二行", 1000);
+    seedMockFile("/vault/sub/newer.md", longCjk, 2000);
+
+    const files = await listFiles("/vault");
+    expect(files).toHaveLength(2);
+    expect(files[0].path).toBe("/vault/sub/newer.md");
+    expect(Array.from(files[0].excerpt)).toHaveLength(120);
+    expect(files[1].path).toBe("/vault/older.md");
+    expect(files[1].excerpt).toBe("# 舊筆記");
+  });
+
+  it("supports createFile (with AlreadyExists error), renamePath, trashPath, watchFolder, and onFsChanged", async () => {
+    const created = await createFile("/demo/created.md");
+    expect(created.path).toBe("/demo/created.md");
+    expect(created.size).toBe(0);
+
+    await expect(createFile("/demo/created.md")).rejects.toMatchObject({
+      kind: "AlreadyExists",
+    } satisfies Partial<AppError>);
+
+    await renamePath("/demo/created.md", "/demo/renamed.md");
+    await expect(openFile("/demo/created.md")).rejects.toMatchObject({
+      kind: "NotFound",
+    } satisfies Partial<AppError>);
+    expect(await openFile("/demo/renamed.md")).toBe("");
+
+    await trashPath("/demo/renamed.md");
+    await expect(openFile("/demo/renamed.md")).rejects.toMatchObject({
+      kind: "NotFound",
+    } satisfies Partial<AppError>);
+
+    await watchFolder("/demo");
+    const received: FsChangedPayload[] = [];
+    const unlisten = await onFsChanged((payload) => {
+      received.push(payload);
+    });
+    await triggerMockFsChanged({ root: "/demo", paths: ["/demo/welcome.md"] });
+    expect(received).toEqual([{ root: "/demo", paths: ["/demo/welcome.md"] }]);
+    unlisten();
   });
 });
