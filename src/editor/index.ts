@@ -6,11 +6,13 @@ import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { languages } from "@codemirror/language-data";
 import { Annotation, Compartment, EditorState } from "@codemirror/state";
 import { EditorView, keymap } from "@codemirror/view";
+import { codeLineNumbersFacet } from "./code-blocks";
 import { createFileKeymap, type FileCommandHandlers } from "./keymaps";
 import {
   type RelativeLinkHandler,
   relativeLinkHandlerFacet,
 } from "./live-preview";
+import { mathAutoNumberFacet, mathMarkdownExtension } from "./math";
 import { createSourceModeController } from "./source-mode";
 
 const ExternalLoadAnnotation = Annotation.define<boolean>();
@@ -31,9 +33,13 @@ export interface CreateEditorOptions {
   parent: HTMLElement;
   initialContent?: string;
   initialSourceMode?: boolean;
+  initialCodeLineNumbers?: boolean;
+  initialMathAutoNumber?: boolean;
   handlers: FileCommandHandlers;
   onUserChange?: (content: string) => void;
   onSourceModeChange?: (sourceMode: boolean) => void;
+  onCodeLineNumbersChange?: (enabled: boolean) => void;
+  onMathAutoNumberChange?: (enabled: boolean) => void;
   onOpenRelativeLink?: RelativeLinkHandler;
 }
 
@@ -49,6 +55,12 @@ export interface KalamosEditor {
   isSourceMode: () => boolean;
   setSourceMode: (enabled: boolean, notify?: boolean) => void;
   toggleSourceMode: () => boolean;
+  isCodeLineNumbers: () => boolean;
+  setCodeLineNumbers: (enabled: boolean, notify?: boolean) => void;
+  toggleCodeLineNumbers: () => boolean;
+  isMathAutoNumber: () => boolean;
+  setMathAutoNumber: (enabled: boolean, notify?: boolean) => void;
+  toggleMathAutoNumber: () => boolean;
   isDirty: () => boolean;
   markClean: (savedContent: string) => void;
   markDirty: () => void;
@@ -64,11 +76,15 @@ export function detectLineSeparator(content: string): "\r\n" | "\n" {
 
 export function createEditor(options: CreateEditorOptions): KalamosEditor {
   const lineSeparatorCompartment = new Compartment();
+  const codeLineNumbersCompartment = new Compartment();
+  const mathAutoNumberCompartment = new Compartment();
   const initialContent = options.initialContent ?? "";
   let unmodifiedContent = initialContent;
   let savedContent: string | null = initialContent;
   let hasUserEditsSinceLoad = false;
   let dirty = false;
+  let codeLineNumbers = Boolean(options.initialCodeLineNumbers);
+  let mathAutoNumber = Boolean(options.initialMathAutoNumber);
 
   const initialSep = detectLineSeparator(initialContent);
 
@@ -83,6 +99,14 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
       toggleSourceMode();
       await options.handlers.onToggleSourceMode?.();
     },
+    onToggleCodeLineNumbers: async () => {
+      toggleCodeLineNumbers();
+      await options.handlers.onToggleCodeLineNumbers?.();
+    },
+    onToggleMathAutoNumber: async () => {
+      toggleMathAutoNumber();
+      await options.handlers.onToggleMathAutoNumber?.();
+    },
   };
 
   const state = EditorState.create({
@@ -92,6 +116,8 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
       lineSeparatorCompartment.of(
         initialSep === "\r\n" ? EditorState.lineSeparator.of("\r\n") : [],
       ),
+      codeLineNumbersCompartment.of(codeLineNumbersFacet.of(codeLineNumbers)),
+      mathAutoNumberCompartment.of(mathAutoNumberFacet.of(mathAutoNumber)),
       ...(options.onOpenRelativeLink
         ? [relativeLinkHandlerFacet.of(options.onOpenRelativeLink)]
         : []),
@@ -101,6 +127,7 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
         base: markdownLanguage,
         codeLanguages: languages,
         addKeymap: false,
+        extensions: [mathMarkdownExtension],
       }),
       sourceModeController.extension,
       keymap.of([
@@ -173,6 +200,48 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
     return sourceModeController.toggleSourceMode(view);
   }
 
+  function isCodeLineNumbers(): boolean {
+    return codeLineNumbers;
+  }
+
+  function setCodeLineNumbers(enabled: boolean, notify = false): void {
+    codeLineNumbers = enabled;
+    view.dispatch({
+      effects: codeLineNumbersCompartment.reconfigure(
+        codeLineNumbersFacet.of(codeLineNumbers),
+      ),
+    });
+    if (notify) {
+      options.onCodeLineNumbersChange?.(codeLineNumbers);
+    }
+  }
+
+  function toggleCodeLineNumbers(): boolean {
+    setCodeLineNumbers(!codeLineNumbers, true);
+    return codeLineNumbers;
+  }
+
+  function isMathAutoNumber(): boolean {
+    return mathAutoNumber;
+  }
+
+  function setMathAutoNumber(enabled: boolean, notify = false): void {
+    mathAutoNumber = enabled;
+    view.dispatch({
+      effects: mathAutoNumberCompartment.reconfigure(
+        mathAutoNumberFacet.of(mathAutoNumber),
+      ),
+    });
+    if (notify) {
+      options.onMathAutoNumberChange?.(mathAutoNumber);
+    }
+  }
+
+  function toggleMathAutoNumber(): boolean {
+    setMathAutoNumber(!mathAutoNumber, true);
+    return mathAutoNumber;
+  }
+
   function isDirty(): boolean {
     return dirty;
   }
@@ -211,6 +280,12 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
     isSourceMode,
     setSourceMode,
     toggleSourceMode,
+    isCodeLineNumbers,
+    setCodeLineNumbers,
+    toggleCodeLineNumbers,
+    isMathAutoNumber,
+    setMathAutoNumber,
+    toggleMathAutoNumber,
     isDirty,
     markClean,
     markDirty,

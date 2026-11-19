@@ -24,6 +24,8 @@ pub struct Settings {
     pub sidebar_visible: bool,
     pub sidebar_tab: SidebarTab,
     pub source_mode: bool,
+    pub code_line_numbers: bool,
+    pub math_auto_number: bool,
 }
 
 impl Default for Settings {
@@ -34,6 +36,8 @@ impl Default for Settings {
             sidebar_visible: false,
             sidebar_tab: SidebarTab::Tree,
             source_mode: false,
+            code_line_numbers: false,
+            math_auto_number: false,
         }
     }
 }
@@ -105,6 +109,8 @@ mod tests {
         assert_eq!(v["sidebarVisible"], false);
         assert_eq!(v["sidebarTab"], "tree");
         assert_eq!(v["sourceMode"], false);
+        assert_eq!(v["codeLineNumbers"], false);
+        assert_eq!(v["mathAutoNumber"], false);
     }
 
     #[test]
@@ -116,10 +122,35 @@ mod tests {
             sidebar_visible: true,
             sidebar_tab: SidebarTab::Outline,
             source_mode: true,
+            code_line_numbers: true,
+            math_auto_number: true,
         };
         set_settings_in(dir.path(), &updated).expect("set_settings");
         let loaded = get_settings_in(dir.path()).expect("get_settings");
         assert_eq!(loaded, updated);
+    }
+
+    #[test]
+    fn reads_legacy_settings_json_without_new_fields() {
+        let dir = tempdir().expect("tempdir");
+        let settings_path = dir.path().join("settings.json");
+        let legacy_json = r#"{
+            "theme": "papyros",
+            "lastFolder": "/demo",
+            "sidebarVisible": true,
+            "sidebarTab": "list",
+            "sourceMode": false
+        }"#;
+        fs::write(&settings_path, legacy_json).expect("write legacy settings.json");
+
+        let loaded = get_settings_in(dir.path()).expect("load legacy settings");
+        assert_eq!(loaded.theme, "papyros");
+        assert_eq!(loaded.last_folder.as_deref(), Some("/demo"));
+        assert!(loaded.sidebar_visible);
+        assert_eq!(loaded.sidebar_tab, SidebarTab::List);
+        assert!(!loaded.source_mode);
+        assert!(!loaded.code_line_numbers);
+        assert!(!loaded.math_auto_number);
     }
 
     #[test]

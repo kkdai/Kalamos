@@ -181,6 +181,8 @@ components:
         sidebarVisible: { type: boolean, default: false }
         sidebarTab: { type: string, enum: [tree, list, outline], default: tree }
         sourceMode: { type: boolean, default: false }
+        codeLineNumbers: { type: boolean, default: false }
+        mathAutoNumber: { type: boolean, default: false }
     ThemeInfo:
       type: object
       required: [id, name, builtin]
