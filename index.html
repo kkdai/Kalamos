@@ -56,9 +56,18 @@
         height: 100%;
         overflow-y: auto;
       }
-      #status {
+      #statusbar {
         flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding-right: 8px;
+      }
+      #status {
+        flex: 1;
+        min-width: 0;
         min-height: 24px;
+        box-sizing: border-box;
         padding: 4px 16px;
         font-family: var(--k-font-ui, sans-serif);
         font-size: 12px;
@@ -81,7 +90,9 @@
       </div>
       <aside id="sidebar" data-testid="sidebar" data-visible="false" aria-label="Sidebar"></aside>
       <main id="editor-container" aria-label="Markdown Editor"></main>
-      <div id="status" data-testid="status" role="status" aria-live="polite"></div>
+      <footer id="statusbar">
+        <div id="status" data-testid="status" role="status" aria-live="polite"></div>
+      </footer>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
