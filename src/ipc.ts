@@ -52,6 +52,12 @@ export interface FsChangedPayload {
   paths: string[];
 }
 
+export interface ThemeInfo {
+  id: string;
+  name: string;
+  builtin: boolean;
+}
+
 export interface RecoveryEntry {
   docId: string;
   path: string | null;
@@ -87,6 +93,7 @@ interface MockFileRecord {
 const mockFiles = new Map<string, MockFileRecord>();
 const mockDirs = new Set<string>();
 const mockRecovery = new Map<string, RecoveryEntry>();
+const mockCustomThemes = new Map<string, string>();
 let mockSettings: Settings = { ...DEFAULT_SETTINGS };
 let mockWatchedFolder: string | null = null;
 let lastMockTimestampMs = 0;
@@ -232,10 +239,30 @@ function seedDemoFolder(): void {
   );
 }
 
+function seedDefaultCustomThemes(): void {
+  mockCustomThemes.set(
+    "night",
+    [
+      "/* Demo Custom Theme: night */",
+      ":root[data-custom-theme] {",
+      "  color-scheme: dark;",
+      "  --k-bg: #141820;",
+      "  --k-surface: #1c222d;",
+      "  --k-text: #dce3ee;",
+      "  --k-text-muted: #8b96a8;",
+      "  --k-accent: #7aa2f7;",
+      "  --k-link: #e0af68;",
+      "  --k-divider: #2b3344;",
+      "}",
+    ].join("\n"),
+  );
+}
+
 export function resetMockState(): void {
   mockFiles.clear();
   mockDirs.clear();
   mockRecovery.clear();
+  mockCustomThemes.clear();
   mockSettings = { ...DEFAULT_SETTINGS };
   mockWatchedFolder = null;
   lastMockTimestampMs = 0;
@@ -248,6 +275,7 @@ export function resetMockState(): void {
   mockCloseListeners.clear();
   mockFsChangedListeners.clear();
   seedDemoFolder();
+  seedDefaultCustomThemes();
 }
 
 export function setMockDialogHandlers(handlers: {
@@ -304,8 +332,15 @@ export function getMockWatchedFolder(): string | null {
   return mockWatchedFolder;
 }
 
-// Preload /demo folder when module initializes
+export function seedMockCustomTheme(stem: string, css: string): void {
+  const trimmed = stem.trim();
+  if (!trimmed) return;
+  mockCustomThemes.set(trimmed, css);
+}
+
+// Preload /demo folder and default custom themes when module initializes
 seedDemoFolder();
+seedDefaultCustomThemes();
 
 export async function openFile(path: string): Promise<string> {
   if (isTauri()) {
@@ -696,6 +731,56 @@ export async function setSettings(settings: Settings): Promise<null> {
     sourceMode: settings.sourceMode ?? DEFAULT_SETTINGS.sourceMode,
   };
   return null;
+}
+
+function isValidThemeStem(stem: string): boolean {
+  return (
+    stem.length > 0 &&
+    stem === stem.trim() &&
+    !stem.startsWith(".") &&
+    !stem.includes("/") &&
+    !stem.includes("\\") &&
+    !stem.includes("..") &&
+    !stem.includes("\0") &&
+    !stem.includes(":")
+  );
+}
+
+export async function listThemes(): Promise<ThemeInfo[]> {
+  if (isTauri()) {
+    return invoke<ThemeInfo[]>("list_themes");
+  }
+  const builtins: ThemeInfo[] = [
+    { id: "papyros", name: "Papyros", builtin: true },
+    { id: "melan", name: "Melan", builtin: true },
+  ];
+  const customs: ThemeInfo[] = Array.from(mockCustomThemes.keys())
+    .filter((stem) => isValidThemeStem(stem))
+    .sort((a, b) => compareNamesCaseInsensitive(a, b))
+    .map((stem) => ({
+      id: `custom:${stem}`,
+      name: stem,
+      builtin: false,
+    }));
+  return [...builtins, ...customs];
+}
+
+export async function readThemeCss(id: string): Promise<string> {
+  if (isTauri()) {
+    return invoke<string>("read_theme_css", { id });
+  }
+  if (!id || !id.startsWith("custom:")) {
+    throw createAppError("InvalidPath", `Theme id must start with 'custom:': ${id}`);
+  }
+  const stem = id.slice("custom:".length);
+  if (!isValidThemeStem(stem)) {
+    throw createAppError("InvalidPath", `Invalid custom theme id: ${id}`);
+  }
+  const css = mockCustomThemes.get(stem);
+  if (css === undefined) {
+    throw createAppError("NotFound", `Custom theme not found: ${id}`);
+  }
+  return css;
 }
 
 export async function pickOpenFilePath(): Promise<string | null> {

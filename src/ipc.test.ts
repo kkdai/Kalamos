@@ -6,12 +6,15 @@ import {
   getSettings,
   listFiles,
   listRecovery,
+  listThemes,
   onFsChanged,
   openFile,
+  readThemeCss,
   readTree,
   renamePath,
   resetMockState,
   saveFile,
+  seedMockCustomTheme,
   seedMockDir,
   seedMockFile,
   setSettings,
@@ -173,5 +176,36 @@ describe("ipc in-memory mock (api.yaml contract)", () => {
     await triggerMockFsChanged({ root: "/demo", paths: ["/demo/welcome.md"] });
     expect(received).toEqual([{ root: "/demo", paths: ["/demo/welcome.md"] }]);
     unlisten();
+  });
+
+  it("lists built-in and custom themes and reads custom theme CSS with path validation", async () => {
+    const themes = await listThemes();
+    expect(themes).toEqual([
+      { id: "papyros", name: "Papyros", builtin: true },
+      { id: "melan", name: "Melan", builtin: true },
+      { id: "custom:night", name: "night", builtin: false },
+    ]);
+
+    const nightCss = await readThemeCss("custom:night");
+    expect(nightCss).toContain("--k-bg");
+
+    seedMockCustomTheme("amber", ":root { --k-accent: #d98a63; }");
+    const updatedThemes = await listThemes();
+    expect(updatedThemes.map((t) => t.id)).toEqual([
+      "papyros",
+      "melan",
+      "custom:amber",
+      "custom:night",
+    ]);
+
+    await expect(readThemeCss("papyros")).rejects.toMatchObject({
+      kind: "InvalidPath",
+    } satisfies Partial<AppError>);
+    await expect(readThemeCss("custom:../escape")).rejects.toMatchObject({
+      kind: "InvalidPath",
+    } satisfies Partial<AppError>);
+    await expect(readThemeCss("custom:missing")).rejects.toMatchObject({
+      kind: "NotFound",
+    } satisfies Partial<AppError>);
   });
 });

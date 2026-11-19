@@ -1,4 +1,5 @@
 import "./sidebar.css";
+import type { EditorView } from "@codemirror/view";
 import {
   createFile,
   getSettings,
@@ -20,6 +21,7 @@ import {
 } from "../ipc";
 import { createFileList, type FileListView } from "./file-list";
 import { createFileTree, type FileTreeView } from "./file-tree";
+import { createOutline, type OutlineView } from "./outline";
 
 export interface SidebarTabDescriptor {
   id: SidebarTab;
@@ -30,6 +32,7 @@ export interface SidebarTabDescriptor {
 
 export interface CreateSidebarOptions {
   element: HTMLElement;
+  editorView?: EditorView | null;
   onSelectFile: (path: string) => void | Promise<void>;
   onPathRenamed?: (fromPath: string, toPath: string) => void | Promise<void>;
   onPathTrashed?: (trashedPath: string) => void | Promise<void>;
@@ -40,6 +43,8 @@ export interface SidebarController {
   element: HTMLElement;
   fileTree: FileTreeView;
   fileList: FileListView;
+  outline: OutlineView;
+  attachEditorView: (view: EditorView) => void;
   isVisible: () => boolean;
   setVisible: (visible: boolean, persist?: boolean) => Promise<void>;
   toggleVisible: () => Promise<boolean>;
@@ -121,6 +126,7 @@ export function createSidebar(options: CreateSidebarOptions): SidebarController 
   const tabs: SidebarTabDescriptor[] = [
     { id: "tree", label: "檔案樹", testId: "sidebar-tab-tree" },
     { id: "list", label: "檔案列表", testId: "sidebar-tab-list" },
+    { id: "outline", label: "大綱", testId: "sidebar-tab-outline" },
   ];
 
   // Build Sidebar DOM structure
@@ -224,8 +230,13 @@ export function createSidebar(options: CreateSidebarOptions): SidebarController 
     },
   });
 
+  const outline = createOutline({
+    container: bodyEl,
+    view: options.editorView ?? null,
+  });
+
   bodyEl.addEventListener("contextmenu", (e) => {
-    if (e.defaultPrevented || !currentFolder) return;
+    if (e.defaultPrevented || !currentFolder || currentTab === "outline") return;
     e.preventDefault();
     openContextMenu(e, { path: currentFolder, kind: "dir" });
   });
@@ -251,17 +262,23 @@ export function createSidebar(options: CreateSidebarOptions): SidebarController 
   function renderActiveTabView(): void {
     renderTabsHeader();
     if (currentTab === "tree") {
+      outline.setActiveMount(false);
       fileTree.render(currentTree, activeFilePath);
     } else if (currentTab === "list") {
+      outline.setActiveMount(false);
       fileList.render(currentFiles, activeFilePath);
-    } else {
-      const customTab = tabs.find((t) => t.id === currentTab);
+    } else if (currentTab === "outline") {
+      const customTab = tabs.find((t) => t.id === "outline");
       if (customTab?.render) {
+        outline.setActiveMount(false);
         bodyEl.innerHTML = "";
         customTab.render(bodyEl);
       } else {
-        fileTree.render(currentTree, activeFilePath);
+        outline.setActiveMount(true);
       }
+    } else {
+      outline.setActiveMount(false);
+      fileTree.render(currentTree, activeFilePath);
     }
   }
 
@@ -566,6 +583,10 @@ export function createSidebar(options: CreateSidebarOptions): SidebarController 
     }
   }
 
+  function attachEditorView(view: EditorView): void {
+    outline.attachView(view);
+  }
+
   function registerTab(descriptor: SidebarTabDescriptor): void {
     const existingIdx = tabs.findIndex((t) => t.id === descriptor.id);
     if (existingIdx >= 0) {
@@ -601,6 +622,7 @@ export function createSidebar(options: CreateSidebarOptions): SidebarController 
     }
     document.removeEventListener("click", onDocumentClick);
     document.removeEventListener("keydown", onDocumentKeydown);
+    outline.destroy();
     fileTree.destroy();
     fileList.destroy();
     element.innerHTML = "";
@@ -612,6 +634,8 @@ export function createSidebar(options: CreateSidebarOptions): SidebarController 
     element,
     fileTree,
     fileList,
+    outline,
+    attachEditorView,
     isVisible: () => visible,
     setVisible,
     toggleVisible,
