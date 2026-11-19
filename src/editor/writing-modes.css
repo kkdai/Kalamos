@@ -1,0 +1,18 @@
+/* WM-01 Ataraxia / WM-02 Stichos (theme tokens only). */
+:root {
+  --k-focus-dim-opacity: 0.3;
+}
+
+.k-focus-mode .cm-content > * {
+  transition: opacity var(--k-transition, 180ms ease-out);
+}
+
+.k-focus-mode .cm-content > .k-focus-dim {
+  opacity: var(--k-focus-dim-opacity);
+}
+
+/* Room above the first and below the last line so both can be centred. */
+.k-typewriter-mode .cm-content {
+  padding-top: calc(50vh - 2em);
+  padding-bottom: calc(50vh - 2em);
+}

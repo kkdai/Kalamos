@@ -24,6 +24,7 @@ import {
   readFileAsBase64,
 } from "./editor/images";
 import { bindWindowShortcuts } from "./editor/keymaps";
+import { FOCUS_MODE_MESSAGE, TYPEWRITER_MODE_MESSAGE } from "./editor/writing-modes";
 import { createWordCounter, type WordCounter } from "./editor/word-count-view";
 import {
   jumpToHeadingSlug,
@@ -268,6 +269,8 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
       codeLineNumbers: editor.isCodeLineNumbers(),
       mathAutoNumber: editor.isMathAutoNumber(),
       imageRootDir: editor.getImageRootDir(),
+      focusMode: editor.isFocusMode(),
+      typewriterMode: editor.isTypewriterMode(),
       ...patch,
     };
     await setSettings(currentSettings).catch(() => null);
@@ -306,6 +309,14 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
     onMathAutoNumberChange: (mathAutoNumber) => {
       void persistEditorSettingPatch({ mathAutoNumber });
     },
+    onFocusModeChange: (focusMode) => {
+      setStatus(FOCUS_MODE_MESSAGE(focusMode), false);
+      void persistEditorSettingPatch({ focusMode });
+    },
+    onTypewriterModeChange: (typewriterMode) => {
+      setStatus(TYPEWRITER_MODE_MESSAGE(typewriterMode), false);
+      void persistEditorSettingPatch({ typewriterMode });
+    },
     onOpenRelativeLink: async (relativePath, slug, view) => {
       if (currentPath === null) {
         setStatus("請先儲存目前文件，才能開啟相對路徑連結", true);
@@ -335,6 +346,12 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
     },
     onToggleMathAutoNumber: () => {
       editor.toggleMathAutoNumber();
+    },
+    onToggleFocusMode: () => {
+      editor.toggleFocusMode();
+    },
+    onToggleTypewriterMode: () => {
+      editor.toggleTypewriterMode();
     },
   };
 
@@ -731,6 +748,8 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
       editor.setCodeLineNumbers(Boolean(settings.codeLineNumbers), false);
       editor.setMathAutoNumber(Boolean(settings.mathAutoNumber), false);
       editor.setImageRootDir(settings.imageRootDir ?? null);
+      editor.setFocusMode(Boolean(settings.focusMode), false);
+      editor.setTypewriterMode(Boolean(settings.typewriterMode), false);
     }
     await themeMenu.init();
     await sidebar.init();

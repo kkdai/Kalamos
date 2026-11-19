@@ -25,6 +25,8 @@ export interface FileCommandHandlers {
   onToggleSourceMode?: () => void | Promise<void>;
   onToggleCodeLineNumbers?: () => void | Promise<void>;
   onToggleMathAutoNumber?: () => void | Promise<void>;
+  onToggleFocusMode?: () => void | Promise<void>;
+  onToggleTypewriterMode?: () => void | Promise<void>;
 }
 
 type SymmetricMarker = "**" | "*" | "`";
@@ -320,6 +322,22 @@ export function createFileKeymap(handlers: FileCommandHandlers): KeyBinding[] {
         return true;
       },
     },
+    {
+      key: "F8",
+      preventDefault: true,
+      run: () => {
+        void handlers.onToggleFocusMode?.();
+        return true;
+      },
+    },
+    {
+      key: "F9",
+      preventDefault: true,
+      run: () => {
+        void handlers.onToggleTypewriterMode?.();
+        return true;
+      },
+    },
   ];
 }
 
@@ -331,6 +349,17 @@ export function bindWindowShortcuts(
   const listener = (rawEvent: Event) => {
     const event = rawEvent as KeyboardEvent;
     if (event.defaultPrevented) return;
+    const noModifiers = !event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey;
+    if (noModifiers && event.key === "F8") {
+      event.preventDefault();
+      void handlers.onToggleFocusMode?.();
+      return;
+    }
+    if (noModifiers && event.key === "F9") {
+      event.preventDefault();
+      void handlers.onToggleTypewriterMode?.();
+      return;
+    }
     if (!(event.metaKey || event.ctrlKey)) return;
 
     if (

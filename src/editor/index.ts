@@ -28,6 +28,7 @@ import { footnoteExtension } from "./footnotes";
 import { frontMatterExtension } from "./front-matter";
 import { mathAutoNumberFacet, mathMarkdownExtension } from "./math";
 import { createSourceModeController } from "./source-mode";
+import { focusModeExtension, typewriterModeExtension } from "./writing-modes";
 
 const ExternalLoadAnnotation = Annotation.define<boolean>();
 
@@ -49,11 +50,15 @@ export interface CreateEditorOptions {
   initialSourceMode?: boolean;
   initialCodeLineNumbers?: boolean;
   initialMathAutoNumber?: boolean;
+  initialFocusMode?: boolean;
+  initialTypewriterMode?: boolean;
   handlers: FileCommandHandlers;
   onUserChange?: (content: string) => void;
   onSourceModeChange?: (sourceMode: boolean) => void;
   onCodeLineNumbersChange?: (enabled: boolean) => void;
   onMathAutoNumberChange?: (enabled: boolean) => void;
+  onFocusModeChange?: (enabled: boolean) => void;
+  onTypewriterModeChange?: (enabled: boolean) => void;
   onOpenRelativeLink?: RelativeLinkHandler;
   onPasteImages?: PasteImagesHandler;
   /** IM-04: the image root (setting or front matter) was refused as too broad. */
@@ -78,6 +83,14 @@ export interface KalamosEditor {
   isMathAutoNumber: () => boolean;
   setMathAutoNumber: (enabled: boolean, notify?: boolean) => void;
   toggleMathAutoNumber: () => boolean;
+  /** WM-01 Ataraxia focus mode. */
+  isFocusMode: () => boolean;
+  setFocusMode: (enabled: boolean, notify?: boolean) => void;
+  toggleFocusMode: () => boolean;
+  /** WM-02 Stichos typewriter mode. */
+  isTypewriterMode: () => boolean;
+  setTypewriterMode: (enabled: boolean, notify?: boolean) => void;
+  toggleTypewriterMode: () => boolean;
   isDirty: () => boolean;
   markClean: (savedContent: string) => void;
   markDirty: () => void;
@@ -100,6 +113,8 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
   const lineSeparatorCompartment = new Compartment();
   const codeLineNumbersCompartment = new Compartment();
   const mathAutoNumberCompartment = new Compartment();
+  const focusModeCompartment = new Compartment();
+  const typewriterModeCompartment = new Compartment();
   const initialContent = options.initialContent ?? "";
   let unmodifiedContent = initialContent;
   let savedContent: string | null = initialContent;
@@ -107,6 +122,8 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
   let dirty = false;
   let codeLineNumbers = Boolean(options.initialCodeLineNumbers);
   let mathAutoNumber = Boolean(options.initialMathAutoNumber);
+  let focusMode = Boolean(options.initialFocusMode);
+  let typewriterMode = Boolean(options.initialTypewriterMode);
 
   const initialSep = detectLineSeparator(initialContent);
 
@@ -129,6 +146,14 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
       toggleMathAutoNumber();
       await options.handlers.onToggleMathAutoNumber?.();
     },
+    onToggleFocusMode: async () => {
+      toggleFocusMode();
+      await options.handlers.onToggleFocusMode?.();
+    },
+    onToggleTypewriterMode: async () => {
+      toggleTypewriterMode();
+      await options.handlers.onToggleTypewriterMode?.();
+    },
   };
 
   const state = EditorState.create({
@@ -140,6 +165,8 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
       ),
       codeLineNumbersCompartment.of(codeLineNumbersFacet.of(codeLineNumbers)),
       mathAutoNumberCompartment.of(mathAutoNumberFacet.of(mathAutoNumber)),
+      focusModeCompartment.of(focusMode ? focusModeExtension : []),
+      typewriterModeCompartment.of(typewriterMode ? typewriterModeExtension : []),
       ...(options.onOpenRelativeLink
         ? [relativeLinkHandlerFacet.of(options.onOpenRelativeLink)]
         : []),
@@ -270,6 +297,49 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
     return mathAutoNumber;
   }
 
+  function isFocusMode(): boolean {
+    return focusMode;
+  }
+
+  function setFocusMode(enabled: boolean, notify = false): void {
+    focusMode = enabled;
+    view.dispatch({
+      effects: focusModeCompartment.reconfigure(focusMode ? focusModeExtension : []),
+    });
+    if (notify) {
+      options.onFocusModeChange?.(focusMode);
+    }
+  }
+
+  function toggleFocusMode(): boolean {
+    setFocusMode(!focusMode, true);
+    return focusMode;
+  }
+
+  function isTypewriterMode(): boolean {
+    return typewriterMode;
+  }
+
+  function setTypewriterMode(enabled: boolean, notify = false): void {
+    typewriterMode = enabled;
+    view.dispatch({
+      effects: [
+        typewriterModeCompartment.reconfigure(typewriterMode ? typewriterModeExtension : []),
+        ...(typewriterMode
+          ? [EditorView.scrollIntoView(view.state.selection.main.head, { y: "center" })]
+          : []),
+      ],
+    });
+    if (notify) {
+      options.onTypewriterModeChange?.(typewriterMode);
+    }
+  }
+
+  function toggleTypewriterMode(): boolean {
+    setTypewriterMode(!typewriterMode, true);
+    return typewriterMode;
+  }
+
   function isDirty(): boolean {
     return dirty;
   }
@@ -328,6 +398,12 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
     isMathAutoNumber,
     setMathAutoNumber,
     toggleMathAutoNumber,
+    isFocusMode,
+    setFocusMode,
+    toggleFocusMode,
+    isTypewriterMode,
+    setTypewriterMode,
+    toggleTypewriterMode,
     isDirty,
     markClean,
     markDirty,

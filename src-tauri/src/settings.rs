@@ -28,6 +28,10 @@ pub struct Settings {
     pub math_auto_number: bool,
     /// IM-04: folder that `/`-rooted image paths resolve against.
     pub image_root_dir: Option<String>,
+    /// WM-01 Ataraxia focus mode (F8).
+    pub focus_mode: bool,
+    /// WM-02 Stichos typewriter mode (F9).
+    pub typewriter_mode: bool,
 }
 
 impl Default for Settings {
@@ -41,6 +45,8 @@ impl Default for Settings {
             code_line_numbers: false,
             math_auto_number: false,
             image_root_dir: None,
+            focus_mode: false,
+            typewriter_mode: false,
         }
     }
 }
@@ -115,6 +121,8 @@ mod tests {
         assert_eq!(v["codeLineNumbers"], false);
         assert_eq!(v["mathAutoNumber"], false);
         assert!(v["imageRootDir"].is_null());
+        assert_eq!(v["focusMode"], false);
+        assert_eq!(v["typewriterMode"], false);
     }
 
     #[test]
@@ -129,6 +137,8 @@ mod tests {
             code_line_numbers: true,
             math_auto_number: true,
             image_root_dir: Some("/tmp/kalamos-test/blog".to_string()),
+            focus_mode: true,
+            typewriter_mode: true,
         };
         set_settings_in(dir.path(), &updated).expect("set_settings");
         let loaded = get_settings_in(dir.path()).expect("get_settings");
@@ -157,6 +167,8 @@ mod tests {
         assert!(!loaded.code_line_numbers);
         assert!(!loaded.math_auto_number);
         assert_eq!(loaded.image_root_dir, None);
+        assert!(!loaded.focus_mode);
+        assert!(!loaded.typewriter_mode);
     }
 
     #[test]
@@ -181,6 +193,35 @@ mod tests {
 
         let v = serde_json::to_value(&loaded).unwrap();
         assert_eq!(v["imageRootDir"], "/Users/me/blog");
+    }
+
+    #[test]
+    fn reads_settings_without_writing_mode_keys_and_round_trips_them() {
+        let dir = tempdir().expect("tempdir");
+        let settings_path = dir.path().join("settings.json");
+        // A settings file written before WM-01 / WM-02 existed.
+        let previous_json = r#"{
+            "theme": "melan",
+            "lastFolder": "/tmp/kalamos-test/notes",
+            "sidebarVisible": false,
+            "sidebarTab": "outline",
+            "sourceMode": true,
+            "codeLineNumbers": true,
+            "mathAutoNumber": true
+        }"#;
+        fs::write(&settings_path, previous_json).expect("write settings.json");
+        let mut loaded = get_settings_in(dir.path()).expect("load settings");
+        assert!(loaded.source_mode && loaded.code_line_numbers && loaded.math_auto_number);
+        assert!(!loaded.focus_mode);
+        assert!(!loaded.typewriter_mode);
+
+        loaded.focus_mode = true;
+        set_settings_in(dir.path(), &loaded).expect("save settings");
+        let raw: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(&settings_path).unwrap()).unwrap();
+        assert_eq!(raw["focusMode"], true);
+        assert_eq!(raw["typewriterMode"], false);
+        assert_eq!(get_settings_in(dir.path()).unwrap(), loaded);
     }
 
     #[test]
