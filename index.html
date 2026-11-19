@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Kalamos</title>
+    <style>
+      *, *::before, *::after {
+        box-sizing: border-box;
+      }
+      html, body, #app {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        width: 100%;
+      }
+      #app {
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+      }
+      #recovery-banner {
+        display: none;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 8px 16px;
+        border-bottom: 1px solid #d9cdb3;
+        font-size: 14px;
+      }
+      #recovery-banner[data-visible="true"] {
+        display: flex;
+      }
+      #recovery-actions {
+        display: flex;
+        gap: 8px;
+      }
+      #editor-container {
+        flex: 1;
+        overflow: auto;
+      }
+      #status {
+        min-height: 24px;
+        padding: 4px 16px;
+        font-size: 12px;
+        border-top: 1px solid transparent;
+      }
+      #status[data-error="true"] {
+        border-top-color: #d9cdb3;
+        color: #a4552f;
+      }
+      .cm-editor {
+        height: 100%;
+        max-width: 720px;
+        margin: 0 auto;
+        font-size: 17px;
+        line-height: 1.75;
+      }
+      .cm-scroller {
+        overflow: auto;
+      }
+      .cm-content {
+        padding: 32px 24px;
+      }
+      .cm-editor.cm-focused {
+        outline: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div id="recovery-banner" role="alert" data-visible="false">
+        <span id="recovery-message">偵測到上次未儲存的內容，是否還原？</span>
+        <div id="recovery-actions">
+          <button type="button" id="recovery-restore-btn">還原</button>
+          <button type="button" id="recovery-discard-btn">捨棄</button>
+        </div>
+      </div>
+      <main id="editor-container" aria-label="Markdown Editor"></main>
+      <div id="status" data-testid="status" role="status" aria-live="polite"></div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
