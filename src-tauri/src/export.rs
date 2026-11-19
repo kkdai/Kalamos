@@ -84,6 +84,14 @@ pub fn search_needles(text: &str) -> Vec<String> {
     needles
 }
 
+/// Is text whose vertical centre is `center_from_top` points below the page
+/// top inside the printed area? WebKit also draws a clipped copy of a block
+/// that straddles a page break into the previous page's bottom margin; that
+/// copy is invisible but still in the text layer, so bookmarks must skip it.
+pub fn in_printable_area(center_from_top: f64, page_height: f64) -> bool {
+    center_from_top >= MARGIN_TOP_PT && center_from_top <= page_height - MARGIN_BOTTOM_PT
+}
+
 /// First hit at or after `cursor` in reading order.
 fn first_hit_after(hits: &[TextHit], cursor: TextHit) -> Option<TextHit> {
     let mut sorted: Vec<TextHit> = hits.to_vec();
@@ -710,6 +718,9 @@ mod imp {
                 let bounds = unsafe { selection.boundsForPage(&page.page) };
                 let (origin_y, height) = page_height(&page.page);
                 let top = origin_y + height - (bounds.origin.y + bounds.size.height);
+                if !in_printable_area(top + bounds.size.height / 2.0, height) {
+                    continue;
+                }
                 hits.push(TextHit { page: index, top });
             }
         }
@@ -963,6 +974,16 @@ mod tests {
         // Astral chars count as two UTF-16 units.
         let emoji = fold_text("😀 Title", &mut nfkc);
         assert_eq!(emoji.find_utf16(&fold_text("title", &mut nfkc)), vec![(3, 8)]);
+    }
+
+    #[test]
+    fn hits_inside_the_page_margins_are_ignored() {
+        // A4: the clipped copy of a heading at the bottom margin (centre ~38 pt
+        // above the page bottom) is not a real occurrence; the body area is.
+        assert!(!in_printable_area(A4_HEIGHT_PT - 38.0, A4_HEIGHT_PT));
+        assert!(!in_printable_area(20.0, A4_HEIGHT_PT));
+        assert!(in_printable_area(MARGIN_TOP_PT + 10.0, A4_HEIGHT_PT));
+        assert!(in_printable_area(A4_HEIGHT_PT - MARGIN_BOTTOM_PT - 10.0, A4_HEIGHT_PT));
     }
 
     #[test]
