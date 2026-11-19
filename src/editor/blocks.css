@@ -1,0 +1,161 @@
+/*
+ * ED-06 / ED-07: blockquote, horizontal rule, YAML front matter, footnotes, [TOC].
+ * Colors come only from theme tokens (--k-*).
+ */
+
+/* Blockquote: one left border per nesting level */
+.cm-line.k-quote-line {
+  color: var(--k-text-muted);
+  --k-quote-bar: 3px;
+  --k-quote-gap: 12px;
+}
+
+.cm-line.k-quote-depth-1 {
+  padding-left: calc(var(--k-quote-gap) + 4px);
+  background: linear-gradient(to right, var(--k-accent) var(--k-quote-bar), transparent 0) no-repeat;
+}
+
+.cm-line.k-quote-depth-2 {
+  padding-left: calc(2 * var(--k-quote-gap) + 4px);
+  background:
+    linear-gradient(to right, var(--k-accent) var(--k-quote-bar), transparent 0) no-repeat 0 0,
+    linear-gradient(to right, var(--k-divider) var(--k-quote-bar), transparent 0) no-repeat var(--k-quote-gap) 0;
+}
+
+.cm-line.k-quote-depth-3,
+.cm-line.k-quote-depth-4,
+.cm-line.k-quote-depth-5,
+.cm-line.k-quote-depth-6 {
+  padding-left: calc(3 * var(--k-quote-gap) + 4px);
+  background:
+    linear-gradient(to right, var(--k-accent) var(--k-quote-bar), transparent 0) no-repeat 0 0,
+    linear-gradient(to right, var(--k-divider) var(--k-quote-bar), transparent 0) no-repeat var(--k-quote-gap) 0,
+    linear-gradient(to right, var(--k-divider) var(--k-quote-bar), transparent 0) no-repeat calc(2 * var(--k-quote-gap)) 0;
+}
+
+/* Horizontal rule */
+.k-hr {
+  display: inline-block;
+  width: 100%;
+  height: 0;
+  vertical-align: middle;
+  border-top: 1px solid var(--k-divider);
+}
+
+/* YAML front matter: muted monospace box */
+.cm-line.k-frontmatter-line {
+  font-family: var(--k-font-mono);
+  font-size: 0.85em;
+  color: var(--k-text-muted);
+  background-color: var(--k-surface);
+  padding-left: 12px;
+  padding-right: 12px;
+  border-left: 1px solid var(--k-divider);
+  border-right: 1px solid var(--k-divider);
+}
+
+.cm-line.k-frontmatter-first {
+  border-top: 1px solid var(--k-divider);
+  border-top-left-radius: 6px;
+  border-top-right-radius: 6px;
+}
+
+.cm-line.k-frontmatter-last {
+  border-bottom: 1px solid var(--k-divider);
+  border-bottom-left-radius: 6px;
+  border-bottom-right-radius: 6px;
+}
+
+.k-frontmatter-fence {
+  color: var(--k-divider);
+}
+
+/* Footnotes */
+.k-footnote-ref {
+  color: var(--k-link);
+  font-size: 0.75em;
+  line-height: 0;
+  padding: 0 0.1em;
+  cursor: pointer;
+  user-select: none;
+}
+
+.k-footnote-ref::before {
+  content: "[";
+}
+
+.k-footnote-ref::after {
+  content: "]";
+}
+
+.k-footnote-ref-src {
+  color: var(--k-link);
+}
+
+.cm-line.k-footnote-def-line {
+  font-size: 0.9em;
+  color: var(--k-text-muted);
+}
+
+.k-footnote-def-mark {
+  color: var(--k-link);
+}
+
+.k-footnote-unused {
+  color: var(--k-text-muted);
+}
+
+.cm-tooltip.cm-tooltip-hover:has(.k-footnote-tooltip) {
+  background-color: var(--k-surface);
+  border: 1px solid var(--k-divider);
+  border-radius: 6px;
+}
+
+.k-footnote-tooltip {
+  max-width: 420px;
+  padding: 6px 10px;
+  color: var(--k-text);
+  font-family: var(--k-font-body);
+  font-size: 0.9em;
+  line-height: 1.5;
+}
+
+.k-footnote-tooltip-label {
+  color: var(--k-link);
+}
+
+/* [TOC] */
+.k-toc {
+  margin: 4px 0;
+  padding: 8px 16px;
+  border-left: 3px solid var(--k-accent);
+  background-color: var(--k-surface);
+  border-radius: 0 6px 6px 0;
+  font-family: var(--k-font-ui);
+  font-size: 0.9em;
+}
+
+.k-toc ul {
+  list-style: none;
+  margin: 0;
+  padding-left: 1.2em;
+}
+
+.k-toc > ul {
+  padding-left: 0;
+}
+
+.k-toc-link {
+  color: var(--k-link);
+  text-decoration: none;
+  cursor: pointer;
+  line-height: 1.8;
+}
+
+.k-toc-link:hover {
+  text-decoration: underline;
+}
+
+.k-toc-empty {
+  color: var(--k-text-muted);
+}

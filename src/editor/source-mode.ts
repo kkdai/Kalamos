@@ -1,5 +1,6 @@
 import { Compartment, type Extension } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
+import { blocksExtension } from "./blocks";
 import { codeBlocksExtension } from "./code-blocks";
 import { diagramsExtension } from "./diagrams";
 import { imagePreviewExtension } from "./images";
@@ -14,6 +15,7 @@ const richPreviewExtensions: Extension = [
   tablePreviewStateField,
   imagePreviewExtension,
   diagramsExtension,
+  blocksExtension,
 ];
 
 export interface SourceModeController {

@@ -173,4 +173,18 @@ img { max-width: 100%; break-inside: avoid; page-break-inside: avoid; }
 
 .k-math-block svg { max-width: 100%; }
 .k-math-error { color: var(--k-link); }
+
+sup.k-fn-ref { font-size: 0.75em; line-height: 0; }
+sup.k-fn-ref a::before { content: "["; }
+sup.k-fn-ref a::after { content: "]"; }
+
+.k-footnotes { margin-top: 2em; font-size: 9.5pt; color: var(--k-text-muted); }
+.k-footnotes hr { margin: 0 0 0.8em; width: 30%; }
+.k-footnotes ol { padding-left: 1.4em; }
+.k-fn-back { margin-left: 0.3em; }
+
+nav.k-toc { margin: 0.8em 0 1.2em; padding: 0.4em 1em; border-left: 3px solid var(--k-accent); }
+nav.k-toc ul { list-style: none; margin: 0; padding-left: 1.2em; }
+nav.k-toc > ul { padding-left: 0; }
+nav.k-toc li { margin: 0.15em 0; }
 `;

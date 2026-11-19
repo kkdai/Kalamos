@@ -20,6 +20,8 @@ import {
   type RelativeLinkHandler,
   relativeLinkHandlerFacet,
 } from "./live-preview";
+import { footnoteExtension } from "./footnotes";
+import { frontMatterExtension } from "./front-matter";
 import { mathAutoNumberFacet, mathMarkdownExtension } from "./math";
 import { createSourceModeController } from "./source-mode";
 
@@ -140,7 +142,7 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
         base: markdownLanguage,
         codeLanguages: languages,
         addKeymap: false,
-        extensions: [mathMarkdownExtension, cjkEmphasisExtension],
+        extensions: [mathMarkdownExtension, cjkEmphasisExtension, frontMatterExtension, footnoteExtension],
       }),
       sourceModeController.extension,
       keymap.of([

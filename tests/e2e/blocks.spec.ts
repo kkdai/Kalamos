@@ -540,3 +540,85 @@ test.describe("#11 diagrams", () => {
     expect((r + g + b) / 3).toBeGreaterThan(128);
   });
 });
+
+// ---------------------------------------------------------------------------
+// #12 ED-06 other blocks + ED-07 [TOC]
+// ---------------------------------------------------------------------------
+
+test.describe("#12 blocks / TOC", () => {
+  test("#12 AC: hovering a footnote reference shows its content", async ({ page }) => {
+    const src = "Kalamos 註腳[^1] 範例。\n\n[^1]: 這是註腳內容 **粗體**。";
+    await setDoc(page, src, src.length);
+    const ref = page.locator(".cm-content .k-footnote-ref");
+    await expect(ref).toHaveText("1");
+    await ref.hover();
+    const tip = page.getByTestId("footnote-tooltip");
+    await expect(tip).toBeVisible();
+    await expect(tip).toContainText("這是註腳內容 **粗體**。");
+    // Clicking jumps to the definition.
+    await ref.click();
+    await expect.poll(async () => (await getSelection(page)).head).toBe(src.indexOf("這是"));
+  });
+
+  test("#12 spec: an undefined footnote reference stays literal", async ({ page }) => {
+    const src = "Missing[^nope] ref\n\nend";
+    await setDoc(page, src, src.length);
+    await expect(page.locator(".cm-content .k-footnote-ref")).toHaveCount(0);
+    await expect(page.locator(".cm-content")).toContainText("Missing[^nope] ref");
+  });
+
+  test("#12 AC: TOC updates immediately after typing a new heading; clicking scrolls to it", async ({ page }) => {
+    const filler = Array.from({ length: 60 }, (_, i) => `段落 ${i + 1}`).join("\n\n");
+    const src = `[TOC]\n\n# 第一章\n\n${filler}\n\n## 結尾\n`;
+    await setDoc(page, src, src.length);
+    const links = page.locator(".cm-content .k-toc a");
+    await expect(links).toHaveText(["第一章", "結尾"]);
+
+    await page.keyboard.press(`${MOD}+End`);
+    await page.keyboard.type("\n## 新增標題");
+    // The TOC is at the top: scroll back (without moving the cursor) so
+    // CodeMirror renders it.
+    await expect(async () => {
+      await page.evaluate(async () => {
+        const main = await import("/src/main.ts" as string);
+        const view = main.getActiveApp().editor.view;
+        // EditorView.scrollIntoView via the instance's class (no bare imports here).
+        view.dispatch({ effects: view.constructor.scrollIntoView(0, { y: "start" }) });
+      });
+      await expect(links).toHaveText(["第一章", "結尾", "新增標題"], { timeout: 500 });
+    }).toPass({ timeout: 5000 });
+
+    await links.nth(1).click();
+    await expect.poll(async () => {
+      const head = (await getSelection(page)).head;
+      return (await getDoc(page)).slice(head, head + 2);
+    }).toBe("結尾");
+    await expect(page.locator(".cm-content .cm-line", { hasText: "結尾" }).first()).toBeInViewport();
+  });
+
+  test("#12 spec: horizontal rule renders as a line; source shows on its line", async ({ page }) => {
+    const src = "above\n\n***\n\nbelow";
+    await setDoc(page, src, src.length);
+    await expect(page.locator(".cm-content .k-hr")).toHaveCount(1);
+    await setCursor(page, 8);
+    await expect(page.locator(".cm-content .k-hr")).toHaveCount(0);
+    await expect(page.locator(".cm-content")).toContainText("***");
+  });
+
+  test("#12 spec: front matter renders as a muted box, not a rule or heading", async ({ page }) => {
+    const src = "---\ntitle: 部落格文章\ntags: [a]\n---\n\n# 正文\n";
+    await setDoc(page, src, src.length);
+    await expect(page.locator(".cm-content .k-frontmatter-line")).toHaveCount(4);
+    await expect(page.locator(".cm-content .k-hr")).toHaveCount(0);
+    await expect(page.locator(".cm-content .k-h2")).toHaveCount(0);
+    await expect(page.locator(".cm-content .k-frontmatter-line").nth(1)).toHaveText("title: 部落格文章");
+  });
+
+  test("#12 spec: blockquote markers hide and nested quotes get deeper borders", async ({ page }) => {
+    const src = "> 外層\n> > 內層\n\nend";
+    await setDoc(page, src, src.length);
+    await expect(page.locator(".cm-content .k-quote-depth-1")).toHaveCount(1);
+    await expect(page.locator(".cm-content .k-quote-depth-2")).toHaveCount(1);
+    await expect(page.locator(".cm-content .k-quote-line .k-mark-hidden")).toHaveCount(3);
+  });
+});

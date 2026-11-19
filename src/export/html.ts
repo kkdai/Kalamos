@@ -15,8 +15,12 @@ import type { SyntaxNode } from "@lezer/common";
 import { highlightCode } from "@lezer/highlight";
 import { papyrosHighlightStyle, resolveCodeLanguage } from "../editor/code-blocks";
 import { resolveImageSrc } from "../editor/images";
+import { isTocText, nestTocEntries, type TocEntry } from "../editor/blocks";
+import { buildFootnoteIndex, type FootnoteIndex, footnoteIdOf } from "../editor/footnotes";
+import { frontMatterExtension } from "../editor/front-matter";
 import { collectDocumentHeadings } from "../editor/lists";
 import { cjkEmphasisExtension } from "../editor/cjk-emphasis";
+import { footnoteExtension } from "../editor/footnotes";
 import { ensureMathJaxLoaded, mathMarkdownExtension } from "../editor/math";
 import { PRINT_CSS as printCss } from "./print-css";
 
@@ -72,6 +76,8 @@ const MARK_NODES = new Set([
   "TableDelimiter",
   "Comment",
   "ProcessingInstruction",
+  "FootnoteMark",
+  "FrontMatterMark",
 ]);
 
 export function escapeHtml(text: string): string {
@@ -176,6 +182,7 @@ async function prepareMathRenderer(
 
 class Renderer {
   private headingIndex = 0;
+  private readonly referencedFootnotes = new Set<string>();
 
   constructor(
     private readonly doc: string,
@@ -183,7 +190,57 @@ class Renderer {
     private readonly docPath: string | null,
     private readonly highlight: CodeHighlighter,
     private readonly math: MathRenderer,
+    private readonly footnotes: FootnoteIndex,
+    private readonly root: SyntaxNode,
   ) {}
+
+  private footnoteReference(node: SyntaxNode): string {
+    const raw = this.slice(node.from, node.to);
+    const id = footnoteIdOf(raw);
+    const n = this.footnotes.numbers.get(id);
+    if (!n) return escapeHtml(raw);
+    const first = !this.referencedFootnotes.has(id);
+    this.referencedFootnotes.add(id);
+    const idAttr = first ? ` id="fnref-${n}"` : "";
+    return `<sup class="k-fn-ref"${idAttr}><a href="#fn-${n}">${n}</a></sup>`;
+  }
+
+  /** `[TOC]`: nested list of links to the headings. */
+  private toc(): string {
+    const entries: TocEntry[] = this.headings.map((h) => ({ level: h.level, text: h.text, slug: h.id }));
+    if (entries.length === 0) return "";
+    const list = (nodes: ReturnType<typeof nestTocEntries>): string =>
+      `<ul>\n${nodes
+        .map(
+          (n) =>
+            `<li><a href="#${escapeHtml(n.slug)}">${escapeHtml(n.text)}</a>${
+              n.children.length > 0 ? list(n.children) : ""
+            }</li>\n`,
+        )
+        .join("")}</ul>\n`;
+    return `<nav class="k-toc">\n${list(nestTocEntries(entries))}</nav>\n`;
+  }
+
+  /** Footnotes section (numbered by first reference), or "" when there are none. */
+  footnoteSection(): string {
+    if (this.footnotes.order.length === 0) return "";
+    const defs = new Map<string, SyntaxNode>();
+    for (const child of children(this.root)) {
+      if (child.name !== "FootnoteDefinition") continue;
+      const mark = child.getChild("FootnoteMark");
+      if (!mark) continue;
+      const id = footnoteIdOf(this.slice(mark.from, mark.to));
+      if (!defs.has(id)) defs.set(id, child);
+    }
+    const items = this.footnotes.order.map((id, i) => {
+      const n = i + 1;
+      const def = defs.get(id);
+      const info = this.footnotes.definitions.get(id);
+      const body = def && info ? this.inline(def, info.contentFrom, def.to).trim() : "";
+      return `<li id="fn-${n}">${body} <a class="k-fn-back" href="#fnref-${n}">↩</a></li>\n`;
+    });
+    return `<section class="k-footnotes">\n<hr>\n<ol>\n${items.join("")}</ol>\n</section>\n`;
+  }
 
   private slice(from: number, to: number): string {
     return this.doc.slice(from, to);
@@ -249,6 +306,8 @@ class Renderer {
         return this.link(node);
       case "Image":
         return this.image(node);
+      case "FootnoteReference":
+        return this.footnoteReference(node);
       case "Autolink": {
         const url = node.getChild("URL");
         const href = url ? this.slice(url.from, url.to) : "";
@@ -316,7 +375,13 @@ class Renderer {
           .map((c) => this.block(c))
           .join("");
       case "Paragraph":
+        if (node.parent?.name === "Document" && isTocText(this.slice(node.from, node.to))) {
+          return this.toc();
+        }
         return `<p>${this.inline(node).trim()}</p>\n`;
+      case "FrontMatter":
+      case "FootnoteDefinition":
+        return "";
       case "Blockquote":
         return `<blockquote>\n${this.blocks(node)}</blockquote>\n`;
       case "BulletList":
@@ -521,7 +586,7 @@ function createParseState(content: string): EditorState {
       markdown({
         base: markdownLanguage,
         addKeymap: false,
-        extensions: [mathMarkdownExtension, cjkEmphasisExtension],
+        extensions: [mathMarkdownExtension, cjkEmphasisExtension, frontMatterExtension, footnoteExtension],
       }),
     ],
   });
@@ -566,8 +631,17 @@ export async function buildExportHtml(
     prepareCodeHighlighter(codeInfos),
     prepareMathRenderer(hasMath, Boolean(options.mathAutoNumber)),
   ]);
-  const renderer = new Renderer(doc, headings, options.docPath, highlight, math);
-  const body = renderer.block(tree.topNode);
+  const footnotes = buildFootnoteIndex(tree, (from, to) => doc.slice(from, to));
+  const renderer = new Renderer(
+    doc,
+    headings,
+    options.docPath,
+    highlight,
+    math,
+    footnotes,
+    tree.topNode,
+  );
+  const body = renderer.block(tree.topNode) + renderer.footnoteSection();
 
   const csp =
     "default-src 'none'; img-src file: data: https: http:; style-src 'unsafe-inline'; font-src file: data:";
