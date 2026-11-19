@@ -31,12 +31,27 @@ import {
   type Settings,
 } from "./ipc";
 import { createSidebar, type SidebarController } from "./sidebar/sidebar";
+import {
+  applyThemeWithCustomCss,
+  createThemeMenu,
+  CUSTOM_THEME_STYLE_ID,
+  type ThemeMenuController,
+} from "./theme/theme-menu";
 
 export const NAMED_AUTOSAVE_DELAY_MS = 1000;
 export const UNTITLED_RECOVERY_INTERVAL_MS = 5000;
 
 export function applyTheme(theme: string): void {
   if (typeof document === "undefined") return;
+  if (theme && theme.startsWith("custom:")) {
+    void applyThemeWithCustomCss(theme);
+    return;
+  }
+  const existingCustomStyle = document.getElementById(CUSTOM_THEME_STYLE_ID);
+  if (existingCustomStyle) {
+    existingCustomStyle.remove();
+  }
+  document.documentElement.removeAttribute("data-custom-theme");
   if (!theme || theme === "system") {
     document.documentElement.removeAttribute("data-theme");
   } else {
@@ -64,6 +79,7 @@ function formatErrorMessage(prefix: string, err: unknown): string {
 export interface KalamosApp {
   editor: KalamosEditor;
   sidebar: SidebarController;
+  themeMenu: ThemeMenuController;
   getDocId: () => string;
   getCurrentPath: () => string | null;
   getPendingRecovery: () => RecoveryEntry | null;
@@ -189,6 +205,7 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
   async function persistSourceMode(sourceMode: boolean): Promise<void> {
     currentSettings = {
       ...currentSettings,
+      theme: themeMenu.getCurrentTheme(),
       sidebarVisible: sidebar.isVisible(),
       sidebarTab: sidebar.getTab(),
       lastFolder: sidebar.getCurrentFolder() ?? currentSettings.lastFolder,
@@ -252,6 +269,7 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
 
   const sidebar = createSidebar({
     element: sidebarEl,
+    editorView: editor.view,
     onSelectFile: async (path) => {
       await openDocument(path);
     },
@@ -289,6 +307,19 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
     },
   });
 
+  const themeMenu = createThemeMenu({
+    parent: editorContainer.parentElement ?? document.body,
+    onThemeChange: (themeId) => {
+      currentSettings = {
+        ...currentSettings,
+        theme: themeId,
+      };
+    },
+    onError: (prefix, err) => {
+      setStatus(formatErrorMessage(prefix, err), true);
+    },
+  });
+
   const onSidebarKeydown = (event: KeyboardEvent) => {
     if (event.defaultPrevented) return;
     if (!(event.metaKey || event.ctrlKey) || !event.shiftKey || event.altKey) {
@@ -301,6 +332,9 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
     } else if (key === "o") {
       event.preventDefault();
       void sidebar.openFolder();
+    } else if (key === "t") {
+      event.preventDefault();
+      void themeMenu.cycleTheme();
     }
   };
   window.addEventListener("keydown", onSidebarKeydown);
@@ -437,6 +471,7 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
       applyTheme(settings.theme);
       editor.setSourceMode(Boolean(settings.sourceMode), false);
     }
+    await themeMenu.init();
     await sidebar.init();
     const entries = await listRecovery().catch(() => []);
     if (entries.length > 0) {
@@ -459,6 +494,7 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
     }
     restoreBtn?.removeEventListener("click", onRestoreClick);
     discardBtn?.removeEventListener("click", onDiscardClick);
+    themeMenu.destroy();
     sidebar.destroy();
     editor.destroy();
   }
@@ -466,6 +502,7 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
   return {
     editor,
     sidebar,
+    themeMenu,
     getDocId: () => docId,
     getCurrentPath: () => currentPath,
     getPendingRecovery: () => pendingRecovery,

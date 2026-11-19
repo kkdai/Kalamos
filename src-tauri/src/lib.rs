@@ -3,6 +3,7 @@ pub mod files;
 pub mod fsops;
 pub mod recovery;
 pub mod settings;
+pub mod themes;
 pub mod tree;
 pub mod watch;
 
@@ -26,6 +27,8 @@ pub fn run() {
             recovery::clear_recovery,
             settings::get_settings,
             settings::set_settings,
+            themes::list_themes,
+            themes::read_theme_css,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
