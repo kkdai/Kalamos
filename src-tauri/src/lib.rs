@@ -3,6 +3,7 @@ pub mod export;
 pub mod files;
 pub mod fsops;
 pub mod images;
+pub mod pandoc;
 pub mod recovery;
 pub mod settings;
 pub mod themes;
@@ -35,6 +36,9 @@ pub fn run() {
             images::import_image_bytes,
             images::allow_asset_dir,
             export::export_pdf,
+            pandoc::pandoc_status,
+            pandoc::export_pandoc,
+            pandoc::import_pandoc,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

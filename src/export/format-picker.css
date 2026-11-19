@@ -1,0 +1,72 @@
+/* EX-02 export format picker (issue #16). */
+
+.k-format-picker-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 15vh;
+  background-color: rgba(0, 0, 0, 0.18);
+}
+
+.k-format-picker {
+  min-width: 260px;
+  padding: 10px;
+  background-color: var(--k-surface, #ede4cf);
+  color: var(--k-text, #2b2622);
+  border: 1px solid var(--k-divider, #d9cdb3);
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-family: var(--k-font-ui, inherit);
+}
+
+.k-format-picker-title {
+  margin: 2px 8px 8px;
+  font-size: 0.9em;
+  font-weight: 600;
+  color: var(--k-text-muted, #6e6355);
+}
+
+.k-format-option {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 7px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.k-format-option:hover,
+.k-format-option:focus-visible {
+  background-color: color-mix(in srgb, var(--k-accent, #5e7a4a) 16%, transparent);
+  outline: none;
+}
+
+.k-format-option-desc {
+  font-size: 0.82em;
+  color: var(--k-text-muted, #6e6355);
+}
+
+.k-format-cancel {
+  margin-top: 6px;
+  align-self: flex-end;
+  padding: 4px 10px;
+  border: 1px solid var(--k-divider, #d9cdb3);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--k-text-muted, #6e6355);
+  font: inherit;
+  font-size: 0.85em;
+  cursor: pointer;
+}
