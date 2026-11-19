@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   getSettings,
   listRecovery,
+  setSettings,
+  DEFAULT_SETTINGS,
   openFile,
   readMockFile,
   resetMockState,
@@ -432,5 +434,61 @@ describe("Sidebar — file tree, file list, fs-changed, context menu, and shortc
     expect(recoveries).toHaveLength(1);
     expect(recoveries[0].path).toBeNull();
     expect(recoveries[0].content).toBe(`${originalText}\n刪除前未存修改`);
+  });
+});
+
+describe("Sidebar — opening a folder reveals it (#32 / BUG-2)", () => {
+  let app: KalamosApp | null = null;
+
+  beforeEach(() => {
+    resetMockState();
+    setupDom();
+  });
+
+  afterEach(() => {
+    app?.destroy();
+    app = null;
+  });
+
+  it("user-initiated open shows a hidden sidebar on the file tree tab and persists it", async () => {
+    setMockDialogHandlers({ openFolder: () => "/demo" });
+    app = createKalamosApp(document);
+    await app.init();
+    await app.sidebar.setTab("outline");
+    expect(app.sidebar.isVisible()).toBe(false);
+
+    expect(await app.sidebar.openFolder()).toBe(true);
+    expect(app.sidebar.isVisible()).toBe(true);
+    expect(app.sidebar.getTab()).toBe("tree");
+    const el = document.querySelector<HTMLElement>('[data-testid="sidebar"]')!;
+    expect(el.dataset.visible).toBe("true");
+    expect(el.querySelectorAll('[data-testid="file-item"]').length).toBeGreaterThan(0);
+
+    const settings = await getSettings();
+    expect(settings.sidebarVisible).toBe(true);
+    expect(settings.sidebarTab).toBe("tree");
+    expect(settings.lastFolder).toBe("/demo");
+  });
+
+  it("a cancelled dialog leaves the sidebar hidden", async () => {
+    setMockDialogHandlers({ openFolder: () => null });
+    app = createKalamosApp(document);
+    await app.init();
+    expect(await app.sidebar.openFolder()).toBe(false);
+    expect(app.sidebar.isVisible()).toBe(false);
+  });
+
+  it("startup restore of lastFolder keeps the saved hidden state and tab", async () => {
+    await setSettings({
+      ...DEFAULT_SETTINGS,
+      lastFolder: "/demo",
+      sidebarVisible: false,
+      sidebarTab: "outline",
+    });
+    app = createKalamosApp(document);
+    await app.init();
+    expect(app.sidebar.getCurrentFolder()).toBe("/demo");
+    expect(app.sidebar.isVisible()).toBe(false);
+    expect(app.sidebar.getTab()).toBe("outline");
   });
 });

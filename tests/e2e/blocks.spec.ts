@@ -177,9 +177,8 @@ test.describe("#7 tables", () => {
     await expect(page.getByTestId("table-widget").locator("tbody td").nth(1)).toContainText("2");
   });
 
-  // BUG-5: typing a whole `| 1 | 2 |` row inside a new body row, then Enter,
-  // reformats the row and silently drops text. Kept failing on purpose.
-  test.fixme("#7 spec: typing a literal `| 1 | 2 |` body row keeps its text [BUG-5]", async ({ page }) => {
+  // BUG-5 (#32): extra cells typed into a row must never be dropped.
+  test("#7 spec: typing a literal `| 1 | 2 |` body row keeps its text [BUG-5]", async ({ page }) => {
     await setDoc(page, "| a | b |\n| --- | --- |", "| a | b |\n| --- | --- |".length);
     await page.keyboard.press("Enter");
     await page.keyboard.type("| 1 | 2 |");
@@ -188,6 +187,42 @@ test.describe("#7 tables", () => {
     expect(doc).toContain("1");
     expect(doc).toContain("2");
     expect(doc).toMatch(/\| 1 +\| 2 +\|/);
+    // The table widened instead of losing a column; every row has the same width.
+    const rows = doc.split("\n").filter((l) => l.startsWith("|"));
+    expect(new Set(rows.map((r) => r.split("|").length)).size).toBe(1);
+    expect(isAligned(doc)).toBe(true);
+  });
+
+  test("#7 spec: Tab with extra cells in a row widens the table instead of dropping them [BUG-5]", async ({ page }) => {
+    const src = "| a | b |\n| --- | --- |\n| 1 | 2 | 3 |";
+    await setDoc(page, src, 2);
+    await page.keyboard.press("Tab");
+    const rows = (await getDoc(page)).split("\n");
+    expect(rows[0]).toMatch(/^\| a +\| b +\| +\|$/);
+    expect(rows[1]).toMatch(/^\| -+ \| -+ \| -+ \|$/);
+    expect(rows[2]).toMatch(/^\| 1 +\| 2 +\| 3 +\|$/);
+  });
+
+  test("#7 spec: Enter on an empty last row leaves the table into a new paragraph [BUG-5]", async ({ page }) => {
+    const src = "| a | b |\n| --- | --- |\n| 1 | 2 |";
+    await setDoc(page, src, src.length);
+    await page.keyboard.press("Enter"); // new empty row
+    expect((await getDoc(page)).split("\n")).toHaveLength(4);
+    await page.keyboard.press("Enter"); // empty last row → exit
+    await page.keyboard.type("after");
+    const doc = await getDoc(page);
+    expect(doc).toBe("| a   | b   |\n| --- | --- |\n| 1   | 2   |\n\nafter");
+    await expect(page.getByTestId("table-widget")).toHaveCount(1);
+    await expect(page.getByTestId("table-widget").locator("tbody tr")).toHaveCount(1);
+  });
+
+  test("#7 spec: exiting a table keeps the following paragraph separated [BUG-5]", async ({ page }) => {
+    const src = "| a | b |\n| --- | --- |\n| 1 | 2 |\n|   |   |\n\nend";
+    await setDoc(page, src, src.indexOf("|   |") + 2);
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("mid");
+    const doc = await getDoc(page);
+    expect(doc).toMatch(/\| 1 +\| 2 +\|\n\nmid\n\nend$/);
   });
 
   test("#7 spec: Tab / Shift+Tab move between cells; Tab in last cell adds a row", async ({ page }) => {
@@ -222,9 +257,8 @@ test.describe("#7 tables", () => {
     expect(doc).toContain("| 芭樂 |");
   });
 
-  // BUG-6: cell edits are written back unformatted; columns only re-align on
-  // Tab / Enter, not when the user simply clicks away. Kept failing on purpose.
-  test.fixme("#7 spec: after editing a cell and leaving, source columns stay aligned [BUG-6]", async ({ page }) => {
+  // BUG-6 (#32): leaving an edited table re-aligns its source.
+  test("#7 spec: after editing a cell and leaving, source columns stay aligned [BUG-6]", async ({ page }) => {
     const aligned = [
       "| name   | qty |",
       "| ------ | --- |",
@@ -240,6 +274,59 @@ test.describe("#7 tables", () => {
     const doc = await getDoc(page);
     expect(doc).toContain("one hundred");
     expect(isAligned(doc.slice(0, doc.indexOf("\n\nend")))).toBe(true);
+  });
+
+  test("#7 spec: the re-align on leave is a single undo step [BUG-6]", async ({ page }) => {
+    const aligned = "| name  | qty |\n| ----- | --- |\n| apple | 1   |";
+    const src = `${aligned}\n\nend`;
+    await setDoc(page, src, src.length);
+    await page.getByTestId("table-widget").locator('td[data-row="1"][data-col="1"]').click();
+    await page.keyboard.type("12345");
+    const edited = await getDoc(page);
+    expect(isAligned(edited.slice(0, edited.indexOf("\n\nend")))).toBe(false);
+    await setCursor(page, edited.length);
+    const formatted = await getDoc(page);
+    expect(isAligned(formatted.slice(0, formatted.indexOf("\n\nend")))).toBe(true);
+    await page.keyboard.press(`${MOD}+z`);
+    expect(await getDoc(page)).toBe(edited);
+  });
+
+  test("#7 spec: entering and leaving a table without editing never changes it [BUG-6]", async ({ page }) => {
+    // Deliberately unaligned source: must survive a visit untouched.
+    const src = "| a | bbbbbb |\n|---|---|\n| 1 | 2 |\n\nend";
+    await setDoc(page, src, src.length);
+    await page.getByTestId("table-widget").locator('td[data-row="1"][data-col="0"]').click();
+    await setCursor(page, src.length);
+    await nextFrames(page);
+    expect(await getDoc(page)).toBe(src);
+    expect(await page.evaluate(async () => {
+      const app = (await import("/src/main.ts" as string)).getActiveApp();
+      return app.editor.isDirty();
+    })).toBe(false);
+  });
+
+  test("#7 spec: composing in a cell never reformats mid-composition; leaving afterwards re-aligns [BUG-6]", async ({ page }) => {
+    const aligned = "| name  | qty |\n| ----- | --- |\n| apple | 1   |";
+    const src = `${aligned}\n\nend`;
+    await setDoc(page, src, src.length);
+    await page.getByTestId("table-widget").locator('td[data-row="1"][data-col="1"]').click();
+    const cdp = await page.context().newCDPSession(page);
+    for (const step of ["y", "yi", "yib", "yiba"]) {
+      await cdp.send("Input.imeSetComposition", { text: step, selectionStart: step.length, selectionEnd: step.length });
+      await nextFrames(page);
+      // Only the composed text changes; nothing re-pads the table.
+      const doc = await getDoc(page);
+      expect(doc.split("\n")[2]).toBe(`| apple | ${step}`.padEnd(0) + doc.split("\n")[2].slice(`| apple | ${step}`.length));
+      expect(doc.split("\n").slice(0, 2).join("\n")).toBe("| name  | qty |\n| ----- | --- |");
+    }
+    await cdp.send("Input.insertText", { text: "一百" });
+    await nextFrames(page, 4);
+    expect((await getDoc(page)).split("\n")[2]).toMatch(/^\| apple \| 一百 *\|$/);
+    await setCursor(page, (await getDoc(page)).length);
+    const doc = await getDoc(page);
+    const tableSrc = doc.slice(0, doc.indexOf("\n\nend"));
+    expect(tableSrc).toContain("一百");
+    expect(isAligned(tableSrc)).toBe(true);
   });
 
   test("#7 spec: source mode unloads the table widget", async ({ page }) => {

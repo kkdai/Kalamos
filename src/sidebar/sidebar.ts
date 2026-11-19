@@ -356,6 +356,15 @@ export function createSidebar(options: CreateSidebarOptions): SidebarController 
       await watchFolder(targetPath);
       if (persist) {
         await persistSettingsPatch({ lastFolder: targetPath });
+        // User-initiated open (Cmd+Shift+O / button): reveal the result on the
+        // file tree even if the sidebar was hidden. Startup restore
+        // (persist = false) keeps the saved visibility and tab.
+        if (currentTab !== "tree") {
+          await setTab("tree", true);
+        }
+        if (!visible) {
+          await setVisible(true, true);
+        }
       }
       return true;
     } catch (err) {

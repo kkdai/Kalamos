@@ -337,14 +337,32 @@ test("AC10 sidebar hidden by default; Cmd+Shift+L toggles; three tabs", async ({
   await expect(sidebar).toHaveAttribute("data-visible", "false");
 });
 
-// BUG-2: Cmd+Shift+O loads the folder but leaves a hidden sidebar hidden, so
-// nothing visible happens. Kept failing on purpose (see .herdr/reports/m1-qa.md).
-test.fixme("AC10 Cmd+Shift+O with hidden sidebar reveals the opened folder [BUG-2]", async ({ page }) => {
+// BUG-2 (#32): opening a folder must reveal a hidden sidebar on the file tree.
+test("AC10 Cmd+Shift+O with hidden sidebar reveals the opened folder [BUG-2]", async ({ page }) => {
   await withIpc(page, "ipc.setMockDialogHandlers({ openFolder: () => '/demo' });");
+  // Start from the outline tab to check we switch back to the file tree.
+  await page.evaluate(async () => {
+    const app = (await import("/src/main.ts" as string)).getActiveApp();
+    await app.sidebar.setTab("outline");
+  });
+  await expect(page.locator("#sidebar")).toHaveAttribute("data-visible", "false");
   await page.getByTestId("editor").click();
   await page.keyboard.press(`${MOD}+Shift+o`);
   await expect(page.getByTestId("sidebar-folder-title")).toContainText("demo");
   await expect(page.locator("#sidebar")).toHaveAttribute("data-visible", "true");
+  await expect(page.getByTestId("sidebar-tab-tree")).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByTestId("file-item").filter({ hasText: "welcome.md" })).toBeVisible();
+  await expect
+    .poll(() => withIpc<boolean>(page, "return (await ipc.getSettings()).sidebarVisible;"))
+    .toBe(true);
+});
+
+test("AC10 cancelling the Cmd+Shift+O dialog leaves a hidden sidebar hidden", async ({ page }) => {
+  await withIpc(page, "ipc.setMockDialogHandlers({ openFolder: () => null });");
+  await page.getByTestId("editor").click();
+  await page.keyboard.press(`${MOD}+Shift+o`);
+  await page.waitForTimeout(200);
+  await expect(page.locator("#sidebar")).toHaveAttribute("data-visible", "false");
 });
 
 test("AC10 Cmd+Shift+O opens a folder; clicking a file opens it", async ({ page }) => {
@@ -352,8 +370,6 @@ test("AC10 Cmd+Shift+O opens a folder; clicking a file opens it", async ({ page 
   await page.getByTestId("editor").click();
   await page.keyboard.press(`${MOD}+Shift+o`);
   await expect(page.getByTestId("sidebar-folder-title")).toContainText("demo");
-  // Reveal the sidebar explicitly (BUG-2: Cmd+Shift+O does not).
-  await page.keyboard.press(`${MOD}+Shift+l`);
   await expect(page.locator("#sidebar")).toHaveAttribute("data-visible", "true");
 
   // File tree tab

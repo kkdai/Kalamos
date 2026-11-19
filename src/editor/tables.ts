@@ -10,6 +10,8 @@ import {
   Decoration,
   type DecorationSet,
   EditorView,
+  ViewPlugin,
+  type ViewUpdate,
   WidgetType,
 } from "@codemirror/view";
 import type { SyntaxNode } from "@lezer/common";
@@ -35,6 +37,11 @@ export interface ParsedTableRow {
   to: number;
   rawLineText: string;
   cells: ParsedTableCell[];
+  /**
+   * Text of cells beyond the header's column count (body rows only). The
+   * widget renders `cells`, but formatting must never drop these (BUG-5).
+   */
+  overflowCellTexts: string[];
   isDelimiter: boolean;
 }
 
@@ -247,6 +254,7 @@ export function parseTableFromLines(
     to: lines[0].to,
     rawLineText: lines[0].text,
     cells: headerCells,
+    overflowCellTexts: [],
     isDelimiter: false,
   };
 
@@ -256,6 +264,7 @@ export function parseTableFromLines(
     to: lines[1].to,
     rawLineText: lines[1].text,
     cells: delimCells,
+    overflowCellTexts: [],
     isDelimiter: true,
   };
 
@@ -279,6 +288,7 @@ export function parseTableFromLines(
       to: line.to,
       rawLineText: line.text,
       cells: cells.slice(0, colCount),
+      overflowCellTexts: cells.slice(colCount).map((c) => c.text),
       isDelimiter: false,
     });
   }
@@ -420,12 +430,48 @@ export function formatMarkdownTable(
   ].join("\n");
 }
 
+export interface TableCellMatrix {
+  colCount: number;
+  headerCells: string[];
+  delimiterStyles: DelimiterStyle[];
+  bodyRows: string[][];
+}
+
+/**
+ * Cell texts of a parsed table, ready for `formatMarkdownTable`. Body rows
+ * that carry more non-empty cells than the header widen the table (new empty
+ * header cells, default delimiters) instead of losing text. Trailing empty
+ * overflow cells are whitespace only and are dropped.
+ */
+export function tableCellMatrix(table: ParsedTable): TableCellMatrix {
+  let colCount = table.colCount;
+  for (const row of table.bodyRows) {
+    const overflow = row.overflowCellTexts;
+    for (let i = overflow.length - 1; i >= 0; i--) {
+      if (overflow[i].length > 0) {
+        colCount = Math.max(colCount, table.colCount + i + 1);
+        break;
+      }
+    }
+  }
+  const pad = (cells: string[]) =>
+    Array.from({ length: colCount }, (_, i) => cells[i] ?? "");
+  return {
+    colCount,
+    headerCells: pad(table.headerRow.cells.map((c) => c.text)),
+    delimiterStyles: Array.from(
+      { length: colCount },
+      (_, i) => table.delimiterStyles[i] ?? "default",
+    ),
+    bodyRows: table.bodyRows.map((r) =>
+      pad([...r.cells.map((c) => c.text), ...r.overflowCellTexts]),
+    ),
+  };
+}
+
 export function formatParsedTable(table: ParsedTable): string {
-  return formatMarkdownTable(
-    table.headerRow.cells.map((c) => c.text),
-    table.delimiterStyles,
-    table.bodyRows.map((r) => r.cells.map((c) => c.text)),
-  );
+  const m = tableCellMatrix(table);
+  return formatMarkdownTable(m.headerCells, m.delimiterStyles, m.bodyRows);
 }
 
 function locateCursorCellInTable(
@@ -511,17 +557,17 @@ export function handleTableTab(view: EditorView): boolean {
   if (!table) return false;
 
   const { navRowIdx, colIdx } = locateCursorCellInTable(table, pos);
-  const headerCells = table.headerRow.cells.map((c) => c.text);
-  const bodyRows = table.bodyRows.map((r) => r.cells.map((c) => c.text));
+  const { colCount, headerCells, delimiterStyles, bodyRows } =
+    tableCellMatrix(table);
   const totalNavRows = 1 + bodyRows.length;
 
   let nextNavRowIdx = navRowIdx;
   let nextColIdx = colIdx + 1;
-  if (nextColIdx >= table.colCount) {
+  if (nextColIdx >= colCount) {
     nextColIdx = 0;
     nextNavRowIdx = navRowIdx + 1;
     if (nextNavRowIdx >= totalNavRows) {
-      bodyRows.push(Array.from({ length: table.colCount }, () => ""));
+      bodyRows.push(Array.from({ length: colCount }, () => ""));
     }
   }
 
@@ -529,7 +575,7 @@ export function handleTableTab(view: EditorView): boolean {
     view,
     table,
     headerCells,
-    table.delimiterStyles,
+    delimiterStyles,
     bodyRows,
     nextNavRowIdx,
     nextColIdx,
@@ -543,15 +589,15 @@ export function handleTableShiftTab(view: EditorView): boolean {
   if (!table) return false;
 
   const { navRowIdx, colIdx } = locateCursorCellInTable(table, pos);
-  const headerCells = table.headerRow.cells.map((c) => c.text);
-  const bodyRows = table.bodyRows.map((r) => r.cells.map((c) => c.text));
+  const { colCount, headerCells, delimiterStyles, bodyRows } =
+    tableCellMatrix(table);
 
   let prevNavRowIdx = navRowIdx;
   let prevColIdx = colIdx - 1;
   if (prevColIdx < 0) {
     if (navRowIdx > 0) {
       prevNavRowIdx = navRowIdx - 1;
-      prevColIdx = table.colCount - 1;
+      prevColIdx = colCount - 1;
     } else {
       prevNavRowIdx = 0;
       prevColIdx = 0;
@@ -562,11 +608,40 @@ export function handleTableShiftTab(view: EditorView): boolean {
     view,
     table,
     headerCells,
-    table.delimiterStyles,
+    delimiterStyles,
     bodyRows,
     prevNavRowIdx,
     prevColIdx,
   );
+}
+
+function isTableRowEmpty(row: ParsedTableRow): boolean {
+  return (
+    row.cells.every((c) => c.text.length === 0) &&
+    row.overflowCellTexts.every((t) => t.length === 0)
+  );
+}
+
+function exitTableFromEmptyLastRow(
+  view: EditorView,
+  row: ParsedTableRow,
+): boolean {
+  const { state } = view;
+  // Remove the empty row (and the newline before it), then leave
+  // "<last row>\n\n<cursor>". The blank line is required: a plain line right
+  // after a table row would be parsed as another row. If a single-newline
+  // paragraph followed, keep it separated from the new cursor line too.
+  const from = row.from - 1;
+  const rest = state.sliceDoc(row.to, Math.min(state.doc.length, row.to + 2));
+  const insert =
+    rest.startsWith("\n") && !rest.startsWith("\n\n") ? "\n\n\n" : "\n\n";
+  view.dispatch({
+    changes: { from, to: row.to, insert },
+    selection: EditorSelection.cursor(from + 2),
+    scrollIntoView: true,
+    userEvent: "input.table.exit",
+  });
+  return true;
 }
 
 export function handleTableEnter(view: EditorView): boolean {
@@ -576,21 +651,36 @@ export function handleTableEnter(view: EditorView): boolean {
   if (!table) return false;
 
   const { navRowIdx } = locateCursorCellInTable(table, pos);
-  const headerCells = table.headerRow.cells.map((c) => c.text);
-  const bodyRows = table.bodyRows.map((r) => r.cells.map((c) => c.text));
+
+  // Enter on an empty last body row leaves the table: drop that row and put
+  // the cursor in a new paragraph after the table (blank line in between).
+  const lastBodyRow = table.bodyRows[table.bodyRows.length - 1];
+  const onDelimiterRow =
+    pos >= table.delimiterRow.from && pos <= table.delimiterRow.to;
+  if (
+    lastBodyRow &&
+    !onDelimiterRow &&
+    navRowIdx === table.bodyRows.length &&
+    isTableRowEmpty(lastBodyRow)
+  ) {
+    return exitTableFromEmptyLastRow(view, lastBodyRow);
+  }
+
+  const { colCount, headerCells, delimiterStyles, bodyRows } =
+    tableCellMatrix(table);
 
   const insertBodyIndex = Math.max(0, navRowIdx);
   bodyRows.splice(
     insertBodyIndex,
     0,
-    Array.from({ length: table.colCount }, () => ""),
+    Array.from({ length: colCount }, () => ""),
   );
 
   return dispatchFormattedTableAndSelectCell(
     view,
     table,
     headerCells,
-    table.delimiterStyles,
+    delimiterStyles,
     bodyRows,
     insertBodyIndex + 1,
     0,
@@ -650,16 +740,11 @@ export function reorderTableBodyRow(
     return false;
   }
 
-  const headerCells = table.headerRow.cells.map((c) => c.text);
-  const bodyRows = table.bodyRows.map((r) => r.cells.map((c) => c.text));
+  const { headerCells, delimiterStyles, bodyRows } = tableCellMatrix(table);
   const [moved] = bodyRows.splice(fromBodyRowIndex, 1);
   bodyRows.splice(toBodyRowIndex, 0, moved);
 
-  const formatted = formatMarkdownTable(
-    headerCells,
-    table.delimiterStyles,
-    bodyRows,
-  );
+  const formatted = formatMarkdownTable(headerCells, delimiterStyles, bodyRows);
 
   view.dispatch({
     changes: { from: table.from, to: table.to, insert: formatted },
@@ -1073,6 +1158,112 @@ export function buildTablePreviewDecorations(
   return updateTableMaskAndDecorations(tables, state.selection).decorations;
 }
 
+interface ActiveTableRange {
+  from: number;
+  to: number;
+  /** The table's source was changed while the cursor was inside it. */
+  edited: boolean;
+}
+
+function tableRangeAtCursor(state: EditorState): { from: number; to: number } | null {
+  const table = findTableAtPos(state, state.selection.main.head);
+  return table ? { from: table.from, to: table.to } : null;
+}
+
+/**
+ * BUG-6: re-align a table's source when the cursor leaves it after editing.
+ *
+ * - Only tables edited while active are formatted, so merely clicking into a
+ *   table never changes an untouched file.
+ * - The format is one transaction (one undo step) dispatched right after the
+ *   update that moved the cursor out; it is postponed while an IME
+ *   composition is in progress and runs on the first update after it ends.
+ */
+export const tableAutoFormatPlugin = ViewPlugin.fromClass(
+  class {
+    active: ActiveTableRange | null;
+    pendingPos: number | null = null;
+    scheduled = false;
+    destroyed = false;
+
+    constructor(view: EditorView) {
+      const range = tableRangeAtCursor(view.state);
+      this.active = range ? { ...range, edited: false } : null;
+    }
+
+    update(update: ViewUpdate): void {
+      let prev = this.active;
+      if (update.docChanged) {
+        if (prev) {
+          prev = {
+            from: update.changes.mapPos(prev.from, -1),
+            to: update.changes.mapPos(prev.to, 1),
+            edited: prev.edited || update.changes.touchesRange(prev.from, prev.to) !== false,
+          };
+        }
+        if (this.pendingPos !== null) {
+          this.pendingPos = update.changes.mapPos(this.pendingPos, -1);
+        }
+      }
+
+      if (update.docChanged || update.selectionSet) {
+        const cur = tableRangeAtCursor(update.state);
+        if (prev && (!cur || cur.from !== prev.from)) {
+          if (prev.edited) {
+            this.pendingPos = prev.from;
+          }
+          prev = null;
+        }
+        this.active = cur
+          ? { ...cur, edited: prev ? prev.edited : false }
+          : null;
+      } else {
+        this.active = prev;
+      }
+
+      if (this.pendingPos !== null && !update.view.composing) {
+        this.schedule(update.view);
+      }
+    }
+
+    schedule(view: EditorView): void {
+      if (this.scheduled) return;
+      this.scheduled = true;
+      // Dispatching inside update() is not allowed; run right after it.
+      queueMicrotask(() => {
+        this.scheduled = false;
+        this.flush(view);
+      });
+    }
+
+    flush(view: EditorView): void {
+      if (this.destroyed || this.pendingPos === null) return;
+      if (view.composing) return; // retried on the next update
+      const pos = this.pendingPos;
+      this.pendingPos = null;
+      const { state } = view;
+      if (pos > state.doc.length) return;
+      const table = findTableAtPos(state, pos);
+      if (!table) return;
+      if (isSelectionTouchingRange(state.selection, table.from, table.to)) {
+        // The cursor came back before we ran; keep tracking it as edited.
+        this.active = { from: table.from, to: table.to, edited: true };
+        return;
+      }
+      const formatted = formatParsedTable(table);
+      if (formatted === state.sliceDoc(table.from, table.to)) return;
+      view.dispatch({
+        changes: { from: table.from, to: table.to, insert: formatted },
+        userEvent: "input.table.format",
+      });
+    }
+
+    destroy(): void {
+      this.destroyed = true;
+    }
+  },
+);
+
 export const tablePreviewStateField = StateField.define<TableFieldState>({
   create(state) {
     const tables = scanTablesFromSyntaxTree(state);
@@ -1096,5 +1287,9 @@ export const tablePreviewStateField = StateField.define<TableFieldState>({
     }
     return fieldState;
   },
-  provide: (f) => EditorView.decorations.from(f, (s) => s.decorations),
+  provide: (f) => [
+    EditorView.decorations.from(f, (s) => s.decorations),
+    // Lives and dies with the table preview (source mode unloads both).
+    tableAutoFormatPlugin,
+  ],
 });
