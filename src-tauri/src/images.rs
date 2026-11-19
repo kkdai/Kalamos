@@ -259,14 +259,54 @@ pub fn import_image_bytes(
     Ok(result)
 }
 
+/// Prefix of the error message returned when a folder is too broad to expose.
+pub const TOO_BROAD_MESSAGE: &str = "Image root folder is too broad";
+
+/// True when exposing `path` (recursively) would open too much of the disk:
+/// the filesystem root, or the home folder itself or any of its ancestors
+/// (`/`, `/Users`, `/Users/<me>`). Both paths should already be canonical.
+pub fn is_too_broad(path: &Path, home: Option<&Path>) -> bool {
+    if path.parent().is_none() {
+        return true;
+    }
+    home.is_some_and(|h| h.starts_with(path))
+}
+
+fn canonical_home<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Option<PathBuf> {
+    use tauri::Manager;
+    let home = app
+        .path()
+        .home_dir()
+        .ok()
+        .or_else(|| std::env::var_os("HOME").map(PathBuf::from))?;
+    Some(fs::canonicalize(&home).unwrap_or(home))
+}
+
+/// Checks a requested asset folder (e.g. an image root that may come from a
+/// downloaded document's front matter) before it is allowed recursively.
+pub fn check_asset_dir(path: &Path, home: Option<&Path>) -> Result<PathBuf, AppError> {
+    let canonical = fs::canonicalize(path)
+        .map_err(|_| AppError::invalid_path(format!("Not a folder: {}", path.display())))?;
+    if is_too_broad(&canonical, home) {
+        return Err(AppError::invalid_path(format!(
+            "{TOO_BROAD_MESSAGE}: {}",
+            path.display()
+        )));
+    }
+    Ok(canonical)
+}
+
 #[tauri::command]
 pub fn allow_asset_dir(app: tauri::AppHandle, path: String) -> Result<(), AppError> {
     let p = Path::new(&path);
     if p.is_file() {
+        // The document's own folder: unchanged behaviour.
         allow_parent_dir(&app, &path);
         return Ok(());
     }
-    allow_dir(&app, p)
+    let home = canonical_home(&app);
+    let canonical = check_asset_dir(p, home.as_deref())?;
+    allow_dir(&app, &canonical)
 }
 
 #[cfg(test)]
@@ -274,6 +314,40 @@ mod tests {
     use super::*;
     use crate::error::ErrorKind;
     use tempfile::tempdir;
+
+    #[test]
+    fn too_broad_folders_are_rejected() {
+        let home = Path::new("/Users/me");
+        assert!(is_too_broad(Path::new("/"), Some(home)));
+        assert!(is_too_broad(Path::new("/Users"), Some(home)));
+        assert!(is_too_broad(Path::new("/Users/me"), Some(home)));
+        assert!(!is_too_broad(Path::new("/Users/me/blog"), Some(home)));
+        assert!(!is_too_broad(Path::new("/tmp/x"), Some(home)));
+        assert!(!is_too_broad(Path::new("/Users/other"), Some(home)));
+        // Without a known home only the filesystem root is refused.
+        assert!(is_too_broad(Path::new("/"), None));
+        assert!(!is_too_broad(Path::new("/Users"), None));
+    }
+
+    #[test]
+    fn check_asset_dir_canonicalizes_before_judging() {
+        let dir = tempdir().expect("tempdir");
+        let home = fs::canonicalize(dir.path()).unwrap();
+        let blog = home.join("blog");
+        fs::create_dir(&blog).unwrap();
+
+        assert_eq!(check_asset_dir(&blog, Some(&home)).unwrap(), blog);
+        // `blog/..` is the home folder itself once canonicalized.
+        let err = check_asset_dir(&blog.join(".."), Some(&home)).unwrap_err();
+        assert_eq!(err.kind, ErrorKind::InvalidPath);
+        assert!(err.message.starts_with(TOO_BROAD_MESSAGE));
+        let err = check_asset_dir(Path::new("/"), Some(&home)).unwrap_err();
+        assert!(err.message.starts_with(TOO_BROAD_MESSAGE));
+        // Missing folders are an InvalidPath error, not "too broad".
+        let err = check_asset_dir(&home.join("missing"), Some(&home)).unwrap_err();
+        assert_eq!(err.kind, ErrorKind::InvalidPath);
+        assert!(!err.message.starts_with(TOO_BROAD_MESSAGE));
+    }
 
     const PNG: &[u8] = &[0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 13];
     const JPG: &[u8] = &[0xFF, 0xD8, 0xFF, 0xE0, 0, 16];

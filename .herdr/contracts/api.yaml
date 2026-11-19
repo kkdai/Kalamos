@@ -255,6 +255,7 @@ components:
         sourceMode: { type: boolean, default: false }
         codeLineNumbers: { type: boolean, default: false }
         mathAutoNumber: { type: boolean, default: false }
+        imageRootDir: { type: [string, 'null'], default: null, description: "IM-04 image root folder: '/'-rooted image paths resolve under it; a document's front matter typora-root-url overrides it" }
     ImportedImage:
       type: object
       required: [relativePath]

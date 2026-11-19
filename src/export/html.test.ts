@@ -93,7 +93,9 @@ describe("EX-01 export HTML", () => {
     expect(body).not.toMatch(/<iframe/i);
     expect(body).not.toContain("javascript:");
     expect(body).toContain("&lt;script&gt;alert(2)&lt;/script&gt;");
-    expect(body).toContain("&lt;img src=x onerror=&quot;alert(3)&quot;&gt; and <br> ok.");
+    // IM-03: <img> is rebuilt from allow-listed attributes only (onerror dropped).
+    expect(body).toContain('Inline <img src="file:///notes/x" alt=""> and <br> ok.');
+    expect(body).not.toMatch(/onerror/i);
     expect(body).toContain('<span class="k-link">js</span>');
     expect(body).toContain('<a href="https://example.com"');
     expect(body).toContain('<span class="k-image-missing">[a&quot;b]</span>');

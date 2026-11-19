@@ -12,8 +12,12 @@ import { codeLineNumbersFacet } from "./code-blocks";
 import {
   imageDocPathField,
   imagePasteHandler,
+  imageRootSettingField,
+  type ImageRootTooBroadHandler,
+  imageRootTooBroadHandlerFacet,
   type PasteImagesHandler,
   setImageDocPathEffect,
+  setImageRootSettingEffect,
 } from "./images";
 import { createFileKeymap, type FileCommandHandlers } from "./keymaps";
 import {
@@ -52,6 +56,8 @@ export interface CreateEditorOptions {
   onMathAutoNumberChange?: (enabled: boolean) => void;
   onOpenRelativeLink?: RelativeLinkHandler;
   onPasteImages?: PasteImagesHandler;
+  /** IM-04: the image root (setting or front matter) was refused as too broad. */
+  onImageRootTooBroad?: ImageRootTooBroadHandler;
 }
 
 export interface SetContentOptions {
@@ -77,6 +83,9 @@ export interface KalamosEditor {
   markDirty: () => void;
   /** Path of the current document (null = untitled); used to resolve relative image paths. */
   setDocumentPath: (path: string | null) => void;
+  /** IM-04: image root folder setting (null = none). */
+  setImageRootDir: (path: string | null) => void;
+  getImageRootDir: () => string | null;
   destroy: () => void;
 }
 
@@ -135,6 +144,10 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
         ? [relativeLinkHandlerFacet.of(options.onOpenRelativeLink)]
         : []),
       imageDocPathField,
+      imageRootSettingField,
+      ...(options.onImageRootTooBroad
+        ? [imageRootTooBroadHandlerFacet.of(options.onImageRootTooBroad)]
+        : []),
       ...(options.onPasteImages ? [imagePasteHandler(options.onPasteImages)] : []),
       history(),
       EditorView.lineWrapping,
@@ -280,6 +293,15 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
     view.dispatch({ effects: setImageDocPathEffect.of(path) });
   }
 
+  function setImageRootDir(path: string | null): void {
+    if (view.state.field(imageRootSettingField) === path) return;
+    view.dispatch({ effects: setImageRootSettingEffect.of(path) });
+  }
+
+  function getImageRootDir(): string | null {
+    return view.state.field(imageRootSettingField);
+  }
+
   function destroy(): void {
     view.destroy();
   }
@@ -310,6 +332,8 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
     markClean,
     markDirty,
     setDocumentPath,
+    setImageRootDir,
+    getImageRootDir,
     destroy,
   };
 }

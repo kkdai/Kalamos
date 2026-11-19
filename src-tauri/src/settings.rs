@@ -26,6 +26,8 @@ pub struct Settings {
     pub source_mode: bool,
     pub code_line_numbers: bool,
     pub math_auto_number: bool,
+    /// IM-04: folder that `/`-rooted image paths resolve against.
+    pub image_root_dir: Option<String>,
 }
 
 impl Default for Settings {
@@ -38,6 +40,7 @@ impl Default for Settings {
             source_mode: false,
             code_line_numbers: false,
             math_auto_number: false,
+            image_root_dir: None,
         }
     }
 }
@@ -111,6 +114,7 @@ mod tests {
         assert_eq!(v["sourceMode"], false);
         assert_eq!(v["codeLineNumbers"], false);
         assert_eq!(v["mathAutoNumber"], false);
+        assert!(v["imageRootDir"].is_null());
     }
 
     #[test]
@@ -124,6 +128,7 @@ mod tests {
             source_mode: true,
             code_line_numbers: true,
             math_auto_number: true,
+            image_root_dir: Some("/tmp/kalamos-test/blog".to_string()),
         };
         set_settings_in(dir.path(), &updated).expect("set_settings");
         let loaded = get_settings_in(dir.path()).expect("get_settings");
@@ -151,6 +156,31 @@ mod tests {
         assert!(!loaded.source_mode);
         assert!(!loaded.code_line_numbers);
         assert!(!loaded.math_auto_number);
+        assert_eq!(loaded.image_root_dir, None);
+    }
+
+    #[test]
+    fn image_root_dir_is_camel_case_and_optional() {
+        let dir = tempdir().expect("tempdir");
+        let settings_path = dir.path().join("settings.json");
+        // A settings file written before IM-04 (has mathAutoNumber, no imageRootDir).
+        fs::write(
+            &settings_path,
+            r#"{ "theme": "melan", "codeLineNumbers": true, "mathAutoNumber": true }"#,
+        )
+        .expect("write settings.json");
+        let loaded = get_settings_in(dir.path()).expect("load settings");
+        assert_eq!(loaded.image_root_dir, None);
+        assert!(loaded.math_auto_number);
+
+        fs::write(&settings_path, r#"{ "imageRootDir": "/Users/me/blog" }"#)
+            .expect("write settings.json");
+        let loaded = get_settings_in(dir.path()).expect("load settings");
+        assert_eq!(loaded.image_root_dir.as_deref(), Some("/Users/me/blog"));
+        assert_eq!(loaded.theme, "system");
+
+        let v = serde_json::to_value(&loaded).unwrap();
+        assert_eq!(v["imageRootDir"], "/Users/me/blog");
     }
 
     #[test]

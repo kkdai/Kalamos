@@ -76,6 +76,8 @@ export interface Settings {
   sourceMode: boolean;
   codeLineNumbers?: boolean;
   mathAutoNumber?: boolean;
+  /** IM-04: folder that `/`-rooted image paths resolve against. */
+  imageRootDir?: string | null;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -86,6 +88,7 @@ export const DEFAULT_SETTINGS: Settings = {
   sourceMode: false,
   codeLineNumbers: false,
   mathAutoNumber: false,
+  imageRootDir: null,
 };
 
 export const MAX_EXCERPT_CHARS = 120;
@@ -744,6 +747,7 @@ export async function setSettings(settings: Settings): Promise<null> {
     codeLineNumbers:
       settings.codeLineNumbers ?? DEFAULT_SETTINGS.codeLineNumbers,
     mathAutoNumber: settings.mathAutoNumber ?? DEFAULT_SETTINGS.mathAutoNumber,
+    imageRootDir: settings.imageRootDir ?? DEFAULT_SETTINGS.imageRootDir,
   };
   return null;
 }
@@ -999,6 +1003,22 @@ export async function importImageBytes(
 }
 
 /** Allow a folder (or a file's folder) in the asset protocol scope. */
+/** Message prefix of the Rust `allow_asset_dir` "too broad" rejection. */
+export const ASSET_DIR_TOO_BROAD_MESSAGE = "Image root folder is too broad";
+/** Home folder used by the in-memory mock for the "too broad" check. */
+export const MOCK_HOME_DIR = "/Users/kalamos";
+
+/** True when `allowAssetDir` refused a folder for being `/` or home / an ancestor of home. */
+export function isAssetDirTooBroadError(err: unknown): boolean {
+  const e = err as Partial<AppError> | null;
+  return (
+    !!e &&
+    e.kind === "InvalidPath" &&
+    typeof e.message === "string" &&
+    e.message.startsWith(ASSET_DIR_TOO_BROAD_MESSAGE)
+  );
+}
+
 export async function allowAssetDir(path: string): Promise<null> {
   if (isTauri()) {
     return invoke<null>("allow_asset_dir", { path });
@@ -1008,7 +1028,15 @@ export async function allowAssetDir(path: string): Promise<null> {
   }
   const norm = normalizePath(path);
   // Like the Rust command: a file path allows its parent folder.
-  mockAllowedAssetDirs.add(mockFiles.has(norm) ? dirnameOf(norm) : norm);
+  if (mockFiles.has(norm)) {
+    mockAllowedAssetDirs.add(dirnameOf(norm));
+    return null;
+  }
+  // Like the Rust command: refuse `/` and the home folder or any ancestor of it.
+  if (norm === "/" || MOCK_HOME_DIR === norm || MOCK_HOME_DIR.startsWith(`${norm}/`)) {
+    throw createAppError("InvalidPath", `${ASSET_DIR_TOO_BROAD_MESSAGE}: ${path}`);
+  }
+  mockAllowedAssetDirs.add(norm);
   return null;
 }
 
