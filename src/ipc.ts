@@ -82,6 +82,12 @@ export interface Settings {
   focusMode?: boolean;
   /** WM-02 Stichos typewriter mode (F9). */
   typewriterMode?: boolean;
+  /** IM-05: image upload program (absolute path or a name in PATH); null = not configured. */
+  uploadCommand?: string | null;
+  /** IM-05: fixed arguments placed before the image paths. */
+  uploadArgs?: string[];
+  /** IM-05: upload pasted / dropped images right after importing them. */
+  uploadOnInsert?: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -95,6 +101,9 @@ export const DEFAULT_SETTINGS: Settings = {
   imageRootDir: null,
   focusMode: false,
   typewriterMode: false,
+  uploadCommand: null,
+  uploadArgs: [],
+  uploadOnInsert: false,
 };
 
 export const MAX_EXCERPT_CHARS = 120;
@@ -295,6 +304,8 @@ export function resetMockState(): void {
   mockFileDropListeners.clear();
   mockPdfExports.length = 0;
   mockExportPdfHandler = null;
+  mockUploadHandler = null;
+  mockUploadCalls.length = 0;
   mockPandocStatus = { ...DEFAULT_MOCK_PANDOC_STATUS };
   mockPandocExports.length = 0;
   mockPandocExportHandler = null;
@@ -760,6 +771,11 @@ export async function setSettings(settings: Settings): Promise<null> {
     imageRootDir: settings.imageRootDir ?? DEFAULT_SETTINGS.imageRootDir,
     focusMode: settings.focusMode ?? DEFAULT_SETTINGS.focusMode,
     typewriterMode: settings.typewriterMode ?? DEFAULT_SETTINGS.typewriterMode,
+    // Like Rust set_settings: the upload command / args are only ever read from
+    // the settings file, never written by the app (IM-05 defence in depth).
+    uploadCommand: mockSettings.uploadCommand ?? DEFAULT_SETTINGS.uploadCommand,
+    uploadArgs: [...(mockSettings.uploadArgs ?? DEFAULT_SETTINGS.uploadArgs ?? [])],
+    uploadOnInsert: settings.uploadOnInsert ?? DEFAULT_SETTINGS.uploadOnInsert,
   };
   return null;
 }
@@ -1327,4 +1343,50 @@ export function setMockPandocExportHandler(handler: MockPandocExportHandler | nu
 
 export function setMockPandocImportHandler(handler: MockPandocImportHandler | null): void {
   mockPandocImportHandler = handler;
+}
+
+// ---------------------------------------------------------------------------
+// Image upload (IM-05)
+// ---------------------------------------------------------------------------
+
+export const UPLOADER_NOT_CONFIGURED_MESSAGE = "尚未設定圖床上傳指令（見 docs/image-upload.md）";
+
+export interface UploadResult {
+  /** One URL per path, same order. */
+  urls: string[];
+}
+
+type MockUploadHandler = (paths: string[]) => UploadResult | Promise<UploadResult>;
+let mockUploadHandler: MockUploadHandler | null = null;
+const mockUploadCalls: string[][] = [];
+
+/** Upload local images with the uploader configured in settings (uploadCommand / uploadArgs). */
+export async function uploadImages(paths: string[]): Promise<UploadResult> {
+  if (isTauri()) {
+    return invoke<UploadResult>("upload_images", { paths });
+  }
+  mockUploadCalls.push([...paths]);
+  if (mockUploadHandler) return mockUploadHandler(paths);
+  if (!mockSettings.uploadCommand || !mockSettings.uploadCommand.trim()) {
+    throw createAppError("NotFound", UPLOADER_NOT_CONFIGURED_MESSAGE);
+  }
+  return {
+    urls: paths.map((p) => {
+      const name = normalizePath(p).split("/").pop() ?? "image";
+      return `https://mock-images.kalamos.test/${encodeURIComponent(name)}`;
+    }),
+  };
+}
+
+/** Mock stand-in for the user editing `uploadCommand` / `uploadArgs` in settings.json. */
+export function seedMockUploadSettings(uploadCommand: string | null, uploadArgs: string[] = []): void {
+  mockSettings = { ...mockSettings, uploadCommand, uploadArgs: [...uploadArgs] };
+}
+
+export function setMockUploadHandler(handler: MockUploadHandler | null): void {
+  mockUploadHandler = handler;
+}
+
+export function getMockUploadCalls(): string[][] {
+  return mockUploadCalls.map((c) => [...c]);
 }

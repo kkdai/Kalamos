@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
+  seedMockUploadSettings,
   clearRecovery,
   createFile,
   DEFAULT_SETTINGS,
@@ -94,11 +95,35 @@ describe("ipc in-memory mock (api.yaml contract)", () => {
       imageRootDir: "/tmp/kalamos-test/blog",
     };
     await setSettings(updated);
-    // Settings saved before WM-01 / WM-02 get the new keys' defaults.
-    expect(await getSettings()).toEqual({ ...updated, focusMode: false, typewriterMode: false });
+    // Settings saved before WM-01 / WM-02 / IM-05 get the new keys' defaults.
+    expect(await getSettings()).toEqual({
+      ...updated,
+      focusMode: false,
+      typewriterMode: false,
+      uploadCommand: null,
+      uploadArgs: [],
+      uploadOnInsert: false,
+    });
 
     await setSettings({ ...updated, focusMode: true, typewriterMode: true });
     expect(await getSettings()).toMatchObject({ focusMode: true, typewriterMode: true });
+
+    // IM-05: the app can never set the upload command / args (only the file can)…
+    await setSettings({
+      ...updated,
+      uploadCommand: "/bin/sh",
+      uploadArgs: ["-c", "touch /tmp/kalamos-test/pwned"],
+      uploadOnInsert: true,
+    });
+    expect(await getSettings()).toMatchObject({ uploadCommand: null, uploadArgs: [], uploadOnInsert: true });
+    // …and app writes keep what the user put in the file.
+    seedMockUploadSettings("/tmp/kalamos-test/bin/picgo", ["upload"]);
+    await setSettings({ ...(await getSettings()), uploadCommand: null, uploadArgs: [], theme: "papyros" });
+    expect(await getSettings()).toMatchObject({
+      theme: "papyros",
+      uploadCommand: "/tmp/kalamos-test/bin/picgo",
+      uploadArgs: ["upload"],
+    });
   });
 
   it("preloads /demo folder with mixed CJK/English, H1-H6 headings, and a subfolder", async () => {

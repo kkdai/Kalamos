@@ -32,6 +32,12 @@ pub struct Settings {
     pub focus_mode: bool,
     /// WM-02 Stichos typewriter mode (F9).
     pub typewriter_mode: bool,
+    /// IM-05: image upload program (absolute path or a name found in PATH).
+    pub upload_command: Option<String>,
+    /// IM-05: fixed arguments before the image paths.
+    pub upload_args: Vec<String>,
+    /// IM-05: upload pasted / dropped images right after importing them.
+    pub upload_on_insert: bool,
 }
 
 impl Default for Settings {
@@ -47,6 +53,9 @@ impl Default for Settings {
             image_root_dir: None,
             focus_mode: false,
             typewriter_mode: false,
+            upload_command: None,
+            upload_args: Vec::new(),
+            upload_on_insert: false,
         }
     }
 }
@@ -72,13 +81,29 @@ pub fn get_settings_in(app_data_dir: &Path) -> Result<Settings, AppError> {
     }
 }
 
+/// Settings the WebView may never change (IM-05 defence in depth): the upload
+/// command runs a local program, so it is only ever taken from the file on
+/// disk. Whatever the frontend sends for these keys is replaced by the
+/// values currently stored (null / [] when the file has none).
+pub fn keep_protected_from_disk(incoming: &Settings, on_disk: &Settings) -> Settings {
+    Settings {
+        upload_command: on_disk.upload_command.clone(),
+        upload_args: on_disk.upload_args.clone(),
+        ..incoming.clone()
+    }
+}
+
+/// Writes `settings`, except the protected keys (`uploadCommand`, `uploadArgs`),
+/// which keep the values already in `settings.json`.
 pub fn set_settings_in(app_data_dir: &Path, settings: &Settings) -> Result<(), AppError> {
     fs::create_dir_all(app_data_dir)?;
     let settings_path = app_data_dir.join("settings.json");
     let settings_path_str = settings_path
         .to_str()
         .ok_or_else(|| AppError::invalid_path("Non-UTF-8 settings path"))?;
-    let json = serde_json::to_string_pretty(settings)?;
+    let on_disk = get_settings_in(app_data_dir)?;
+    let merged = keep_protected_from_disk(settings, &on_disk);
+    let json = serde_json::to_string_pretty(&merged)?;
     save_file_impl(settings_path_str, &json)?;
     Ok(())
 }
@@ -123,6 +148,9 @@ mod tests {
         assert!(v["imageRootDir"].is_null());
         assert_eq!(v["focusMode"], false);
         assert_eq!(v["typewriterMode"], false);
+        assert!(v["uploadCommand"].is_null());
+        assert_eq!(v["uploadArgs"], serde_json::json!([]));
+        assert_eq!(v["uploadOnInsert"], false);
     }
 
     #[test]
@@ -139,10 +167,59 @@ mod tests {
             image_root_dir: Some("/tmp/kalamos-test/blog".to_string()),
             focus_mode: true,
             typewriter_mode: true,
+            // Protected keys: cannot be written through set_settings (see below).
+            upload_command: None,
+            upload_args: Vec::new(),
+            upload_on_insert: true,
         };
         set_settings_in(dir.path(), &updated).expect("set_settings");
         let loaded = get_settings_in(dir.path()).expect("get_settings");
         assert_eq!(loaded, updated);
+    }
+
+    #[test]
+    fn set_settings_never_changes_the_upload_command_or_args() {
+        let dir = tempdir().expect("tempdir");
+        let settings_path = dir.path().join("settings.json");
+
+        // No file yet: whatever the frontend sends, the keys stay null / [].
+        let attempt = Settings {
+            upload_command: Some("/bin/sh".to_string()),
+            upload_args: vec!["-c".to_string(), "touch /tmp/kalamos-test/pwned".to_string()],
+            upload_on_insert: true,
+            theme: "melan".to_string(),
+            ..Settings::default()
+        };
+        set_settings_in(dir.path(), &attempt).expect("set_settings");
+        let raw: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(&settings_path).unwrap()).unwrap();
+        assert!(raw["uploadCommand"].is_null());
+        assert_eq!(raw["uploadArgs"], serde_json::json!([]));
+        // Other fields, including uploadOnInsert, are written normally.
+        assert_eq!(raw["theme"], "melan");
+        assert_eq!(raw["uploadOnInsert"], true);
+
+        // A user-edited file: its uploader survives any set_settings call.
+        fs::write(
+            &settings_path,
+            r#"{ "theme": "papyros", "uploadCommand": "/tmp/kalamos-test/bin/picgo", "uploadArgs": ["upload"] }"#,
+        )
+        .unwrap();
+        set_settings_in(dir.path(), &Settings { focus_mode: true, ..attempt.clone() }).expect("set_settings");
+        let loaded = get_settings_in(dir.path()).expect("load");
+        assert_eq!(loaded.upload_command.as_deref(), Some("/tmp/kalamos-test/bin/picgo"));
+        assert_eq!(loaded.upload_args, vec!["upload".to_string()]);
+        assert_eq!(loaded.theme, "melan");
+        assert!(loaded.focus_mode);
+        assert!(loaded.upload_on_insert);
+
+        // Clearing them from the frontend does not work either.
+        set_settings_in(
+            dir.path(),
+            &Settings { upload_command: None, upload_args: Vec::new(), ..loaded.clone() },
+        )
+        .expect("set_settings");
+        assert_eq!(get_settings_in(dir.path()).unwrap(), loaded);
     }
 
     #[test]
@@ -169,6 +246,35 @@ mod tests {
         assert_eq!(loaded.image_root_dir, None);
         assert!(!loaded.focus_mode);
         assert!(!loaded.typewriter_mode);
+        assert_eq!(loaded.upload_command, None);
+        assert!(loaded.upload_args.is_empty());
+        assert!(!loaded.upload_on_insert);
+    }
+
+    #[test]
+    fn upload_settings_are_optional_and_camel_case() {
+        let dir = tempdir().expect("tempdir");
+        let settings_path = dir.path().join("settings.json");
+        // Written before IM-05: no upload keys.
+        fs::write(&settings_path, r#"{ "theme": "papyros", "focusMode": true }"#).unwrap();
+        let loaded = get_settings_in(dir.path()).expect("load settings");
+        assert!(loaded.focus_mode);
+        assert_eq!(loaded.upload_command, None);
+        assert!(loaded.upload_args.is_empty());
+        assert!(!loaded.upload_on_insert);
+
+        fs::write(
+            &settings_path,
+            r#"{ "uploadCommand": "/tmp/kalamos-test/bin/picgo", "uploadArgs": ["upload"], "uploadOnInsert": true }"#,
+        )
+        .unwrap();
+        let loaded = get_settings_in(dir.path()).expect("load settings");
+        assert_eq!(loaded.upload_command.as_deref(), Some("/tmp/kalamos-test/bin/picgo"));
+        assert_eq!(loaded.upload_args, vec!["upload".to_string()]);
+        assert!(loaded.upload_on_insert);
+        // Writing back what was read keeps everything.
+        set_settings_in(dir.path(), &loaded).unwrap();
+        assert_eq!(get_settings_in(dir.path()).unwrap(), loaded);
     }
 
     #[test]

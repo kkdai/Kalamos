@@ -126,7 +126,11 @@ paths:
         '200': { description: settings, content: { application/json: { schema: { $ref: '#/components/schemas/Settings' } } } }
   /invoke/set_settings:
     post:
-      summary: Replace settings (persisted to app data settings.json).
+      summary: |
+        Replace settings (persisted to app data settings.json). Protected keys `uploadCommand` and
+        `uploadArgs` (IM-05) are ignored: the values already in settings.json are kept (null / [] when
+        absent), so the WebView can never choose the program `upload_images` runs. get_settings still
+        returns them.
       requestBody:
         content: { application/json: { schema: { type: object, required: [settings], properties: { settings: { $ref: '#/components/schemas/Settings' } } } } }
       responses:
@@ -283,6 +287,29 @@ paths:
       responses:
         '200': { description: converted, content: { application/json: { schema: { $ref: '#/components/schemas/PandocImport' } } } }
         default: { $ref: '#/components/responses/Error' }
+  /invoke/upload_images:
+    post:
+      summary: |
+        IM-05. Upload local images with the uploader configured in settings (`uploadCommand` +
+        `uploadArgs`; never from document content). Runs `uploadCommand uploadArgs… paths…` as an
+        argument vector (no shell; a bare command name is looked up in PATH, /opt/homebrew/bin,
+        /usr/local/bin). The command must print one http(s) URL per image on stdout; the last N URL
+        lines are returned in input order. Every path must be an absolute, existing file with a
+        png/jpg/jpeg/gif/webp/svg extension (directories refused) — validated before anything runs.
+        Errors: uploader not configured → NotFound "尚未設定圖床上傳指令（見 docs/image-upload.md）";
+        bad path → InvalidPath / NotFound; non-zero exit (stderr tail in the message) or 60 s timeout
+        (child killed) → Io; fewer URLs than images → Parse. No partial results.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [paths]
+              properties: { paths: { type: array, items: { type: string } } }
+            example: { paths: [/tmp/kalamos-test/notes/assets/cat.png] }
+      responses:
+        '200': { description: uploaded, content: { application/json: { schema: { $ref: '#/components/schemas/UploadResult' }, example: { urls: [https://img.example.test/cat.png] } } } }
+        default: { $ref: '#/components/responses/Error' }
 components:
   schemas:
     PandocFormat: { type: string, enum: [docx, odt, latex, mediawiki, epub] }
@@ -333,6 +360,13 @@ components:
         imageRootDir: { type: [string, 'null'], default: null, description: "IM-04 image root folder: '/'-rooted image paths resolve under it; a document's front matter typora-root-url overrides it" }
         focusMode: { type: boolean, default: false, description: 'WM-01 Ataraxia focus mode (F8)' }
         typewriterMode: { type: boolean, default: false, description: 'WM-02 Stichos typewriter mode (F9)' }
+        uploadCommand: { type: [string, 'null'], default: null, description: 'IM-05 image upload program (absolute path or a name in PATH); null = not configured. Read-only for the app: only set by editing settings.json (set_settings keeps the stored value)' }
+        uploadArgs: { type: array, items: { type: string }, default: [], description: 'IM-05 fixed arguments placed before the image paths. Read-only for the app, like uploadCommand' }
+        uploadOnInsert: { type: boolean, default: false, description: 'IM-05 upload pasted / dropped images right after importing them' }
+    UploadResult:
+      type: object
+      required: [urls]
+      properties: { urls: { type: array, items: { type: string }, description: one URL per input path, same order } }
     ImportedImage:
       type: object
       required: [relativePath]

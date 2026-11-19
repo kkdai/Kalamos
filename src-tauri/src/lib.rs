@@ -8,6 +8,7 @@ pub mod recovery;
 pub mod settings;
 pub mod themes;
 pub mod tree;
+pub mod upload;
 pub mod watch;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -39,6 +40,7 @@ pub fn run() {
             pandoc::pandoc_status,
             pandoc::export_pandoc,
             pandoc::import_pandoc,
+            upload::upload_images,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

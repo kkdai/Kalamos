@@ -37,6 +37,7 @@ import {
   imageExtFromMime,
   readFileAsBase64,
 } from "./editor/images";
+import { collectUploadTargetsInRange, uploadImagesInEditor } from "./editor/image-upload";
 import { bindWindowShortcuts } from "./editor/keymaps";
 import { FOCUS_MODE_MESSAGE, TYPEWRITER_MODE_MESSAGE } from "./editor/writing-modes";
 import { createWordCounter, type WordCounter } from "./editor/word-count-view";
@@ -69,6 +70,8 @@ import {
   pickSavePdfPath,
   saveFile,
   setSettings,
+  UPLOADER_NOT_CONFIGURED_MESSAGE,
+  uploadImages,
   writeRecovery,
   type RecoveryEntry,
   type Settings,
@@ -141,6 +144,8 @@ export interface KalamosApp {
   newDocument: () => Promise<boolean>;
   /** IM-04: pick the image root folder (Cmd+Opt+R); false when cancelled. */
   pickImageRootDir: () => Promise<boolean>;
+  /** IM-05: upload the local images under the cursor (or all of them) and use the URLs (Cmd+Opt+U). */
+  uploadDocumentImages: () => Promise<boolean>;
   /** IM-04: set (path) or clear (null, Cmd+Opt+Shift+R) the image root folder. */
   setImageRootDir: (path: string | null) => Promise<void>;
   getImageRootDir: () => string | null;
@@ -638,6 +643,10 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
     } else if (event.code === "KeyI") {
       event.preventDefault();
       void importDocument();
+    } else if (event.code === "KeyU") {
+      // IM-05: Cmd+Opt+U uploads images to the configured image host.
+      event.preventDefault();
+      void uploadDocumentImages();
     }
   };
   window.addEventListener("keydown", onPandocKeydown);
@@ -680,13 +689,58 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
     if (currentPath !== docPath) return false;
     const { view } = editor;
     const anchor = Math.min(pos, view.state.doc.length);
+    const lengthBefore = view.state.doc.length;
     insertImageMarkdown(view, anchor, relativePaths);
     if (lastError !== null) {
       setStatus(formatErrorMessage("部分圖片插入失敗", lastError), true);
     } else {
       setStatus("", false);
     }
+    const settings = await refreshUploadSettings();
+    if (settings.uploadOnInsert && lastError === null && currentPath === docPath) {
+      const insertedTo = anchor + (view.state.doc.length - lengthBefore);
+      await runImageUpload(collectUploadTargetsInRange(view.state, anchor, insertedTo));
+    }
     return true;
+  }
+
+  /** Upload settings are read from disk each time (settings.json may have been edited). */
+  async function refreshUploadSettings(): Promise<Settings> {
+    const fresh = await getSettings().catch(() => null);
+    if (fresh) {
+      currentSettings = {
+        ...currentSettings,
+        uploadCommand: fresh.uploadCommand ?? null,
+        uploadArgs: fresh.uploadArgs ?? [],
+        uploadOnInsert: Boolean(fresh.uploadOnInsert),
+      };
+    }
+    return currentSettings;
+  }
+
+  let uploadingImages = false;
+
+  async function runImageUpload(targets?: Parameters<typeof uploadImagesInEditor>[0]["targets"]): Promise<boolean> {
+    if (uploadingImages) return false;
+    uploadingImages = true;
+    try {
+      const settings = await refreshUploadSettings();
+      const result = await uploadImagesInEditor({
+        view: editor.view,
+        uploader: settings.uploadCommand,
+        upload: uploadImages,
+        setStatus,
+        targets,
+        notConfiguredMessage: UPLOADER_NOT_CONFIGURED_MESSAGE,
+      });
+      return result.error === null && result.replaced > 0;
+    } finally {
+      uploadingImages = false;
+    }
+  }
+
+  async function uploadDocumentImages(): Promise<boolean> {
+    return runImageUpload();
   }
 
   async function dropImageFiles(
@@ -951,6 +1005,7 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
     saveDocumentAs,
     newDocument,
     pickImageRootDir,
+    uploadDocumentImages,
     setImageRootDir,
     getImageRootDir: () => editor.getImageRootDir(),
     exportDocumentAs,
