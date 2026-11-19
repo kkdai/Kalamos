@@ -1,8 +1,19 @@
+import "@fontsource/source-serif-4";
+import "@fontsource/noto-serif-tc";
+import "@fontsource/inter";
+import "@fontsource/noto-sans-tc";
+import "@fontsource/jetbrains-mono";
+import "./styles/tokens.css";
+import "./styles/themes/papyros.css";
+import "./styles/themes/melan.css";
+import "./styles/editor.css";
+
 import { createEditor, type KalamosEditor } from "./editor";
 import { bindWindowShortcuts } from "./editor/keymaps";
 import {
   askDiscardChanges,
   clearRecovery,
+  DEFAULT_SETTINGS,
   getSettings,
   listRecovery,
   onWindowCloseRequested,
@@ -10,12 +21,23 @@ import {
   pickOpenFilePath,
   pickSaveFilePath,
   saveFile,
+  setSettings,
   writeRecovery,
   type RecoveryEntry,
+  type Settings,
 } from "./ipc";
 
 export const NAMED_AUTOSAVE_DELAY_MS = 1000;
 export const UNTITLED_RECOVERY_INTERVAL_MS = 5000;
+
+export function applyTheme(theme: string): void {
+  if (typeof document === "undefined") return;
+  if (!theme || theme === "system") {
+    document.documentElement.removeAttribute("data-theme");
+  } else {
+    document.documentElement.setAttribute("data-theme", theme);
+  }
+}
 
 function generateDocId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -66,6 +88,7 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
   let autosaveTimer: ReturnType<typeof setTimeout> | null = null;
   let unlistenClose: (() => void) | null = null;
   let statusText = "";
+  let currentSettings: Settings = { ...DEFAULT_SETTINGS };
 
   function setStatus(message: string, isError = false): void {
     statusText = message;
@@ -147,6 +170,11 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
     return true;
   }
 
+  async function persistSourceMode(sourceMode: boolean): Promise<void> {
+    currentSettings = { ...currentSettings, sourceMode };
+    await setSettings(currentSettings).catch(() => null);
+  }
+
   const handlers = {
     onOpenFile: async () => {
       await openDocument();
@@ -171,9 +199,23 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
         scheduleNamedAutosave();
       }
     },
+    onSourceModeChange: (sourceMode) => {
+      void persistSourceMode(sourceMode);
+    },
   });
 
-  const unbindShortcuts = bindWindowShortcuts(window, handlers);
+  const windowHandlers = {
+    ...handlers,
+    onToggleSourceMode: () => {
+      editor.toggleSourceMode();
+    },
+  };
+
+  const unbindShortcuts = bindWindowShortcuts(
+    window,
+    windowHandlers,
+    () => editor.view,
+  );
 
   const recoveryInterval = setInterval(() => {
     if (currentPath === null && editor.isDirty()) {
@@ -299,7 +341,12 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
     unlistenClose = await onWindowCloseRequested(async () => {
       await flushBeforeClose();
     });
-    await getSettings().catch(() => null);
+    const settings = await getSettings().catch(() => null);
+    if (settings) {
+      currentSettings = { ...settings };
+      applyTheme(settings.theme);
+      editor.setSourceMode(Boolean(settings.sourceMode), false);
+    }
     const entries = await listRecovery().catch(() => []);
     if (entries.length > 0) {
       pendingRecovery = entries[0];
