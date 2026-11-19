@@ -81,6 +81,42 @@ export function isAllowedExternalUrl(rawUrl: string): boolean {
   }
 }
 
+export function navigateMarkdownLink(
+  rawUrl: string,
+  view: EditorView,
+): boolean {
+  const url = rawUrl.trim();
+  if (!url) return false;
+
+  // 1. Heading anchor `#slug`
+  if (url.startsWith("#")) {
+    jumpToHeadingSlug(view, url.slice(1));
+    return true;
+  }
+
+  // 2. Relative `.md` / `.markdown` link (with optional `#slug`)
+  const relativeTarget = parseRelativeMarkdownLink(url);
+  if (relativeTarget) {
+    const handler = view.state.facet(relativeLinkHandlerFacet)[0];
+    if (handler) {
+      void handler(relativeTarget.pathPart, relativeTarget.slugPart, view);
+    }
+    return true;
+  }
+
+  // 3. External `http:` / `https:` / `mailto:` link
+  if (!isAllowedExternalUrl(url)) return false;
+  if (isTauri()) {
+    void openUrl(url).catch(() => null);
+  } else if (
+    typeof window !== "undefined" &&
+    typeof window.open === "function"
+  ) {
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+  return true;
+}
+
 export function isSelectionTouchingRange(
   selection: EditorSelection,
   from: number,
@@ -111,6 +147,10 @@ export function collectLivePreviewSpecsInRanges(
       enter: (nodeRef) => {
         const { name, from, to } = nodeRef;
         if (from >= to) return;
+
+        if (name === "Table" && !isSelectionTouchingRange(selection, from, to)) {
+          return false;
+        }
 
         const headingLevel = HEADING_LEVEL_BY_NODE[name];
         const inlineInfo = INLINE_CLASS_BY_NODE[name];
@@ -441,41 +481,11 @@ export const livePreviewPlugin = ViewPlugin.fromClass(
           checkPos ?? view.state.selection.main.head,
         );
         if (!url) return false;
-
-        // 1. Heading anchor `#slug`
-        if (url.startsWith("#")) {
+        if (navigateMarkdownLink(url, view)) {
           event.preventDefault();
-          jumpToHeadingSlug(view, url.slice(1));
           return true;
         }
-
-        // 2. Relative `.md` / `.markdown` link (with optional `#slug`)
-        const relativeTarget = parseRelativeMarkdownLink(url);
-        if (relativeTarget) {
-          event.preventDefault();
-          const handler = view.state.facet(relativeLinkHandlerFacet)[0];
-          if (handler) {
-            void handler(
-              relativeTarget.pathPart,
-              relativeTarget.slugPart,
-              view,
-            );
-          }
-          return true;
-        }
-
-        // 3. External `http:` / `https:` / `mailto:` link
-        if (!isAllowedExternalUrl(url)) return false;
-        event.preventDefault();
-        if (isTauri()) {
-          void openUrl(url).catch(() => null);
-        } else if (
-          typeof window !== "undefined" &&
-          typeof window.open === "function"
-        ) {
-          window.open(url, "_blank", "noopener,noreferrer");
-        }
-        return true;
+        return false;
       },
     },
   },

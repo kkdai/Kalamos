@@ -10,6 +10,12 @@ import {
   toggleOrderedList,
   toggleTaskList,
 } from "./lists";
+import {
+  handleTableEnter,
+  handleTableShiftTab,
+  handleTableTab,
+  insertDefaultTable,
+} from "./tables";
 
 export interface FileCommandHandlers {
   onOpenFile: () => void | Promise<void>;
@@ -182,7 +188,7 @@ export function createFileKeymap(handlers: FileCommandHandlers): KeyBinding[] {
   return [
     {
       key: "Enter",
-      run: (view) => handleListEnter(view),
+      run: (view) => handleTableEnter(view) || handleListEnter(view),
     },
     {
       key: "Backspace",
@@ -190,11 +196,16 @@ export function createFileKeymap(handlers: FileCommandHandlers): KeyBinding[] {
     },
     {
       key: "Tab",
-      run: (view) => indentListItem(view),
+      run: (view) => handleTableTab(view) || indentListItem(view),
     },
     {
       key: "Shift-Tab",
-      run: (view) => outdentListItem(view),
+      run: (view) => handleTableShiftTab(view) || outdentListItem(view),
+    },
+    {
+      key: "Mod-Alt-t",
+      preventDefault: true,
+      run: (view) => insertDefaultTable(view),
     },
     {
       key: "Mod-o",
@@ -302,7 +313,22 @@ export function bindWindowShortcuts(
   const listener = (rawEvent: Event) => {
     const event = rawEvent as KeyboardEvent;
     if (event.defaultPrevented) return;
-    if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
+    if (!(event.metaKey || event.ctrlKey)) return;
+
+    if (
+      event.altKey &&
+      !event.shiftKey &&
+      (event.key.toLowerCase() === "t" || event.code === "KeyT")
+    ) {
+      const view = getView?.();
+      if (view) {
+        event.preventDefault();
+        insertDefaultTable(view);
+      }
+      return;
+    }
+
+    if (event.altKey) return;
 
     const key = event.key.toLowerCase();
     if (key === "o" && !event.shiftKey) {

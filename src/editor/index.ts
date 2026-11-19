@@ -1,4 +1,5 @@
 import "./editor-blocks.css";
+import "./tables.css";
 
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
