@@ -1,0 +1,22 @@
+/**
+ * Kalamos Built-in Theme: Papyros (πάπυρος — 莎草紙，淺色)
+ * Color palette defined strictly per PRD §12.3.
+ */
+
+:root,
+:root[data-theme="papyros"],
+[data-theme="papyros"] {
+  color-scheme: light;
+
+  /* PRD §12.3 Palette */
+  --k-bg: #F5EFE0;
+  --k-surface: #EDE4CF;
+  --k-text: #2B2622;
+  --k-text-muted: #6E6355;
+  --k-accent: #5E7A4A;
+  --k-link: #A4552F;
+  --k-divider: #D9CDB3;
+
+  /* Derived semi-transparent selection from --k-link (#A4552F) */
+  --k-selection-bg: rgba(164, 85, 47, 0.22);
+}

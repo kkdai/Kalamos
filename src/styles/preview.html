@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="zh-Hant" data-theme="papyros">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kalamos — Papyros / Melan 主題與排版預覽</title>
+  <link rel="stylesheet" href="./tokens.css" />
+  <link rel="stylesheet" href="./themes/papyros.css" />
+  <link rel="stylesheet" href="./themes/melan.css" />
+  <link rel="stylesheet" href="./editor.css" />
+  <style>
+    /* Preview page controls & layout demo (uses Kalamos tokens exclusively) */
+    .preview-bar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 20px;
+      background-color: var(--k-surface);
+      border-bottom: 1px solid var(--k-divider);
+      font-family: var(--k-font-ui);
+      font-size: 13px;
+      color: var(--k-text);
+      transition:
+        background-color var(--k-transition),
+        border-color var(--k-transition),
+        color var(--k-transition);
+    }
+
+    .preview-brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+    }
+
+    .preview-brand-sub {
+      color: var(--k-text-muted);
+      font-weight: 400;
+    }
+
+    .preview-controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .preview-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      border-radius: 6px;
+      border: 1px solid var(--k-divider);
+      background-color: var(--k-bg);
+      color: var(--k-text);
+      font-family: var(--k-font-ui);
+      font-size: 13px;
+      cursor: pointer;
+      transition:
+        background-color var(--k-transition-fast),
+        border-color var(--k-transition-fast),
+        color var(--k-transition-fast);
+    }
+
+    .preview-btn:hover {
+      border-color: var(--k-accent);
+    }
+
+    .preview-btn[aria-pressed="true"] {
+      border-color: var(--k-accent);
+      box-shadow: inset 0 0 0 1px var(--k-accent);
+      font-weight: 600;
+    }
+
+    /* Swatch bar for inspecting the 7 PRD §12.3 tokens */
+    .preview-swatches {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+      gap: 8px;
+      margin: 20px 0 32px;
+      padding: 14px;
+      background-color: var(--k-surface);
+      border: 1px solid var(--k-divider);
+      border-radius: 8px;
+      font-family: var(--k-font-ui);
+      font-size: 12px;
+    }
+
+    .swatch-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .swatch-chip {
+      width: 22px;
+      height: 22px;
+      border-radius: 4px;
+      border: 1px solid var(--k-divider);
+      flex-shrink: 0;
+    }
+
+    .swatch-meta {
+      display: flex;
+      flex-direction: column;
+      line-height: 1.3;
+    }
+
+    .swatch-name {
+      font-family: var(--k-font-mono);
+      font-size: 11px;
+      color: var(--k-text);
+    }
+
+    .swatch-hex {
+      font-family: var(--k-font-mono);
+      font-size: 11px;
+      color: var(--k-text-muted);
+    }
+
+    .preview-list {
+      margin: 0.4em 0 0.8em;
+      padding-left: 1.5em;
+    }
+
+    .preview-list li {
+      margin: 0.25em 0;
+    }
+  </style>
+</head>
+<body>
+  <!-- Top theme switcher bar -->
+  <header class="preview-bar k-ui">
+    <div class="preview-brand">
+      <svg class="k-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M18.5 3.5L6 16l-2.5 4.5L8 18 20.5 5.5a1.4 1.4 0 0 0-2-2z" />
+        <path d="M4 20.5h16" />
+      </svg>
+      <span>Kalamos（κάλαμος）</span>
+      <span class="preview-brand-sub">Write, and it appears. ／ 落筆即成文</span>
+    </div>
+    <div class="preview-controls" role="toolbar" aria-label="主題與顯示切換">
+      <button
+        type="button"
+        class="preview-btn"
+        id="btn-papyros"
+        data-set-theme="papyros"
+        aria-pressed="true"
+      >
+        Papyros（莎草紙・淺色）
+      </button>
+      <button
+        type="button"
+        class="preview-btn"
+        id="btn-melan"
+        data-set-theme="melan"
+        aria-pressed="false"
+      >
+        Melan（墨・深色）
+      </button>
+      <button
+        type="button"
+        class="preview-btn"
+        id="btn-toggle-marks"
+        aria-pressed="false"
+      >
+        顯示隱藏語法符號 (.k-mark)
+      </button>
+    </div>
+  </header>
+
+  <!-- Simulated CodeMirror 6 Structure (.cm-editor > .cm-scroller > .cm-content > .cm-line) -->
+  <main class="cm-editor cm-focused">
+    <div class="cm-scroller">
+      <article class="cm-content" contenteditable="true" spellcheck="false" aria-label="Kalamos 編輯預覽區">
+        <!-- Heading 1 -->
+        <div class="cm-line k-h1"><span class="k-mark k-mark-hidden"># </span>Kalamos：蘆葦筆與莎草紙的書寫體驗</div>
+
+        <!-- Introductory mixed CJK/English paragraph -->
+        <div class="cm-line">Kalamos（古希臘語 <span class="k-em"><span class="k-mark k-mark-hidden">*</span>κάλαμος<span class="k-mark k-mark-hidden">*</span></span>）是以「蘆葦筆寫在莎草紙上」為核心意象的 WYSIWYM Markdown 編輯器。預設畫面只有一張安靜的紙，版心最寬 <span class="k-code"><span class="k-mark k-mark-hidden">`</span>720px<span class="k-mark k-mark-hidden">`</span></span>、字級 <span class="k-code"><span class="k-mark k-mark-hidden">`</span>17px<span class="k-mark k-mark-hidden">`</span></span>、行高 <span class="k-code"><span class="k-mark k-mark-hidden">`</span>1.75<span class="k-mark k-mark-hidden">`</span></span>（約每行 40 個中文字），讓中英混排的長文閱讀與寫作保持穩定節奏。</div>
+
+        <!-- Live palette swatch card -->
+        <div class="preview-swatches" contenteditable="false" aria-label="PRD §12.3 色票預覽">
+          <div class="swatch-item">
+            <span class="swatch-chip" style="background: var(--k-bg)"></span>
+            <div class="swatch-meta">
+              <span class="swatch-name">--k-bg</span>
+              <span class="swatch-hex" data-var="--k-bg"></span>
+            </div>
+          </div>
+          <div class="swatch-item">
+            <span class="swatch-chip" style="background: var(--k-surface)"></span>
+            <div class="swatch-meta">
+              <span class="swatch-name">--k-surface</span>
+              <span class="swatch-hex" data-var="--k-surface"></span>
+            </div>
+          </div>
+          <div class="swatch-item">
+            <span class="swatch-chip" style="background: var(--k-text)"></span>
+            <div class="swatch-meta">
+              <span class="swatch-name">--k-text</span>
+              <span class="swatch-hex" data-var="--k-text"></span>
+            </div>
+          </div>
+          <div class="swatch-item">
+            <span class="swatch-chip" style="background: var(--k-text-muted)"></span>
+            <div class="swatch-meta">
+              <span class="swatch-name">--k-text-muted</span>
+              <span class="swatch-hex" data-var="--k-text-muted"></span>
+            </div>
+          </div>
+          <div class="swatch-item">
+            <span class="swatch-chip" style="background: var(--k-accent)"></span>
+            <div class="swatch-meta">
+              <span class="swatch-name">--k-accent</span>
+              <span class="swatch-hex" data-var="--k-accent"></span>
+            </div>
+          </div>
+          <div class="swatch-item">
+            <span class="swatch-chip" style="background: var(--k-link)"></span>
+            <div class="swatch-meta">
+              <span class="swatch-name">--k-link</span>
+              <span class="swatch-hex" data-var="--k-link"></span>
+            </div>
+          </div>
+          <div class="swatch-item">
+            <span class="swatch-chip" style="background: var(--k-divider)"></span>
+            <div class="swatch-meta">
+              <span class="swatch-name">--k-divider</span>
+              <span class="swatch-hex" data-var="--k-divider"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Heading 2 -->
+        <div class="cm-line k-h2"><span class="k-mark k-mark-hidden">## </span>一、行內樣式與符號隱藏（無殘留空白）</div>
+
+        <div class="cm-line">在中文緊接的句子中輸入<span class="k-strong"><span class="k-mark k-mark-hidden">**</span>無空白粗體<span class="k-mark k-mark-hidden">**</span></span>、<span class="k-em"><span class="k-mark k-mark-hidden">*</span>斜體強調<span class="k-mark k-mark-hidden">*</span></span>或<span class="k-strike"><span class="k-mark k-mark-hidden">~~</span>刪除線文字<span class="k-mark k-mark-hidden">~~</span></span>時，<span class="k-code"><span class="k-mark k-mark-hidden">`</span>.k-mark-hidden<span class="k-mark k-mark-hidden">`</span></span> 透過 <span class="k-code"><span class="k-mark k-mark-hidden">`</span>font-size: 0; letter-spacing: 0<span class="k-mark k-mark-hidden">`</span></span> 收合寬度為 0px，字與字之間緊密銜接、不留任何空白；當游標進入該節點切回 <span class="k-code"><span class="k-mark k-mark-hidden">`</span>.k-mark<span class="k-mark k-mark-hidden">`</span></span> 時，符號以 <span class="k-code"><span class="k-mark k-mark-hidden">`</span>@keyframes<span class="k-mark k-mark-hidden">`</span></span>（<span class="k-code"><span class="k-mark k-mark-hidden">`</span>opacity 0 → 1, 150ms ease-out<span class="k-mark k-mark-hidden">`</span></span>）柔和淡入。支援赭紅色超連結 <a class="k-link" href="https://typora.io" onclick="return false;"><span class="k-mark k-mark-hidden">[</span>Typora 設計參考規格<span class="k-mark k-mark-hidden">](https://typora.io)</span></a> 與半透明赭紅（<span class="k-code">--k-link</span>）選取背景。</div>
+
+        <!-- Blockquote -->
+        <div class="cm-line k-blockquote"><span class="k-mark k-mark-hidden">&gt; </span>「紙先於工具，符號隱去，墨色有分量。」—— 蘆葦綠（<span class="k-code">--k-accent</span>）僅用於非文字 UI（引用左邊框、指示條、狀態圖示），次要文字（<span class="k-code">--k-text-muted</span>）維持 WCAG AA 對比度。</div>
+
+        <!-- Heading 3 -->
+        <div class="cm-line k-h3"><span class="k-mark k-mark-hidden">### </span>二、清單與技術筆記（Lists &amp; Code Blocks）</div>
+
+        <ul class="preview-list">
+          <li class="cm-line"><span class="k-strong"><span class="k-mark k-mark-hidden">**</span>Papyros（莎草紙）<span class="k-mark k-mark-hidden">**</span></span>：暖調紙面 <span class="k-code">#F5EFE0</span> 搭配深墨色文字 <span class="k-code">#2B2622</span>（對比度 13.05:1）。</li>
+          <li class="cm-line"><span class="k-strong"><span class="k-mark k-mark-hidden">**</span>Melan（墨）<span class="k-mark k-mark-hidden">**</span></span>：深墨底色 <span class="k-code">#1C1A17</span> 搭配溫潤羊皮紙白字 <span class="k-code">#E8E0D0</span>（對比度 13.23:1）。</li>
+          <li class="cm-line"><span class="k-strong"><span class="k-mark k-mark-hidden">**</span>中英混排字體<span class="k-mark k-mark-hidden">**</span></span>：英文 <span class="k-code">Source Serif 4</span> 搭配繁體中文 <span class="k-code">Noto Serif TC</span>，介面採用 <span class="k-code">Inter</span> 與 <span class="k-code">Noto Sans TC</span>。</li>
+        </ul>
+
+        <!-- Code block -->
+        <pre class="cm-line k-code-block"><code>// CodeMirror 6 decoration example with JetBrains Mono
+import { Decoration, EditorView } from "@codemirror/view";
+
+export function applyTheme(theme: "papyros" | "melan"): void {
+  document.documentElement.dataset.theme = theme;
+}</code></pre>
+
+        <!-- Horizontal Rule -->
+        <hr class="k-hr" />
+
+        <!-- Heading Hierarchy H1-H6 Showcase -->
+        <div class="cm-line k-h2"><span class="k-mark k-mark-hidden">## </span>三、標題層級一覽（H1 – H6）</div>
+        <div class="cm-line k-h1"><span class="k-mark k-mark-hidden"># </span>H1 一級標題 — Source Serif 4 &amp; 思源宋體</div>
+        <div class="cm-line k-h2"><span class="k-mark k-mark-hidden">## </span>H2 二級標題 — 章節分隔線與視覺重心</div>
+        <div class="cm-line k-h3"><span class="k-mark k-mark-hidden">### </span>H3 三級標題 — 技術段落子題</div>
+        <div class="cm-line k-h4"><span class="k-mark k-mark-hidden">#### </span>H4 四級標題 — 細節條目說明</div>
+        <div class="cm-line k-h5"><span class="k-mark k-mark-hidden">##### </span>H5 五級標題 — 補充小節</div>
+        <div class="cm-line k-h6"><span class="k-mark k-mark-hidden">###### </span>H6 六級標題 — 次要墨色（--k-text-muted）註記</div>
+      </article>
+    </div>
+  </main>
+
+  <script>
+    (function () {
+      const root = document.documentElement;
+      const themeButtons = document.querySelectorAll("[data-set-theme]");
+      const toggleMarksBtn = document.getElementById("btn-toggle-marks");
+      const varSpans = document.querySelectorAll("[data-var]");
+      let showMarks = false;
+
+      function updateVarReadout() {
+        const computed = getComputedStyle(root);
+        varSpans.forEach((el) => {
+          const cssVar = el.getAttribute("data-var");
+          el.textContent = computed.getPropertyValue(cssVar).trim();
+        });
+      }
+
+      function setTheme(theme) {
+        root.setAttribute("data-theme", theme);
+        themeButtons.forEach((btn) => {
+          const isCurrent = btn.getAttribute("data-set-theme") === theme;
+          btn.setAttribute("aria-pressed", String(isCurrent));
+        });
+        updateVarReadout();
+      }
+
+      themeButtons.forEach((btn) => {
+        btn.addEventListener("click", () => {
+          setTheme(btn.getAttribute("data-set-theme"));
+        });
+      });
+
+      toggleMarksBtn.addEventListener("click", () => {
+        showMarks = !showMarks;
+        toggleMarksBtn.setAttribute("aria-pressed", String(showMarks));
+        document.querySelectorAll(".k-mark").forEach((el) => {
+          el.classList.toggle("k-mark-hidden", !showMarks);
+        });
+      });
+
+      updateVarReadout();
+    })();
+  </script>
+</body>
+</html>
