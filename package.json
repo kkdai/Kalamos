@@ -29,7 +29,9 @@
     "@tauri-apps/plugin-dialog": "^2.0.0",
     "@tauri-apps/plugin-opener": "^2.0.0",
     "codemirror": "^6.0.1",
-    "mathjax-full": "^3.2.1"
+    "dompurify": "^3.4.18",
+    "mathjax-full": "^3.2.1",
+    "mermaid": "^12.3.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.65.1",
