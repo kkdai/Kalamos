@@ -1,0 +1,27 @@
+/**
+ * Kalamos Design Tokens (PRD §12.4–12.5)
+ * Shared variables for typography, layout dimensions, and motion.
+ */
+
+:root {
+  /* Typography — Font stacks (PRD §12.4) */
+  --k-font-body: "Source Serif 4", "Noto Serif TC", serif;
+  --k-font-ui: Inter, "Noto Sans TC", sans-serif;
+  --k-font-mono: "JetBrains Mono", monospace;
+
+  /* Typography — Size & Rhythm (PRD §12.4) */
+  --k-font-size: 17px;
+  --k-line-height: 1.75;
+
+  /* Layout — Content Measure (PRD §12.4: ~40 CJK chars per line) */
+  --k-max-width: 720px;
+
+  /* Cursor & Iconography (PRD §12.5) */
+  --k-cursor-width: 2px;
+  --k-icon-stroke-width: 1.5px;
+
+  /* Motion — Quiet feedback, 150–200ms ease-out (PRD §12.5) */
+  --k-transition-fast: 150ms ease-out;
+  --k-transition: 180ms ease-out;
+  --k-transition-slow: 200ms ease-out;
+}

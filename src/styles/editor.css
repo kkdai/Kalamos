@@ -1,0 +1,299 @@
+/**
+ * Kalamos Editor & Typography Styles (PRD §12.3–12.5)
+ * Styles CodeMirror 6 content area (.cm-editor, .cm-content, .cm-line)
+ * and live-preview Markdown decorations (.k-h1…h6, .k-strong, .k-em,
+ * .k-code, .k-link, .k-blockquote, .k-hr, .k-mark, .k-mark-hidden).
+ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  background-color: var(--k-bg);
+  color: var(--k-text);
+  font-family: var(--k-font-body);
+  font-size: var(--k-font-size, 17px);
+  line-height: var(--k-line-height, 1.75);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  transition:
+    background-color var(--k-transition, 180ms ease-out),
+    color var(--k-transition, 180ms ease-out);
+}
+
+/* ==========================================================================
+   Selection — Semi-transparent --k-link (赭紅) per PRD §12.3 & Issue #2
+   ========================================================================== */
+
+::selection,
+.cm-content ::selection,
+.cm-line ::selection {
+  background-color: var(--k-selection-bg, rgba(164, 85, 47, 0.22));
+  background-color: color-mix(in srgb, var(--k-link) 22%, transparent);
+}
+
+.cm-editor .cm-selectionBackground,
+.cm-editor.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground {
+  background-color: var(--k-selection-bg, rgba(164, 85, 47, 0.22)) !important;
+  background-color: color-mix(in srgb, var(--k-link) 22%, transparent) !important;
+}
+
+/* ==========================================================================
+   CodeMirror 6 Core Layout (.cm-editor, .cm-content, .cm-line)
+   ========================================================================== */
+
+.cm-editor {
+  height: 100%;
+  min-height: 100vh;
+  background-color: var(--k-bg);
+  color: var(--k-text);
+  font-family: var(--k-font-body);
+  font-size: var(--k-font-size, 17px);
+  line-height: var(--k-line-height, 1.75);
+}
+
+.cm-editor.cm-focused {
+  outline: none;
+}
+
+.cm-scroller {
+  font-family: var(--k-font-body);
+  line-height: var(--k-line-height, 1.75);
+  overflow-y: auto;
+}
+
+.cm-content {
+  width: 100%;
+  max-width: var(--k-max-width, 720px);
+  margin: 0 auto;
+  padding: 56px 32px 120px;
+  font-family: var(--k-font-body);
+  font-size: var(--k-font-size, 17px);
+  line-height: var(--k-line-height, 1.75);
+  color: var(--k-text);
+  caret-color: var(--k-text);
+}
+
+.cm-line {
+  padding: 0;
+  font-family: inherit;
+  line-height: var(--k-line-height, 1.75);
+  color: var(--k-text);
+  word-break: break-word;
+}
+
+/* ==========================================================================
+   Cursor — Ink-colored, slightly thicker nib cursor (PRD §12.5)
+   ========================================================================== */
+
+.cm-editor .cm-cursor,
+.cm-editor .cm-dropCursor {
+  border-left-color: var(--k-text);
+  border-left-width: var(--k-cursor-width, 2px);
+  border-left-style: solid;
+}
+
+/* ==========================================================================
+   Headings (.k-h1 … .k-h6)
+   ========================================================================== */
+
+.k-h1,
+.k-h2,
+.k-h3,
+.k-h4,
+.k-h5,
+.k-h6 {
+  font-family: var(--k-font-body);
+  font-weight: 700;
+  color: var(--k-text);
+  letter-spacing: -0.01em;
+}
+
+.k-h1 {
+  font-size: 2em;
+  line-height: 1.3;
+  padding-top: 0.6em;
+  padding-bottom: 0.25em;
+}
+
+.k-h2 {
+  font-size: 1.55em;
+  line-height: 1.35;
+  padding-top: 0.55em;
+  padding-bottom: 0.2em;
+  border-bottom: 1px solid var(--k-divider);
+}
+
+.k-h3 {
+  font-size: 1.3em;
+  line-height: 1.4;
+  padding-top: 0.45em;
+  padding-bottom: 0.15em;
+}
+
+.k-h4 {
+  font-size: 1.12em;
+  line-height: 1.45;
+  padding-top: 0.35em;
+  padding-bottom: 0.1em;
+}
+
+.k-h5 {
+  font-size: 1em;
+  line-height: 1.5;
+  padding-top: 0.3em;
+  padding-bottom: 0.1em;
+}
+
+.k-h6 {
+  font-size: 0.92em;
+  line-height: 1.5;
+  color: var(--k-text-muted);
+  padding-top: 0.3em;
+  padding-bottom: 0.1em;
+}
+
+/* ==========================================================================
+   Inline & Block Markdown Classes
+   (.k-strong, .k-em, .k-strike, .k-code, .k-link, .k-blockquote, .k-hr)
+   ========================================================================== */
+
+.k-strong {
+  font-weight: 700;
+  color: var(--k-text);
+}
+
+.k-em {
+  font-style: italic;
+}
+
+.k-strike {
+  text-decoration: line-through;
+  color: var(--k-text-muted);
+}
+
+.k-code {
+  font-family: var(--k-font-mono);
+  font-size: 0.88em;
+  background-color: var(--k-surface);
+  color: var(--k-text);
+  padding: 0.15em 0.4em;
+  border-radius: 4px;
+  border: 1px solid var(--k-divider);
+  font-variant-ligatures: contextual;
+}
+
+.k-code-block {
+  display: block;
+  font-family: var(--k-font-mono);
+  font-size: 0.9em;
+  line-height: 1.6;
+  background-color: var(--k-surface);
+  color: var(--k-text);
+  padding: 0.9em 1.1em;
+  margin: 0.6em 0;
+  border-radius: 6px;
+  border: 1px solid var(--k-divider);
+  overflow-x: auto;
+  font-variant-ligatures: contextual;
+}
+
+.k-link {
+  color: var(--k-link);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--k-link) 55%, transparent);
+  text-underline-offset: 0.2em;
+  text-decoration-thickness: 1px;
+  cursor: pointer;
+  transition:
+    color var(--k-transition-fast, 150ms ease-out),
+    text-decoration-color var(--k-transition-fast, 150ms ease-out);
+}
+
+.k-link:hover {
+  text-decoration-color: var(--k-link);
+}
+
+.k-blockquote {
+  border-left: 3px solid var(--k-accent);
+  padding-left: 1em;
+  color: var(--k-text-muted);
+}
+
+.k-hr {
+  display: block;
+  border: none;
+  border-top: 1px solid var(--k-divider);
+  margin: 1.25em 0;
+  color: var(--k-text-muted);
+}
+
+/* ==========================================================================
+   Markdown Syntax Markers (.k-mark, .k-mark-hidden)
+   - .k-mark-hidden collapses width via font-size: 0 + letter-spacing: 0
+     (rather than display: none) so the inline span stays in the render tree
+     and CodeMirror 6 Range.getClientRects() / coordsAtPos cursor measurement
+     remains accurate while leaving zero blank space (ED-01).
+   - .k-mark fades in via @keyframes (opacity 0 -> 1, 150ms ease-out) without
+     any transform/translate displacement (PRD §12.5).
+   ========================================================================== */
+
+@keyframes k-mark-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.k-mark {
+  color: var(--k-text-muted);
+  opacity: 1;
+  animation: k-mark-fade-in var(--k-transition-fast, 150ms ease-out);
+}
+
+.k-mark-hidden {
+  font-size: 0;
+  letter-spacing: 0;
+  line-height: 0;
+  opacity: 0;
+  pointer-events: none;
+  user-select: none;
+  animation: none;
+}
+
+/* ==========================================================================
+   Lists, UI Surface & Stroke Icons (PRD §12.4–12.5)
+   ========================================================================== */
+
+.k-list-marker {
+  color: var(--k-accent);
+  font-weight: 600;
+}
+
+.k-ui {
+  font-family: var(--k-font-ui);
+}
+
+.k-surface {
+  background-color: var(--k-surface);
+  color: var(--k-text);
+  border-color: var(--k-divider);
+}
+
+.k-icon {
+  stroke: currentColor;
+  stroke-width: var(--k-icon-stroke-width, 1.5px);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+}

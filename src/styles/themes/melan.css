@@ -1,0 +1,37 @@
+/**
+ * Kalamos Built-in Theme: Melan (μέλαν — 墨，深色)
+ * Color palette defined strictly per PRD §12.3.
+ */
+
+:root[data-theme="melan"],
+[data-theme="melan"] {
+  color-scheme: dark;
+
+  /* PRD §12.3 Palette */
+  --k-bg: #1C1A17;
+  --k-surface: #25221E;
+  --k-text: #E8E0D0;
+  --k-text-muted: #9C9384;
+  --k-accent: #93AE7C;
+  --k-link: #D98A63;
+  --k-divider: #3A362F;
+
+  /* Derived semi-transparent selection from --k-link (#D98A63) */
+  --k-selection-bg: rgba(217, 138, 99, 0.25);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+
+    --k-bg: #1C1A17;
+    --k-surface: #25221E;
+    --k-text: #E8E0D0;
+    --k-text-muted: #9C9384;
+    --k-accent: #93AE7C;
+    --k-link: #D98A63;
+    --k-divider: #3A362F;
+
+    --k-selection-bg: rgba(217, 138, 99, 0.25);
+  }
+}
