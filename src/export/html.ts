@@ -642,6 +642,7 @@ function createParseState(content: string): EditorState {
       markdown({
         base: markdownLanguage,
         addKeymap: false,
+        completeHTMLTags: false,
         extensions: [mathMarkdownExtension, cjkEmphasisExtension, frontMatterExtension, footnoteExtension],
       }),
     ],

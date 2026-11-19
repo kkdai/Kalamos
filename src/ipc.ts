@@ -88,6 +88,10 @@ export interface Settings {
   uploadArgs?: string[];
   /** IM-05: upload pasted / dropped images right after importing them. */
   uploadOnInsert?: boolean;
+  /** ED-09: auto-close brackets / quotes (default on). */
+  autoPairBrackets?: boolean;
+  /** ED-09: auto-close Markdown * _ ` ~ (default off). */
+  autoPairMarkdown?: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -104,6 +108,8 @@ export const DEFAULT_SETTINGS: Settings = {
   uploadCommand: null,
   uploadArgs: [],
   uploadOnInsert: false,
+  autoPairBrackets: true,
+  autoPairMarkdown: false,
 };
 
 export const MAX_EXCERPT_CHARS = 120;
@@ -776,6 +782,8 @@ export async function setSettings(settings: Settings): Promise<null> {
     uploadCommand: mockSettings.uploadCommand ?? DEFAULT_SETTINGS.uploadCommand,
     uploadArgs: [...(mockSettings.uploadArgs ?? DEFAULT_SETTINGS.uploadArgs ?? [])],
     uploadOnInsert: settings.uploadOnInsert ?? DEFAULT_SETTINGS.uploadOnInsert,
+    autoPairBrackets: settings.autoPairBrackets ?? DEFAULT_SETTINGS.autoPairBrackets,
+    autoPairMarkdown: settings.autoPairMarkdown ?? DEFAULT_SETTINGS.autoPairMarkdown,
   };
   return null;
 }

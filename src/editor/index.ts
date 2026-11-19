@@ -29,6 +29,8 @@ import { frontMatterExtension } from "./front-matter";
 import { mathAutoNumberFacet, mathMarkdownExtension } from "./math";
 import { createSourceModeController } from "./source-mode";
 import { focusModeExtension, typewriterModeExtension } from "./writing-modes";
+import { autoPairBracketsExtension, autoPairMarkdownExtension } from "./auto-pair";
+import { emojiExtension } from "./emoji";
 
 const ExternalLoadAnnotation = Annotation.define<boolean>();
 
@@ -52,6 +54,10 @@ export interface CreateEditorOptions {
   initialMathAutoNumber?: boolean;
   initialFocusMode?: boolean;
   initialTypewriterMode?: boolean;
+  /** ED-09 (default true). */
+  initialAutoPairBrackets?: boolean;
+  /** ED-09 (default false). */
+  initialAutoPairMarkdown?: boolean;
   handlers: FileCommandHandlers;
   onUserChange?: (content: string) => void;
   onSourceModeChange?: (sourceMode: boolean) => void;
@@ -59,6 +65,8 @@ export interface CreateEditorOptions {
   onMathAutoNumberChange?: (enabled: boolean) => void;
   onFocusModeChange?: (enabled: boolean) => void;
   onTypewriterModeChange?: (enabled: boolean) => void;
+  onAutoPairBracketsChange?: (enabled: boolean) => void;
+  onAutoPairMarkdownChange?: (enabled: boolean) => void;
   onOpenRelativeLink?: RelativeLinkHandler;
   onPasteImages?: PasteImagesHandler;
   /** IM-04: the image root (setting or front matter) was refused as too broad. */
@@ -91,6 +99,14 @@ export interface KalamosEditor {
   isTypewriterMode: () => boolean;
   setTypewriterMode: (enabled: boolean, notify?: boolean) => void;
   toggleTypewriterMode: () => boolean;
+  /** ED-09 auto-pair brackets / quotes. */
+  isAutoPairBrackets: () => boolean;
+  setAutoPairBrackets: (enabled: boolean, notify?: boolean) => void;
+  toggleAutoPairBrackets: () => boolean;
+  /** ED-09 auto-pair Markdown * _ ` ~. */
+  isAutoPairMarkdown: () => boolean;
+  setAutoPairMarkdown: (enabled: boolean, notify?: boolean) => void;
+  toggleAutoPairMarkdown: () => boolean;
   isDirty: () => boolean;
   markClean: (savedContent: string) => void;
   markDirty: () => void;
@@ -115,6 +131,8 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
   const mathAutoNumberCompartment = new Compartment();
   const focusModeCompartment = new Compartment();
   const typewriterModeCompartment = new Compartment();
+  const autoPairBracketsCompartment = new Compartment();
+  const autoPairMarkdownCompartment = new Compartment();
   const initialContent = options.initialContent ?? "";
   let unmodifiedContent = initialContent;
   let savedContent: string | null = initialContent;
@@ -124,6 +142,8 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
   let mathAutoNumber = Boolean(options.initialMathAutoNumber);
   let focusMode = Boolean(options.initialFocusMode);
   let typewriterMode = Boolean(options.initialTypewriterMode);
+  let autoPairBrackets = options.initialAutoPairBrackets ?? true;
+  let autoPairMarkdown = Boolean(options.initialAutoPairMarkdown);
 
   const initialSep = detectLineSeparator(initialContent);
 
@@ -154,6 +174,14 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
       toggleTypewriterMode();
       await options.handlers.onToggleTypewriterMode?.();
     },
+    onToggleAutoPairBrackets: async () => {
+      toggleAutoPairBrackets();
+      await options.handlers.onToggleAutoPairBrackets?.();
+    },
+    onToggleAutoPairMarkdown: async () => {
+      toggleAutoPairMarkdown();
+      await options.handlers.onToggleAutoPairMarkdown?.();
+    },
   };
 
   const state = EditorState.create({
@@ -167,6 +195,9 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
       mathAutoNumberCompartment.of(mathAutoNumberFacet.of(mathAutoNumber)),
       focusModeCompartment.of(focusMode ? focusModeExtension : []),
       typewriterModeCompartment.of(typewriterMode ? typewriterModeExtension : []),
+      autoPairBracketsCompartment.of(autoPairBrackets ? autoPairBracketsExtension : []),
+      autoPairMarkdownCompartment.of(autoPairMarkdown ? autoPairMarkdownExtension : []),
+      emojiExtension,
       ...(options.onOpenRelativeLink
         ? [relativeLinkHandlerFacet.of(options.onOpenRelativeLink)]
         : []),
@@ -182,6 +213,8 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
         base: markdownLanguage,
         codeLanguages: languages,
         addKeymap: false,
+        // Only emoji completion (ED-08); no HTML tag suggestions for `<di…`.
+        completeHTMLTags: false,
         extensions: [mathMarkdownExtension, cjkEmphasisExtension, frontMatterExtension, footnoteExtension],
       }),
       sourceModeController.extension,
@@ -340,6 +373,44 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
     return typewriterMode;
   }
 
+  function isAutoPairBrackets(): boolean {
+    return autoPairBrackets;
+  }
+
+  function setAutoPairBrackets(enabled: boolean, notify = false): void {
+    autoPairBrackets = enabled;
+    view.dispatch({
+      effects: autoPairBracketsCompartment.reconfigure(
+        autoPairBrackets ? autoPairBracketsExtension : [],
+      ),
+    });
+    if (notify) options.onAutoPairBracketsChange?.(autoPairBrackets);
+  }
+
+  function toggleAutoPairBrackets(): boolean {
+    setAutoPairBrackets(!autoPairBrackets, true);
+    return autoPairBrackets;
+  }
+
+  function isAutoPairMarkdown(): boolean {
+    return autoPairMarkdown;
+  }
+
+  function setAutoPairMarkdown(enabled: boolean, notify = false): void {
+    autoPairMarkdown = enabled;
+    view.dispatch({
+      effects: autoPairMarkdownCompartment.reconfigure(
+        autoPairMarkdown ? autoPairMarkdownExtension : [],
+      ),
+    });
+    if (notify) options.onAutoPairMarkdownChange?.(autoPairMarkdown);
+  }
+
+  function toggleAutoPairMarkdown(): boolean {
+    setAutoPairMarkdown(!autoPairMarkdown, true);
+    return autoPairMarkdown;
+  }
+
   function isDirty(): boolean {
     return dirty;
   }
@@ -404,6 +475,12 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
     isTypewriterMode,
     setTypewriterMode,
     toggleTypewriterMode,
+    isAutoPairBrackets,
+    setAutoPairBrackets,
+    toggleAutoPairBrackets,
+    isAutoPairMarkdown,
+    setAutoPairMarkdown,
+    toggleAutoPairMarkdown,
     isDirty,
     markClean,
     markDirty,

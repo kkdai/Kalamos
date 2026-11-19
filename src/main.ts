@@ -40,6 +40,7 @@ import {
 import { collectUploadTargetsInRange, uploadImagesInEditor } from "./editor/image-upload";
 import { bindWindowShortcuts } from "./editor/keymaps";
 import { FOCUS_MODE_MESSAGE, TYPEWRITER_MODE_MESSAGE } from "./editor/writing-modes";
+import { AUTO_PAIR_BRACKETS_MESSAGE, AUTO_PAIR_MARKDOWN_MESSAGE } from "./editor/auto-pair";
 import { createWordCounter, type WordCounter } from "./editor/word-count-view";
 import {
   jumpToHeadingSlug,
@@ -300,6 +301,8 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
       imageRootDir: editor.getImageRootDir(),
       focusMode: editor.isFocusMode(),
       typewriterMode: editor.isTypewriterMode(),
+      autoPairBrackets: editor.isAutoPairBrackets(),
+      autoPairMarkdown: editor.isAutoPairMarkdown(),
       ...patch,
     };
     await setSettings(currentSettings).catch(() => null);
@@ -346,6 +349,14 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
       setStatus(TYPEWRITER_MODE_MESSAGE(typewriterMode), false);
       void persistEditorSettingPatch({ typewriterMode });
     },
+    onAutoPairBracketsChange: (autoPairBrackets) => {
+      setStatus(AUTO_PAIR_BRACKETS_MESSAGE(autoPairBrackets), false);
+      void persistEditorSettingPatch({ autoPairBrackets });
+    },
+    onAutoPairMarkdownChange: (autoPairMarkdown) => {
+      setStatus(AUTO_PAIR_MARKDOWN_MESSAGE(autoPairMarkdown), false);
+      void persistEditorSettingPatch({ autoPairMarkdown });
+    },
     onOpenRelativeLink: async (relativePath, slug, view) => {
       if (currentPath === null) {
         setStatus("請先儲存目前文件，才能開啟相對路徑連結", true);
@@ -381,6 +392,12 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
     },
     onToggleTypewriterMode: () => {
       editor.toggleTypewriterMode();
+    },
+    onToggleAutoPairBrackets: () => {
+      editor.toggleAutoPairBrackets();
+    },
+    onToggleAutoPairMarkdown: () => {
+      editor.toggleAutoPairMarkdown();
     },
   };
 
@@ -954,6 +971,8 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
       editor.setImageRootDir(settings.imageRootDir ?? null);
       editor.setFocusMode(Boolean(settings.focusMode), false);
       editor.setTypewriterMode(Boolean(settings.typewriterMode), false);
+      editor.setAutoPairBrackets(settings.autoPairBrackets ?? true, false);
+      editor.setAutoPairMarkdown(Boolean(settings.autoPairMarkdown), false);
     }
     await themeMenu.init();
     await sidebar.init();
