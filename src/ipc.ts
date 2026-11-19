@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   ask as askDialog,
@@ -30,6 +31,27 @@ export interface FileMeta {
   size: number;
 }
 
+export type TreeNodeKind = "dir" | "file";
+
+export interface TreeNode {
+  name: string;
+  path: string;
+  kind: TreeNodeKind;
+  children?: TreeNode[];
+}
+
+export interface FileEntry {
+  path: string;
+  name: string;
+  mtimeMs: number;
+  excerpt: string;
+}
+
+export interface FsChangedPayload {
+  root: string;
+  paths: string[];
+}
+
 export interface RecoveryEntry {
   docId: string;
   path: string | null;
@@ -55,14 +77,18 @@ export const DEFAULT_SETTINGS: Settings = {
   sourceMode: false,
 };
 
+export const MAX_EXCERPT_CHARS = 120;
+
 interface MockFileRecord {
   content: string;
   mtimeMs: number;
 }
 
 const mockFiles = new Map<string, MockFileRecord>();
+const mockDirs = new Set<string>();
 const mockRecovery = new Map<string, RecoveryEntry>();
 let mockSettings: Settings = { ...DEFAULT_SETTINGS };
+let mockWatchedFolder: string | null = null;
 let lastMockTimestampMs = 0;
 
 type DialogOpenHandler = () => string | null | Promise<string | null>;
@@ -70,17 +96,25 @@ type DialogSaveHandler = (
   defaultPath?: string | null,
 ) => string | null | Promise<string | null>;
 type DialogAskHandler = (message: string) => boolean | Promise<boolean>;
+type DialogPromptHandler = (
+  message: string,
+  defaultValue?: string,
+) => string | null | Promise<string | null>;
 type MockSaveInterceptor = (
   path: string,
   content: string,
   defaultSave: () => Promise<FileMeta>,
 ) => Promise<FileMeta>;
+type FsChangedListener = (payload: FsChangedPayload) => void | Promise<void>;
 
 let mockOpenDialogHandler: DialogOpenHandler | null = null;
+let mockOpenFolderDialogHandler: DialogOpenHandler | null = null;
 let mockSaveDialogHandler: DialogSaveHandler | null = null;
 let mockAskDialogHandler: DialogAskHandler | null = null;
+let mockPromptDialogHandler: DialogPromptHandler | null = null;
 let mockSaveInterceptor: MockSaveInterceptor | null = null;
 const mockCloseListeners = new Set<() => void | Promise<void>>();
+const mockFsChangedListeners = new Set<FsChangedListener>();
 
 export function isTauri(): boolean {
   return (
@@ -100,6 +134,47 @@ function createAppError(kind: ErrorKind, message: string): AppError {
   return { kind, message };
 }
 
+function normalizePath(rawPath: string): string {
+  const trimmed = rawPath.trim();
+  if (!trimmed) return "";
+  if (trimmed === "/") return "/";
+  return trimmed.replace(/\/+$/, "");
+}
+
+function registerAncestorDirs(fileOrDirPath: string, includeSelf = false): void {
+  const norm = normalizePath(fileOrDirPath);
+  if (!norm) return;
+  const isAbsolute = norm.startsWith("/");
+  const parts = norm.split("/").filter((p) => p.length > 0);
+  const end = includeSelf ? parts.length : parts.length - 1;
+  let current = "";
+  for (let i = 0; i < end; i++) {
+    const part = parts[i];
+    current = current ? `${current}/${part}` : isAbsolute ? `/${part}` : part;
+    mockDirs.add(current);
+  }
+}
+
+export function isIgnoredName(name: string): boolean {
+  return name.startsWith(".") || name === ".git" || name === "node_modules";
+}
+
+export function isMarkdownName(name: string): boolean {
+  const lower = name.toLowerCase();
+  return lower.endsWith(".md") || lower.endsWith(".markdown");
+}
+
+export function extractExcerpt(content: string): string {
+  const lines = content.split(/\r?\n/);
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.length > 0) {
+      return Array.from(trimmed).slice(0, MAX_EXCERPT_CHARS).join("");
+    }
+  }
+  return "";
+}
+
 function validateDocId(docId: string): void {
   if (
     !docId ||
@@ -113,31 +188,89 @@ function validateDocId(docId: string): void {
   }
 }
 
+function seedDemoFolder(): void {
+  seedMockDir("/demo");
+  seedMockDir("/demo/guides");
+  seedMockFile(
+    "/demo/welcome.md",
+    [
+      "# Kalamos 歡迎使用指南",
+      "",
+      "Write, and it appears. 落筆即成文 —— 在莎草紙（Papyros）與墨（Melan）之間專注書寫中英混排技術文章。",
+      "",
+      "## 二級標題：即時預覽 WYSIWYM",
+      "",
+      "游標離開段落後自動隱藏 Markdown 符號，支援 **粗體**、*斜體*、`code` 與 [超連結](https://typora.io)。",
+      "",
+      "### 三級標題：檔案管理與側欄",
+      "",
+      "使用 Cmd+Shift+L 切換側欄，在檔案樹與檔案列表之間自由切換。",
+      "",
+      "#### 四級標題：大綱與導覽",
+      "",
+      "##### 五級標題：自動儲存與異常救回",
+      "",
+      "###### 六級標題：標準 GFM 無損存檔",
+    ].join("\n"),
+  );
+  seedMockFile(
+    "/demo/notes.md",
+    [
+      "# 技術筆記 Architecture Notes",
+      "",
+      "Kalamos 採用 Tauri 2 + TypeScript + CodeMirror 6，確保本地檔案讀寫快速且逐 byte 無損。",
+    ].join("\n"),
+  );
+  seedMockFile(
+    "/demo/guides/shortcuts.md",
+    [
+      "# 快捷鍵一覽 Keyboard Shortcuts",
+      "",
+      "- Cmd+O：開啟檔案 / Cmd+Shift+O：開啟資料夾",
+      "- Cmd+S：儲存檔案 / Cmd+Shift+L：切換側欄",
+    ].join("\n"),
+  );
+}
+
 export function resetMockState(): void {
   mockFiles.clear();
+  mockDirs.clear();
   mockRecovery.clear();
   mockSettings = { ...DEFAULT_SETTINGS };
+  mockWatchedFolder = null;
   lastMockTimestampMs = 0;
   mockOpenDialogHandler = null;
+  mockOpenFolderDialogHandler = null;
   mockSaveDialogHandler = null;
   mockAskDialogHandler = null;
+  mockPromptDialogHandler = null;
   mockSaveInterceptor = null;
   mockCloseListeners.clear();
+  mockFsChangedListeners.clear();
+  seedDemoFolder();
 }
 
 export function setMockDialogHandlers(handlers: {
   open?: DialogOpenHandler | null;
+  openFolder?: DialogOpenHandler | null;
   save?: DialogSaveHandler | null;
   ask?: DialogAskHandler | null;
+  prompt?: DialogPromptHandler | null;
 }): void {
   if (handlers.open !== undefined) {
     mockOpenDialogHandler = handlers.open;
+  }
+  if (handlers.openFolder !== undefined) {
+    mockOpenFolderDialogHandler = handlers.openFolder;
   }
   if (handlers.save !== undefined) {
     mockSaveDialogHandler = handlers.save;
   }
   if (handlers.ask !== undefined) {
     mockAskDialogHandler = handlers.ask;
+  }
+  if (handlers.prompt !== undefined) {
+    mockPromptDialogHandler = handlers.prompt;
   }
 }
 
@@ -147,13 +280,32 @@ export function setMockSaveInterceptor(
   mockSaveInterceptor = interceptor;
 }
 
-export function seedMockFile(path: string, content: string): void {
-  mockFiles.set(path, { content, mtimeMs: nextMockTimestampMs() });
+export function seedMockDir(path: string): void {
+  const norm = normalizePath(path);
+  if (!norm) return;
+  registerAncestorDirs(norm, true);
+}
+
+export function seedMockFile(path: string, content: string, mtimeMs?: number): void {
+  const norm = normalizePath(path);
+  if (!norm) return;
+  registerAncestorDirs(norm, false);
+  mockFiles.set(norm, {
+    content,
+    mtimeMs: mtimeMs ?? nextMockTimestampMs(),
+  });
 }
 
 export function readMockFile(path: string): string | undefined {
-  return mockFiles.get(path)?.content;
+  return mockFiles.get(normalizePath(path))?.content;
 }
+
+export function getMockWatchedFolder(): string | null {
+  return mockWatchedFolder;
+}
+
+// Preload /demo folder when module initializes
+seedDemoFolder();
 
 export async function openFile(path: string): Promise<string> {
   if (isTauri()) {
@@ -162,7 +314,8 @@ export async function openFile(path: string): Promise<string> {
   if (!path || !path.trim()) {
     throw createAppError("InvalidPath", "Path must not be empty");
   }
-  const entry = mockFiles.get(path);
+  const norm = normalizePath(path);
+  const entry = mockFiles.get(norm);
   if (!entry) {
     throw createAppError("NotFound", `File not found: ${path}`);
   }
@@ -180,15 +333,311 @@ export async function saveFile(
     if (!path || !path.trim()) {
       throw createAppError("InvalidPath", "Path must not be empty");
     }
+    const norm = normalizePath(path);
+    if (mockDirs.has(norm)) {
+      throw createAppError("InvalidPath", `Target path is a directory: ${path}`);
+    }
     const mtimeMs = nextMockTimestampMs();
     const size = new TextEncoder().encode(content).byteLength;
-    mockFiles.set(path, { content, mtimeMs });
-    return { path, mtimeMs, size };
+    registerAncestorDirs(norm, false);
+    mockFiles.set(norm, { content, mtimeMs });
+    return { path: norm, mtimeMs, size };
   };
   if (mockSaveInterceptor) {
     return mockSaveInterceptor(path, content, defaultSave);
   }
   return defaultSave();
+}
+
+function assertValidMockDir(path: string): string {
+  if (!path || !path.trim()) {
+    throw createAppError("InvalidPath", "Path must not be empty");
+  }
+  const norm = normalizePath(path);
+  if (mockFiles.has(norm)) {
+    throw createAppError("InvalidPath", `Path is not a directory: ${path}`);
+  }
+  const prefix = norm === "/" ? "/" : `${norm}/`;
+  const hasDescendant =
+    mockDirs.has(norm) ||
+    Array.from(mockFiles.keys()).some((k) => k.startsWith(prefix)) ||
+    Array.from(mockDirs).some((d) => d.startsWith(prefix));
+  if (!hasDescendant) {
+    throw createAppError("NotFound", `Directory not found: ${path}`);
+  }
+  mockDirs.add(norm);
+  return norm;
+}
+
+function compareNamesCaseInsensitive(a: string, b: string): number {
+  const aLower = a.toLowerCase();
+  const bLower = b.toLowerCase();
+  if (aLower < bLower) return -1;
+  if (aLower > bLower) return 1;
+  if (a < b) return -1;
+  if (a > b) return 1;
+  return 0;
+}
+
+function buildMockTree(dirPath: string): TreeNode {
+  const name =
+    dirPath === "/"
+      ? "/"
+      : dirPath.slice(dirPath.lastIndexOf("/") + 1) || dirPath;
+  const prefix = dirPath === "/" ? "/" : `${dirPath}/`;
+
+  const childDirNames = new Set<string>();
+  const childFileNames = new Set<string>();
+
+  for (const d of mockDirs) {
+    if (!d.startsWith(prefix) || d === dirPath) continue;
+    const rest = d.slice(prefix.length);
+    const slashIdx = rest.indexOf("/");
+    const firstSeg = slashIdx === -1 ? rest : rest.slice(0, slashIdx);
+    if (firstSeg && !isIgnoredName(firstSeg)) {
+      childDirNames.add(firstSeg);
+    }
+  }
+
+  for (const f of mockFiles.keys()) {
+    if (!f.startsWith(prefix)) continue;
+    const rest = f.slice(prefix.length);
+    const slashIdx = rest.indexOf("/");
+    if (slashIdx === -1) {
+      if (rest && !isIgnoredName(rest) && isMarkdownName(rest)) {
+        childFileNames.add(rest);
+      }
+    } else {
+      const firstSeg = rest.slice(0, slashIdx);
+      if (firstSeg && !isIgnoredName(firstSeg)) {
+        childDirNames.add(firstSeg);
+      }
+    }
+  }
+
+  const children: TreeNode[] = [];
+
+  for (const dirName of childDirNames) {
+    const childPath = dirPath === "/" ? `/${dirName}` : `${dirPath}/${dirName}`;
+    children.push(buildMockTree(childPath));
+  }
+
+  for (const fileName of childFileNames) {
+    const childPath = dirPath === "/" ? `/${fileName}` : `${dirPath}/${fileName}`;
+    children.push({
+      name: fileName,
+      path: childPath,
+      kind: "file",
+    });
+  }
+
+  children.sort((a, b) => {
+    if (a.kind !== b.kind) {
+      return a.kind === "dir" ? -1 : 1;
+    }
+    return compareNamesCaseInsensitive(a.name, b.name);
+  });
+
+  return {
+    name,
+    path: dirPath,
+    kind: "dir",
+    children,
+  };
+}
+
+export async function readTree(path: string): Promise<TreeNode> {
+  if (isTauri()) {
+    return invoke<TreeNode>("read_tree", { path });
+  }
+  const norm = assertValidMockDir(path);
+  return buildMockTree(norm);
+}
+
+export async function listFiles(path: string): Promise<FileEntry[]> {
+  if (isTauri()) {
+    return invoke<FileEntry[]>("list_files", { path });
+  }
+  const norm = assertValidMockDir(path);
+  const prefix = norm === "/" ? "/" : `${norm}/`;
+  const entries: FileEntry[] = [];
+
+  for (const [filePath, record] of mockFiles.entries()) {
+    if (!filePath.startsWith(prefix)) continue;
+    const relative = filePath.slice(prefix.length);
+    const segments = relative.split("/");
+    if (segments.some((seg) => isIgnoredName(seg))) {
+      continue;
+    }
+    const fileName = segments[segments.length - 1];
+    if (!fileName || !isMarkdownName(fileName)) {
+      continue;
+    }
+    entries.push({
+      path: filePath,
+      name: fileName,
+      mtimeMs: record.mtimeMs,
+      excerpt: extractExcerpt(record.content),
+    });
+  }
+
+  entries.sort((a, b) => {
+    if (b.mtimeMs !== a.mtimeMs) {
+      return b.mtimeMs - a.mtimeMs;
+    }
+    const byName = compareNamesCaseInsensitive(a.name, b.name);
+    if (byName !== 0) return byName;
+    return a.path < b.path ? -1 : a.path > b.path ? 1 : 0;
+  });
+
+  return entries;
+}
+
+export async function watchFolder(path: string): Promise<null> {
+  if (isTauri()) {
+    return invoke<null>("watch_folder", { path });
+  }
+  const norm = assertValidMockDir(path);
+  mockWatchedFolder = norm;
+  return null;
+}
+
+export async function createFile(path: string): Promise<FileMeta> {
+  if (isTauri()) {
+    return invoke<FileMeta>("create_file", { path });
+  }
+  if (!path || !path.trim()) {
+    throw createAppError("InvalidPath", "Path must not be empty");
+  }
+  const norm = normalizePath(path);
+  if (mockFiles.has(norm) || mockDirs.has(norm)) {
+    throw createAppError("AlreadyExists", `File already exists: ${path}`);
+  }
+  registerAncestorDirs(norm, false);
+  const mtimeMs = nextMockTimestampMs();
+  mockFiles.set(norm, { content: "", mtimeMs });
+  return { path: norm, mtimeMs, size: 0 };
+}
+
+export async function renamePath(from: string, to: string): Promise<null> {
+  if (isTauri()) {
+    return invoke<null>("rename_path", { from, to });
+  }
+  if (!from || !from.trim() || !to || !to.trim()) {
+    throw createAppError("InvalidPath", "Path must not be empty");
+  }
+  const normFrom = normalizePath(from);
+  const normTo = normalizePath(to);
+
+  const isFile = mockFiles.has(normFrom);
+  const isDir = mockDirs.has(normFrom);
+  if (!isFile && !isDir) {
+    throw createAppError("NotFound", `Source path does not exist: ${from}`);
+  }
+  if (normFrom !== normTo && (mockFiles.has(normTo) || mockDirs.has(normTo))) {
+    throw createAppError("AlreadyExists", `Destination already exists: ${to}`);
+  }
+
+  if (isFile) {
+    const record = mockFiles.get(normFrom)!;
+    mockFiles.delete(normFrom);
+    registerAncestorDirs(normTo, false);
+    mockFiles.set(normTo, {
+      content: record.content,
+      mtimeMs: nextMockTimestampMs(),
+    });
+    return null;
+  }
+
+  // Rename directory and all nested dirs & files
+  const prefix = `${normFrom}/`;
+  const dirsToMove = Array.from(mockDirs).filter(
+    (d) => d === normFrom || d.startsWith(prefix),
+  );
+  for (const d of dirsToMove) {
+    mockDirs.delete(d);
+  }
+  for (const d of dirsToMove) {
+    const relocated = d === normFrom ? normTo : `${normTo}${d.slice(normFrom.length)}`;
+    registerAncestorDirs(relocated, true);
+  }
+
+  const filesToMove = Array.from(mockFiles.entries()).filter(([f]) =>
+    f.startsWith(prefix),
+  );
+  for (const [f] of filesToMove) {
+    mockFiles.delete(f);
+  }
+  for (const [f, rec] of filesToMove) {
+    const relocated = `${normTo}${f.slice(normFrom.length)}`;
+    registerAncestorDirs(relocated, false);
+    mockFiles.set(relocated, rec);
+  }
+
+  return null;
+}
+
+export async function trashPath(path: string): Promise<null> {
+  if (isTauri()) {
+    return invoke<null>("trash_path", { path });
+  }
+  if (!path || !path.trim()) {
+    throw createAppError("InvalidPath", "Path must not be empty");
+  }
+  const norm = normalizePath(path);
+  const isFile = mockFiles.has(norm);
+  const isDir = mockDirs.has(norm);
+  if (!isFile && !isDir) {
+    throw createAppError("NotFound", `Path does not exist: ${path}`);
+  }
+
+  if (isFile) {
+    mockFiles.delete(norm);
+    return null;
+  }
+
+  const prefix = `${norm}/`;
+  for (const d of Array.from(mockDirs)) {
+    if (d === norm || d.startsWith(prefix)) {
+      mockDirs.delete(d);
+    }
+  }
+  for (const f of Array.from(mockFiles.keys())) {
+    if (f.startsWith(prefix)) {
+      mockFiles.delete(f);
+    }
+  }
+  return null;
+}
+
+export async function onFsChanged(
+  listener: FsChangedListener,
+): Promise<() => void> {
+  if (isTauri()) {
+    return listen<FsChangedPayload>("fs-changed", (event) => {
+      void listener(event.payload);
+    });
+  }
+  mockFsChangedListeners.add(listener);
+  return () => {
+    mockFsChangedListeners.delete(listener);
+  };
+}
+
+export async function triggerMockFsChanged(
+  payload?: Partial<FsChangedPayload> | string,
+): Promise<void> {
+  const defaultRoot = mockWatchedFolder ?? "/demo";
+  const resolved: FsChangedPayload =
+    typeof payload === "string"
+      ? { root: mockWatchedFolder ?? payload, paths: [payload] }
+      : {
+          root: payload?.root ?? defaultRoot,
+          paths: payload?.paths ?? [payload?.root ?? defaultRoot],
+        };
+  for (const listener of Array.from(mockFsChangedListeners)) {
+    await listener(resolved);
+  }
 }
 
 export async function writeRecovery(
@@ -264,6 +713,23 @@ export async function pickOpenFilePath(): Promise<string | null> {
   return null;
 }
 
+export async function pickOpenFolderPath(): Promise<string | null> {
+  if (isTauri()) {
+    const selected = await openDialog({
+      multiple: false,
+      directory: true,
+    });
+    return typeof selected === "string" ? selected : null;
+  }
+  if (mockOpenFolderDialogHandler) {
+    return await mockOpenFolderDialogHandler();
+  }
+  if (mockOpenDialogHandler) {
+    return await mockOpenDialogHandler();
+  }
+  return null;
+}
+
 export async function pickSaveFilePath(
   defaultPath?: string | null,
 ): Promise<string | null> {
@@ -290,6 +756,20 @@ export async function askDiscardChanges(
     return await mockAskDialogHandler(message);
   }
   return true;
+}
+
+export function hasMockPromptHandler(): boolean {
+  return mockPromptDialogHandler !== null;
+}
+
+export async function promptMockInput(
+  message: string,
+  defaultValue?: string,
+): Promise<string | null> {
+  if (mockPromptDialogHandler) {
+    return await mockPromptDialogHandler(message, defaultValue);
+  }
+  return null;
 }
 
 export async function onWindowCloseRequested(
