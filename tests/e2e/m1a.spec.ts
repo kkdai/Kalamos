@@ -217,10 +217,9 @@ for (const t of TOGGLES) {
   });
 }
 
-// BUG-1: CommonMark flanking rules — kept failing on purpose (see report).
-test.fixme("AC8 bold around CJK punctuation renders (「你好」 followed by CJK) [BUG-1]", async ({ page }) => {
-  // Risk called out in PLAN.md: CommonMark flanking rules reject
-  // `**「你好」**再見` (closing ** preceded by punctuation, followed by a letter).
+// BUG-1 / #22: CJK-friendly flanking (src/editor/cjk-emphasis.ts) lets `**`
+// sit between full-width punctuation and CJK letters.
+test("AC8 bold around CJK punctuation renders (「你好」 followed by CJK) [BUG-1 #22]", async ({ page }) => {
   const src = "他說「你好」再見\n\nend";
   await setDoc(page, src);
   await selectRange(page, 2, 6);
@@ -228,6 +227,23 @@ test.fixme("AC8 bold around CJK punctuation renders (「你好」 followed by CJ
   expect(await getDoc(page)).toBe("他說**「你好」**再見\n\nend");
   await setCursor(page, (await getDoc(page)).length);
   await expect(line(page, 1).locator(".k-strong")).toContainText("「你好」");
+});
+
+test("#22 typing `中文**「粗體」**中文` / `中文**粗體。**中文` renders strong; text unchanged", async ({ page }) => {
+  await setDoc(page, "\n\nend", 0);
+  await page.keyboard.type("中文**「粗體」**中文");
+  await setCursor(page, (await getDoc(page)).length);
+  const strong = line(page, 1).locator(".k-strong");
+  await expect(strong).toHaveText("「粗體」");
+  await expect(line(page, 1).locator(".k-mark-hidden")).toHaveCount(2);
+
+  await setCursor(page, 0);
+  await page.keyboard.press("End");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("中文**粗體。**中文");
+  await setCursor(page, (await getDoc(page)).length);
+  await expect(line(page, 2).locator(".k-strong")).toHaveText("粗體。");
+  expect(await getDoc(page)).toBe("中文**「粗體」**中文\n中文**粗體。**中文\n\nend");
 });
 
 // ---------------------------------------------------------------------------

@@ -16,6 +16,7 @@ import { highlightCode } from "@lezer/highlight";
 import { papyrosHighlightStyle, resolveCodeLanguage } from "../editor/code-blocks";
 import { resolveImageSrc } from "../editor/images";
 import { collectDocumentHeadings } from "../editor/lists";
+import { cjkEmphasisExtension } from "../editor/cjk-emphasis";
 import { ensureMathJaxLoaded, mathMarkdownExtension } from "../editor/math";
 import { PRINT_CSS as printCss } from "./print-css";
 
@@ -520,7 +521,7 @@ function createParseState(content: string): EditorState {
       markdown({
         base: markdownLanguage,
         addKeymap: false,
-        extensions: [mathMarkdownExtension],
+        extensions: [mathMarkdownExtension, cjkEmphasisExtension],
       }),
     ],
   });
