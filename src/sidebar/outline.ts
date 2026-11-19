@@ -41,7 +41,8 @@ export function extractOutlineHeadings(state: EditorState): OutlineHeading[] {
         name === "FencedCode" ||
         name === "CodeBlock" ||
         name === "HTMLBlock" ||
-        name === "CommentBlock"
+        name === "CommentBlock" ||
+        name === "FrontMatter"
       ) {
         return false;
       }
