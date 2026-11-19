@@ -91,6 +91,7 @@ describe("ipc in-memory mock (api.yaml contract)", () => {
       sourceMode: true,
       codeLineNumbers: true,
       mathAutoNumber: true,
+      imageRootDir: "/tmp/kalamos-test/blog",
     };
     await setSettings(updated);
     expect(await getSettings()).toEqual(updated);

@@ -32,6 +32,7 @@ import {
 import {
   allowAssetDir,
   askDiscardChanges,
+  isAssetDirTooBroadError,
   clearRecovery,
   DEFAULT_SETTINGS,
   exportPdf,
@@ -43,6 +44,7 @@ import {
   onWindowCloseRequested,
   openFile,
   pickOpenFilePath,
+  pickOpenFolderPath,
   pickSaveFilePath,
   pickSavePdfPath,
   saveFile,
@@ -98,6 +100,10 @@ function formatErrorMessage(prefix: string, err: unknown): string {
   return `${prefix}：${String(err)}`;
 }
 
+export const IMAGE_ROOT_STATUS_PREFIX = "圖片根目錄：";
+export const IMAGE_ROOT_CLEARED_MESSAGE = "已清除圖片根目錄";
+export const IMAGE_ROOT_TOO_BROAD_PREFIX = "圖片根目錄範圍過大：";
+
 export interface KalamosApp {
   editor: KalamosEditor;
   sidebar: SidebarController;
@@ -113,6 +119,11 @@ export interface KalamosApp {
   saveDocument: () => Promise<boolean>;
   saveDocumentAs: (explicitPath?: string) => Promise<boolean>;
   newDocument: () => Promise<boolean>;
+  /** IM-04: pick the image root folder (Cmd+Opt+R); false when cancelled. */
+  pickImageRootDir: () => Promise<boolean>;
+  /** IM-04: set (path) or clear (null, Cmd+Opt+Shift+R) the image root folder. */
+  setImageRootDir: (path: string | null) => Promise<void>;
+  getImageRootDir: () => string | null;
   /** EX-01: export the current document to PDF (Cmd+Shift+E). */
   exportDocumentPdf: (explicitPath?: string) => Promise<boolean>;
   isExportingPdf: () => boolean;
@@ -256,6 +267,7 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
       sourceMode: editor.isSourceMode(),
       codeLineNumbers: editor.isCodeLineNumbers(),
       mathAutoNumber: editor.isMathAutoNumber(),
+      imageRootDir: editor.getImageRootDir(),
       ...patch,
     };
     await setSettings(currentSettings).catch(() => null);
@@ -307,6 +319,9 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
     },
     onPasteImages: async (files, view) => {
       await insertPastedImages(files, view.state.selection.main.head);
+    },
+    onImageRootTooBroad: (root) => {
+      setStatus(`${IMAGE_ROOT_TOO_BROAD_PREFIX}${root}`, true);
     },
   });
 
@@ -415,6 +430,50 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
     }
   };
   window.addEventListener("keydown", onSidebarKeydown);
+
+  async function setImageRootDir(path: string | null): Promise<void> {
+    const normalized = path && path.trim() ? path.trim() : null;
+    editor.setImageRootDir(normalized);
+    setStatus(normalized ? `${IMAGE_ROOT_STATUS_PREFIX}${normalized}` : IMAGE_ROOT_CLEARED_MESSAGE, false);
+    await persistEditorSettingPatch({ imageRootDir: normalized });
+    if (!normalized) return;
+    try {
+      await allowAssetDir(normalized);
+    } catch (err) {
+      // Kept as the setting (images show their fallback), but say why.
+      if (isAssetDirTooBroadError(err)) {
+        setStatus(`${IMAGE_ROOT_TOO_BROAD_PREFIX}${normalized}`, true);
+      }
+    }
+  }
+
+  async function pickImageRootDir(): Promise<boolean> {
+    let picked: string | null;
+    try {
+      picked = await pickOpenFolderPath();
+    } catch (err) {
+      setStatus(formatErrorMessage("設定圖片根目錄失敗", err), true);
+      return false;
+    }
+    if (!picked) return false;
+    await setImageRootDir(picked);
+    return true;
+  }
+
+  // IM-04: Cmd+Opt+R picks the image root folder, Cmd+Opt+Shift+R clears it.
+  // event.code is used because Option changes event.key on macOS.
+  const onImageRootKeydown = (event: KeyboardEvent) => {
+    if (event.defaultPrevented) return;
+    if (!(event.metaKey || event.ctrlKey) || !event.altKey) return;
+    if (event.code !== "KeyR" && event.key.toLowerCase() !== "r") return;
+    event.preventDefault();
+    if (event.shiftKey) {
+      void setImageRootDir(null);
+    } else {
+      void pickImageRootDir();
+    }
+  };
+  window.addEventListener("keydown", onImageRootKeydown);
 
   const recoveryInterval = setInterval(() => {
     if (currentPath === null && editor.isDirty()) {
@@ -589,6 +648,7 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
           title: documentTitle(docPath),
           docPath,
           mathAutoNumber: editor.isMathAutoNumber(),
+          imageRootDir: editor.getImageRootDir(),
         });
         const meta = await exportPdf(html, outPath, headings);
         setStatus(exportedPdfMessage(meta.path), false);
@@ -670,6 +730,7 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
       editor.setSourceMode(Boolean(settings.sourceMode), false);
       editor.setCodeLineNumbers(Boolean(settings.codeLineNumbers), false);
       editor.setMathAutoNumber(Boolean(settings.mathAutoNumber), false);
+      editor.setImageRootDir(settings.imageRootDir ?? null);
     }
     await themeMenu.init();
     await sidebar.init();
@@ -691,6 +752,7 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
     clearInterval(recoveryInterval);
     unbindShortcuts();
     window.removeEventListener("keydown", onSidebarKeydown);
+    window.removeEventListener("keydown", onImageRootKeydown);
     if (unlistenClose) {
       unlistenClose();
       unlistenClose = null;
@@ -718,6 +780,9 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
     saveDocument,
     saveDocumentAs,
     newDocument,
+    pickImageRootDir,
+    setImageRootDir,
+    getImageRootDir: () => editor.getImageRootDir(),
     exportDocumentPdf,
     isExportingPdf: () => exportingPdf,
     dropImageFiles,

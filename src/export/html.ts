@@ -14,10 +14,11 @@ import { EditorState } from "@codemirror/state";
 import type { SyntaxNode } from "@lezer/common";
 import { highlightCode } from "@lezer/highlight";
 import { papyrosHighlightStyle, resolveCodeLanguage } from "../editor/code-blocks";
-import { resolveImageSrc } from "../editor/images";
 import { isTocText, nestTocEntries, type TocEntry } from "../editor/blocks";
 import { buildFootnoteIndex, type FootnoteIndex, footnoteIdOf } from "../editor/footnotes";
 import { frontMatterExtension } from "../editor/front-matter";
+import { findTyporaRootUrlInText, imageSizeCss, parseImgTag } from "../editor/image-attrs";
+import { resolveImageRoot, resolveImageSrc } from "../editor/images";
 import { collectDocumentHeadings } from "../editor/lists";
 import { cjkEmphasisExtension } from "../editor/cjk-emphasis";
 import { footnoteExtension } from "../editor/footnotes";
@@ -37,6 +38,8 @@ export interface ExportHtmlOptions {
   docPath: string | null;
   /** Number display equations like the editor's auto-number mode. */
   mathAutoNumber?: boolean;
+  /** IM-04 image root setting; front matter `typora-root-url` overrides it. */
+  imageRootDir?: string | null;
 }
 
 export interface ExportHtmlResult {
@@ -192,6 +195,7 @@ class Renderer {
     private readonly math: MathRenderer,
     private readonly footnotes: FootnoteIndex,
     private readonly root: SyntaxNode,
+    private readonly imageRoot: string | null = null,
   ) {}
 
   private footnoteReference(node: SyntaxNode): string {
@@ -292,7 +296,8 @@ class Renderer {
         return "<br>";
       case "HTMLTag": {
         const raw = this.slice(node.from, node.to);
-        return /^<br\s*\/?>$/i.test(raw) ? "<br>" : escapeHtml(raw);
+        if (/^<br\s*\/?>$/i.test(raw)) return "<br>";
+        return this.htmlImage(raw) ?? escapeHtml(raw);
       }
       case "InlineMath": {
         const marks = node.getChildren("InlineMathMark");
@@ -353,7 +358,11 @@ class Renderer {
   private image(node: SyntaxNode): string {
     const { labelFrom, labelTo, href, title } = this.linkParts(node);
     const alt = this.slice(labelFrom, labelTo).replace(/[*_`~]/g, "").trim();
-    const resolved = resolveImageSrc(href, this.docPath, fileUrlFromPath);
+    return this.imageElement(href, alt, title, "");
+  }
+
+  private imageElement(href: string, alt: string, title: string, style: string): string {
+    const resolved = resolveImageSrc(href, this.docPath, fileUrlFromPath, this.imageRoot);
     const src =
       resolved.kind === "remote" || resolved.kind === "data" || resolved.kind === "local"
         ? resolved.url
@@ -362,7 +371,31 @@ class Renderer {
       return `<span class="k-image-missing">[${escapeHtml(alt || href)}]</span>`;
     }
     const titleAttr = title ? ` title="${escapeHtml(title)}"` : "";
-    return `<img src="${escapeHtml(src)}" alt="${escapeHtml(alt)}"${titleAttr}>`;
+    const styleAttr = style ? ` style="${escapeHtml(style)}"` : "";
+    return `<img src="${escapeHtml(src)}" alt="${escapeHtml(alt)}"${titleAttr}${styleAttr}>`;
+  }
+
+  /** IM-03: a single `<img>` tag, rebuilt from its allow-listed attributes only. */
+  private htmlImage(raw: string): string | null {
+    const tag = parseImgTag(raw);
+    if (!tag) return null;
+    return this.imageElement(tag.src, tag.alt, tag.title ?? "", imageSizeCss(tag.size));
+  }
+
+  /** An HTML block whose every non-blank line is one `<img>` tag. */
+  private htmlImageBlock(from: number, to: number): string | null {
+    const lines = this.slice(from, to)
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0);
+    if (lines.length === 0) return null;
+    const images: string[] = [];
+    for (const line of lines) {
+      const img = this.htmlImage(line);
+      if (img === null) return null;
+      images.push(img);
+    }
+    return `<p>${images.join("\n")}</p>\n`;
   }
 
   block(node: SyntaxNode): string {
@@ -415,7 +448,10 @@ class Renderer {
         return `${this.math(tex, true)}\n`;
       }
       case "HTMLBlock":
-        return `<pre class="k-raw-html">${this.text(node.from, node.to)}</pre>\n`;
+        return (
+          this.htmlImageBlock(node.from, node.to) ??
+          `<pre class="k-raw-html">${this.text(node.from, node.to)}</pre>\n`
+        );
       case "LinkReference":
       case "CommentBlock":
       case "ProcessingInstructionBlock":
@@ -632,6 +668,11 @@ export async function buildExportHtml(
     prepareMathRenderer(hasMath, Boolean(options.mathAutoNumber)),
   ]);
   const footnotes = buildFootnoteIndex(tree, (from, to) => doc.slice(from, to));
+  const imageRoot = resolveImageRoot(
+    findTyporaRootUrlInText(doc),
+    options.docPath,
+    options.imageRootDir ?? null,
+  );
   const renderer = new Renderer(
     doc,
     headings,
@@ -640,6 +681,7 @@ export async function buildExportHtml(
     math,
     footnotes,
     tree.topNode,
+    imageRoot,
   );
   const body = renderer.block(tree.topNode) + renderer.footnoteSection();
 

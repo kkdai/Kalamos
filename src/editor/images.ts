@@ -2,6 +2,7 @@ import { syntaxTree } from "@codemirror/language";
 import {
   type EditorState,
   type Extension,
+  Facet,
   type Range,
   StateEffect,
   StateField,
@@ -14,7 +15,15 @@ import {
   type ViewUpdate,
   WidgetType,
 } from "@codemirror/view";
-import { localFileUrl } from "../ipc";
+import { allowAssetDir, isAssetDirTooBroadError, localFileUrl } from "../ipc";
+import {
+  findTyporaRootUrl,
+  hasImageSize,
+  type ImageSize,
+  imageSizeKey,
+  parseImgTag,
+  resolveZoomedSize,
+} from "./image-attrs";
 import { isSelectionTouchingRange } from "./live-preview";
 
 export const UNSAVED_RELATIVE_IMAGE_HINT = "存檔後才能顯示相對路徑圖片";
@@ -35,6 +44,66 @@ export const imageDocPathField = StateField.define<string | null>({
     return value;
   },
 });
+
+// ---------------------------------------------------------------------------
+// Image root folder (IM-04): setting + `typora-root-url` front matter
+// ---------------------------------------------------------------------------
+
+/** Called when the asset protocol refuses an image root as too broad. */
+export type ImageRootTooBroadHandler = (root: string) => void;
+export const imageRootTooBroadHandlerFacet = Facet.define<ImageRootTooBroadHandler>();
+
+/** The `imageRootDir` setting (absolute folder or null). */
+export const setImageRootSettingEffect = StateEffect.define<string | null>();
+
+export const imageRootSettingField = StateField.define<string | null>({
+  create: () => null,
+  update(value, tr) {
+    for (const effect of tr.effects) {
+      if (effect.is(setImageRootSettingEffect)) return effect.value;
+    }
+    return value;
+  },
+});
+
+/**
+ * The root folder in effect: front matter `typora-root-url` wins over the
+ * setting. A relative front matter root resolves against the document folder
+ * (ignored for untitled documents, which then fall back to the setting).
+ */
+export function resolveImageRoot(
+  frontMatterRoot: string | null,
+  docPath: string | null,
+  settingRoot: string | null,
+): string | null {
+  let fm = frontMatterRoot?.trim() ?? "";
+  if (/^file:\/\//i.test(fm)) {
+    try {
+      fm = safeDecode(new URL(fm).pathname);
+    } catch {
+      fm = "";
+    }
+  }
+  if (fm && !/^[a-z][a-z0-9+.-]*:/i.test(fm)) {
+    if (fm.startsWith("/")) return joinPath("/", fm);
+    if (docPath) return joinPath(dirname(docPath), fm);
+  }
+  const setting = settingRoot?.trim() ?? "";
+  return setting.startsWith("/") ? joinPath("/", setting) : null;
+}
+
+/** Effective image root for an editor state. */
+export function effectiveImageRoot(state: EditorState): string | null {
+  const doc = state.doc;
+  const fm = findTyporaRootUrl((i) =>
+    i < doc.lines ? doc.line(i + 1).text : undefined,
+  );
+  return resolveImageRoot(
+    fm,
+    state.field(imageDocPathField, false) ?? null,
+    state.field(imageRootSettingField, false) ?? null,
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Path resolution
@@ -88,10 +157,15 @@ export function unwrapImageDestination(raw: string): string {
   return trimmed;
 }
 
+/**
+ * Resolves an image source. With an image `root` in effect, a src starting
+ * with `/` resolves under the root (and cannot escape it with `..`).
+ */
 export function resolveImageSrc(
   rawSrc: string,
   docPath: string | null,
   toUrl: (path: string) => string = localFileUrl,
+  root: string | null = null,
 ): ResolvedImageSrc {
   const src = unwrapImageDestination(rawSrc);
   if (!src) return { kind: "invalid", reason: "empty" };
@@ -118,7 +192,8 @@ export function resolveImageSrc(
     const withoutSuffix = src.replace(/[?#].*$/, "");
     const decoded = safeDecode(withoutSuffix);
     if (decoded.startsWith("/")) {
-      localPath = joinPath("/", decoded);
+      const fromSlash = joinPath("/", decoded);
+      localPath = root ? joinPath(root, fromSlash.slice(1)) : fromSlash;
     } else {
       if (!docPath) return { kind: "needs-save" };
       localPath = joinPath(dirname(docPath), decoded);
@@ -137,6 +212,41 @@ export interface ImageSpec {
   alt: string;
   src: string;
   title: string | null;
+  /** IM-03: size from an `<img>` tag (undefined for `![]()`). */
+  size?: ImageSize;
+  /** True for `<img>` tags. */
+  html?: boolean;
+}
+
+/** Specs for every line of `[from, to)` that is exactly one `<img>` tag. */
+function htmlImageSpecs(
+  state: EditorState,
+  from: number,
+  to: number,
+  out: ImageSpec[],
+): void {
+  const first = state.doc.lineAt(from);
+  const last = state.doc.lineAt(Math.max(from, to - 1));
+  for (let n = first.number; n <= last.number; n++) {
+    const line = state.doc.line(n);
+    const start = Math.max(line.from, from);
+    const end = Math.min(line.to, to);
+    const text = state.sliceDoc(start, end);
+    const lead = text.length - text.trimStart().length;
+    const trimmed = text.trim();
+    if (!trimmed.startsWith("<")) continue;
+    const tag = parseImgTag(trimmed);
+    if (!tag) continue;
+    out.push({
+      from: start + lead,
+      to: start + lead + trimmed.length,
+      alt: tag.alt,
+      src: tag.src,
+      title: tag.title,
+      size: tag.size,
+      html: true,
+    });
+  }
 }
 
 function unquoteTitle(raw: string): string {
@@ -169,6 +279,12 @@ export function collectImageSpecs(
       from: range.from,
       to: range.to,
       enter: (nodeRef) => {
+        if (nodeRef.name === "HTMLTag" || nodeRef.name === "HTMLBlock") {
+          if (seen.has(nodeRef.from)) return false;
+          seen.add(nodeRef.from);
+          htmlImageSpecs(state, nodeRef.from, nodeRef.to, specs);
+          return false;
+        }
         if (nodeRef.name !== "Image") return;
         if (seen.has(nodeRef.from)) return false;
         seen.add(nodeRef.from);
@@ -250,11 +366,34 @@ export function renderImageFallback(
   container.append(box);
 }
 
+/** Applies IM-03 sizes; `zoom` scales the natural size once it is known. */
+export function applyImageSize(img: HTMLImageElement, input: ImageSize | undefined): void {
+  if (!input || !hasImageSize(input)) return;
+  const size = resolveZoomedSize(input);
+  img.classList.add("k-image-sized");
+  if (size.width) img.style.width = size.width;
+  if (size.height) img.style.height = size.height;
+  if (size.maxWidth) img.style.maxWidth = size.maxWidth;
+  // With an explicit width / height, zoom was already folded into them.
+  if (size.zoom === undefined) return;
+  const zoom = size.zoom;
+  const applyNatural = (): void => {
+    if (img.naturalWidth > 0) {
+      img.style.width = `${Math.round(img.naturalWidth * zoom * 100) / 100}px`;
+    }
+  };
+  if (img.complete && img.naturalWidth > 0) applyNatural();
+  else img.addEventListener("load", applyNatural, { once: true });
+}
+
 export class ImageWidget extends WidgetType {
   constructor(
     readonly alt: string,
     readonly title: string | null,
     readonly resolved: ResolvedImageSrc,
+    readonly size?: ImageSize,
+    /** Offset from the widget start where a click puts the cursor. */
+    readonly editOffset = 2,
   ) {
     super();
   }
@@ -270,7 +409,9 @@ export class ImageWidget extends WidgetType {
     return (
       other.alt === this.alt &&
       other.title === this.title &&
-      other.key() === this.key()
+      other.key() === this.key() &&
+      imageSizeKey(other.size) === imageSizeKey(this.size) &&
+      other.editOffset === this.editOffset
     );
   }
 
@@ -296,6 +437,8 @@ export class ImageWidget extends WidgetType {
       renderImageFallback(wrapper, this.alt, "無法顯示圖片");
     } else {
       wrapper.dataset.state = "loading";
+      // Resolved local path (debugging aid; survives the broken-image fallback).
+      if (r.kind === "local") wrapper.dataset.path = r.path;
       const img = doc.createElement("img");
       img.className = "k-image-img";
       img.alt = this.alt;
@@ -303,6 +446,7 @@ export class ImageWidget extends WidgetType {
       img.loading = "lazy";
       img.draggable = false;
       if (this.title) img.title = this.title;
+      applyImageSize(img, this.size);
       img.addEventListener("load", () => {
         wrapper.dataset.state = "loaded";
         view.requestMeasure();
@@ -324,8 +468,8 @@ export class ImageWidget extends WidgetType {
       } catch {
         return;
       }
-      // Put the cursor just after `![` so the source is revealed for editing.
-      const anchor = Math.min(pos + 2, view.state.doc.length);
+      // Put the cursor just after `![` / `<` so the source is revealed for editing.
+      const anchor = Math.min(pos + this.editOffset, view.state.doc.length);
       view.dispatch({ selection: { anchor }, scrollIntoView: true });
       view.focus();
     });
@@ -343,6 +487,7 @@ export function buildImageDecorations(
 ): DecorationSet {
   const state = view.state;
   const docPath = state.field(imageDocPathField, false) ?? null;
+  const root = effectiveImageRoot(state);
   const ranges =
     view.visibleRanges.length > 0 ? view.visibleRanges : [view.viewport];
   const decorations: Array<Range<Decoration>> = [];
@@ -351,7 +496,9 @@ export function buildImageDecorations(
     const widget = new ImageWidget(
       spec.alt,
       spec.title,
-      resolveImageSrc(spec.src, docPath, toUrl),
+      resolveImageSrc(spec.src, docPath, toUrl, root),
+      spec.size,
+      spec.html ? 1 : 2,
     );
     decorations.push(
       Decoration.replace({ widget }).range(spec.from, spec.to),
@@ -362,16 +509,45 @@ export function buildImageDecorations(
 
 function hasDocPathChange(update: ViewUpdate): boolean {
   return update.transactions.some((tr) =>
-    tr.effects.some((e) => e.is(setImageDocPathEffect)),
+    tr.effects.some(
+      (e) => e.is(setImageDocPathEffect) || e.is(setImageRootSettingEffect),
+    ),
   );
+}
+
+const allowedRoots = new Set<string>();
+
+/**
+ * Lets the asset protocol load files under `root` (once per root). A root
+ * that is too broad (`/`, home or an ancestor) is refused by the backend;
+ * images then show their broken-image fallback and the handler is told.
+ */
+function allowImageRoot(root: string | null, view: EditorView): void {
+  if (!root || allowedRoots.has(root)) return;
+  allowedRoots.add(root);
+  void allowAssetDir(root).catch((err: unknown) => {
+    allowedRoots.delete(root);
+    if (!isAssetDirTooBroadError(err)) return;
+    for (const handler of view.state.facet(imageRootTooBroadHandlerFacet)) {
+      try {
+        handler(root);
+      } catch {
+        // never let a status callback break the editor
+      }
+    }
+  });
 }
 
 export const imagePreviewPlugin = ViewPlugin.fromClass(
   class {
     decorations: DecorationSet;
 
+    private root: string | null;
+
     constructor(view: EditorView) {
       this.decorations = buildImageDecorations(view);
+      this.root = effectiveImageRoot(view.state);
+      allowImageRoot(this.root, view);
     }
 
     update(update: ViewUpdate): void {
@@ -390,6 +566,11 @@ export const imagePreviewPlugin = ViewPlugin.fromClass(
         update.transactions.some((tr) => tr.reconfigured)
       ) {
         this.decorations = buildImageDecorations(update.view);
+        const root = effectiveImageRoot(update.state);
+        if (root !== this.root) {
+          this.root = root;
+          allowImageRoot(root, update.view);
+        }
       }
     }
   },
