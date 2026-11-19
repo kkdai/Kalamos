@@ -24,6 +24,7 @@ import {
   readFileAsBase64,
 } from "./editor/images";
 import { bindWindowShortcuts } from "./editor/keymaps";
+import { createWordCounter, type WordCounter } from "./editor/word-count-view";
 import {
   jumpToHeadingSlug,
   resolveRelativeMarkdownPath,
@@ -101,6 +102,7 @@ export interface KalamosApp {
   editor: KalamosEditor;
   sidebar: SidebarController;
   themeMenu: ThemeMenuController;
+  wordCounter: WordCounter;
   getDocId: () => string;
   getCurrentPath: () => string | null;
   getPendingRecovery: () => RecoveryEntry | null;
@@ -320,6 +322,15 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
       editor.toggleMathAutoNumber();
     },
   };
+
+  const wordCounter = createWordCounter({
+    view: editor.view,
+    parent:
+      root.querySelector<HTMLElement>("#statusbar") ??
+      statusEl?.parentElement ??
+      editorContainer.parentElement ??
+      document.body,
+  });
 
   const unbindShortcuts = bindWindowShortcuts(
     window,
@@ -687,6 +698,7 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
     restoreBtn?.removeEventListener("click", onRestoreClick);
     discardBtn?.removeEventListener("click", onDiscardClick);
     themeMenu.destroy();
+    wordCounter.destroy();
     sidebar.destroy();
     editor.destroy();
   }
@@ -695,6 +707,7 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
     editor,
     sidebar,
     themeMenu,
+    wordCounter,
     getDocId: () => docId,
     getCurrentPath: () => currentPath,
     getPendingRecovery: () => pendingRecovery,
