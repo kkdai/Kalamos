@@ -78,6 +78,10 @@ export interface Settings {
   mathAutoNumber?: boolean;
   /** IM-04: folder that `/`-rooted image paths resolve against. */
   imageRootDir?: string | null;
+  /** WM-01 Ataraxia focus mode (F8). */
+  focusMode?: boolean;
+  /** WM-02 Stichos typewriter mode (F9). */
+  typewriterMode?: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -89,6 +93,8 @@ export const DEFAULT_SETTINGS: Settings = {
   codeLineNumbers: false,
   mathAutoNumber: false,
   imageRootDir: null,
+  focusMode: false,
+  typewriterMode: false,
 };
 
 export const MAX_EXCERPT_CHARS = 120;
@@ -748,6 +754,8 @@ export async function setSettings(settings: Settings): Promise<null> {
       settings.codeLineNumbers ?? DEFAULT_SETTINGS.codeLineNumbers,
     mathAutoNumber: settings.mathAutoNumber ?? DEFAULT_SETTINGS.mathAutoNumber,
     imageRootDir: settings.imageRootDir ?? DEFAULT_SETTINGS.imageRootDir,
+    focusMode: settings.focusMode ?? DEFAULT_SETTINGS.focusMode,
+    typewriterMode: settings.typewriterMode ?? DEFAULT_SETTINGS.typewriterMode,
   };
   return null;
 }

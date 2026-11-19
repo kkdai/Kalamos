@@ -94,7 +94,11 @@ describe("ipc in-memory mock (api.yaml contract)", () => {
       imageRootDir: "/tmp/kalamos-test/blog",
     };
     await setSettings(updated);
-    expect(await getSettings()).toEqual(updated);
+    // Settings saved before WM-01 / WM-02 get the new keys' defaults.
+    expect(await getSettings()).toEqual({ ...updated, focusMode: false, typewriterMode: false });
+
+    await setSettings({ ...updated, focusMode: true, typewriterMode: true });
+    expect(await getSettings()).toMatchObject({ focusMode: true, typewriterMode: true });
   });
 
   it("preloads /demo folder with mixed CJK/English, H1-H6 headings, and a subfolder", async () => {

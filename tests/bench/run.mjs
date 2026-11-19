@@ -14,9 +14,11 @@
  *   (rAF + MessageChannel ≈ "frame presented"). Keystrokes are spread over the
  *   top / middle / bottom of the document and inside a table, a code block and
  *   a list.
- * - Single scenario "as-is": MathJax loads without any shim (BUG-4 fixed via
+ * - Scenario "as-is": MathJax loads without any shim (BUG-4 fixed via
  *   Vite `define`), so math typesetting cost is included. The run fails if
  *   math did not actually render or if the page logged errors.
+ * - Scenario "ataraxia+stichos": the same with focus mode (F8) and typewriter
+ *   mode (F9) on (#15).
  *
  * Output: one JSON object on stdout. Logs go to stderr.
  * Exit code 1 if p95 input latency ≥ budget (50 ms) or math did not render.
@@ -80,7 +82,7 @@ function summarize(values) {
   };
 }
 
-async function runScenario(browser, baseURL, doc, { name }) {
+async function runScenario(browser, baseURL, doc, { name, writingModes = false }) {
   const context = await browser.newContext({ viewport: { width: 1200, height: 800 } });
   const page = await context.newPage();
   const pageErrors = [];
@@ -101,6 +103,13 @@ async function runScenario(browser, baseURL, doc, { name }) {
     await app.openDocument("/bench/10k.md");
   });
   await page.waitForTimeout(1500);
+  if (writingModes) {
+    await page.evaluate(async () => {
+      const app = (await import("/src/main.ts")).getActiveApp();
+      app.editor.setFocusMode(true);
+      app.editor.setTypewriterMode(true);
+    });
+  }
 
   // --- open → first render -------------------------------------------------
   const openTimes = [];
@@ -213,7 +222,7 @@ async function main() {
   const browserVersion = browser.version();
   const results = [];
   try {
-    for (const scenario of [{ name: "as-is" }]) {
+    for (const scenario of [{ name: "as-is" }, { name: "ataraxia+stichos", writingModes: true }]) {
       log(`scenario ${scenario.name} …`);
       results.push(await runScenario(browser, baseURL, doc, scenario));
     }

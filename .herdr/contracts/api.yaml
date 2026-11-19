@@ -256,6 +256,8 @@ components:
         codeLineNumbers: { type: boolean, default: false }
         mathAutoNumber: { type: boolean, default: false }
         imageRootDir: { type: [string, 'null'], default: null, description: "IM-04 image root folder: '/'-rooted image paths resolve under it; a document's front matter typora-root-url overrides it" }
+        focusMode: { type: boolean, default: false, description: 'WM-01 Ataraxia focus mode (F8)' }
+        typewriterMode: { type: boolean, default: false, description: 'WM-02 Stichos typewriter mode (F9)' }
     ImportedImage:
       type: object
       required: [relativePath]
