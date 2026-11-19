@@ -1,0 +1,75 @@
+.k-table-wrapper {
+  position: relative;
+  margin: 1em 0;
+  overflow-x: auto;
+}
+
+.k-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--k-font-body);
+  font-size: 0.95em;
+  line-height: 1.6;
+  color: var(--k-text);
+  background-color: var(--k-bg);
+}
+
+.k-table th,
+.k-table td {
+  position: relative;
+  padding: 8px 12px;
+  border: 1px solid var(--k-divider);
+  vertical-align: top;
+  cursor: text;
+}
+
+.k-table th {
+  background-color: var(--k-surface);
+  font-weight: 700;
+}
+
+.k-table tbody tr:hover {
+  background-color: color-mix(in srgb, var(--k-surface) 55%, transparent);
+}
+
+.k-table-row-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-right: 6px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--k-text-muted);
+  cursor: grab;
+  opacity: 0;
+  vertical-align: middle;
+  transition: opacity var(--k-transition-fast, 150ms ease-out);
+}
+
+.k-table tbody tr:hover .k-table-row-handle,
+.k-table-row-handle:focus-visible {
+  opacity: 1;
+}
+
+.k-table-row-handle:active {
+  cursor: grabbing;
+}
+
+.k-table-col-resizer {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  user-select: none;
+  z-index: 2;
+}
+
+.k-table-col-resizer:hover {
+  background-color: var(--k-accent);
+  opacity: 0.45;
+}

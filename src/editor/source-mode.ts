@@ -1,6 +1,12 @@
 import { Compartment, type Extension } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
 import { livePreviewExtension } from "./live-preview";
+import { tablePreviewStateField } from "./tables";
+
+const activeLivePreviewExtensions = [
+  ...livePreviewExtension,
+  tablePreviewStateField,
+];
 
 export interface SourceModeController {
   extension: Extension;
@@ -23,7 +29,9 @@ export function createSourceModeController(options?: {
   ): void {
     sourceMode = enabled;
     view.dispatch({
-      effects: compartment.reconfigure(enabled ? [] : livePreviewExtension),
+      effects: compartment.reconfigure(
+        enabled ? [] : activeLivePreviewExtensions,
+      ),
     });
     if (notify) {
       options?.onSourceModeChange?.(sourceMode);
@@ -36,7 +44,7 @@ export function createSourceModeController(options?: {
   }
 
   return {
-    extension: compartment.of(sourceMode ? [] : livePreviewExtension),
+    extension: compartment.of(sourceMode ? [] : activeLivePreviewExtensions),
     isSourceMode: () => sourceMode,
     setSourceMode,
     toggleSourceMode,
