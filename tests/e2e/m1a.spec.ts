@@ -83,8 +83,10 @@ for (const c of INLINE_CASES) {
     // text equals the content text (markers collapse to zero width).
     await expect(first.locator(".k-mark")).toHaveCount(0);
 
-    // Cursor back inside → markers visible again.
-    await setCursor(page, 2);
+    // Cursor back onto the markers → visible again. Offset 1 is inside the
+    // marker for every case (`#`, `**`, `` ` ``, `~~`, `[`); since #49 a
+    // heading's `#` shows only with the cursor on it, not in the title text.
+    await setCursor(page, 1);
     await expect(first.locator(".k-mark-hidden")).toHaveCount(0);
     const visibleMarks = await page.evaluate(() =>
       Array.from(document.querySelectorAll(".cm-content .cm-line:first-child .k-mark")).map(
@@ -297,12 +299,16 @@ test("AC9 decorations are frozen during IME composition (CDP imeSetComposition)"
 });
 
 test("AC9 composing on a decorated line keeps its markers stable", async ({ page }) => {
-  // Cursor at the end of a heading line: the heading is active (marks visible).
+  // Cursor at the end of a heading line. Since #49 the `##` is hidden there
+  // (shown only with the cursor on it); either way its marker decorations
+  // must not change while composing.
   const src = "## 標題";
   await setDoc(page, src, src.length);
   const cdp = await page.context().newCDPSession(page);
   const markCount = () =>
-    page.evaluate(() => document.querySelectorAll(".cm-content .cm-line:first-child .k-mark").length);
+    page.evaluate(
+      () => document.querySelectorAll(".cm-content .cm-line:first-child .k-mark, .cm-content .cm-line:first-child .k-mark-hidden").length,
+    );
   const before = await markCount();
   expect(before).toBeGreaterThan(0);
   for (const step of ["z", "zh", "zho", "中"]) {

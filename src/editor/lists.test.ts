@@ -55,9 +55,9 @@ describe("Lists & Task Lists (ED-04) and Links & Bookmarks (ED-05)", () => {
     expect(handleListEnter(view)).toBe(true);
     expect(app.editor.getContent()).toBe("- 第一項\n- ");
 
-    // Press Enter again on empty `- ` -> exits list
+    // Press Enter again on empty `- ` -> exits list, leaving a blank line (#49)
     expect(handleListEnter(view)).toBe(true);
-    expect(app.editor.getContent()).toBe("- 第一項\n");
+    expect(app.editor.getContent()).toBe("- 第一項\n\n");
 
     // 2. Ordered list auto-increment & exit on empty item
     app.editor.setContent("1. First");
@@ -74,7 +74,7 @@ describe("Lists & Task Lists (ED-04) and Links & Bookmarks (ED-05)", () => {
 
     // Press Enter on empty `3. ` -> exits list
     expect(handleListEnter(view)).toBe(true);
-    expect(app.editor.getContent()).toBe("1. First\n2. Second\n");
+    expect(app.editor.getContent()).toBe("1. First\n2. Second\n\n");
 
     // 3. Task list continues as `- [ ] ` and exits on empty item
     app.editor.setContent("- [x] 已完成項目");
@@ -84,7 +84,7 @@ describe("Lists & Task Lists (ED-04) and Links & Bookmarks (ED-05)", () => {
 
     // Press Enter on empty `- [ ] ` -> exits list
     expect(handleListEnter(view)).toBe(true);
-    expect(app.editor.getContent()).toBe("- [x] 已完成項目\n");
+    expect(app.editor.getContent()).toBe("- [x] 已完成項目\n\n");
   });
 
   it("Tab and Shift+Tab indent/outdent list items aligned to parent item content column", async () => {

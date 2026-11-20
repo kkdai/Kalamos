@@ -114,7 +114,12 @@ describe("ED-06 decorations", () => {
     const hidden = s.filter((x) => x.className === "k-mark-hidden").map((x) => spanText(state, x));
     expect(hidden).toEqual(["> ", "> ", "> "]);
 
-    state = makeState(doc, 3); // cursor on the first line
+    // #49: cursor in the quoted text keeps every `>` hidden…
+    state = makeState(doc, 3);
+    expect(specs(state).filter((x) => x.className === "k-mark-hidden")).toHaveLength(3);
+
+    // …only the cursor on a `>` itself reveals that marker.
+    state = makeState(doc, 1);
     s = specs(state);
     const marks = s.filter((x) => x.kind === "mark");
     expect(marks.find((x) => x.from === 0)?.className).toBe("k-mark");

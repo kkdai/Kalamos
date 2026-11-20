@@ -64,26 +64,73 @@ export function parseListLine(lineText: string): ParsedListLine {
   };
 }
 
+/** A line holding only blockquote markers (`>`, `> >`, `> `…). */
+const EMPTY_QUOTE_LINE_RE = /^(?:[ \t]{0,3}>[ \t]?)+[ \t]*$/;
+/** Marker prefix of a list item line: indent, marker, spaces, optional task box. */
+const LIST_ITEM_PREFIX_RE = /^([ \t]*)((?:[-+*]|\d{1,9}[.)])(?:[ \t]+\[[ xX]\])?)(?:[ \t]+|$)/;
+
+function isBlank(text: string): boolean {
+  return text.trim() === "";
+}
+
+/** Is `pos` inside code (where list / quote syntax is plain text)? */
+function isInCode(state: EditorState, pos: number): boolean {
+  for (let n: ReturnType<ReturnType<typeof syntaxTree>["resolveInner"]> | null = syntaxTree(state).resolveInner(pos, 1); n; n = n.parent) {
+    if (n.name === "FencedCode" || n.name === "CodeBlock" || n.name === "CodeText") return true;
+  }
+  return false;
+}
+
+/**
+ * Leave the list / quote: the empty marker line becomes the blank line that
+ * separates the block from what follows, and the cursor goes to a fresh line
+ * after it (so the new paragraph is not a lazy continuation of the block,
+ * nor glued to a following paragraph when there is one).
+ */
+function endBlockAtLine(view: EditorView, lineNumber: number): void {
+  const { state } = view;
+  const line = state.doc.line(lineNumber);
+  view.dispatch({
+    changes: { from: line.from, to: line.to, insert: state.lineBreak },
+    selection: EditorSelection.cursor(line.from + state.lineBreak.length),
+    scrollIntoView: true,
+    userEvent: "input",
+  });
+}
+
+/**
+ * Enter in lists and blockquotes (Typora behaviour):
+ * - non-empty item / quote line: continue the markup (CodeMirror);
+ * - empty nested list item: move it out one level;
+ * - empty top-level item or empty `>` line: end the list / quote, leaving a
+ *   blank line; a nested empty `> >` line drops one quote level.
+ */
 export function handleListEnter(view: EditorView): boolean {
   const { state } = view;
   if (state.selection.ranges.length === 1 && state.selection.main.empty) {
     const pos = state.selection.main.head;
     const line = state.doc.lineAt(pos);
-    // If line is an empty list/task item, end the list level or clear the marker
-    if (EMPTY_LIST_LINE_RE.test(line.text)) {
-      const handledByCm = continueMarkupNoBlank({
-        state,
-        dispatch: (tr) => view.dispatch(tr),
-      });
-      if (handledByCm) return true;
-
-      view.dispatch({
-        changes: { from: line.from, to: line.to, insert: "" },
-        selection: EditorSelection.cursor(line.from),
-        scrollIntoView: true,
-        userEvent: "input",
-      });
-      return true;
+    if (!isInCode(state, line.from)) {
+      if (EMPTY_QUOTE_LINE_RE.test(line.text)) {
+        const depth = (line.text.match(/>/g) ?? []).length;
+        if (depth > 1) {
+          const outer = "> ".repeat(depth - 1);
+          view.dispatch({
+            changes: { from: line.from, to: line.to, insert: outer },
+            selection: EditorSelection.cursor(line.from + outer.length),
+            userEvent: "input",
+          });
+        } else {
+          endBlockAtLine(view, line.number);
+        }
+        return true;
+      }
+      if (EMPTY_LIST_LINE_RE.test(line.text)) {
+        const indent = /^[ \t]*/.exec(line.text)?.[0] ?? "";
+        if (indent.length > 0 && outdentListItem(view)) return true;
+        endBlockAtLine(view, line.number);
+        return true;
+      }
     }
   }
 
@@ -93,7 +140,39 @@ export function handleListEnter(view: EditorView): boolean {
   });
 }
 
+/**
+ * Backspace right after a list item's marker (`- |text`, `1. |text`,
+ * `- [ ] |text`) turns the item into a plain paragraph (Typora behaviour):
+ * the marker goes, the indentation stays (a nested item becomes a paragraph
+ * of its parent item) and blank lines are added around it where needed so
+ * it is not read as a lazy continuation of the neighbouring lines.
+ * Everything else falls back to CodeMirror's `deleteMarkupBackward`.
+ */
 export function handleListBackspace(view: EditorView): boolean {
+  const { state } = view;
+  if (state.selection.ranges.length === 1 && state.selection.main.empty) {
+    const head = state.selection.main.head;
+    const line = state.doc.lineAt(head);
+    const m = LIST_ITEM_PREFIX_RE.exec(line.text);
+    if (m && head === line.from + m[0].length && head > line.from && !isInCode(state, line.from)) {
+      const indent = m[1];
+      const content = line.text.slice(m[0].length);
+      const prev = line.number > 1 ? state.doc.line(line.number - 1) : null;
+      const next = line.number < state.doc.lines ? state.doc.line(line.number + 1) : null;
+      const br = state.lineBreak;
+      const blankBefore = !isBlank(content) && prev !== null && !isBlank(prev.text) ? br : "";
+      const blankAfter = !isBlank(content) && next !== null && !isBlank(next.text) ? br : "";
+      const changes = [{ from: line.from, to: head, insert: blankBefore + indent }];
+      if (blankAfter) changes.push({ from: line.to, to: line.to, insert: blankAfter });
+      view.dispatch({
+        changes,
+        selection: EditorSelection.cursor(line.from + blankBefore.length + indent.length),
+        scrollIntoView: true,
+        userEvent: "delete.backward",
+      });
+      return true;
+    }
+  }
   return deleteMarkupBackward({
     state: view.state,
     dispatch: (tr) => view.dispatch(tr),
