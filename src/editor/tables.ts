@@ -21,6 +21,7 @@ import {
   isSelectionTouchingRange,
   navigateMarkdownLink,
 } from "./live-preview";
+import { mapPosClamped } from "./positions";
 
 export type TableAlign = "left" | "center" | "right";
 export type DelimiterStyle = "default" | "left" | "center" | "right";
@@ -1206,13 +1207,13 @@ export const tableAutoFormatPlugin = ViewPlugin.fromClass(
       if (update.docChanged) {
         if (prev) {
           prev = {
-            from: update.changes.mapPos(prev.from, -1),
-            to: update.changes.mapPos(prev.to, 1),
+            from: mapPosClamped(update.changes, prev.from, -1),
+            to: mapPosClamped(update.changes, prev.to, 1),
             edited: prev.edited || update.changes.touchesRange(prev.from, prev.to) !== false,
           };
         }
         if (this.pendingPos !== null) {
-          this.pendingPos = update.changes.mapPos(this.pendingPos, -1);
+          this.pendingPos = mapPosClamped(update.changes, this.pendingPos, -1);
         }
       }
 

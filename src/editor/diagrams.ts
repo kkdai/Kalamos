@@ -35,6 +35,7 @@ import {
   WidgetType,
 } from "@codemirror/view";
 import { isSelectionTouchingRange } from "./live-preview";
+import { mapPosClamped } from "./positions";
 
 // ---------------------------------------------------------------------------
 // Block detection
@@ -945,8 +946,8 @@ export const diagramStateField = StateField.define<DiagramFieldValue>({
     // IME composition: never re-decorate while composing; just map.
     if (tr.isUserEvent("input.type.compose")) {
       const dirty: PosRange[] = value.dirty.map((r) => ({
-        from: tr.changes.mapPos(r.from, -1),
-        to: tr.changes.mapPos(r.to, 1),
+        from: mapPosClamped(tr.changes, r.from, -1),
+        to: mapPosClamped(tr.changes, r.to, 1),
       }));
       tr.changes.iterChangedRanges((_fa, _ta, fromB, toB) => {
         dirty.push({ from: fromB, to: toB });
@@ -956,7 +957,9 @@ export const diagramStateField = StateField.define<DiagramFieldValue>({
         theme,
         dirty,
         dirtyAll: value.dirtyAll || themeChanged || (tr.docChanged && isStructuralChange(tr)),
-        parsedTo: value.parsedTo,
+        // Mapped, not copied: a copied position can fall outside the next
+        // (shorter) document and make mapPos throw (#56).
+        parsedTo: mapPosClamped(tr.changes, value.parsedTo, 1),
       };
     }
 
@@ -984,8 +987,8 @@ export const diagramStateField = StateField.define<DiagramFieldValue>({
 
     const decorations = value.decorations.map(tr.changes);
     const regions: PosRange[] = value.dirty.map((r) => ({
-      from: tr.changes.mapPos(r.from, -1),
-      to: tr.changes.mapPos(r.to, 1),
+      from: mapPosClamped(tr.changes, r.from, -1),
+      to: mapPosClamped(tr.changes, r.to, 1),
     }));
     tr.changes.iterChangedRanges((_fa, _ta, fromB, toB) => {
       regions.push({ from: fromB, to: toB });
@@ -993,14 +996,14 @@ export const diagramStateField = StateField.define<DiagramFieldValue>({
     if (tr.selection || tr.docChanged) {
       for (const r of selectionRanges(tr.startState.selection)) {
         regions.push({
-          from: tr.changes.mapPos(r.from, -1),
-          to: tr.changes.mapPos(r.to, 1),
+          from: mapPosClamped(tr.changes, r.from, -1),
+          to: mapPosClamped(tr.changes, r.to, 1),
         });
       }
       regions.push(...selectionRanges(tr.state.selection));
     }
     const parsedNow = syntaxTree(tr.state).length;
-    let parsedTo = tr.changes.mapPos(value.parsedTo, 1);
+    let parsedTo = mapPosClamped(tr.changes, value.parsedTo, 1);
     if (parsedNow > parsedTo) {
       regions.push({ from: parsedTo, to: parsedNow });
       parsedTo = parsedNow;

@@ -23,6 +23,7 @@ import type { SyntaxNode } from "@lezer/common";
 import { tags } from "@lezer/highlight";
 import type { BlockContext, InlineContext, Line, MarkdownConfig } from "@lezer/markdown";
 import { isSelectionTouchingRange } from "./live-preview";
+import { mapPosClamped } from "./positions";
 
 export const mathAutoNumberFacet = Facet.define<boolean, boolean>({
   combine: (values) => values[0] ?? false,
@@ -952,8 +953,8 @@ export const mathStateField = StateField.define<MathFieldValue>({
     // IME composition (AC9): never re-render while composing; just map.
     if (composing) {
       const dirty: PosRange[] = value.dirty.map((r) => ({
-        from: tr.changes.mapPos(r.from, -1),
-        to: tr.changes.mapPos(r.to, 1),
+        from: mapPosClamped(tr.changes, r.from, -1),
+        to: mapPosClamped(tr.changes, r.to, 1),
       }));
       tr.changes.iterChangedRanges((_fa, _ta, fromB, toB) => {
         dirty.push({ from: fromB, to: toB });
@@ -963,7 +964,9 @@ export const mathStateField = StateField.define<MathFieldValue>({
         dirty,
         dirtyAll:
           value.dirtyAll || (tr.docChanged && isStructuralChange(tr)),
-        parsedTo: value.parsedTo,
+        // Mapped, not copied: a copied position can fall outside the next
+        // (shorter) document and make mapPos throw (#56).
+        parsedTo: mapPosClamped(tr.changes, value.parsedTo, 1),
       };
     }
 
@@ -995,8 +998,8 @@ export const mathStateField = StateField.define<MathFieldValue>({
 
     let decorations = value.decorations.map(tr.changes);
     const regions: PosRange[] = value.dirty.map((r) => ({
-      from: tr.changes.mapPos(r.from, -1),
-      to: tr.changes.mapPos(r.to, 1),
+      from: mapPosClamped(tr.changes, r.from, -1),
+      to: mapPosClamped(tr.changes, r.to, 1),
     }));
     tr.changes.iterChangedRanges((_fa, _ta, fromB, toB) => {
       regions.push({ from: fromB, to: toB });
@@ -1005,8 +1008,8 @@ export const mathStateField = StateField.define<MathFieldValue>({
       // Only formulas under the old and new selection change active state.
       for (const r of selectionRanges(tr.startState.selection)) {
         regions.push({
-          from: tr.changes.mapPos(r.from, -1),
-          to: tr.changes.mapPos(r.to, 1),
+          from: mapPosClamped(tr.changes, r.from, -1),
+          to: mapPosClamped(tr.changes, r.to, 1),
         });
       }
       regions.push(...selectionRanges(tr.state.selection));
@@ -1014,7 +1017,7 @@ export const mathStateField = StateField.define<MathFieldValue>({
 
     // Background parsing reached text that had no tree yet: decorate it.
     const parsedNow = syntaxTree(tr.state).length;
-    let parsedTo = tr.changes.mapPos(value.parsedTo, 1);
+    let parsedTo = mapPosClamped(tr.changes, value.parsedTo, 1);
     if (parsedNow > parsedTo) {
       regions.push({ from: parsedTo, to: parsedNow });
       parsedTo = parsedNow;
