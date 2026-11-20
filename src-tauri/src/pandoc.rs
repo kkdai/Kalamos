@@ -30,8 +30,10 @@ pub const EXTRA_SEARCH_DIRS: &[&str] = &["/opt/homebrew/bin", "/usr/local/bin"];
 /// Markdown dialect Kalamos documents are written in.
 pub const MARKDOWN_READER: &str =
     "markdown+tex_math_dollars+footnotes+yaml_metadata_block+pipe_tables+task_lists";
-/// Markdown dialect produced on import.
-pub const MARKDOWN_WRITER: &str = "gfm+tex_math_dollars+footnotes";
+/// Markdown dialect produced on import. `gfm` enables `tex_math_gfm` by
+/// default (math as $`…`$ / ```math), which Kalamos does not read; turn it off
+/// so math comes out as `$…$` / `$$…$$` (#48).
+pub const MARKDOWN_WRITER: &str = "gfm-tex_math_gfm+tex_math_dollars+footnotes";
 pub const PANDOC_MISSING_MESSAGE: &str = "找不到 Pandoc：請先安裝（brew install pandoc）";
 pub const PANDOC_TOO_OLD_FOR_IMPORT_MESSAGE: &str = "Pandoc 版本過舊，匯入需要 2.15 以上";
 /// First pandoc release with `--sandbox` (imports run sandboxed).
@@ -547,15 +549,61 @@ pub async fn export_pandoc(
 // Import
 // ---------------------------------------------------------------------------
 
+/// File name of the import Lua filter inside the per-import temp folder.
+pub const IMPORT_FILTER_NAME: &str = "kalamos-import.lua";
+
+/// Import Lua filter (#48). Word / ODT / EPUB images carry a size and often a
+/// caption, which GFM cannot express, so pandoc would fall back to raw HTML
+/// (`<figure><img …><figcaption>`). This turns every Figure into a plain
+/// paragraph of images (caption text as alt) and drops image attributes, so
+/// the result is `![alt](path)`. Other raw HTML (`<u>`, `<sub>`…) is untouched.
+pub const IMPORT_LUA_FILTER: &str = r#"-- Kalamos import filter (#48): figures become plain images, image sizes dropped.
+local function plain(img)
+  img.attr = pandoc.Attr()
+  return img
+end
+
+function Image(img)
+  return plain(img)
+end
+
+function Figure(fig)
+  local caption = pandoc.utils.stringify(fig.caption.long or {})
+  local images = {}
+  fig:walk({
+    Image = function(img)
+      table.insert(images, img)
+    end,
+  })
+  if #images == 0 then
+    return nil
+  end
+  local inlines = {}
+  for i, img in ipairs(images) do
+    img = plain(img)
+    if caption ~= "" then
+      img.caption = pandoc.Inlines(caption)
+    end
+    if i > 1 then
+      table.insert(inlines, pandoc.Space())
+    end
+    table.insert(inlines, img)
+  end
+  return pandoc.Para(inlines)
+end"#;
+
 /// Argument vector for an import (Markdown on stdout, media into `media_dir`).
 ///
 /// Imported files come from outside (downloads), so pandoc runs with
 /// `--sandbox`: it may not read other local files (`\input`, `<img src=/…>`,
 /// …) into the result or the extracted media. Exports are not sandboxed
-/// because they must read the document's images.
-pub fn import_args(source: &Path, reader: &str, media_dir: &Path) -> Vec<OsString> {
+/// because they must read the document's images. The Lua filter is our own
+/// file (written by `import_with`), not part of the imported document.
+pub fn import_args(source: &Path, reader: &str, media_dir: &Path, filter: &Path) -> Vec<OsString> {
     let mut extract = OsString::from("--extract-media=");
     extract.push(media_dir.as_os_str());
+    let mut lua = OsString::from("--lua-filter=");
+    lua.push(filter.as_os_str());
     vec![
         "--sandbox".into(),
         "-f".into(),
@@ -563,11 +611,19 @@ pub fn import_args(source: &Path, reader: &str, media_dir: &Path) -> Vec<OsStrin
         "-t".into(),
         MARKDOWN_WRITER.into(),
         "--wrap=none".into(),
+        lua,
         extract,
         // `--` so a file name starting with `-` is never read as an option.
         "--".into(),
         source.as_os_str().to_owned(),
     ]
+}
+
+/// Post-processing of imported Markdown: drop zero-width spaces (U+200B), which
+/// Word documents scatter around math and which would otherwise be invisible
+/// noise in the file.
+pub fn clean_imported_markdown(markdown: &str) -> String {
+    markdown.replace('\u{200B}', "")
 }
 
 fn new_media_dir(base: &Path, source: &Path) -> PathBuf {
@@ -612,21 +668,36 @@ pub fn import_with(
             source.display()
         )));
     }
-    let media_dir = new_media_dir(temp_base, source);
-    let args = import_args(source, reader, &media_dir);
-    let out = run_pandoc(pandoc, &args, None, timeout)?;
-    if let Err(err) = check_exit(&out) {
-        let _ = fs::remove_dir_all(&media_dir);
-        return Err(err);
+    // One temp folder per import: the Lua filter, and the extracted media.
+    let work_dir = new_media_dir(temp_base, source);
+    fs::create_dir_all(&work_dir)?;
+    let filter = work_dir.join(IMPORT_FILTER_NAME);
+    let result = fs::write(&filter, IMPORT_LUA_FILTER)
+        .map_err(AppError::from)
+        .and_then(|_| {
+            let args = import_args(source, reader, &work_dir, &filter);
+            let out = run_pandoc(pandoc, &args, None, timeout)?;
+            check_exit(&out)?;
+            String::from_utf8(out.stdout).map_err(|_| AppError::parse("Pandoc 輸出不是 UTF-8"))
+        });
+    let _ = fs::remove_file(&filter);
+    let markdown = match result {
+        Ok(markdown) => clean_imported_markdown(&markdown),
+        Err(err) => {
+            let _ = fs::remove_dir_all(&work_dir);
+            return Err(err);
+        }
+    };
+    // Keep the folder only when pandoc extracted something into it.
+    let has_media = fs::read_dir(&work_dir)
+        .map(|mut entries| entries.next().is_some())
+        .unwrap_or(false);
+    if !has_media {
+        let _ = fs::remove_dir(&work_dir);
     }
-    let markdown = String::from_utf8(out.stdout)
-        .map_err(|_| AppError::parse("Pandoc 輸出不是 UTF-8"))?;
-    let media_dir = media_dir
-        .is_dir()
-        .then(|| media_dir.to_string_lossy().into_owned());
     Ok(ImportResult {
         markdown,
-        media_dir,
+        media_dir: has_media.then(|| work_dir.to_string_lossy().into_owned()),
     })
 }
 
@@ -919,9 +990,12 @@ dir=$(dirname "$0")
 : > "$dir/argv.txt"
 for a in "$@"; do printf '%s\n' "$a" >> "$dir/argv.txt"; done
 for a in "$@"; do
-  case "$a" in --extract-media=*) m="${a#--extract-media=}"; mkdir -p "$m/media"; printf 'png' > "$m/media/image1.png";; esac
+  case "$a" in
+    --extract-media=*) m="${a#--extract-media=}"; mkdir -p "$m/media"; printf 'png' > "$m/media/image1.png";;
+    --lua-filter=*) cp "${a#--lua-filter=}" "$dir/filter-copy.lua";;
+  esac
 done
-printf '# 第一章\n\n## 第一節\n\n### 小節\n\n![](%s/media/image1.png)\n' "$m"
+printf '# 第一章\n\n## 第一節\n\n### 小節\n\n![](%s/media/image1.png)\n\n公式 $x$\342\200\213 後\n' "$m"
 "#,
         );
         let source = dir.path().join("報告.docx");
@@ -940,8 +1014,15 @@ printf '# 第一章\n\n## 第一節\n\n### 小節\n\n![](%s/media/image1.png)\n'
             &args[0..6],
             &["--sandbox", "-f", "docx", "-t", MARKDOWN_WRITER, "--wrap=none"]
         );
-        assert_eq!(args[6], format!("--extract-media={media}"));
-        assert_eq!(&args[7..], &["--", source.to_str().unwrap()]);
+        let filter = format!("{media}/{IMPORT_FILTER_NAME}");
+        assert_eq!(args[6], format!("--lua-filter={filter}"));
+        assert_eq!(args[7], format!("--extract-media={media}"));
+        assert_eq!(&args[8..], &["--", source.to_str().unwrap()]);
+        // The filter was there for pandoc, then removed; U+200B is stripped.
+        assert_eq!(fs::read_to_string(dir.path().join("filter-copy.lua")).unwrap(), IMPORT_LUA_FILTER);
+        assert!(!Path::new(&filter).exists());
+        assert!(result.markdown.contains("公式 $x$ 後"));
+        assert!(!result.markdown.contains('\u{200B}'));
     }
 
     #[test]
@@ -950,10 +1031,14 @@ printf '# 第一章\n\n## 第一節\n\n### 小節\n\n![](%s/media/image1.png)\n'
         let failing = fake_pandoc(dir.path(), "echo 'pandoc: unknown reader' >&2\nexit 2");
         let source = dir.path().join("a.odt");
         fs::write(&source, "x").unwrap();
-        let err = import_with(&failing, Some("3.1"), &source, dir.path(), Duration::from_secs(5))
+        let base = dir.path().join("base");
+        fs::create_dir(&base).unwrap();
+        let err = import_with(&failing, Some("3.1"), &source, &base, Duration::from_secs(5))
             .unwrap_err();
         assert_eq!(err.kind, ErrorKind::Io);
         assert!(err.message.contains("unknown reader"));
+        // The per-import temp folder (filter + media) is removed on failure.
+        assert_eq!(fs::read_dir(&base).unwrap().count(), 0);
         let err = import_with(
             &failing,
             Some("3.1"),
@@ -972,6 +1057,26 @@ printf '# 第一章\n\n## 第一節\n\n### 小節\n\n![](%s/media/image1.png)\n'
         )
         .unwrap_err();
         assert_eq!(err.kind, ErrorKind::InvalidPath);
+    }
+
+    #[test]
+    fn import_without_media_leaves_no_temp_folder() {
+        let dir = tempdir().unwrap();
+        let pandoc = fake_pandoc(dir.path(), "printf '# 標題\\n'");
+        let source = dir.path().join("a.html");
+        fs::write(&source, "<h1>標題</h1>").unwrap();
+        let base = dir.path().join("base");
+        fs::create_dir(&base).unwrap();
+        let result = import_with(&pandoc, Some("3.14"), &source, &base, Duration::from_secs(5)).unwrap();
+        assert_eq!(result.markdown, "# 標題\n");
+        assert_eq!(result.media_dir, None);
+        assert_eq!(fs::read_dir(&base).unwrap().count(), 0);
+    }
+
+    #[test]
+    fn imported_markdown_drops_zero_width_spaces() {
+        assert_eq!(clean_imported_markdown("$x$\u{200B} 後\u{200B}"), "$x$ 後");
+        assert_eq!(clean_imported_markdown("無變化 \u{200C}"), "無變化 \u{200C}");
     }
 
     #[test]
@@ -1013,28 +1118,170 @@ printf '# 第一章\n\n## 第一節\n\n### 小節\n\n![](%s/media/image1.png)\n'
         assert!(!args.iter().any(|a| a == "--sandbox"));
     }
 
-    /// Runs only when a real pandoc is installed (skipped otherwise).
+    #[test]
+    fn import_writer_disables_gfm_math() {
+        assert!(MARKDOWN_WRITER.starts_with("gfm-tex_math_gfm+tex_math_dollars"));
+        let args = import_args(
+            Path::new("/tmp/kalamos-test/a.docx"),
+            "docx",
+            Path::new("/tmp/kalamos-test/m"),
+            Path::new("/tmp/kalamos-test/m/f.lua"),
+        );
+        assert!(args.iter().any(|a| a == "gfm-tex_math_gfm+tex_math_dollars+footnotes"));
+    }
+
+    /// A valid 1×1 PNG.
+    const PNG_1X1: &[u8] = &[
+        0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44,
+        0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1f,
+        0x15, 0xc4, 0x89, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9c, 0x63, 0xf8,
+        0xcf, 0xc0, 0xf0, 0x1f, 0x00, 0x05, 0x00, 0x01, 0xff, 0x89, 0x99, 0x3d, 0x1d, 0x00, 0x00,
+        0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
+    ];
+
+    const REAL_DOC: &str = "# 第一章 H1\n\n## 第一節 H2\n\n### 小節 H3\n\n- 項目甲\n- 項目乙\n\n\
+| 欄A | 欄B |\n|---|---|\n| 1 | 2 |\n\n質能 $E=mc^2$ 公式，[底線]{.underline}\n\n$$\n\\int_0^1 x\\,dx\n$$\n\n\
+![點](img/dot.png)\n";
+
+    /// A document folder with `doc.md` + `img/dot.png`; returns (dir, request for `format`).
+    fn real_fixture(format: &str, ext: &str) -> (tempfile::TempDir, ExportRequest) {
+        let dir = tempdir().unwrap();
+        fs::create_dir(dir.path().join("img")).unwrap();
+        fs::write(dir.path().join("img/dot.png"), PNG_1X1).unwrap();
+        let out = dir.path().join(format!("out.{ext}"));
+        let req = ExportRequest {
+            doc_path: Some(dir.path().join("doc.md").to_string_lossy().into_owned()),
+            markdown: REAL_DOC.to_string(),
+            format: format.to_string(),
+            out_path: out.to_string_lossy().into_owned(),
+            image_root: None,
+            toc: false,
+        };
+        (dir, req)
+    }
+
+    fn real_pandoc() -> Option<(PathBuf, Option<String>)> {
+        let status = detect();
+        let path = status.path.filter(|_| status.available)?;
+        Some((PathBuf::from(path), status.version))
+    }
+
+    /// Runs only when a real pandoc is installed (skipped otherwise): export a
+    /// DOCX with headings, list, table, inline / display math and a local image,
+    /// import it back and check everything survived.
     #[test]
     fn real_pandoc_roundtrip_if_installed() {
-        let status = detect();
-        let Some(path) = status.path.filter(|_| status.available) else {
+        let Some((pandoc, version)) = real_pandoc() else {
             eprintln!("pandoc not installed; skipping real_pandoc_roundtrip_if_installed");
             return;
         };
-        let pandoc = PathBuf::from(path);
-        let dir = tempdir().unwrap();
-        let docx = dir.path().join("t.docx");
-        let mut req = request(&docx, "docx");
-        req.markdown = "# H1\n\n## H2\n\n### H3\n\n- item\n\n| a | b |\n|---|---|\n| 1 | 2 |\n".into();
-        export_with(&pandoc, &req, PANDOC_TIMEOUT).unwrap();
-        if !supports_sandbox(status.version.as_deref()) {
+        let (dir, req) = real_fixture("docx", "docx");
+        let meta = export_with(&pandoc, &req, PANDOC_TIMEOUT).unwrap();
+        assert!(meta.size > 0);
+        if !supports_sandbox(version.as_deref()) {
             eprintln!("pandoc too old for --sandbox; skipping import half");
             return;
         }
-        let back =
-            import_with(&pandoc, status.version.as_deref(), &docx, dir.path(), PANDOC_TIMEOUT).unwrap();
-        assert!(back.markdown.contains("# H1"));
-        assert!(back.markdown.contains("## H2"));
-        assert!(back.markdown.contains("### H3"));
+        let temp_base = dir.path().join("tmp");
+        fs::create_dir(&temp_base).unwrap();
+        let back = import_with(
+            &pandoc,
+            version.as_deref(),
+            Path::new(&req.out_path),
+            &temp_base,
+            PANDOC_TIMEOUT,
+        )
+        .unwrap();
+        let md = &back.markdown;
+        assert!(md.contains("# 第一章 H1\n"), "{md}");
+        assert!(md.contains("\n## 第一節 H2\n"), "{md}");
+        assert!(md.contains("\n### 小節 H3\n"), "{md}");
+        assert!(md.contains("- 項目甲") && md.contains("- 項目乙"), "{md}");
+        assert!(md.contains("| 欄A") && md.contains("| 1 "), "{md}");
+        // Math as $…$ / $$…$$, never the gfm $`…`$ / ```math forms.
+        assert!(md.contains("$E = mc^{2}$"), "{md}");
+        assert!(md.contains("$$") && md.contains("\\int_{0}^{1}"), "{md}");
+        assert!(!md.contains("$`") && !md.contains("```math"), "{md}");
+        // Lua filter: the captioned image is a plain ![caption](…), no HTML figure / img.
+        assert!(md.contains("![點]("), "{md}");
+        assert!(!md.contains("<figure") && !md.contains("<figcaption") && !md.contains("<img"), "{md}");
+        // Other raw HTML is kept; zero-width spaces are gone.
+        assert!(md.contains("<u>底線</u>"), "{md}");
+        assert!(!md.contains('\u{200B}'), "{md}");
+        // The embedded image was extracted and is referenced by absolute path.
+        let media = back.media_dir.expect("media extracted");
+        assert!(media.starts_with(temp_base.to_str().unwrap()));
+        let extracted: Vec<_> = walk_files(Path::new(&media));
+        // The filter file does not linger in the media folder.
+        assert!(extracted.iter().all(|p| !p.ends_with(IMPORT_FILTER_NAME)));
+        assert_eq!(extracted.len(), 1, "{extracted:?}");
+        assert!(md.contains(extracted[0].to_str().unwrap()), "{md}");
+    }
+
+    fn walk_files(dir: &Path) -> Vec<PathBuf> {
+        let mut out = Vec::new();
+        for entry in fs::read_dir(dir).unwrap().flatten() {
+            let p = entry.path();
+            if p.is_dir() {
+                out.extend(walk_files(&p));
+            } else {
+                out.push(p);
+            }
+        }
+        out
+    }
+
+    /// Runs only with a real pandoc: every export format keeps headings, the
+    /// list, the table and the image (checked by reading the file back).
+    #[test]
+    fn real_pandoc_every_export_format_if_installed() {
+        let Some((pandoc, _)) = real_pandoc() else {
+            eprintln!("pandoc not installed; skipping real_pandoc_every_export_format_if_installed");
+            return;
+        };
+        for (format, ext, reader) in [
+            ("docx", "docx", "docx"),
+            ("odt", "odt", "odt"),
+            ("latex", "tex", "latex"),
+            ("mediawiki", "wiki", "mediawiki"),
+            ("epub", "epub", "epub"),
+        ] {
+            let (dir, req) = real_fixture(format, ext);
+            export_with(&pandoc, &req, PANDOC_TIMEOUT)
+                .unwrap_or_else(|e| panic!("{format}: {e:?}"));
+            let args: Vec<OsString> = vec![
+                "-f".into(),
+                reader.into(),
+                "-t".into(),
+                MARKDOWN_WRITER.into(),
+                "--wrap=none".into(),
+                "--".into(),
+                req.out_path.clone().into(),
+            ];
+            let out = run_pandoc(&pandoc, &args, None, PANDOC_TIMEOUT).unwrap();
+            assert!(out.status.success(), "{format}: {}", stderr_tail(&out.stderr));
+            let md = String::from_utf8_lossy(&out.stdout).into_owned();
+            for needle in ["第一章 H1", "第一節 H2", "小節 H3"] {
+                assert!(md.contains(needle), "{format} heading {needle}: {md}");
+            }
+            // Heading level = number of leading `#` (ODT adds <span id="anchor"> inside).
+            for (prefix, text) in [("# ", "第一章 H1"), ("## ", "第一節 H2"), ("### ", "小節 H3")] {
+                assert!(
+                    md.lines().any(|l| l.starts_with(prefix) && l.ends_with(text)),
+                    "{format} level of {text}: {md}"
+                );
+            }
+            assert!(md.contains("- 項目甲") && md.contains("- 項目乙"), "{format} list: {md}");
+            assert!(md.contains("欄A") && md.contains("欄B"), "{format} table: {md}");
+            assert!(md.contains('|'), "{format} table as table: {md}");
+            // DOCX / ODT / EPUB images carry a size GFM cannot express, so pandoc
+            // writes them as an HTML <img> (inside <figure> when captioned).
+            assert!(md.contains("![") || md.contains("<img "), "{format} image: {md}");
+            if matches!(format, "latex" | "mediawiki") {
+                // Text formats reference the image by path.
+                assert!(md.contains("dot.png"), "{format} image path: {md}");
+            }
+            drop(dir);
+        }
     }
 }

@@ -271,10 +271,12 @@ paths:
     post:
       summary: |
         EX-03. Convert a .docx / .odt / .epub / .tex / .html(.htm) / .wiki(.mediawiki) file (reader chosen
-        from the extension) to Markdown (`--sandbox -t gfm+tex_math_dollars+footnotes --wrap=none`; the
+        from the extension) to Markdown (`--sandbox -t gfm-tex_math_gfm+tex_math_dollars+footnotes --wrap=none`; the
         sandbox stops a downloaded file from pulling other local files in via \input / <img src=…>, so
         pandoc ≥ 2.15 is required — older or unknown versions fail with kind=Io
-        "Pandoc 版本過舊，匯入需要 2.15 以上" without running pandoc). Embedded
+        "Pandoc 版本過舊，匯入需要 2.15 以上" without running pandoc). A built-in Lua filter (written to the
+        per-import temp folder, passed as --lua-filter) turns figures into plain `![caption](path)` and drops
+        image width/height, so no <figure>/<img> HTML appears; zero-width spaces (U+200B) are removed. Embedded
         images are extracted to a new temp folder (`mediaDir`); the Markdown references them by
         absolute path. The frontend opens the result as a new, dirty, untitled document.
         Errors: unsupported extension / empty path → InvalidPath; file or Pandoc missing → NotFound;

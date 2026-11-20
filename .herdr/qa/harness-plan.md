@@ -109,6 +109,12 @@ cargo run --manifest-path src-tauri/Cargo.toml --example export_pdf_smoke -- /tm
 | 驗收：匯入 DOCX 標題層級正確 | cargo `import_reads_stdout_and_extracts_media`；e2e `tests/e2e/pandoc.spec.ts`（mock） | M-EX3 |
 | 規格：Cmd+Opt+E 格式選單 → 存檔對話框（`<doc>.<ext>`）→「匯出中…」→「已匯出 <格式>：<路徑>」；無 pandoc 顯示安裝提示、不開對話框；Cmd+Opt+I 開成未命名、dirty 文件 | vitest `src/export/pandoc.test.ts`、e2e `tests/e2e/pandoc.spec.ts` | M-EX2、M-EX3 |
 
+已知限制（Pandoc 本身的行為，非 Kalamos bug；#48 以 pandoc 3.14 實測）：
+
+- **ODT 行內數學匯入後變成區塊數學**：pandoc 的 ODT reader 把 ODF 公式一律讀成 display math，匯入的 `.odt` 中 `$E=mc^2$` 會變成 `$$E = mc^{2}$$`（DOCX、EPUB、LaTeX、MediaWiki 無此問題）。
+- **ODT 圖片標題是獨立段落**：ODT reader 不產生 Figure，圖片匯入為 `![](…)`、標題文字是下一段；DOCX / EPUB 的有標題圖片經內建 Lua filter 轉為 `![標題](…)`。
+- 匯入時圖片的寬高屬性一律移除（GFM 無法表示），`<u>`、`<sub>` 等其他 HTML 照舊保留；零寬空白 U+200B 會被移除。
+
 ## 手動步驟（需真實 Tauri 視窗 / 磁碟）
 
 前置：`npm run tauri dev`（或 `npm run tauri build` 後開 `Kalamos.app`）。準備資料夾 `~/kalamos-qa/`。
