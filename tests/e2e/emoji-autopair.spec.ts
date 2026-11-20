@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { MOD, boot, getDoc, nextFrames, setDoc, withIpc } from "./helpers";
 
 /** Issues #17 (ED-08 emoji autocomplete) and #18 (ED-09 auto-pairing). */
@@ -7,14 +7,43 @@ test.beforeEach(async ({ page }) => {
   await boot(page);
 });
 
+/**
+ * Waits until the completion popup shows `label` first and its options have
+ * stopped changing for longer than CodeMirror's `interactionDelay` (75 ms):
+ * Enter pressed sooner after the results (re)open is ignored by
+ * acceptCompletion and types a newline instead. On a cold start the gemoji
+ * chunk loads late, so results can arrive just before Enter. Condition-based
+ * polling, no fixed sleep.
+ */
+async function waitForCompletionReady(page: Page, label: string): Promise<void> {
+  await page.waitForFunction(
+    (label) => {
+      const w = window as unknown as { __kCompHtml?: string; __kCompSince?: number };
+      const popup = document.querySelector(".cm-tooltip-autocomplete");
+      const html = popup?.innerHTML ?? "";
+      if (html !== w.__kCompHtml) {
+        w.__kCompHtml = html;
+        w.__kCompSince = Date.now();
+        return false;
+      }
+      const first = popup?.querySelector("li");
+      return Boolean(first?.textContent?.includes(label)) && Date.now() - (w.__kCompSince ?? 0) > 150;
+    },
+    label,
+    { polling: 25, timeout: 10_000 },
+  );
+}
+
 test("#17 AC: typing :smile shows the candidate list; Enter inserts 😄", async ({ page }) => {
   await setDoc(page, "今天 ", "今天 ".length);
   await page.keyboard.type(":smile");
   const popup = page.locator(".cm-tooltip-autocomplete");
+  // The first trigger lazy-loads the gemoji chunk: allow for a slow cold start.
   await expect(popup).toBeVisible({ timeout: 10_000 });
   const first = popup.locator("li").first();
-  await expect(first).toContainText(":smile:");
-  await expect(first.getByTestId("emoji-option")).toHaveText("😄");
+  await expect(first).toContainText(":smile:", { timeout: 10_000 });
+  await expect(first.getByTestId("emoji-option")).toHaveText("😄", { timeout: 10_000 });
+  await waitForCompletionReady(page, ":smile:");
   await page.keyboard.press("Enter");
   await expect(popup).toHaveCount(0);
   expect(await getDoc(page)).toBe("今天 😄");
