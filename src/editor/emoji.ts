@@ -21,6 +21,7 @@ import { syntaxTree } from "@codemirror/language";
 import { EditorState, type Extension, Prec, StateEffect, StateField } from "@codemirror/state";
 import { EditorView, ViewPlugin } from "@codemirror/view";
 import type { SyntaxNode } from "@lezer/common";
+import { mapPosClamped } from "./positions";
 
 export interface EmojiEntry {
   name: string;
@@ -225,7 +226,7 @@ const pendingShortcodes = StateField.define<ReadonlyArray<{ from: number; to: nu
   update(value, tr) {
     let next = value;
     if (tr.docChanged && next.length > 0) {
-      next = next.map((r) => ({ from: tr.changes.mapPos(r.from, 1), to: tr.changes.mapPos(r.to, -1) }));
+      next = next.map((r) => ({ from: mapPosClamped(tr.changes, r.from, 1), to: mapPosClamped(tr.changes, r.to, -1) }));
     }
     for (const e of tr.effects) {
       if (e.is(addPendingShortcode)) next = [...next, e.value];

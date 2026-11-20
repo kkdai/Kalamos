@@ -329,6 +329,35 @@ test.describe("#7 tables", () => {
     expect(isAligned(tableSrc)).toBe(true);
   });
 
+  test("#7 spec: composition that shortens the document never leaves out-of-range positions [#56]", async ({ page }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (e) => errors.push(e.message));
+    const src = "| 名稱 | 數量 |\n| --- | --- |\n| 蘋果 | 十二 |\n\n結尾[^1]\n\n[^1]: 註腳\n\n$$\nx\n$$\n\nend";
+    await setDoc(page, src, src.length);
+    const thrown = await page.evaluate(async () => {
+      const main = await import("/src/main.ts" as string);
+      const app = main.getActiveApp();
+      const view = app.editor.view;
+      try {
+        const cell = view.state.doc.toString().indexOf("十二");
+        view.dispatch({ selection: { anchor: cell + 2 } });
+        view.dispatch({
+          changes: { from: cell, to: cell + 2, insert: "一百" },
+          userEvent: "input.type.compose",
+        });
+        // A shrinking change while still composing (like the table re-align in #56).
+        view.dispatch({ changes: { from: 0, to: 8 }, userEvent: "input.type.compose" });
+        app.editor.setCursor(view.state.doc.length);
+        view.dispatch({ changes: { from: view.state.doc.length, insert: "!" }, userEvent: "input.type" });
+        return null;
+      } catch (e) {
+        return String(e);
+      }
+    });
+    expect(thrown).toBeNull();
+    expect(errors.filter((m) => /RangeError/.test(m))).toEqual([]);
+  });
+
   test("#7 spec: source mode unloads the table widget", async ({ page }) => {
     const src = `${TABLE}\n\nend`;
     await setDoc(page, src, src.length);

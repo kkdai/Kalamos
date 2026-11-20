@@ -28,6 +28,7 @@ import {
   type Transaction,
 } from "@codemirror/state";
 import { EditorView, keymap } from "@codemirror/view";
+import { mapPosClamped } from "./positions";
 
 export const AUTO_PAIR_BRACKETS_MESSAGE = (on: boolean): string => `自動配對括號：${on ? "開" : "關"}`;
 export const AUTO_PAIR_MARKDOWN_MESSAGE = (on: boolean): string =>
@@ -86,7 +87,7 @@ export const markdownPairField = StateField.define<MarkdownPairState>({
     let emptyPairAt = value.emptyPairAt;
     if (tr.docChanged) {
       // Callers also check that the symbol is still there before trusting a closer.
-      closers = closers.map((p) => tr.changes.mapPos(p, 1));
+      closers = closers.map((p) => mapPosClamped(tr.changes, p, 1));
       emptyPairAt = null;
     } else if (tr.selection) {
       emptyPairAt = null;

@@ -27,6 +27,7 @@ import {
   type ImageSpec,
   resolveImageSrc,
 } from "./images";
+import { mapPosClamped } from "./positions";
 
 export const NO_LOCAL_IMAGES_MESSAGE = "沒有可上傳的本機圖片";
 
@@ -226,8 +227,8 @@ export function replaceUploadedImages(
       skipped++;
       continue;
     }
-    const from = changes.mapPos(t.from, 1);
-    const to = changes.mapPos(t.to, -1);
+    const from = mapPosClamped(changes, t.from, 1);
+    const to = mapPosClamped(changes, t.to, -1);
     if (view.state.sliceDoc(from, to) !== t.text) {
       skipped++;
       continue;

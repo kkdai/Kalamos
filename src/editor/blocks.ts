@@ -38,6 +38,7 @@ import {
 } from "./footnotes";
 import { isSelectionTouchingRange } from "./live-preview";
 import { collectDocumentHeadings, jumpToHeadingSlug } from "./lists";
+import { mapPosClamped } from "./positions";
 
 /** Re-run block decorations after an IME composition ended. */
 export const blocksRefreshEffect = StateEffect.define<null>();
@@ -83,9 +84,9 @@ function mapFootnoteIndex(index: FootnoteIndex, tr: Transaction): FootnoteIndex 
   for (const [id, d] of definitions) {
     definitions.set(id, {
       id,
-      from: tr.changes.mapPos(d.from, -1),
-      to: tr.changes.mapPos(d.to, 1),
-      contentFrom: tr.changes.mapPos(d.contentFrom, 1),
+      from: mapPosClamped(tr.changes, d.from, -1),
+      to: mapPosClamped(tr.changes, d.to, 1),
+      contentFrom: mapPosClamped(tr.changes, d.contentFrom, 1),
     });
   }
   return { ...index, definitions };
@@ -99,11 +100,13 @@ export const footnoteIndexField = StateField.define<FootnoteFieldValue>({
     if (isCompose(tr)) {
       return {
         index: mapFootnoteIndex(value.index, tr),
-        parsedTo: value.parsedTo,
+        // Mapped, not copied: a copied position can fall outside the next
+        // (shorter) document and make mapPos throw (#56).
+        parsedTo: mapPosClamped(tr.changes, value.parsedTo, 1),
         dirty: value.dirty || changeTouches(tr, FOOTNOTE_TEXT_RE),
       };
     }
-    const grown = syntaxTree(tr.state).length > tr.changes.mapPos(value.parsedTo, 1);
+    const grown = syntaxTree(tr.state).length > mapPosClamped(tr.changes, value.parsedTo, 1);
     if (
       value.dirty ||
       grown ||
@@ -115,7 +118,7 @@ export const footnoteIndexField = StateField.define<FootnoteFieldValue>({
     if (!tr.docChanged) return value;
     return {
       index: mapFootnoteIndex(value.index, tr),
-      parsedTo: tr.changes.mapPos(value.parsedTo, 1),
+      parsedTo: mapPosClamped(tr.changes, value.parsedTo, 1),
       dirty: false,
     };
   },
@@ -562,8 +565,8 @@ export const tocField = StateField.define<TocFieldValue>({
     if (isCompose(tr)) {
       return {
         tocs: value.tocs.map((t) => ({
-          from: tr.changes.mapPos(t.from, -1),
-          to: tr.changes.mapPos(t.to, 1),
+          from: mapPosClamped(tr.changes, t.from, -1),
+          to: mapPosClamped(tr.changes, t.to, 1),
         })),
         entries: value.entries,
         decorations: value.decorations.map(tr.changes),
