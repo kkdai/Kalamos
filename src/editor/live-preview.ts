@@ -4,6 +4,8 @@ import {
   type EditorState,
   Facet,
   type Range,
+  StateEffect,
+  StateField,
 } from "@codemirror/state";
 import {
   Decoration,
@@ -126,6 +128,87 @@ export function isSelectionTouchingRange(
     if (range.from <= to && range.to >= from) {
       return true;
     }
+  }
+  return false;
+}
+
+/**
+ * #54: is the selection *inside* an inline span `[from, to]`? A cursor
+ * counts only strictly between the outer edges (so right after the closing
+ * mark or right before the opening mark the span stays rendered); a
+ * non-empty selection counts when it overlaps the span.
+ */
+export function isSelectionInsideSpan(
+  selection: EditorSelection,
+  from: number,
+  to: number,
+): boolean {
+  for (const range of selection.ranges) {
+    if (range.empty ? range.head > from && range.head < to : range.from < to && range.to > from) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * A span shown as source although the cursor sits just after it: set by
+ * Backspace right after a rendered span (Typora "expand first"), cleared by
+ * the next edit or cursor move.
+ */
+export const expandSpanEffect = StateEffect.define<{ from: number; to: number } | null>();
+
+export const expandedSpanField = StateField.define<{ from: number; to: number } | null>({
+  create: () => null,
+  update(value, tr) {
+    for (const e of tr.effects) {
+      if (e.is(expandSpanEffect)) return e.value;
+    }
+    if (value && (tr.docChanged || tr.selection)) return null;
+    return value;
+  },
+});
+
+/** Inline span shown as source: cursor / selection inside it, or expanded by Backspace. */
+export function isInlineSpanActive(state: EditorState, from: number, to: number): boolean {
+  if (isSelectionInsideSpan(state.selection, from, to)) return true;
+  const expanded = state.field(expandedSpanField, false);
+  return Boolean(expanded && expanded.from === from && expanded.to === to);
+}
+
+/** Node names whose source is hidden when the cursor is outside (inline spans). */
+const INLINE_SPAN_NODES = new Set([
+  "Emphasis",
+  "StrongEmphasis",
+  "InlineCode",
+  "Strikethrough",
+  "Link",
+  "Image",
+]);
+
+/**
+ * Backspace right after a rendered inline span (`**bold**|`, `[a](u)|`,
+ * `![](p)|`): reveal its source first instead of deleting a hidden mark
+ * (Typora behaviour). The next Backspace deletes normally.
+ */
+export function expandSpanBeforeCursor(view: EditorView): boolean {
+  const { state } = view;
+  if (state.field(expandedSpanField, false) === undefined) return false; // source mode
+  const sel = state.selection;
+  if (sel.ranges.length !== 1 || !sel.main.empty) return false;
+  const head = sel.main.head;
+  if (head === 0) return false;
+  const expanded = state.field(expandedSpanField, false);
+  for (let n: ReturnType<ReturnType<typeof syntaxTree>["resolveInner"]> | null = syntaxTree(state).resolveInner(head, -1); n; n = n.parent) {
+    if (n.to !== head) {
+      if (n.to < head) continue;
+      break;
+    }
+    if (!INLINE_SPAN_NODES.has(n.name)) continue;
+    if (expanded && expanded.from === n.from && expanded.to === n.to) return false;
+    if (isSelectionInsideSpan(sel, n.from, n.to)) return false;
+    view.dispatch({ effects: expandSpanEffect.of({ from: n.from, to: n.to }) });
+    return true;
   }
   return false;
 }
@@ -302,7 +385,8 @@ export function collectLivePreviewSpecsInRanges(
 
           const openMark = marks[0];
           const closeMark = marks[marks.length - 1];
-          const active = isSelectionTouchingRange(selection, from, to);
+          // #54: source only with the cursor inside the span.
+          const active = isInlineSpanActive(state, from, to);
           const markClass = active ? "k-mark" : "k-mark-hidden";
 
           if (openMark.to > openMark.from) {
@@ -336,7 +420,7 @@ export function collectLivePreviewSpecsInRanges(
 
           const openBracket = linkMarks[0];
           const closeBracket = linkMarks[1];
-          const active = isSelectionTouchingRange(selection, from, to);
+          const active = isInlineSpanActive(state, from, to);
           const markClass = active ? "k-mark" : "k-mark-hidden";
 
           if (openBracket.to > openBracket.from) {
@@ -446,6 +530,8 @@ export const livePreviewPlugin = ViewPlugin.fromClass(
         update.selectionSet ||
         update.viewportChanged ||
         syntaxTree(update.startState) !== syntaxTree(update.state) ||
+        update.startState.field(expandedSpanField, false) !==
+          update.state.field(expandedSpanField, false) ||
         update.transactions.some((tr) => tr.reconfigured)
       ) {
         this.decorations = buildLivePreviewDecorations(update.view);
@@ -500,4 +586,4 @@ export const livePreviewPlugin = ViewPlugin.fromClass(
   },
 );
 
-export const livePreviewExtension = [livePreviewPlugin];
+export const livePreviewExtension = [expandedSpanField, livePreviewPlugin];
