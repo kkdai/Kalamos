@@ -1,5 +1,6 @@
 import type { EditorState } from "@codemirror/state";
 import type { EditorView, KeyBinding } from "@codemirror/view";
+import { expandSpanBeforeCursor } from "./live-preview";
 import {
   copyHeadingBookmark,
   handleListBackspace,
@@ -200,7 +201,7 @@ export function createFileKeymap(handlers: FileCommandHandlers): KeyBinding[] {
     },
     {
       key: "Backspace",
-      run: (view) => handleListBackspace(view),
+      run: (view) => expandSpanBeforeCursor(view) || handleListBackspace(view),
     },
     {
       key: "Tab",

@@ -1,11 +1,13 @@
 import { syntaxTree } from "@codemirror/language";
 import {
-  type EditorState,
+  EditorSelection,
+  EditorState,
   type Extension,
   Facet,
   type Range,
   StateEffect,
   StateField,
+  type Transaction,
 } from "@codemirror/state";
 import {
   Decoration,
@@ -24,7 +26,7 @@ import {
   parseImgTag,
   resolveZoomedSize,
 } from "./image-attrs";
-import { isSelectionTouchingRange } from "./live-preview";
+import { expandedSpanField, isInlineSpanActive } from "./live-preview";
 
 export const UNSAVED_RELATIVE_IMAGE_HINT = "存檔後才能顯示相對路徑圖片";
 export const IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "gif", "webp", "svg"];
@@ -492,7 +494,8 @@ export function buildImageDecorations(
     view.visibleRanges.length > 0 ? view.visibleRanges : [view.viewport];
   const decorations: Array<Range<Decoration>> = [];
   for (const spec of collectImageSpecs(state, ranges)) {
-    if (isSelectionTouchingRange(state.selection, spec.from, spec.to)) continue;
+    // #54: source only with the cursor inside `![…](…)` (or expanded by Backspace).
+    if (isInlineSpanActive(state, spec.from, spec.to)) continue;
     const widget = new ImageWidget(
       spec.alt,
       spec.title,
@@ -563,6 +566,8 @@ export const imagePreviewPlugin = ViewPlugin.fromClass(
         update.viewportChanged ||
         hasDocPathChange(update) ||
         syntaxTree(update.startState) !== syntaxTree(update.state) ||
+        update.startState.field(expandedSpanField, false) !==
+          update.state.field(expandedSpanField, false) ||
         update.transactions.some((tr) => tr.reconfigured)
       ) {
         this.decorations = buildImageDecorations(update.view);
@@ -693,4 +698,35 @@ export function imagePasteHandler(handler: PasteImagesHandler): Extension {
   });
 }
 
-export const imagePreviewExtension: Extension = [imagePreviewPlugin];
+/**
+ * #54: a rendered image is an atomic widget, so one arrow key would jump
+ * over it. Like the hidden marks of other inline spans, stepping onto it
+ * with the keyboard lands just inside its source instead (which shows it).
+ */
+export function enterImageOnArrow(tr: Transaction): number | null {
+  if (!tr.selection || tr.docChanged || !tr.isUserEvent("select")) return null;
+  if (tr.isUserEvent("select.pointer")) return null;
+  const before = tr.startState.selection;
+  const after = tr.selection;
+  if (before.ranges.length !== 1 || after.ranges.length !== 1) return null;
+  if (!before.main.empty || !after.main.empty) return null;
+  const h0 = before.main.head;
+  const h1 = after.main.head;
+  if (Math.abs(h1 - h0) < 2) return null;
+  const line = tr.startState.doc.lineAt(h0);
+  if (h1 < line.from || h1 > line.to) return null;
+  for (const spec of collectImageSpecs(tr.startState, [{ from: line.from, to: line.to }])) {
+    if (isInlineSpanActive(tr.startState, spec.from, spec.to)) continue;
+    if (h0 === spec.to && h1 === spec.from) return spec.to - 1;
+    if (h0 === spec.from && h1 === spec.to) return spec.from + 1;
+  }
+  return null;
+}
+
+const enterImageFilter = EditorState.transactionFilter.of((tr) => {
+  const target = enterImageOnArrow(tr);
+  if (target === null) return tr;
+  return [tr, { selection: EditorSelection.cursor(target), scrollIntoView: tr.scrollIntoView, sequential: true }];
+});
+
+export const imagePreviewExtension: Extension = [imagePreviewPlugin, enterImageFilter];
