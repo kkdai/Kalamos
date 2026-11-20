@@ -174,15 +174,19 @@ export function collectLivePreviewSpecsInRanges(
           const listMark = syntaxNode.getChild("ListMark");
           if (!listMark || listMark.from >= listMark.to) return;
 
-          const line = state.doc.lineAt(listMark.from);
-          const activeOnLine = isSelectionTouchingRange(
-            selection,
-            line.from,
-            line.to,
-          );
           const isOrdered = syntaxNode.parent?.name === "OrderedList";
           const taskNode = syntaxNode.getChild("Task");
           const taskMarker = taskNode?.getChild("TaskMarker") ?? null;
+          // #49: like inline marks, the source of a block marker shows only
+          // while the cursor is on the marker itself (`-`, `1.`, `- [ ]`),
+          // not anywhere on the line — typing `- ` gives a bullet at once.
+          const markerEnd =
+            taskMarker && taskMarker.from < taskMarker.to ? taskMarker.to : listMark.to;
+          const activeOnLine = isSelectionTouchingRange(
+            selection,
+            listMark.from,
+            markerEnd,
+          );
 
           if (activeOnLine) {
             specs.push({
@@ -241,7 +245,12 @@ export function collectLivePreviewSpecsInRanges(
 
           const openMark = marks[0];
           const closeMark = marks.length > 1 ? marks[marks.length - 1] : null;
-          const active = isSelectionTouchingRange(selection, from, to);
+          // #49: `##` shows only while the cursor is in the marks themselves.
+          const active =
+            isSelectionTouchingRange(selection, from, openMark.to) ||
+            (closeMark !== null &&
+              closeMark.from > openMark.to &&
+              isSelectionTouchingRange(selection, closeMark.from, to));
           const markClass = active ? "k-mark" : "k-mark-hidden";
 
           // Include the single space (or spaces) right after the leading `#` marks

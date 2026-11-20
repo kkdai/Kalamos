@@ -188,14 +188,22 @@ describe("Live Preview (ED-01), Source Mode (ED-02), Shortcuts (ED-03) & IME", (
       className: "k-mark",
     });
 
-    // Move cursor inside # H1 -> heading marker becomes .k-mark
+    // Cursor on the `#` itself -> heading marker becomes .k-mark
     const h1Idx = doc.indexOf("# H1");
-    app.editor.setCursor(h1Idx + 2);
+    app.editor.setCursor(h1Idx + 1);
     const specsInsideH1 = collectLivePreviewSpecs(app.editor.view.state);
     expect(specsInsideH1).toContainEqual({
       from: h1Idx,
       to: h1Idx + 2,
       className: "k-mark",
+    });
+
+    // #49: cursor in the heading text (not on `#`) keeps the marker hidden
+    app.editor.setCursor(h1Idx + 3);
+    expect(collectLivePreviewSpecs(app.editor.view.state)).toContainEqual({
+      from: h1Idx,
+      to: h1Idx + 2,
+      className: "k-mark-hidden",
     });
 
     // Document string is completely untouched by decorations

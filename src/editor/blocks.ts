@@ -331,7 +331,8 @@ export function collectBlockSpecs(
           }
           case "QuoteMark": {
             seen.add(key);
-            const touched = lineTouched(ref.from);
+            // #49: `>` shows only while the cursor is on the marker itself.
+            const touched = isSelectionTouchingRange(selection, ref.from, ref.to);
             let to = ref.to;
             if (!touched && state.sliceDoc(to, to + 1) === " ") to++;
             specs.push({ kind: "mark", from: ref.from, to, className: touched ? "k-mark" : "k-mark-hidden" });
