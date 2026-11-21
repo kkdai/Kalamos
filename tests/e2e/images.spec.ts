@@ -67,3 +67,48 @@ test("#13 IM-04 AC: after setting a root folder (Cmd+Opt+R), /img/a.png resolves
   await expect(page.getByTestId("status")).toHaveText("已清除圖片根目錄");
   await expect(widget).toHaveAttribute("data-path", "/img/a.png");
 });
+
+test("#69 a ../ image from _posts/ is allowed as one file and rendered", async ({ page }) => {
+  const doc = "/tmp/kalamos-test/blog/_posts/2026-11-15-post.md";
+  const pic = "/tmp/kalamos-test/blog/images/pic.png";
+  const content = "# Post\n\n![pic](../images/pic.png)\n\n<img src=\"../images/pic.png\" width=\"80\">\n\nend";
+  await withIpc(
+    page,
+    "ipc.seedMockFile(arg.doc, arg.content); ipc.setMockDialogHandlers({ open: () => arg.doc });",
+    { doc, content },
+  );
+  // Record image loads (asset:// URLs cannot load in a plain browser, so the
+  // <img> ends in its fallback; the src it was given is what matters here).
+  await page.evaluate(() => {
+    const w = window as unknown as { __imgSrcs: string[] };
+    w.__imgSrcs = [];
+    const desc = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, "src")!;
+    Object.defineProperty(HTMLImageElement.prototype, "src", {
+      ...desc,
+      set(value: string) {
+        w.__imgSrcs.push(value);
+        desc.set!.call(this, value);
+      },
+    });
+  });
+  await page.getByTestId("editor").click();
+  await page.keyboard.press(`${MOD}+o`);
+  await expect.poll(() => getDoc(page)).toBe(content);
+  await setCursor(page, 0);
+
+  const widgets = page.getByTestId("image-widget");
+  await expect(widgets).toHaveCount(2);
+  await expect(widgets.first()).toHaveAttribute("data-path", pic);
+  // Mock equivalent of "the image loads": the asset scope allowed exactly that
+  // file (not its folder) and the widget then loaded an <img> for it.
+  await expect(widgets.first()).toHaveAttribute("data-asset-scope", "file");
+  await expect(widgets.nth(1)).toHaveAttribute("data-asset-scope", "file");
+  expect(await withIpc<string[]>(page, "return ipc.getMockAllowedAssetFiles();")).toEqual([pic]);
+  expect(await withIpc<string[]>(page, "return ipc.getMockAllowedAssetDirs();")).not.toContain(
+    "/tmp/kalamos-test/blog/images",
+  );
+  const srcs = await page.evaluate(() =>
+    (window as unknown as { __imgSrcs: string[] }).__imgSrcs.map((s) => decodeURIComponent(s)),
+  );
+  expect(srcs.filter((s) => s.includes(pic))).toHaveLength(2);
+});

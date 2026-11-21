@@ -309,6 +309,61 @@ pub fn allow_asset_dir(app: tauri::AppHandle, path: String) -> Result<(), AppErr
     allow_dir(&app, &canonical)
 }
 
+/// Image types the editor may *display* (WebKit decodes all of these). Wider
+/// than `ALLOWED_IMAGE_EXTS`, which limits what gets imported into `assets/`.
+pub const DISPLAY_IMAGE_EXTS: &[&str] = &[
+    "png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "ico", "avif", "tiff", "tif", "heic",
+];
+
+/// Checks a single image the editor wants to show from outside the folders
+/// already in scope (e.g. `../images/pic.png`, #69). Symlinks are resolved
+/// first, so the real target must be a regular file with an image extension.
+/// Returns the canonical path.
+pub fn check_asset_file(path: &Path) -> Result<PathBuf, AppError> {
+    if path.as_os_str().is_empty() || !path.is_absolute() {
+        return Err(AppError::invalid_path(format!(
+            "Image path must be absolute: {}",
+            path.display()
+        )));
+    }
+    let canonical = fs::canonicalize(path)
+        .map_err(|_| AppError::not_found(format!("Image not found: {}", path.display())))?;
+    if !canonical.is_file() {
+        return Err(AppError::invalid_path(format!(
+            "Not a file: {}",
+            path.display()
+        )));
+    }
+    let ext = canonical
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(str::to_ascii_lowercase)
+        .unwrap_or_default();
+    if !DISPLAY_IMAGE_EXTS.contains(&ext.as_str()) {
+        return Err(AppError::invalid_path(format!(
+            "Not an image file: {}",
+            path.display()
+        )));
+    }
+    Ok(canonical)
+}
+
+/// Allows exactly one image file (not its folder) in the asset protocol scope.
+#[tauri::command]
+pub fn allow_asset_file(app: tauri::AppHandle, path: String) -> Result<(), AppError> {
+    use tauri::Manager;
+    let requested = Path::new(&path);
+    let canonical = check_asset_file(requested)?;
+    let scope = app.asset_protocol_scope();
+    let to_err = |e: tauri::Error| AppError::new(crate::error::ErrorKind::Io, e.to_string());
+    scope.allow_file(&canonical).map_err(to_err)?;
+    // The WebView requests the path as written (it may go through a symlink or `..`).
+    if requested != canonical {
+        scope.allow_file(requested).map_err(to_err)?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -514,6 +569,65 @@ mod tests {
         assert_eq!(
             import_image_bytes_impl(&doc, "***", "png", now).unwrap_err().kind,
             ErrorKind::Parse
+        );
+    }
+
+    fn asset_test_dir() -> tempfile::TempDir {
+        let base = Path::new("/tmp/kalamos-test");
+        fs::create_dir_all(base).unwrap();
+        tempfile::Builder::new()
+            .prefix("asset-file-")
+            .tempdir_in(base)
+            .unwrap()
+    }
+
+    #[test]
+    fn asset_file_in_parent_folder_is_allowed() {
+        let dir = asset_test_dir();
+        let posts = dir.path().join("blog/_posts");
+        let images = dir.path().join("blog/images");
+        fs::create_dir_all(&posts).unwrap();
+        fs::create_dir_all(&images).unwrap();
+        fs::write(images.join("pic.png"), PNG).unwrap();
+        fs::write(images.join("UPPER.JPG"), JPG).unwrap();
+        let via_parent = posts.join("../images/pic.png");
+        let got = check_asset_file(&via_parent).unwrap();
+        assert_eq!(got, fs::canonicalize(images.join("pic.png")).unwrap());
+        assert!(check_asset_file(&posts.join("../images/UPPER.JPG")).is_ok());
+    }
+
+    #[test]
+    fn asset_file_rejects_non_images_folders_and_missing() {
+        let dir = asset_test_dir();
+        let root = dir.path();
+        fs::write(root.join("secret.txt"), b"nope").unwrap();
+        fs::write(root.join("noext"), PNG).unwrap();
+        fs::create_dir_all(root.join("folder.png")).unwrap();
+        let kind = |p: &Path| check_asset_file(p).unwrap_err().kind;
+        assert_eq!(kind(&root.join("secret.txt")), ErrorKind::InvalidPath);
+        assert_eq!(kind(&root.join("noext")), ErrorKind::InvalidPath);
+        assert_eq!(kind(&root.join("folder.png")), ErrorKind::InvalidPath);
+        assert_eq!(kind(&root.join("missing.png")), ErrorKind::NotFound);
+        assert_eq!(kind(Path::new("relative/pic.png")), ErrorKind::InvalidPath);
+        assert_eq!(kind(Path::new("")), ErrorKind::InvalidPath);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn asset_file_resolves_symlinks_before_checking() {
+        let dir = asset_test_dir();
+        let root = dir.path();
+        fs::write(root.join("secret.txt"), b"nope").unwrap();
+        fs::write(root.join("real.png"), PNG).unwrap();
+        std::os::unix::fs::symlink(root.join("secret.txt"), root.join("disguised.png")).unwrap();
+        std::os::unix::fs::symlink(root.join("real.png"), root.join("link.png")).unwrap();
+        assert_eq!(
+            check_asset_file(&root.join("disguised.png")).unwrap_err().kind,
+            ErrorKind::InvalidPath
+        );
+        assert_eq!(
+            check_asset_file(&root.join("link.png")).unwrap(),
+            fs::canonicalize(root.join("real.png")).unwrap()
         );
     }
 }
