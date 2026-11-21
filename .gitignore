@@ -11,4 +11,4 @@ src-tauri/gen/
 *-key.json
 service-account*.json
 credentials*.json
-.herdr/local/
+.herdr/
