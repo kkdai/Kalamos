@@ -134,6 +134,7 @@
      ```bash
      xattr -cr /Applications/Kalamos.app
      ```
+4. **.md 기본 앱으로 설정**: Finder에서 아무 `.md` 파일을 선택 → **정보 가져오기**(⌘I) → **다음으로 열기**에서 **Kalamos** 선택 → **모두 변경…**. 이후 `.md` 더블클릭, Dock 아이콘에 드롭, `open -a Kalamos 파일.md`로 Kalamos에서 열립니다.
 
 ---
 

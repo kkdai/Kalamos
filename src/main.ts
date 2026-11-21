@@ -63,6 +63,7 @@ import {
   importImageBytes,
   listRecovery,
   onFileDrop,
+  onOpenFilesRequested,
   onWindowCloseRequested,
   openFile,
   pickOpenFilePath,
@@ -71,9 +72,11 @@ import {
   pickSavePdfPath,
   saveFile,
   setSettings,
+  takePendingOpenFiles,
   UPLOADER_NOT_CONFIGURED_MESSAGE,
   uploadImages,
   writeRecovery,
+  type OpenFilesRequest,
   type RecoveryEntry,
   type Settings,
 } from "./ipc";
@@ -124,6 +127,29 @@ function formatErrorMessage(prefix: string, err: unknown): string {
   return `${prefix}：${String(err)}`;
 }
 
+function baseName(path: string): string {
+  const parts = path.split(/[\\/]/);
+  return parts[parts.length - 1] || path;
+}
+
+/** #67: status line after the OS handed over files Kalamos did not (all) open. */
+export function openWithStatusMessage(
+  openedPath: string | null,
+  extraCount: number,
+  rejected: string[],
+): string {
+  const parts: string[] = [];
+  if (openedPath !== null && extraCount > 0) {
+    parts.push(
+      `已開啟 ${baseName(openedPath)}；另有 ${extraCount} 個檔案未開啟（Kalamos 一次開啟一個檔案）`,
+    );
+  }
+  if (rejected.length > 0) {
+    parts.push(`無法開啟：${rejected.join("、")}（只支援一般的 Markdown 檔案）`);
+  }
+  return parts.join("；");
+}
+
 export const IMAGE_ROOT_STATUS_PREFIX = "圖片根目錄：";
 export const IMAGE_ROOT_CLEARED_MESSAGE = "已清除圖片根目錄";
 export const IMAGE_ROOT_TOO_BROAD_PREFIX = "圖片根目錄範圍過大：";
@@ -138,6 +164,8 @@ export interface KalamosApp {
   getPendingRecovery: () => RecoveryEntry | null;
   getStatusText: () => string;
   openDocument: (explicitPath?: string) => Promise<boolean>;
+  /** #67: open what Finder / Dock / `open -a` handed over (first file; the rest are reported). */
+  openRequestedFiles: (req: OpenFilesRequest) => Promise<boolean>;
   openFolder: (explicitPath?: string) => Promise<boolean>;
   toggleSidebar: () => Promise<boolean>;
   saveDocument: () => Promise<boolean>;
@@ -797,6 +825,7 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
   }
 
   let unlistenFileDrop: (() => void) | null = null;
+  let unlistenOpenFiles: (() => void) | null = null;
   let destroyed = false;
 
   async function openDocument(explicitPath?: string): Promise<boolean> {
@@ -825,6 +854,32 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
       setStatus(formatErrorMessage("開檔失敗", err), true);
       return false;
     }
+  }
+
+  // Requests are handled one at a time so a second Finder open waits for the
+  // unsaved-changes prompt of the first instead of racing it.
+  let openRequestChain: Promise<unknown> = Promise.resolve();
+
+  function openRequestedFiles(req: OpenFilesRequest): Promise<boolean> {
+    const run = async (): Promise<boolean> => {
+      const paths = req.paths ?? [];
+      const rejected = req.rejected ?? [];
+      if (paths.length === 0) {
+        if (rejected.length > 0) {
+          setStatus(openWithStatusMessage(null, 0, rejected), true);
+        }
+        return false;
+      }
+      const opened = await openDocument(paths[0]);
+      if (opened) {
+        const message = openWithStatusMessage(paths[0], paths.length - 1, rejected);
+        if (message) setStatus(message, rejected.length > 0);
+      }
+      return opened;
+    };
+    const result = openRequestChain.then(run, run);
+    openRequestChain = result.catch(() => null);
+    return result;
   }
 
   async function saveDocument(): Promise<boolean> {
@@ -984,6 +1039,20 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
       pendingRecovery = null;
       setRecoveryBannerVisible(false);
     }
+    // #67: listen first, then take what the OS queued before we were ready —
+    // the Rust side switches from queueing to emitting inside that call.
+    const unlistenOpen = await onOpenFilesRequested(async (req) => {
+      await openRequestedFiles(req);
+    }).catch(() => null);
+    if (destroyed) {
+      unlistenOpen?.();
+      return;
+    }
+    unlistenOpenFiles = unlistenOpen;
+    const pendingOpen = await takePendingOpenFiles().catch(() => null);
+    if (pendingOpen && !destroyed) {
+      await openRequestedFiles(pendingOpen);
+    }
   }
 
   function destroy(): void {
@@ -991,6 +1060,8 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
     clearAutosaveTimer();
     unlistenFileDrop?.();
     unlistenFileDrop = null;
+    unlistenOpenFiles?.();
+    unlistenOpenFiles = null;
     clearInterval(recoveryInterval);
     unbindShortcuts();
     window.removeEventListener("keydown", onSidebarKeydown);
@@ -1018,6 +1089,7 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
     getPendingRecovery: () => pendingRecovery,
     getStatusText: () => statusText,
     openDocument,
+    openRequestedFiles,
     openFolder: (explicitPath?: string) => sidebar.openFolder(explicitPath),
     toggleSidebar: () => sidebar.toggleVisible(),
     saveDocument,
