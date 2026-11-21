@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!--
+    Kalamos app icon (#58): a reed pen (κάλαμος) laid diagonally with an
+    oblique-cut nib and a drop of ink. macOS Big Sur grid: 824×824 rounded
+    square centred in a 1024 canvas (100 px transparent margin), soft shadow.
+    Pure vector, no external fonts or images.
+  -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F6EEDF"/>
+      <stop offset="0.55" stop-color="#F3E9D7"/>
+      <stop offset="1" stop-color="#EADBC2"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.32" cy="0.22" r="0.8">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+    <!-- Stalk shading across its width (local y axis). -->
+    <linearGradient id="stalk" x1="0" y1="-56" x2="0" y2="56" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#C9A877"/>
+      <stop offset="0.35" stop-color="#A8865A"/>
+      <stop offset="1" stop-color="#7A5C3A"/>
+    </linearGradient>
+    <!-- Nib: wood colour fading into ink at the tip (local x axis). -->
+    <linearGradient id="nib" x1="-150" y1="0" x2="-390" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#A8865A"/>
+      <stop offset="0.45" stop-color="#8E6E47"/>
+      <stop offset="0.78" stop-color="#3B2A1E"/>
+      <stop offset="1" stop-color="#2E2017"/>
+    </linearGradient>
+    <linearGradient id="facet" x1="-160" y1="0" x2="-380" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#E2CBA4"/>
+      <stop offset="0.6" stop-color="#B89668"/>
+      <stop offset="1" stop-color="#3B2A1E"/>
+    </linearGradient>
+    <linearGradient id="ink" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4A3627"/>
+      <stop offset="1" stop-color="#2E2017"/>
+    </linearGradient>
+    <filter id="tileShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="12" stdDeviation="14" flood-color="#3B2A1E" flood-opacity="0.28"/>
+    </filter>
+    <filter id="penShadow" filterUnits="userSpaceOnUse" x="-500" y="-200" width="1000" height="400">
+      <feDropShadow dx="10" dy="16" stdDeviation="12" flood-color="#5A4026" flood-opacity="0.30"/>
+    </filter>
+    <clipPath id="tileClip">
+      <rect x="100" y="100" width="824" height="824" rx="185" ry="185"/>
+    </clipPath>
+  </defs>
+
+  <!-- Tile -->
+  <rect x="100" y="100" width="824" height="824" rx="185" ry="185" fill="url(#bg)" filter="url(#tileShadow)"/>
+  <rect x="100" y="100" width="824" height="824" rx="185" ry="185" fill="url(#glow)"/>
+  <rect x="101.5" y="101.5" width="821" height="821" rx="183.5" ry="183.5" fill="none" stroke="#C9B392" stroke-opacity="0.45" stroke-width="3"/>
+
+  <g clip-path="url(#tileClip)">
+    <!-- Reed pen, drawn horizontally (nib at -x) then rotated to point down-left. -->
+    <g transform="translate(548 476) rotate(-45)" filter="url(#penShadow)">
+      <!-- Nib body: tapers to the tip; the underside is cut in a concave scoop -->
+      <path d="M -150 -56 C -240 -50 -330 -24 -394 4 C -350 8 -300 20 -262 40 C -230 52 -190 56 -150 56 Z" fill="url(#nib)"/>
+      <!-- Inside of the scoop (lighter crescent along the cut) -->
+      <path d="M -394 4 C -350 8 -300 20 -262 40 C -230 52 -190 56 -150 56 L -150 44 C -200 40 -250 28 -300 12 C -340 4 -370 2 -394 4 Z" fill="url(#facet)" opacity="0.85"/>
+      <!-- Slit -->
+      <path d="M -384 3 L -270 -8" stroke="#E9D8BC" stroke-opacity="0.8" stroke-width="5" stroke-linecap="round"/>
+      <!-- Stalk -->
+      <path d="M -150 -56 L 352 -56 Q 392 -56 392 -16 L 392 16 Q 392 56 352 56 L -150 56 Z" fill="url(#stalk)"/>
+      <!-- Long highlight along the stalk -->
+      <path d="M -140 -38 L 360 -38" stroke="#F3E2C4" stroke-opacity="0.55" stroke-width="9" stroke-linecap="round"/>
+      <!-- Reed nodes -->
+      <g>
+        <rect x="40" y="-58" width="18" height="116" rx="7" fill="#6B4F31"/>
+        <rect x="58" y="-56" width="6" height="112" fill="#D9BE92" opacity="0.7"/>
+        <rect x="236" y="-58" width="18" height="116" rx="7" fill="#6B4F31"/>
+        <rect x="254" y="-56" width="6" height="112" fill="#D9BE92" opacity="0.7"/>
+      </g>
+      <!-- Shoulder line where the nib is cut from the stalk -->
+      <path d="M -150 -56 L -150 56" stroke="#7A5C3A" stroke-opacity="0.5" stroke-width="4"/>
+    </g>
+
+    <!-- Ink drop falling from the nib -->
+    <path d="M 272 776 C 272 776 240 816 240 838 A 32 32 0 0 0 304 838 C 304 816 272 776 272 776 Z" fill="url(#ink)"/>
+    <ellipse cx="260" cy="834" rx="7" ry="11" fill="#FFFFFF" opacity="0.35"/>
+  </g>
+</svg>
