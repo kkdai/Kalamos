@@ -50,7 +50,7 @@ describe("Tables (BL-01) — block widget, alignment, CJK width, Tab navigation,
     vi.restoreAllMocks();
   });
 
-  it("renders GFM table as HTML <table data-testid='table-widget'> with alignments, nested Lezer inline styles, and code containing `*`, switching to source on cell click", async () => {
+  it("renders GFM table as HTML <table data-testid='table-widget'> with alignments, nested Lezer inline styles, and code containing `*`, editing a cell in place on focus", async () => {
     app = createKalamosApp(document);
     await app.init();
     const { view } = app.editor;
@@ -95,14 +95,25 @@ describe("Tables (BL-01) — block widget, alignment, CJK width, Tab navigation,
     expect(tds[2].querySelector(".k-em")).toBeNull();
     expect(tds[2].textContent).toBe("*跳脫* a | b");
 
-    // Click cell (row 1, col 2 -> "\*跳脫\* a \| b") -> moves cursor into that cell in source and hides widget
-    tds[2].click();
 
+    // #59: focusing a cell edits it in place — the grid stays, the cell shows
+    // its raw inline markdown (`\|` displayed as `|`) and CM's selection moves
+    // into that cell's source.
+    const content = tds[2].querySelector<HTMLElement>(".k-table-cell-content")!;
+    expect(content.contentEditable).toBe("true");
+    content.focus();
+    expect(content.textContent).toBe("\\*跳脫\\* a | b");
     const sel = view.state.selection.main;
-    expect(view.state.sliceDoc(sel.from, sel.to)).toBe("\\*跳脫\\* a \\| b");
+    const cellSrc = "\\*跳脫\\* a \\| b";
+    const cellFrom = view.state.doc.toString().indexOf(cellSrc);
+    expect(sel.head).toBeGreaterThanOrEqual(cellFrom);
+    expect(sel.head).toBeLessThanOrEqual(cellFrom + cellSrc.length);
     expect(
       view.contentDOM.querySelector('table[data-testid="table-widget"]'),
-    ).toBeNull();
+    ).not.toBeNull();
+    // Blur renders it again.
+    content.blur();
+    expect(content.textContent).toBe("*跳脫* a | b");
   });
 
   it("renders table links as <span class='k-link' data-href> without <a href>, blocks javascript: on Cmd+Click, and allows https: / #slug on Cmd+Click", async () => {
