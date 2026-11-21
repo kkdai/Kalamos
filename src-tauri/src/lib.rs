@@ -38,6 +38,7 @@ pub fn run() {
             images::import_image,
             images::import_image_bytes,
             images::allow_asset_dir,
+            images::allow_asset_file,
             export::export_pdf,
             pandoc::pandoc_status,
             pandoc::export_pandoc,

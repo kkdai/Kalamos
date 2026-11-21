@@ -127,6 +127,7 @@ let mockSettings: Settings = { ...DEFAULT_SETTINGS };
 let mockWatchedFolder: string | null = null;
 const mockAssetFiles = new Set<string>();
 const mockAllowedAssetDirs = new Set<string>();
+const mockAllowedAssetFiles = new Set<string>();
 let lastMockTimestampMs = 0;
 
 type DialogOpenHandler = () => string | null | Promise<string | null>;
@@ -307,6 +308,7 @@ export function resetMockState(): void {
   mockFsChangedListeners.clear();
   mockAssetFiles.clear();
   mockAllowedAssetDirs.clear();
+  mockAllowedAssetFiles.clear();
   mockFileDropListeners.clear();
   mockOpenFilesListeners.clear();
   mockOpenFilesReady = false;
@@ -1077,6 +1079,41 @@ export async function allowAssetDir(path: string): Promise<null> {
   }
   mockAllowedAssetDirs.add(norm);
   return null;
+}
+
+/** Image types the asset scope may expose one file at a time (matches Rust `DISPLAY_IMAGE_EXTS`). */
+export const DISPLAY_IMAGE_EXTS = [
+  "png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "ico", "avif", "tiff", "tif", "heic",
+];
+
+/**
+ * #69: allow exactly one image file (not its folder) in the asset protocol
+ * scope, e.g. `../images/pic.png` outside the document folder. The backend
+ * resolves symlinks and refuses folders, missing files and non-images.
+ */
+export async function allowAssetFile(path: string): Promise<null> {
+  if (isTauri()) {
+    return invoke<null>("allow_asset_file", { path });
+  }
+  if (!path || !path.trim() || !path.startsWith("/")) {
+    throw createAppError("InvalidPath", `Image path must be absolute: ${path}`);
+  }
+  const norm = normalizePath(path);
+  if (mockDirs.has(norm)) {
+    throw createAppError("InvalidPath", `Not a file: ${path}`);
+  }
+  const name = norm.slice(norm.lastIndexOf("/") + 1);
+  const dot = name.lastIndexOf(".");
+  const ext = dot > 0 ? name.slice(dot + 1).toLowerCase() : "";
+  if (!DISPLAY_IMAGE_EXTS.includes(ext)) {
+    throw createAppError("InvalidPath", `Not an image file: ${path}`);
+  }
+  mockAllowedAssetFiles.add(norm);
+  return null;
+}
+
+export function getMockAllowedAssetFiles(): string[] {
+  return Array.from(mockAllowedAssetFiles);
 }
 
 export function getMockAllowedAssetDirs(): string[] {

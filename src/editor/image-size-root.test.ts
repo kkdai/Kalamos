@@ -1,7 +1,7 @@
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { buildExportHtml } from "../export/html";
 import {
   allowAssetDir,
@@ -174,7 +174,7 @@ describe("IM-03 sizes in the widget", () => {
     expect(specs[1].alt).toBe("B");
   });
 
-  it("renders <img> as an image widget outside the cursor, source inside", () => {
+  it("renders <img> as an image widget outside the cursor, source inside", async () => {
     const doc = `<img src="/pics/a.png" style="zoom:50%">\n\nend`;
     const parent = document.createElement("div");
     document.body.appendChild(parent);
@@ -191,8 +191,11 @@ describe("IM-03 sizes in the widget", () => {
       }),
       parent,
     });
+    // #69: outside the (untitled) document folder, the file is allowed before it loads.
+    await vi.waitFor(() =>
+      expect(view.contentDOM.querySelector("img.k-image-img")).not.toBeNull(),
+    );
     const img = view.contentDOM.querySelector<HTMLImageElement>("img.k-image-img");
-    expect(img).not.toBeNull();
     expect(decodeURIComponent(img!.src)).toContain("/pics/a.png");
     expect(img!.classList.contains("k-image-sized")).toBe(true);
     view.dispatch({ selection: { anchor: 5 } });

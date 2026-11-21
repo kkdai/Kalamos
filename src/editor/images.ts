@@ -17,7 +17,7 @@ import {
   type ViewUpdate,
   WidgetType,
 } from "@codemirror/view";
-import { allowAssetDir, isAssetDirTooBroadError, localFileUrl } from "../ipc";
+import { allowAssetDir, allowAssetFile, isAssetDirTooBroadError, localFileUrl } from "../ipc";
 import {
   findTyporaRootUrl,
   hasImageSize,
@@ -202,6 +202,63 @@ export function resolveImageSrc(
     }
   }
   return { kind: "local", path: localPath, url: toUrl(localPath) };
+}
+
+// ---------------------------------------------------------------------------
+// Per-file asset scope (#69): images outside the folders already allowed
+// ---------------------------------------------------------------------------
+
+function isUnder(path: string, dir: string): boolean {
+  if (dir === "/") return true;
+  const d = dir.replace(/\/+$/, "");
+  return path === d || path.startsWith(`${d}/`);
+}
+
+/**
+ * True when a local image lies outside the folders the asset protocol already
+ * allows (the document folder, the image root), e.g. `../images/pic.png`.
+ */
+export function needsAssetFileAllow(
+  path: string,
+  docPath: string | null,
+  root: string | null,
+): boolean {
+  if (docPath && isUnder(path, dirname(docPath))) return false;
+  if (root && isUnder(path, root)) return false;
+  return true;
+}
+
+const allowedAssetFiles = new Set<string>();
+const pendingAssetFiles = new Map<string, Promise<boolean>>();
+
+export function isAssetFileAllowed(path: string): boolean {
+  return allowedAssetFiles.has(path);
+}
+
+/**
+ * Asks the backend to allow this one image file (once; successes are cached,
+ * concurrent requests share one call, failures may be retried later).
+ */
+export function ensureAssetFileAllowed(path: string): Promise<boolean> {
+  if (allowedAssetFiles.has(path)) return Promise.resolve(true);
+  const pending = pendingAssetFiles.get(path);
+  if (pending) return pending;
+  const request = allowAssetFile(path).then(
+    () => {
+      allowedAssetFiles.add(path);
+      return true;
+    },
+    () => false,
+  );
+  pendingAssetFiles.set(path, request);
+  void request.finally(() => pendingAssetFiles.delete(path));
+  return request;
+}
+
+/** Test helper: forget every allowed file. */
+export function resetAssetFileAllowCache(): void {
+  allowedAssetFiles.clear();
+  pendingAssetFiles.clear();
 }
 
 // ---------------------------------------------------------------------------
@@ -396,6 +453,8 @@ export class ImageWidget extends WidgetType {
     readonly size?: ImageSize,
     /** Offset from the widget start where a click puts the cursor. */
     readonly editOffset = 2,
+    /** #69: a local file outside the allowed folders; allow it before loading. */
+    readonly needsAllow = false,
   ) {
     super();
   }
@@ -413,7 +472,8 @@ export class ImageWidget extends WidgetType {
       other.title === this.title &&
       other.key() === this.key() &&
       imageSizeKey(other.size) === imageSizeKey(this.size) &&
-      other.editOffset === this.editOffset
+      other.editOffset === this.editOffset &&
+      other.needsAllow === this.needsAllow
     );
   }
 
@@ -441,24 +501,57 @@ export class ImageWidget extends WidgetType {
       wrapper.dataset.state = "loading";
       // Resolved local path (debugging aid; survives the broken-image fallback).
       if (r.kind === "local") wrapper.dataset.path = r.path;
-      const img = doc.createElement("img");
-      img.className = "k-image-img";
-      img.alt = this.alt;
-      img.decoding = "async";
-      img.loading = "lazy";
-      img.draggable = false;
-      if (this.title) img.title = this.title;
-      applyImageSize(img, this.size);
-      img.addEventListener("load", () => {
-        wrapper.dataset.state = "loaded";
-        view.requestMeasure();
-      });
-      img.addEventListener("error", () => {
-        renderImageFallback(wrapper, this.alt, "圖片載入失敗");
-        view.requestMeasure();
-      });
-      img.src = r.url;
-      wrapper.append(img);
+      const localPath = r.kind === "local" ? r.path : null;
+      let retried = false;
+      const markAllowed = (): void => {
+        wrapper.dataset.assetScope = "file";
+      };
+      const showImage = (): void => {
+        const img = doc.createElement("img");
+        img.className = "k-image-img";
+        img.alt = this.alt;
+        img.decoding = "async";
+        img.loading = "lazy";
+        img.draggable = false;
+        if (this.title) img.title = this.title;
+        applyImageSize(img, this.size);
+        img.addEventListener("load", () => {
+          wrapper.dataset.state = "loaded";
+          view.requestMeasure();
+        });
+        img.addEventListener("error", () => {
+          // #69: scope may not cover this file yet; allow it once and reload.
+          if (localPath && !retried && !isAssetFileAllowed(localPath)) {
+            retried = true;
+            void ensureAssetFileAllowed(localPath).then((ok) => {
+              if (ok) {
+                markAllowed();
+                wrapper.dataset.state = "loading";
+                showImage();
+              } else {
+                renderImageFallback(wrapper, this.alt, "圖片載入失敗");
+              }
+              view.requestMeasure();
+            });
+            return;
+          }
+          renderImageFallback(wrapper, this.alt, "圖片載入失敗");
+          view.requestMeasure();
+        });
+        img.src = r.url;
+        wrapper.replaceChildren(img);
+      };
+      if (localPath && this.needsAllow && !isAssetFileAllowed(localPath)) {
+        retried = true;
+        void ensureAssetFileAllowed(localPath).then((ok) => {
+          if (ok) markAllowed();
+          // Load either way: a refusal ends in the broken-image fallback.
+          showImage();
+        });
+      } else {
+        if (localPath && isAssetFileAllowed(localPath)) markAllowed();
+        showImage();
+      }
     }
 
     wrapper.addEventListener("mousedown", (event) => {
@@ -496,12 +589,14 @@ export function buildImageDecorations(
   for (const spec of collectImageSpecs(state, ranges)) {
     // #54: source only with the cursor inside `![…](…)` (or expanded by Backspace).
     if (isInlineSpanActive(state, spec.from, spec.to)) continue;
+    const resolved = resolveImageSrc(spec.src, docPath, toUrl, root);
     const widget = new ImageWidget(
       spec.alt,
       spec.title,
-      resolveImageSrc(spec.src, docPath, toUrl, root),
+      resolved,
       spec.size,
       spec.html ? 1 : 2,
+      resolved.kind === "local" && needsAssetFileAllow(resolved.path, docPath, root),
     );
     decorations.push(
       Decoration.replace({ widget }).range(spec.from, spec.to),
