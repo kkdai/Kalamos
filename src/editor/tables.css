@@ -23,6 +23,13 @@
   cursor: text;
 }
 
+/* Same left padding in every row's first cell (room for the row handle),
+   so body text lines up with the header (#59). */
+.k-table th:first-child,
+.k-table td:first-child {
+  padding-left: 22px;
+}
+
 .k-table th {
   background-color: var(--k-surface);
   font-weight: 700;
@@ -33,12 +40,16 @@
 }
 
 .k-table-row-handle {
+  /* Floats in the first column's left padding: it never shifts the text (#59). */
+  position: absolute;
+  top: 50%;
+  left: 2px;
+  transform: translateY(-50%);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 18px;
   height: 18px;
-  margin-right: 6px;
   padding: 0;
   border: none;
   background: transparent;
@@ -72,4 +83,31 @@
 .k-table-col-resizer:hover {
   background-color: var(--k-accent);
   opacity: 0.45;
+}
+
+/* #59: WYSIWYG cell editing — every cell's content is its own contenteditable. */
+.k-table-cell-content {
+  display: inline-block;
+  min-width: 1ch;
+  min-height: 1.6em;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  outline: none;
+  vertical-align: top;
+  caret-color: var(--k-accent);
+}
+
+.k-table-cell-content[data-editing="1"] {
+  /* Raw inline markdown is shown while editing. */
+  font-family: inherit;
+}
+
+.k-table th:focus-within,
+.k-table td:focus-within {
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--k-accent) 70%, transparent);
+}
+
+.k-table th.k-table-cell-active:not(:focus-within),
+.k-table td.k-table-cell-active:not(:focus-within) {
+  background-color: color-mix(in srgb, var(--k-accent) 14%, transparent);
 }

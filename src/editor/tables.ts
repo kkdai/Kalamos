@@ -1,6 +1,8 @@
 import { markdownLanguage } from "@codemirror/lang-markdown";
 import { syntaxTree } from "@codemirror/language";
+import { redo, undo } from "@codemirror/commands";
 import {
+  Annotation,
   EditorSelection,
   type EditorState,
   type Range,
@@ -10,6 +12,7 @@ import {
   Decoration,
   type DecorationSet,
   EditorView,
+  runScopeHandlers,
   ViewPlugin,
   type ViewUpdate,
   WidgetType,
@@ -21,7 +24,7 @@ import {
   isSelectionTouchingRange,
   navigateMarkdownLink,
 } from "./live-preview";
-import { mapPosClamped } from "./positions";
+import { clampPos, mapPosClamped } from "./positions";
 
 export type TableAlign = "left" | "center" | "right";
 export type DelimiterStyle = "default" | "left" | "center" | "right";
@@ -789,6 +792,10 @@ function renderLezerChildrenToDom(
 
     if (SKIPPED_INLINE_MARK_NAMES.has(child.name)) {
       // Omit syntax marker characters
+    } else if (child.name === "HTMLTag" && /^<br\s*\/?>$/i.test(source.slice(childFrom, childTo))) {
+      targetDom.appendChild(document.createElement("br"));
+    } else if (child.name === "Entity") {
+      targetDom.appendChild(document.createTextNode(decodeEntity(source.slice(childFrom, childTo))));
     } else if (child.name === "Escape") {
       const escapedChar =
         child.to - child.from >= 2
@@ -865,6 +872,26 @@ function renderLezerChildrenToDom(
   }
 }
 
+const NAMED_ENTITIES: Record<string, string> = {
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+  nbsp: "\u00a0",
+};
+
+function decodeEntity(entity: string): string {
+  const m = /^&(#x[0-9a-f]+|#[0-9]+|[a-z]+);$/i.exec(entity);
+  if (!m) return entity;
+  const body = m[1];
+  if (body[0] === "#") {
+    const cp = body[1] === "x" || body[1] === "X" ? Number.parseInt(body.slice(2), 16) : Number(body.slice(1));
+    return Number.isFinite(cp) && cp > 0 && cp <= 0x10ffff ? String.fromCodePoint(cp) : entity;
+  }
+  return NAMED_ENTITIES[body.toLowerCase()] ?? entity;
+}
+
 let cellParser: MarkdownParser | null = null;
 
 /** Parser for table cell contents; shares the editor's CJK emphasis rule. */
@@ -885,6 +912,713 @@ export function renderCellInlineMarkdownToFragment(
   return fragment;
 }
 
+// ---------------------------------------------------------------------------
+// #59 A: WYSIWYG cell editing
+//
+// Every cell's `span.k-table-cell-content` is its own contenteditable. The
+// widget DOM is contenteditable=false and `ignoreEvent()` is true, so CM
+// ignores events, DOM mutations and DOM selection inside it; the cell owns
+// its input and writes each change back to the document (only that cell's
+// contentFrom..contentTo, minimal diff, userEvent "input.type") so undo/redo
+// is the main editor's CM history. `updateDOM` keeps the DOM (and focus) when
+// the table's shape is unchanged; only non-focused cells are re-rendered.
+// ---------------------------------------------------------------------------
+
+/** Marks transactions dispatched by a cell's own contenteditable. */
+export const tableCellSync = Annotation.define<boolean>();
+
+const BR_RE = /^<br\s*\/?>/i;
+
+// A literal `<br>` typed into a cell is stored as `&lt;br>` so it is not read
+// back as a line break; a literal `&lt;br` is stored as `&amp;lt;br` (and so
+// on), so every typed text round-trips.
+const LT_BR_RE = /^&lt;br/i;
+const AMP_BEFORE_LT_BR_RE = /^&(?=(?:amp;)*lt;br)/i;
+const RAW_AMP_BEFORE_LT_BR_RE = /^&amp;(?=(?:amp;)*lt;br)/i;
+
+function rawToken(raw: string, i: number): { display: string; rawLen: number } {
+  if (raw.startsWith("\\\\\\|", i)) return { display: "\\|", rawLen: 4 };
+  if (raw.startsWith("\\|", i)) return { display: "|", rawLen: 2 };
+  if (raw[i] === "<") {
+    const m = BR_RE.exec(raw.slice(i, i + 12));
+    if (m) return { display: "\n", rawLen: m[0].length };
+  }
+  if (raw[i] === "&") {
+    const rest = raw.slice(i, i + 64);
+    if (LT_BR_RE.test(rest)) return { display: "<", rawLen: 4 };
+    if (RAW_AMP_BEFORE_LT_BR_RE.test(rest)) return { display: "&", rawLen: 5 };
+  }
+  return { display: raw[i], rawLen: 1 };
+}
+
+function displayToken(text: string, i: number): string {
+  const ch = text[i];
+  if (ch === "|") return "\\|";
+  if (ch === "\n") return "<br>";
+  if (ch === "\r") return "";
+  if (ch === "<" && BR_RE.test(text.slice(i, i + 12))) return "&lt;";
+  if (ch === "&" && AMP_BEFORE_LT_BR_RE.test(text.slice(i, i + 64))) return "&amp;";
+  // `\` right before `|` must not escape the `\|` it is turned into.
+  if (ch === "\\" && text[i + 1] === "|") return "\\\\";
+  return ch;
+}
+
+/** Cell source between the pipes → the text shown while the cell is edited. */
+export function cellRawToDisplay(raw: string): string {
+  let out = "";
+  for (let i = 0; i < raw.length; ) {
+    const t = rawToken(raw, i);
+    out += t.display;
+    i += t.rawLen;
+  }
+  return out;
+}
+
+/** Text typed into a cell → cell source (`|` → `\|`, newline → `<br>`). */
+export function cellDisplayToRaw(text: string): string {
+  let out = "";
+  for (let i = 0; i < text.length; i++) out += displayToken(text, i);
+  return out;
+}
+
+function rawOffsetToDisplay(raw: string, rawOff: number): number {
+  let d = 0;
+  for (let i = 0; i < raw.length && i < rawOff; ) {
+    const t = rawToken(raw, i);
+    if (i + t.rawLen > rawOff) break;
+    d += t.display.length;
+    i += t.rawLen;
+  }
+  return d;
+}
+
+function displayOffsetToRaw(text: string, dOff: number): number {
+  let r = 0;
+  for (let i = 0; i < text.length && i < dOff; i++) r += displayToken(text, i).length;
+  return r;
+}
+
+function readCellText(node: Node): string {
+  let out = "";
+  node.childNodes.forEach((n) => {
+    if (n.nodeType === Node.TEXT_NODE) out += n.nodeValue ?? "";
+    else if (n.nodeName === "BR") out += "\n";
+    else if (n.nodeType === Node.ELEMENT_NODE) {
+      if ((n.nodeName === "DIV" || n.nodeName === "P") && out.length > 0 && !out.endsWith("\n")) {
+        out += "\n";
+      }
+      out += readCellText(n);
+    }
+  });
+  return out;
+}
+
+/** Text length of the cell without the placeholder `<br>` a trailing newline needs. */
+function cellTextLength(el: HTMLElement): number {
+  return readCellText(el).replace(/\n$/, "").length;
+}
+
+function setCellText(el: HTMLElement, text: string): void {
+  el.textContent = text;
+  // A trailing newline is invisible without something after it.
+  if (text.endsWith("\n")) el.appendChild(document.createElement("br"));
+}
+
+function textOffsetIn(el: HTMLElement, node: Node, offset: number): number {
+  const pre = document.createRange();
+  pre.selectNodeContents(el);
+  pre.setEnd(node, offset);
+  return readCellText(pre.cloneContents()).length;
+}
+
+function cellSelectionOffsets(el: HTMLElement): { start: number; end: number } | null {
+  const sel = el.ownerDocument.getSelection();
+  if (!sel || sel.rangeCount === 0) return null;
+  const r = sel.getRangeAt(0);
+  if (!el.contains(r.startContainer) || !el.contains(r.endContainer)) return null;
+  return {
+    start: textOffsetIn(el, r.startContainer, r.startOffset),
+    end: textOffsetIn(el, r.endContainer, r.endOffset),
+  };
+}
+
+function domPointAt(el: HTMLElement, off: number): [Node, number] {
+  let rem = off;
+  const walk = (node: Node): [Node, number] | null => {
+    for (let i = 0; i < node.childNodes.length; i++) {
+      const n = node.childNodes[i];
+      if (n.nodeType === Node.TEXT_NODE) {
+        const len = n.nodeValue?.length ?? 0;
+        if (rem <= len) return [n, rem];
+        rem -= len;
+      } else if (n.nodeName === "BR") {
+        if (rem === 0) return [node, i];
+        rem -= 1;
+      } else {
+        const r = walk(n);
+        if (r) return r;
+      }
+    }
+    return null;
+  };
+  return walk(el) ?? [el, el.childNodes.length];
+}
+
+function setCellSelection(el: HTMLElement, start: number, end: number): void {
+  const sel = el.ownerDocument.getSelection();
+  if (!sel) return;
+  const len = cellTextLength(el);
+  const [sn, so] = domPointAt(el, Math.max(0, Math.min(start, len)));
+  const [en, eo] = domPointAt(el, Math.max(0, Math.min(end, len)));
+  const range = document.createRange();
+  range.setStart(sn, so);
+  range.setEnd(en, eo);
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
+/** Replace the cell's DOM selection with plain text (paste, drop, Shift+Enter, Cmd+B). */
+function insertTextInCell(el: HTMLElement, text: string, caretBack = 0): void {
+  const offsets = cellSelectionOffsets(el) ?? { start: cellTextLength(el), end: cellTextLength(el) };
+  const current = readCellText(el).replace(/\n$/, "");
+  const next = current.slice(0, offsets.start) + text + current.slice(offsets.end);
+  setCellText(el, next);
+  const caret = offsets.start + text.length - caretBack;
+  setCellSelection(el, caret, caret);
+}
+
+function navRowsOf(table: ParsedTable): ParsedTableRow[] {
+  return [table.headerRow, ...table.bodyRows];
+}
+
+interface CellLocation {
+  table: ParsedTable;
+  row: ParsedTableRow;
+  cell: ParsedTableCell;
+  rowIdx: number;
+  col: number;
+}
+
+function locateCellElement(view: EditorView, el: HTMLElement): CellLocation | null {
+  const wrapper = el.closest<HTMLElement>(".k-table-wrapper");
+  const td = el.closest<HTMLElement>("th, td");
+  if (!wrapper || !td || !wrapper.isConnected) return null;
+  let pos: number;
+  try {
+    pos = view.posAtDOM(wrapper);
+  } catch {
+    return null;
+  }
+  const table = findTableAtPos(view.state, pos);
+  if (!table) return null;
+  const rowIdx = Number(td.dataset.row);
+  const col = Number(td.dataset.col);
+  const row = navRowsOf(table)[rowIdx];
+  const cell = row?.cells[col];
+  if (!row || !cell) return null;
+  return { table, row, cell, rowIdx, col };
+}
+
+function findCellElement(
+  view: EditorView,
+  tableFrom: number,
+  row: number,
+  col: number,
+): HTMLElement | null {
+  for (const wrapper of view.contentDOM.querySelectorAll<HTMLElement>(".k-table-wrapper")) {
+    let pos: number;
+    try {
+      pos = view.posAtDOM(wrapper);
+    } catch {
+      continue;
+    }
+    if (pos !== tableFrom) continue;
+    return wrapper.querySelector<HTMLElement>(
+      `[data-row="${row}"][data-col="${col}"] .k-table-cell-content`,
+    );
+  }
+  return null;
+}
+
+/** Write the cell's text back to its source range (one CM transaction). */
+function writeCellFromElement(view: EditorView, el: HTMLElement): void {
+  if (el.dataset.composing === "1") return;
+  const loc = locateCellElement(view, el);
+  if (!loc) return;
+  const full = readCellText(el);
+  const lead = full.length - full.replace(/^\s+/, "").length;
+  const display = full.trim();
+  let raw = cellDisplayToRaw(display);
+  // A trailing odd backslash would escape the closing pipe (`|x\|`): pad it.
+  if (/(^|[^\\])(\\\\)*\\$/.test(raw)) raw += " ";
+  const offsets = cellSelectionOffsets(el);
+  const { state } = view;
+  const { cell, row } = loc;
+
+  let from: number;
+  let to: number;
+  let insert: string;
+  let contentFrom: number;
+  if (cell.rawFrom === cell.rawTo && cell.rawFrom === row.to) {
+    // A cell missing from a short row: append it (and any missing before it).
+    if (!raw) return;
+    const missingBefore = row.cells
+      .slice(0, loc.col)
+      .filter((c) => c.rawFrom === c.rawTo && c.rawFrom === row.to).length;
+    const endsWithPipe = state.sliceDoc(row.from, row.to).trimEnd().endsWith("|");
+    const head = endsWithPipe ? "" : " |";
+    insert = `${head}${"   |".repeat(missingBefore)} ${raw} |`;
+    from = to = row.to;
+    contentFrom = row.to + insert.length - raw.length - 2;
+  } else {
+    const old = state.sliceDoc(cell.contentFrom, cell.contentTo);
+    if (old === raw) return;
+    let p = 0;
+    while (p < old.length && p < raw.length && old[p] === raw[p]) p++;
+    let q = 0;
+    while (
+      q < old.length - p &&
+      q < raw.length - p &&
+      old[old.length - 1 - q] === raw[raw.length - 1 - q]
+    ) {
+      q++;
+    }
+    from = cell.contentFrom + p;
+    to = cell.contentTo - q;
+    insert = raw.slice(p, raw.length - q);
+    contentFrom = cell.contentFrom;
+  }
+  const caretDisplay = offsets
+    ? Math.max(0, Math.min(offsets.end - lead, display.length))
+    : display.length;
+  const head = contentFrom + displayOffsetToRaw(display, caretDisplay);
+  view.dispatch({
+    changes: { from, to, insert },
+    selection: EditorSelection.cursor(head),
+    userEvent: "input.type",
+    annotations: tableCellSync.of(true),
+  });
+}
+
+/** Keep CM's main selection inside the focused cell (for getActiveTableCell). */
+function syncSelectionToCell(view: EditorView, el: HTMLElement): void {
+  const loc = locateCellElement(view, el);
+  if (!loc) return;
+  const sel = view.state.selection.main;
+  const { cell } = loc;
+  if (sel.from >= cell.rawFrom && sel.to <= cell.rawTo && sel.from >= loc.row.from) {
+    const again = locateCursorCellInTable(loc.table, sel.head);
+    if (again.navRowIdx === loc.rowIdx && again.colIdx === loc.col) return;
+  }
+  view.dispatch({
+    selection: EditorSelection.cursor(cell.contentTo),
+    annotations: tableCellSync.of(true),
+  });
+}
+
+function renderCellContent(el: HTMLElement, raw: string): void {
+  el.dataset.raw = raw;
+  el.replaceChildren(renderCellInlineMarkdownToFragment(raw));
+}
+
+function focusCellElement(el: HTMLElement, start: number, end: number): void {
+  if (el.ownerDocument.activeElement !== el) el.focus({ preventScroll: true });
+  setCellSelection(el, start, end);
+}
+
+/** Focus the cell holding CM's main selection, or CM itself if there is none. */
+function focusFromSelection(view: EditorView): boolean {
+  const active = getActiveTableCell(view.state);
+  const el = active ? findCellElement(view, active.table.from, active.row, active.col) : null;
+  if (!active || !el) return false;
+  const cell = navRowsOf(active.table)[active.row].cells[active.col];
+  const sel = view.state.selection.main;
+  const raw = cell.text;
+  const toDisplay = (pos: number) =>
+    rawOffsetToDisplay(raw, Math.max(0, Math.min(pos - cell.contentFrom, raw.length)));
+  const start = toDisplay(sel.from);
+  const end = toDisplay(sel.to);
+  focusCellElement(el, start, end);
+  return true;
+}
+
+function focusCellWithMode(
+  view: EditorView,
+  tableFrom: number,
+  row: number,
+  col: number,
+  mode: "all" | "start" | "end",
+): boolean {
+  const table = findTableAtPos(view.state, clampPos(tableFrom, view.state.doc.length));
+  if (!table) return false;
+  const rows = navRowsOf(table);
+  const r = Math.max(0, Math.min(row, rows.length - 1));
+  const c = Math.max(0, Math.min(col, table.colCount - 1));
+  const cell = rows[r].cells[c];
+  const anchor = mode === "end" ? cell.contentTo : cell.contentFrom;
+  const head = mode === "start" ? cell.contentFrom : cell.contentTo;
+  view.dispatch({
+    selection: EditorSelection.range(anchor, head),
+    scrollIntoView: true,
+    annotations: tableCellSync.of(true),
+  });
+  const el = findCellElement(view, table.from, r, c);
+  if (!el) {
+    view.focus();
+    return true;
+  }
+  el.focus({ preventScroll: true });
+  const len = cellTextLength(el);
+  if (mode === "all") setCellSelection(el, 0, len);
+  else if (mode === "start") setCellSelection(el, 0, 0);
+  else setCellSelection(el, len, len);
+  return true;
+}
+
+export interface ActiveTableCell {
+  table: ParsedTable;
+  /** 0 = header row, 1.. = body rows. */
+  row: number;
+  col: number;
+}
+
+/** The table cell holding the main selection's head, or null. */
+export function getActiveTableCell(state: EditorState): ActiveTableCell | null {
+  const head = state.selection.main.head;
+  const table = findTableAtPos(state, head);
+  if (!table || head < table.from || head > table.to) return null;
+  const { navRowIdx, colIdx } = locateCursorCellInTable(table, head);
+  return { table, row: navRowIdx, col: colIdx };
+}
+
+/**
+ * Put the selection (and, in live preview, keyboard focus) on a cell; the
+ * cell's whole text is selected. `row` 0 is the header. Out-of-range rows and
+ * columns are clamped. Returns false if there is no table at `tableFrom`.
+ */
+export function focusTableCell(
+  view: EditorView,
+  tableFrom: number,
+  row: number,
+  col: number,
+): boolean {
+  return focusCellWithMode(view, tableFrom, row, col, "all");
+}
+
+function exitTableAbove(view: EditorView, table: ParsedTable): void {
+  if (table.startLine > 1) {
+    view.dispatch({
+      selection: EditorSelection.cursor(view.state.doc.line(table.startLine - 1).to),
+      scrollIntoView: true,
+    });
+  } else {
+    view.dispatch({
+      changes: { from: 0, insert: "\n" },
+      selection: EditorSelection.cursor(0),
+      scrollIntoView: true,
+      userEvent: "input.table.exit",
+    });
+  }
+  view.focus();
+}
+
+function exitTableBelow(view: EditorView, table: ParsedTable, newParagraph: boolean): void {
+  const { state } = view;
+  if (!newParagraph && table.endLine < state.doc.lines) {
+    view.dispatch({
+      selection: EditorSelection.cursor(state.doc.line(table.endLine + 1).from),
+      scrollIntoView: true,
+    });
+  } else {
+    // A plain line right after a row would join the table: keep a blank line.
+    const rest = state.sliceDoc(table.to, Math.min(state.doc.length, table.to + 2));
+    const insert = rest.startsWith("\n") && !rest.startsWith("\n\n") ? "\n\n\n" : "\n\n";
+    view.dispatch({
+      changes: { from: table.to, insert },
+      selection: EditorSelection.cursor(table.to + 2),
+      scrollIntoView: true,
+      userEvent: "input.table.exit",
+    });
+  }
+  view.focus();
+}
+
+function moveToAdjacentCell(view: EditorView, loc: CellLocation, dir: -1 | 1): void {
+  const { table } = loc;
+  const lastRow = navRowsOf(table).length - 1;
+  let r = loc.rowIdx;
+  let c = loc.col + dir;
+  if (c < 0) {
+    r -= 1;
+    c = table.colCount - 1;
+  } else if (c >= table.colCount) {
+    r += 1;
+    c = 0;
+  }
+  if (r < 0) exitTableAbove(view, table);
+  else if (r > lastRow) exitTableBelow(view, table, false);
+  else focusCellWithMode(view, table.from, r, c, dir < 0 ? "end" : "start");
+}
+
+function handleCellEnter(view: EditorView, loc: CellLocation): void {
+  const { table } = loc;
+  const lastRow = navRowsOf(table).length - 1;
+  if (loc.rowIdx < lastRow) {
+    focusCellWithMode(view, table.from, loc.rowIdx + 1, loc.col, "end");
+    return;
+  }
+  if (loc.rowIdx > 0 && isTableRowEmpty(loc.row)) {
+    exitTableFromEmptyLastRow(view, loc.row);
+    view.focus();
+    return;
+  }
+  const { colCount, headerCells, delimiterStyles, bodyRows } = tableCellMatrix(table);
+  bodyRows.push(Array.from({ length: colCount }, () => ""));
+  dispatchFormattedTableAndSelectCell(
+    view,
+    table,
+    headerCells,
+    delimiterStyles,
+    bodyRows,
+    loc.rowIdx + 1,
+    loc.col,
+  );
+}
+
+function wrapCellSelection(view: EditorView, el: HTMLElement, mark: string): void {
+  const offsets = cellSelectionOffsets(el);
+  const text = readCellText(el).replace(/\n$/, "");
+  const start = offsets?.start ?? text.length;
+  const end = offsets?.end ?? text.length;
+  const selected = text.slice(start, end);
+  insertTextInCell(el, `${mark}${selected}${mark}`, selected ? 0 : mark.length);
+  writeCellFromElement(view, el);
+}
+
+const NATIVE_MOD_KEYS = new Set(["c", "x", "v"]);
+
+function handleCellKey(view: EditorView, el: HTMLElement, e: KeyboardEvent): boolean {
+  const loc = locateCellElement(view, el);
+  if (!loc) return false;
+  const mod = e.metaKey || e.ctrlKey;
+  const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+  if (k === "Meta" || k === "Control" || k === "Shift" || k === "Alt") return false;
+
+  if (mod) {
+    if (k === "a" && !e.shiftKey && !e.altKey) {
+      // Native select-all would escape to the whole editor (outer editing host).
+      setCellSelection(el, 0, cellTextLength(el));
+      return true;
+    }
+    if (k === "z" && !e.altKey) {
+      if (e.shiftKey) redo(view);
+      else undo(view);
+      return true;
+    }
+    if (k === "y" && !e.shiftKey && !e.altKey) {
+      redo(view);
+      return true;
+    }
+    if (k === "b" && !e.shiftKey && !e.altKey) {
+      wrapCellSelection(view, el, "**");
+      return true;
+    }
+    if (k === "i" && !e.shiftKey && !e.altKey) {
+      wrapCellSelection(view, el, "*");
+      return true;
+    }
+    if (k === "Enter") {
+      exitTableBelow(view, loc.table, true);
+      return true;
+    }
+    if (NATIVE_MOD_KEYS.has(k) && !e.altKey && !e.shiftKey) return false;
+    if (e.key === "ArrowLeft" || e.key === "ArrowRight" || e.key === "Backspace" || e.key === "Delete") {
+      return false; // native line / word movement and deletion inside the cell
+    }
+    // App shortcuts (save, source mode, find…) keep working inside a cell.
+    syncSelectionToCell(view, el);
+    return runScopeHandlers(view, e, "editor");
+  }
+
+  switch (e.key) {
+    case "Tab":
+      syncSelectionToCell(view, el);
+      if (e.shiftKey) handleTableShiftTab(view);
+      else handleTableTab(view);
+      return true;
+    case "Enter":
+      if (e.altKey) return false;
+      if (e.shiftKey) {
+        insertTextInCell(el, "\n");
+        writeCellFromElement(view, el);
+        return true;
+      }
+      handleCellEnter(view, loc);
+      return true;
+    case "ArrowUp":
+      if (e.shiftKey || e.altKey) return false;
+      if (loc.rowIdx === 0) exitTableAbove(view, loc.table);
+      else focusCellWithMode(view, loc.table.from, loc.rowIdx - 1, loc.col, "end");
+      return true;
+    case "ArrowDown":
+      if (e.shiftKey || e.altKey) return false;
+      if (loc.rowIdx === navRowsOf(loc.table).length - 1) exitTableBelow(view, loc.table, false);
+      else focusCellWithMode(view, loc.table.from, loc.rowIdx + 1, loc.col, "end");
+      return true;
+    case "ArrowLeft":
+    case "ArrowRight": {
+      if (e.shiftKey || e.altKey) return false;
+      const offsets = cellSelectionOffsets(el);
+      if (!offsets || offsets.start !== offsets.end) return false;
+      const atEdge = e.key === "ArrowLeft" ? offsets.start === 0 : offsets.end >= cellTextLength(el);
+      if (!atEdge) return false;
+      moveToAdjacentCell(view, loc, e.key === "ArrowLeft" ? -1 : 1);
+      return true;
+    }
+    case "Escape":
+      exitTableBelow(view, loc.table, false);
+      return true;
+    default:
+      return false;
+  }
+}
+
+/** Views whose widgets were destroyed while one of their cells had focus. */
+/** The cell span that has keyboard focus (cleared on blur unless it was removed). */
+let focusedCellEl: HTMLElement | null = null;
+
+function refocusAfterDestroy(view: EditorView): void {
+  queueMicrotask(() => {
+    if (!view.dom.isConnected) return;
+    const active = view.dom.ownerDocument.activeElement;
+    if (active && active !== view.dom.ownerDocument.body && view.dom.contains(active)) return;
+    if (active && active !== view.dom.ownerDocument.body) return; // focus went elsewhere on purpose
+    if (!focusFromSelection(view)) view.focus();
+  });
+}
+
+const ROW_DRAG_TYPE = "application/x-kalamos-table-row";
+
+function setupCellContent(view: EditorView, el: HTMLElement, raw: string): void {
+  el.className = "k-table-cell-content";
+  if (view.state.facet(EditorView.editable)) {
+    el.contentEditable = "true";
+    el.spellcheck = false;
+    // Focusable by script/click, but not a stop in the page's Tab order
+    // (Tab moves between cells instead).
+    el.tabIndex = -1;
+  }
+  renderCellContent(el, raw);
+
+  el.addEventListener("focus", () => {
+    focusedCellEl = el;
+    el.dataset.editing = "1";
+    const display = cellRawToDisplay(el.dataset.raw ?? "");
+    if (readCellText(el).replace(/\n$/, "") !== display) {
+      setCellText(el, display);
+      setCellSelection(el, display.length, display.length);
+    }
+    try {
+      syncSelectionToCell(view, el);
+    } catch {
+      // The view is mid-update (e.g. the document was replaced); nothing to sync.
+    }
+  });
+  el.addEventListener("blur", () => {
+    // Removed while focused (widget rebuilt): keep it so destroy() can refocus.
+    if (el.isConnected && focusedCellEl === el) focusedCellEl = null;
+    delete el.dataset.editing;
+    delete el.dataset.composing;
+    if (el.isConnected) renderCellContent(el, el.dataset.raw ?? "");
+  });
+  el.addEventListener("compositionstart", () => {
+    el.dataset.composing = "1";
+  });
+  el.addEventListener("compositionend", () => {
+    delete el.dataset.composing;
+    writeCellFromElement(view, el);
+  });
+  el.addEventListener("input", (e) => {
+    if ((e as InputEvent).isComposing || el.dataset.composing === "1") return;
+    writeCellFromElement(view, el);
+  });
+  el.addEventListener("beforeinput", (e) => {
+    const type = e.inputType;
+    if (type === "historyUndo" || type === "historyRedo") {
+      e.preventDefault();
+      if (type === "historyUndo") undo(view);
+      else redo(view);
+    } else if (type.startsWith("format") || type === "insertParagraph") {
+      e.preventDefault();
+    }
+  });
+  el.addEventListener("keydown", (e) => {
+    if (e.isComposing || e.keyCode === 229 || el.dataset.composing === "1") return;
+    if (handleCellKey(view, el, e)) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  });
+  el.addEventListener("paste", (e) => {
+    e.preventDefault();
+    const text = (e.clipboardData?.getData("text/plain") ?? "").replace(/\r\n?/g, "\n");
+    if (!text) return;
+    insertTextInCell(el, text);
+    writeCellFromElement(view, el);
+  });
+  el.addEventListener("drop", (e) => {
+    if (e.dataTransfer?.types.includes(ROW_DRAG_TYPE)) return; // row reorder
+    e.preventDefault();
+    const text = (e.dataTransfer?.getData("text/plain") ?? "").replace(/\r\n?/g, "\n");
+    if (!text) return;
+    if (el.ownerDocument.activeElement !== el) el.focus({ preventScroll: true });
+    const doc = el.ownerDocument as Document & {
+      caretRangeFromPoint?: (x: number, y: number) => globalThis.Range | null;
+    };
+    const point = doc.caretRangeFromPoint?.(e.clientX, e.clientY);
+    if (point && el.contains(point.startContainer)) {
+      const off = textOffsetIn(el, point.startContainer, point.startOffset);
+      setCellSelection(el, off, off);
+    }
+    insertTextInCell(el, text);
+    writeCellFromElement(view, el);
+  });
+}
+
+/** Bring a cell's DOM up to date with its source; the focused cell keeps its DOM. */
+function syncCellContent(view: EditorView, el: HTMLElement, cell: ParsedTableCell): void {
+  const raw = cell.text;
+  if (el.dataset.raw === raw) return;
+  el.dataset.raw = raw;
+  if (el.dataset.editing !== "1") {
+    renderCellContent(el, raw);
+    return;
+  }
+  if (el.dataset.composing === "1") return;
+  const want = cellRawToDisplay(raw);
+  if (readCellText(el).trim() === want) return;
+  // Changed from outside the cell (undo, Cmd+B via keymap, search & replace…).
+  setCellText(el, want);
+  const head = view.state.selection.main.head;
+  const off =
+    head >= cell.contentFrom && head <= cell.contentTo
+      ? rawOffsetToDisplay(raw, head - cell.contentFrom)
+      : want.length;
+  setCellSelection(el, off, off);
+}
+
+function tableShapeMatches(dom: HTMLElement, table: ParsedTable): boolean {
+  const ths = dom.querySelectorAll("thead th");
+  const trs = dom.querySelectorAll("tbody tr");
+  if (ths.length !== table.colCount || trs.length !== table.bodyRows.length) return false;
+  for (const tr of trs) {
+    if (tr.querySelectorAll("td").length !== table.colCount) return false;
+  }
+  return true;
+}
+
+const widgetViews = new WeakMap<HTMLElement, EditorView>();
+
 export class TableBlockWidget extends WidgetType {
   constructor(
     readonly table: ParsedTable,
@@ -901,9 +1635,30 @@ export class TableBlockWidget extends WidgetType {
     );
   }
 
+  /** Same shape → update in place, so a focused cell keeps focus and caret. */
+  updateDOM(dom: HTMLElement, view: EditorView): boolean {
+    if (!tableShapeMatches(dom, this.table)) return false;
+    const rows = navRowsOf(this.table);
+    for (const cellEl of dom.querySelectorAll<HTMLElement>("th[data-row], td[data-row]")) {
+      const r = Number(cellEl.dataset.row);
+      const c = Number(cellEl.dataset.col);
+      const cell = rows[r]?.cells[c];
+      if (!cell) return false;
+      const align = this.table.alignments[c] ?? "left";
+      if (cellEl.dataset.align !== align) {
+        cellEl.dataset.align = align;
+        cellEl.style.textAlign = align;
+      }
+      const content = cellEl.querySelector<HTMLElement>(".k-table-cell-content");
+      if (content) syncCellContent(view, content, cell);
+    }
+    return true;
+  }
+
   toDOM(view: EditorView): HTMLElement {
     const wrapper = document.createElement("div");
     wrapper.className = "k-table-wrapper";
+    widgetViews.set(wrapper, view);
 
     const tableEl = document.createElement("table");
     tableEl.className = "k-table";
@@ -912,7 +1667,19 @@ export class TableBlockWidget extends WidgetType {
     const storedWidths =
       tableColumnWidthsMap.get(this.table.firstLineKey) ?? [];
 
-    const handleCellClick = (event: MouseEvent, cell: ParsedTableCell) => {
+    const modLinkTarget = (event: MouseEvent): HTMLElement | null => {
+      if (!event.metaKey && !event.ctrlKey) return null;
+      return (event.target as HTMLElement | null)?.closest<HTMLElement>(".k-link[data-href]") ?? null;
+    };
+    const handleCellClick = (event: MouseEvent) => {
+      const linkSpan = modLinkTarget(event);
+      if (!linkSpan) return;
+      event.preventDefault();
+      event.stopPropagation();
+      navigateMarkdownLink(linkSpan.dataset.href ?? "", view);
+    };
+
+    const handleCellMouseDown = (event: MouseEvent, content: HTMLElement) => {
       const targetEl = event.target as HTMLElement | null;
       if (
         targetEl?.closest(".k-table-col-resizer") ||
@@ -920,20 +1687,17 @@ export class TableBlockWidget extends WidgetType {
       ) {
         return;
       }
-      const linkSpan = targetEl?.closest<HTMLElement>(".k-link[data-href]");
-      if (linkSpan && (event.metaKey || event.ctrlKey)) {
+      if (modLinkTarget(event)) {
+        // Cmd+click follows the link (on click) instead of editing the cell.
         event.preventDefault();
-        event.stopPropagation();
-        const href = linkSpan.dataset.href ?? "";
-        navigateMarkdownLink(href, view);
         return;
       }
+      if (targetEl && content.contains(targetEl)) return; // native caret placement
+      // Padding around the text: edit the cell with the caret at its end.
       event.preventDefault();
-      view.dispatch({
-        selection: EditorSelection.range(cell.contentFrom, cell.contentTo),
-        scrollIntoView: true,
-      });
-      view.focus();
+      content.focus({ preventScroll: true });
+      const len = cellTextLength(content);
+      setCellSelection(content, len, len);
     };
 
     // Header
@@ -953,8 +1717,7 @@ export class TableBlockWidget extends WidgetType {
       }
 
       const contentSpan = document.createElement("span");
-      contentSpan.className = "k-table-cell-content";
-      contentSpan.appendChild(renderCellInlineMarkdownToFragment(cell.text));
+      setupCellContent(view, contentSpan, cell.text);
       th.appendChild(contentSpan);
 
       const resizer = document.createElement("span");
@@ -965,13 +1728,14 @@ export class TableBlockWidget extends WidgetType {
         e.stopPropagation();
         const startX = e.clientX;
         const startWidth = th.getBoundingClientRect().width || 120;
+        const widthKey = this.table.firstLineKey;
 
         const onMouseMove = (moveEvent: MouseEvent) => {
           const nextWidth = Math.max(
             40,
             startWidth + (moveEvent.clientX - startX),
           );
-          setTableColumnWidth(this.table.firstLineKey, colIdx, nextWidth);
+          setTableColumnWidth(widthKey, colIdx, nextWidth);
           th.style.width = `${nextWidth}px`;
         };
         const onMouseUp = () => {
@@ -983,9 +1747,10 @@ export class TableBlockWidget extends WidgetType {
       });
       th.appendChild(resizer);
 
-      th.addEventListener("click", (e) => {
-        handleCellClick(e, cell);
+      th.addEventListener("mousedown", (e) => {
+        handleCellMouseDown(e, contentSpan);
       });
+      th.addEventListener("click", handleCellClick);
 
       headTr.appendChild(th);
     });
@@ -1008,14 +1773,20 @@ export class TableBlockWidget extends WidgetType {
         e.preventDefault();
         const rawFromIdx =
           draggedBodyRowIdx ??
-          Number(e.dataTransfer?.getData("text/plain") ?? -1);
+          Number(e.dataTransfer?.getData(ROW_DRAG_TYPE) || -1);
         draggedBodyRowIdx = null;
         if (
           !Number.isNaN(rawFromIdx) &&
           rawFromIdx >= 0 &&
           rawFromIdx !== bodyRowIdx
         ) {
-          reorderTableBodyRow(view, this.table.from, rawFromIdx, bodyRowIdx);
+          let tableFrom: number;
+          try {
+            tableFrom = view.posAtDOM(wrapper);
+          } catch {
+            return;
+          }
+          reorderTableBodyRow(view, tableFrom, rawFromIdx, bodyRowIdx);
         }
       });
 
@@ -1051,6 +1822,7 @@ export class TableBlockWidget extends WidgetType {
 
           handle.addEventListener("dragstart", (e) => {
             draggedBodyRowIdx = bodyRowIdx;
+            e.dataTransfer?.setData(ROW_DRAG_TYPE, String(bodyRowIdx));
             e.dataTransfer?.setData("text/plain", String(bodyRowIdx));
           });
           handle.addEventListener("click", (e) => {
@@ -1061,13 +1833,13 @@ export class TableBlockWidget extends WidgetType {
         }
 
         const contentSpan = document.createElement("span");
-        contentSpan.className = "k-table-cell-content";
-        contentSpan.appendChild(renderCellInlineMarkdownToFragment(cell.text));
+        setupCellContent(view, contentSpan, cell.text);
         td.appendChild(contentSpan);
 
-        td.addEventListener("click", (e) => {
-          handleCellClick(e, cell);
+        td.addEventListener("mousedown", (e) => {
+          handleCellMouseDown(e, contentSpan);
         });
+        td.addEventListener("click", handleCellClick);
 
         tr.appendChild(td);
       });
@@ -1080,6 +1852,14 @@ export class TableBlockWidget extends WidgetType {
     return wrapper;
   }
 
+  destroy(dom: HTMLElement): void {
+    const view = widgetViews.get(dom);
+    if (view && focusedCellEl && dom.contains(focusedCellEl)) {
+      focusedCellEl = null;
+      refocusAfterDestroy(view);
+    }
+  }
+
   ignoreEvent(): boolean {
     return true;
   }
@@ -1088,6 +1868,9 @@ export class TableBlockWidget extends WidgetType {
 export interface CachedTableEntry {
   from: number;
   to: number;
+  /** The delimiter row: a cursor there means the table is being typed as source. */
+  delimiterFrom: number;
+  delimiterTo: number;
   widgetDecoration: Range<Decoration>;
 }
 
@@ -1121,6 +1904,8 @@ function scanTablesFromSyntaxTree(state: EditorState): CachedTableEntry[] {
       tables.push({
         from: parsed.from,
         to: parsed.to,
+        delimiterFrom: parsed.delimiterRow.from,
+        delimiterTo: parsed.delimiterRow.to,
         widgetDecoration,
       });
       return false;
@@ -1135,9 +1920,10 @@ function updateTableMaskAndDecorations(
   selection: EditorSelection,
   prevFieldState?: TableFieldState,
 ): TableFieldState {
-  const mask = tables.map((t) =>
-    isSelectionTouchingRange(selection, t.from, t.to),
-  );
+  // #59: tables always render as an editable grid, except while the cursor
+  // is on the delimiter row (the table is still being typed as source).
+  const head = selection.main.head;
+  const mask = tables.map((t) => head >= t.delimiterFrom && head <= t.delimiterTo);
 
   if (
     prevFieldState &&
@@ -1275,6 +2061,79 @@ export const tableAutoFormatPlugin = ViewPlugin.fromClass(
   },
 );
 
+/**
+ * #59: keyboard focus follows CM's selection into the grid. When the main
+ * selection lands in a rendered cell (Tab, Enter, undo, Cmd+Opt+T, arrow keys
+ * from the line above…) while the editor has focus, that cell is focused.
+ * Selection changes made by a cell itself (tableCellSync) are skipped. The
+ * cell holding the selection also gets `k-table-cell-active` (search hits).
+ */
+export const tableCellFocusPlugin = ViewPlugin.fromClass(
+  class {
+    activeTd: HTMLElement | null = null;
+    scheduled = false;
+    wantFocus = false;
+    destroyed = false;
+
+    constructor(readonly view: EditorView) {
+      this.schedule(view.hasFocus);
+    }
+
+    update(update: ViewUpdate): void {
+      if (!update.selectionSet && !update.docChanged && !update.focusChanged && !update.viewportChanged) {
+        return;
+      }
+      const fromCell = update.transactions.some((tr) => tr.annotation(tableCellSync));
+      const want =
+        !fromCell &&
+        (update.selectionSet || update.docChanged || (update.focusChanged && update.view.hasFocus));
+      this.schedule(want);
+    }
+
+    schedule(wantFocus: boolean): void {
+      this.wantFocus ||= wantFocus;
+      if (this.scheduled) return;
+      this.scheduled = true;
+      // Runs after the DOM update of the current transaction.
+      queueMicrotask(() => {
+        this.scheduled = false;
+        const want = this.wantFocus;
+        this.wantFocus = false;
+        if (!this.destroyed) this.apply(want);
+      });
+    }
+
+    apply(wantFocus: boolean): void {
+      const { view } = this;
+      const active = getActiveTableCell(view.state);
+      const el = active ? findCellElement(view, active.table.from, active.row, active.col) : null;
+      const td = el?.closest<HTMLElement>("th, td") ?? null;
+      if (td !== this.activeTd) {
+        this.activeTd?.classList.remove("k-table-cell-active");
+        td?.classList.add("k-table-cell-active");
+        this.activeTd = td;
+      }
+      if (!wantFocus) return;
+      const focused = view.dom.ownerDocument.activeElement;
+      if (el && focused === el) return;
+      const inCell =
+        focused instanceof HTMLElement &&
+        focused.classList.contains("k-table-cell-content") &&
+        view.contentDOM.contains(focused);
+      if (!view.hasFocus && !inCell) return;
+      if (el) focusFromSelection(view);
+      // The selection left the grid (setCursor, search, a command): typing
+      // must follow it, so the editor takes focus back from the cell.
+      else if (inCell) view.focus();
+    }
+
+    destroy(): void {
+      this.destroyed = true;
+      this.activeTd?.classList.remove("k-table-cell-active");
+    }
+  },
+);
+
 export const tablePreviewStateField = StateField.define<TableFieldState>({
   create(state) {
     const tables = scanTablesFromSyntaxTree(state);
@@ -1302,5 +2161,6 @@ export const tablePreviewStateField = StateField.define<TableFieldState>({
     EditorView.decorations.from(f, (s) => s.decorations),
     // Lives and dies with the table preview (source mode unloads both).
     tableAutoFormatPlugin,
+    tableCellFocusPlugin,
   ],
 });

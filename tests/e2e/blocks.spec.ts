@@ -178,19 +178,17 @@ test.describe("#7 tables", () => {
   });
 
   // BUG-5 (#32): extra cells typed into a row must never be dropped.
-  test("#7 spec: typing a literal `| 1 | 2 |` body row keeps its text [BUG-5]", async ({ page }) => {
+  test("#7 spec: typing a literal `| 1 | 2 |` into a cell keeps its text, pipes escaped [BUG-5, #59]", async ({ page }) => {
     await setDoc(page, "| a | b |\n| --- | --- |", "| a | b |\n| --- | --- |".length);
-    await page.keyboard.press("Enter");
+    await page.keyboard.press("Enter"); // delimiter row → new body row, first cell focused
     await page.keyboard.type("| 1 | 2 |");
     await page.keyboard.press("Enter");
     const doc = await getDoc(page);
-    expect(doc).toContain("1");
-    expect(doc).toContain("2");
-    expect(doc).toMatch(/\| 1 +\| 2 +\|/);
-    // The table widened instead of losing a column; every row has the same width.
+    expect(doc.split("\n")[2]).toMatch(/^\| \\\| 1 \\\| 2 \\\| +\| +\|$/);
+    // Still two columns: every row has the same number of unescaped pipes.
     const rows = doc.split("\n").filter((l) => l.startsWith("|"));
-    expect(new Set(rows.map((r) => r.split("|").length)).size).toBe(1);
-    expect(isAligned(doc)).toBe(true);
+    expect(new Set(rows.map((r) => r.split(/(?<!\\)\|/).length)).size).toBe(1);
+    await expect(page.getByTestId("table-widget").locator('td[data-row="1"][data-col="0"]')).toHaveText("| 1 | 2 |");
   });
 
   test("#7 spec: Tab with extra cells in a row widens the table instead of dropping them [BUG-5]", async ({ page }) => {
@@ -250,7 +248,9 @@ test.describe("#7 tables", () => {
     await setDoc(page, src, src.length);
     await page.getByTestId("table-widget").locator('td[data-row="2"][data-col="0"]').click();
     await nextFrames(page);
-    // Selection covers the cell text; typing replaces it.
+    // #59: the grid stays; Cmd+A selects the cell's text, typing replaces it.
+    await expect(page.getByTestId("table-widget")).toHaveCount(1);
+    await page.keyboard.press(`${MOD}+a`);
     await page.keyboard.type("芭樂");
     const doc = await getDoc(page);
     expect(bodyOrder(doc.replace("芭樂", "香蕉"))).toEqual(["蘋果", "香蕉", "櫻桃"]);
@@ -310,14 +310,13 @@ test.describe("#7 tables", () => {
     const src = `${aligned}\n\nend`;
     await setDoc(page, src, src.length);
     await page.getByTestId("table-widget").locator('td[data-row="1"][data-col="1"]').click();
+    await page.keyboard.press(`${MOD}+a`);
     const cdp = await page.context().newCDPSession(page);
     for (const step of ["y", "yi", "yib", "yiba"]) {
       await cdp.send("Input.imeSetComposition", { text: step, selectionStart: step.length, selectionEnd: step.length });
       await nextFrames(page);
-      // Only the composed text changes; nothing re-pads the table.
-      const doc = await getDoc(page);
-      expect(doc.split("\n")[2]).toBe(`| apple | ${step}`.padEnd(0) + doc.split("\n")[2].slice(`| apple | ${step}`.length));
-      expect(doc.split("\n").slice(0, 2).join("\n")).toBe("| name  | qty |\n| ----- | --- |");
+      // #59: nothing is written (or re-padded) while composing.
+      expect(await getDoc(page)).toBe(src);
     }
     await cdp.send("Input.insertText", { text: "一百" });
     await nextFrames(page, 4);
