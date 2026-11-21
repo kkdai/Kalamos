@@ -12,7 +12,7 @@
 }
 
 /* Room above the first and below the last line so both can be centred. */
-.k-typewriter-mode .cm-content {
-  padding-top: calc(50vh - 2em);
-  padding-bottom: calc(50vh - 2em);
+/* Matches the specificity of the base .cm-content rule in editor.css (#63). */
+.cm-editor.k-typewriter-mode .cm-scroller .cm-content {
+  padding-block: calc(50vh - 2em);
 }

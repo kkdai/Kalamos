@@ -70,11 +70,21 @@ body {
   overflow-y: auto;
 }
 
-.cm-content {
+/*
+ * Paper column (#63): capped at --k-max-width and centred in the scroller.
+ * CodeMirror's base theme injects `.ͼ1 .cm-content { margin: 0; padding: 4px 0 }`
+ * (specificity 0,2,0) after our stylesheet, so a bare `.cm-content` loses.
+ * `.cm-editor .cm-scroller .cm-content` (0,3,0) wins without !important.
+ * .cm-scroller is a flex row: flex-grow fills up to max-width, then the auto
+ * margins split the remaining space evenly. Inline padding keeps ≥ 24px of
+ * breathing room on narrow windows.
+ */
+.cm-editor .cm-scroller .cm-content {
   width: 100%;
   max-width: var(--k-max-width, 720px);
   margin: 0 auto;
-  padding: 56px 32px 120px;
+  padding-block: 56px 120px;
+  padding-inline: var(--k-content-padding-x, 32px);
   font-family: var(--k-font-body);
   font-size: var(--k-font-size, 17px);
   line-height: var(--k-line-height, 1.75);

@@ -34,10 +34,9 @@
 }
 
 .k-sidebar[data-visible="true"] ~ #editor-container {
-  padding-left: max(
-    0px,
-    calc(var(--k-sidebar-width, 260px) - (100vw - var(--k-max-width, 720px)) / 2)
-  );
+  /* The fixed sidebar takes its width out of the editor area; the paper
+     column then centres itself in what is left (#63). */
+  padding-left: var(--k-sidebar-width, 260px);
 }
 
 .k-sidebar-header {
