@@ -3,6 +3,7 @@ pub mod export;
 pub mod files;
 pub mod fsops;
 pub mod images;
+pub mod open_with;
 pub mod pandoc;
 pub mod recovery;
 pub mod settings;
@@ -15,6 +16,7 @@ pub mod watch;
 pub fn run() {
     tauri::Builder::default()
         .manage(watch::WatcherManager::new())
+        .manage(open_with::PendingOpenFiles::new())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
@@ -41,7 +43,15 @@ pub fn run() {
             pandoc::export_pandoc,
             pandoc::import_pandoc,
             upload::upload_images,
+            open_with::take_pending_open_files,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|_app, _event| {
+            // #67: Finder / Dock / `open -a Kalamos x.md` (macOS only event).
+            #[cfg(any(target_os = "macos", target_os = "ios"))]
+            if let tauri::RunEvent::Opened { urls } = &_event {
+                open_with::handle_opened_urls(_app, urls);
+            }
+        });
 }

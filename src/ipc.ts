@@ -308,6 +308,9 @@ export function resetMockState(): void {
   mockAssetFiles.clear();
   mockAllowedAssetDirs.clear();
   mockFileDropListeners.clear();
+  mockOpenFilesListeners.clear();
+  mockOpenFilesReady = false;
+  mockPendingOpenFiles = { paths: [], rejected: [] };
   mockPdfExports.length = 0;
   mockExportPdfHandler = null;
   mockUploadHandler = null;
@@ -1119,6 +1122,70 @@ export async function onFileDrop(listener: FileDropListener): Promise<() => void
 export async function triggerMockFileDrop(payload: FileDropPayload): Promise<void> {
   for (const listener of Array.from(mockFileDropListeners)) {
     await listener(payload);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Open with Kalamos (#67): files handed over by Finder / Dock / `open -a`
+// ---------------------------------------------------------------------------
+
+/** Mirrors `open_with::OpenFilesRequest`: paths are already filtered and canonical. */
+export interface OpenFilesRequest {
+  paths: string[];
+  /** Names of what the OS handed over but Kalamos refused (not a Markdown regular file). */
+  rejected: string[];
+}
+
+export const OPEN_FILES_EVENT = "kalamos://open-files";
+
+type OpenFilesListener = (req: OpenFilesRequest) => void | Promise<void>;
+const mockOpenFilesListeners = new Set<OpenFilesListener>();
+let mockOpenFilesReady = false;
+let mockPendingOpenFiles: OpenFilesRequest = { paths: [], rejected: [] };
+
+/** Listen for open requests that arrive after the frontend is ready. */
+export async function onOpenFilesRequested(
+  listener: OpenFilesListener,
+): Promise<() => void> {
+  if (isTauri()) {
+    return listen<OpenFilesRequest>(OPEN_FILES_EVENT, (event) => {
+      void listener(event.payload);
+    });
+  }
+  mockOpenFilesListeners.add(listener);
+  return () => {
+    mockOpenFilesListeners.delete(listener);
+  };
+}
+
+/** Mark the frontend ready and take what the OS queued before it was (cold launch). */
+export async function takePendingOpenFiles(): Promise<OpenFilesRequest> {
+  if (isTauri()) {
+    return invoke<OpenFilesRequest>("take_pending_open_files");
+  }
+  mockOpenFilesReady = true;
+  const taken = mockPendingOpenFiles;
+  mockPendingOpenFiles = { paths: [], rejected: [] };
+  return taken;
+}
+
+/**
+ * Mock stand-in for `RunEvent::Opened`: queued until `takePendingOpenFiles`
+ * runs (cold launch), delivered to listeners afterwards (app already running).
+ */
+export async function triggerMockOpenFiles(req: Partial<OpenFilesRequest>): Promise<void> {
+  const full: OpenFilesRequest = {
+    paths: [...(req.paths ?? [])],
+    rejected: [...(req.rejected ?? [])],
+  };
+  if (full.paths.length === 0 && full.rejected.length === 0) return;
+  if (!mockOpenFilesReady) {
+    mockPendingOpenFiles.paths.push(...full.paths);
+    mockPendingOpenFiles.rejected.push(...full.rejected);
+    return;
+  }
+  for (const listener of Array.from(mockOpenFilesListeners)) {
+    await listener(full);
   }
 }
 

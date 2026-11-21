@@ -134,6 +134,7 @@
      ```bash
      xattr -cr /Applications/Kalamos.app
      ```
+4. **Make Kalamos the default for Markdown**: in Finder, select any `.md` file → **Get Info** (⌘I) → **Open with: Kalamos** → **Change All…**. Double-clicking a `.md` file, dropping one on the Dock icon, or `open -a Kalamos file.md` then opens it in Kalamos.
 
 ---
 

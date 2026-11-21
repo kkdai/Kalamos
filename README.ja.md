@@ -134,6 +134,7 @@
      ```bash
      xattr -cr /Applications/Kalamos.app
      ```
+4. **.md の既定アプリにする**：Finder で任意の `.md` ファイルを選択 →「**情報を見る**」（⌘I）→「**このアプリケーションで開く**」で **Kalamos** を選び →「**すべてを変更…**」。以後、`.md` のダブルクリック、Dock アイコンへのドロップ、`open -a Kalamos ファイル.md` で Kalamos が開きます。
 
 ---
 
