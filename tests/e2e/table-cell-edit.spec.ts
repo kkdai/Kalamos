@@ -32,6 +32,7 @@ function rows(doc: string): string[][] {
 test("#59 insert 3×3 → type cells with Tab → source mode shows the correct markdown", async ({ page }) => {
   await setDoc(page, "", 0);
   await page.keyboard.press(`${MOD}+Alt+KeyT`);
+  await page.keyboard.press("Enter"); // #59 B: insert dialog, default 3 × 3
   await nextFrames(page);
   await expect(page.getByTestId("table-widget")).toHaveCount(1);
   expect(await activeCell(page)).toEqual({ row: 0, col: 0 });

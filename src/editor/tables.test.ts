@@ -327,7 +327,7 @@ describe("Tables (BL-01) — block widget, alignment, CJK width, Tab navigation,
     expect(view.state.doc.lineAt(view.state.selection.main.head).number).toBe(6);
   });
 
-  it("inserts a 3x3 default table via Cmd+Opt+T with cursor in the first header cell", async () => {
+  it("Cmd+Opt+T opens the insert dialog (#59); 插入 inserts a 3x3 table with the cursor in the first header cell", async () => {
     app = createKalamosApp(document);
     await app.init();
     const { view } = app.editor;
@@ -342,11 +342,19 @@ describe("Tables (BL-01) — block widget, alignment, CJK width, Tab navigation,
       }),
     );
 
+    const dialog = document.querySelector<HTMLElement>('[data-testid="table-insert-dialog"]');
+    expect(dialog).not.toBeNull();
+    dialog!.querySelector<HTMLButtonElement>('[data-testid="table-dialog-ok"]')!.click();
+    await Promise.resolve();
+    await Promise.resolve();
+
     const doc = app.editor.getContent();
     const lines = doc.split("\n");
     expect(lines).toHaveLength(4); // 1 header + 1 delimiter + 2 body rows (3 columns x 3 navigable rows)
-    const sel = view.state.selection.main;
-    expect(view.state.sliceDoc(sel.from, sel.to)).toBe("Header 1");
+    expect(lines[0].split("|")).toHaveLength(5);
+    const head = view.state.selection.main.head;
+    expect(head).toBe(2);
+    expect(document.querySelector('[data-testid="table-insert-dialog"]')).toBeNull();
   });
 
   it("reorders body rows via drag & drop in a single undoable transaction and stores column widths in memory only", async () => {

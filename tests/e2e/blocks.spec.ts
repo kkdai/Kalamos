@@ -142,26 +142,27 @@ test.describe("#7 tables", () => {
     await expect(page.getByTestId("table-widget").locator("tbody tr").first()).toContainText("香蕉");
   });
 
-  test("#7 spec: Cmd+Opt+T inserts a 3-column default table", async ({ page }) => {
+  test("#7 / #59 spec: Cmd+Opt+T opens the insert dialog; Enter inserts a 3 × 3 table", async ({ page }) => {
     await setDoc(page, "", 0);
     await page.keyboard.press(`${MOD}+Alt+KeyT`);
+    await expect(page.getByTestId("table-insert-dialog")).toBeVisible();
+    await page.keyboard.press("Enter");
+    await expect(page.getByTestId("table-insert-dialog")).toHaveCount(0);
     await nextFrames(page);
     const doc = await getDoc(page);
     const rows = doc.split("\n").filter((l) => l.startsWith("|"));
-    expect(rows[0]).toMatch(/^\|\s*Header 1\s*\|\s*Header 2\s*\|\s*Header 3\s*\|$/);
     expect(rows.length).toBe(4); // header + delimiter + 2 body rows (3 rows × 3 cols)
+    expect(rows[0].split("|").length).toBe(5);
     expect(isAligned(doc)).toBe(true);
-    // The first header cell is selected so typing replaces it.
+    // The cursor is in the first header cell.
     await page.keyboard.type("名稱");
     expect((await getDoc(page)).split("\n")[0]).toMatch(/^\|\s*名稱\s*\|/);
   });
 
-  test("#7 spec: typing `| a | b |` + delimiter row produces a table", async ({ page }) => {
+  test("#7 / #59 spec: typing `| a | b |` + Enter produces a table", async ({ page }) => {
     await setDoc(page, "", 0);
     await page.keyboard.type("| a | b |");
-    await page.keyboard.press("Enter");
-    await page.keyboard.type("| --- | --- |");
-    // Enter inside a table adds a formatted body row with the cursor in cell 1.
+    // #59: Enter turns the row into header + delimiter + one empty body row.
     await page.keyboard.press("Enter");
     await page.keyboard.type("1");
     await page.keyboard.press("Tab");

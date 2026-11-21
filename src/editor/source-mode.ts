@@ -6,6 +6,7 @@ import { diagramsExtension } from "./diagrams";
 import { imagePreviewExtension } from "./images";
 import { livePreviewExtension } from "./live-preview";
 import { mathExtension } from "./math";
+import { tableToolbarExtension } from "./table-toolbar";
 import { tablePreviewStateField } from "./tables";
 
 const richPreviewExtensions: Extension = [
@@ -13,6 +14,7 @@ const richPreviewExtensions: Extension = [
   codeBlocksExtension,
   mathExtension,
   tablePreviewStateField,
+  tableToolbarExtension,
   imagePreviewExtension,
   diagramsExtension,
   blocksExtension,
