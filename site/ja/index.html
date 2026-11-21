@@ -1,0 +1,474 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Kalamos — 書いた瞬間に、そのままの姿へ。| macOS 向け WYSIWYM Markdown エディタ</title>
+    <meta name="description" content="Kalamos は Tauri 2 で作られた macOS 向けの静かでオフラインなライブプレビュー Markdown エディタ。テーブル編集、MathJax 数式、Mermaid 図表、しおり付き PDF、Pandoc 連携、カスタム CSS テーマに対応。" />
+    <link rel="icon" type="image/svg+xml" href="../assets/kalamos-icon.svg" />
+    <link rel="alternate" hreflang="en" href="https://kkdai.github.io/Kalamos/" />
+    <link rel="alternate" hreflang="zh-Hant" href="https://kkdai.github.io/Kalamos/zh-TW/" />
+    <link rel="alternate" hreflang="ja" href="https://kkdai.github.io/Kalamos/ja/" />
+    <link rel="alternate" hreflang="ko" href="https://kkdai.github.io/Kalamos/ko/" />
+    <link rel="alternate" hreflang="x-default" href="https://kkdai.github.io/Kalamos/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="ja_JP" />
+    <meta property="og:title" content="Kalamos — 書いた瞬間に、そのままの姿へ。" />
+    <meta property="og:description" content="静かでオフラインな macOS 向けライブプレビュー Markdown エディタ。テーブル、MathJax、Mermaid、しおり付き PDF、カスタム CSS テーマを内蔵。" />
+    <meta property="og:image" content="https://kkdai.github.io/Kalamos/assets/screenshots/hero-live-preview-ja.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="stylesheet" href="../assets/style.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">本文へスキップ</a>
+
+    <header class="site-header">
+      <div class="container header-inner">
+        <a class="brand" href="./">
+          <img class="brand-icon" src="../assets/kalamos-icon.svg" alt="Kalamos 葦ペンアイコン" width="30" height="30" />
+          <span>Kalamos</span>
+        </a>
+        <div class="header-right">
+          <nav class="nav-links" aria-label="メインナビゲーション">
+            <a href="#features">特長</a>
+            <a href="#workflow">ワークフロー</a>
+            <a href="#shortcuts">ショートカット</a>
+            <a href="#faq">FAQ</a>
+            <a href="https://github.com/kkdai/Kalamos" rel="noopener">GitHub</a>
+          </nav>
+          <nav class="lang-switcher" aria-label="言語切り替え">
+            <a href="../" hreflang="en">EN</a>
+            <a href="../zh-TW/" hreflang="zh-Hant">繁中</a>
+            <span aria-current="page">日本語</span>
+            <a href="../ko/" hreflang="ko">한국어</a>
+          </nav>
+        </div>
+      </div>
+    </header>
+
+    <main id="main">
+      <!-- Hero -->
+      <section class="hero">
+        <div class="container">
+          <img class="hero-icon" src="../assets/kalamos-icon.svg" alt="Kalamos アプリアイコン" width="84" height="84" />
+          <h1 class="hero-title">Kalamos</h1>
+          <p class="hero-tagline">書いた瞬間に、そのままの姿へ。</p>
+          <p class="hero-lead">macOS 向けの静かな WYSIWYM ライブプレビュー Markdown エディタ。古代ギリシャ語の「葦ペン」に名を借り、標準的な GFM ファイルを打ったそばから紙面のように整えます。無料・オフライン・アカウント不要。</p>
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="https://github.com/kkdai/Kalamos/releases" rel="noopener">macOS 版をダウンロード</a>
+            <a class="btn btn-secondary" href="https://github.com/kkdai/Kalamos" rel="noopener">GitHub で見る</a>
+          </div>
+          <p class="hero-meta">macOS（.dmg）· Tauri 2 + CodeMirror 6 · オフライン＆標準 GFM</p>
+
+          <div class="hero-shot">
+            <div class="window-frame">
+              <div class="window-bar" aria-hidden="true">
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-title">writing-notes.md — Kalamos</span>
+              </div>
+              <img
+                src="../assets/screenshots/hero-live-preview-ja.png"
+                alt="Papyros ライトテーマで日本語の見出し、本文、引用、箇条書き、タスクリストを表示する Kalamos のライブプレビュー画面"
+                width="1920"
+                height="1400"
+                loading="lazy"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Quiet Pillars -->
+      <section class="pillars" id="features">
+        <div class="container">
+          <div class="pillars-grid">
+            <div class="pillar">
+              <h3>単一ペインのライブプレビュー</h3>
+              <p>左右分割プレビューは不要です。閉じ記号を打った瞬間に描画され、カーソルが離れると記号が静かに消えます。<kbd>Cmd+/</kbd> でいつでもソースモードに切り替えられます。</p>
+            </div>
+            <div class="pillar">
+              <h3>CJK と IME に心地よい設計</h3>
+              <p>全角句読点に隣接する太字・斜体も正しく解釈。IME 変換中は装飾の更新を一時停止するため、日本語や中国語の入力中に画面が揺れません。</p>
+            </div>
+            <div class="pillar">
+              <h3>ローカル完結・安心の自動保存</h3>
+              <p>独自記法を一切含まない標準 GFM 形式で保存。原子的保存、1 秒自動保存、クラッシュリカバリで大切な下書きを守ります。</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Showcase 1: Tables -->
+      <section class="showcase showcase--tinted">
+        <div class="container">
+          <div class="showcase-header">
+            <span class="eyebrow">テーブル編集</span>
+            <h2 class="section-title">パイプ記号を数えずに、表を整える</h2>
+            <p class="section-desc"><kbd>Cmd+Opt+T</kbd> のグリッド選択ダイアログか、<code>|a|b|</code>＋Enter ですぐに表を作成。セル内での直接編集、列幅ドラッグ、本文を隠さないフローティングツールバーで快適に構造を調整できます。</p>
+          </div>
+          <div class="showcase-media">
+            <div class="window-frame">
+              <div class="window-bar" aria-hidden="true">
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-title">tables.md — Kalamos</span>
+              </div>
+              <img
+                src="../assets/screenshots/table-editor.png"
+                alt="編集中のセルと表上部のフローティングツールバーを表示する Kalamos のテーブルエディタ"
+                width="1920"
+                height="1400"
+                loading="lazy"
+              />
+            </div>
+          </div>
+          <div class="showcase-notes">
+            <div class="showcase-note">
+              <strong>スムーズなセル移動</strong>
+              <span>Tab・Shift+Tab・Enter でセルを移動し、Cmd+Enter で表の外へ抜けられます。</span>
+            </div>
+            <div class="showcase-note">
+              <strong>全角幅を考慮した自動整形</strong>
+              <span>全角文字を幅 2 として計算し、Markdown ソース側の区切り線も美しく揃えます。</span>
+            </div>
+            <div class="showcase-note">
+              <strong>1 ステップで取り消し</strong>
+              <span>行や列の追加・削除・揃え変更も、Cmd+Z 一回でまるごと元に戻せます。</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Showcase 2: Math & Diagrams -->
+      <section class="showcase">
+        <div class="container">
+          <div class="showcase-header">
+            <span class="eyebrow">数式とダイアグラム</span>
+            <h2 class="section-title">数式もフローチャートも、オフラインで美しく</h2>
+            <p class="section-desc">内蔵の MathJax 3 でインライン <code>$...$</code> とディスプレイ <code>$$...$$</code> 数式（AMS・<code>mhchem</code> 化学式・<code>bbox</code> 対応）を描画。Mermaid、flowchart.js、シーケンス図もテーマ配色に馴染む SVG として表示します。</p>
+          </div>
+          <div class="showcase-media">
+            <div class="window-frame">
+              <div class="window-bar" aria-hidden="true">
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-title">math-and-diagrams.md — Kalamos</span>
+              </div>
+              <img
+                src="../assets/screenshots/math-diagrams.png"
+                alt="MathJax 3 によるインライン数式・化学式・積分記号と Mermaid フローチャートを描画する Kalamos"
+                width="1920"
+                height="1400"
+                loading="lazy"
+              />
+            </div>
+          </div>
+          <div class="showcase-notes">
+            <div class="showcase-note">
+              <strong>ビューポート遅延描画</strong>
+              <span>画面に映る数式だけを組版するため、10,000 行の長文でも軽快に動作します。</span>
+            </div>
+            <div class="showcase-note">
+              <strong>AMS 自動番号付け</strong>
+              <span>Cmd+Opt+N で文書全体のディスプレイ数式に連番を自動付与できます。</span>
+            </div>
+            <div class="showcase-note">
+              <strong>行番号付きエラー表示</strong>
+              <span>図表に構文エラーがあっても空白にせず、原因と該当行をその場で知らせます。</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Showcase 3: Code Blocks -->
+      <section class="showcase showcase--tinted">
+        <div class="container">
+          <div class="showcase-header">
+            <span class="eyebrow">コードブロック</span>
+            <h2 class="section-title">100 言語以上を穏やかな配色でハイライト</h2>
+            <p class="section-desc">紙面のトーンに溶け込む低彩度シンタックスハイライトと、リガチャ対応の JetBrains Mono を同梱。<kbd>Cmd+Opt+L</kbd> で行番号の表示も自在に切り替えられます。</p>
+          </div>
+          <div class="showcase-media">
+            <div class="window-frame">
+              <div class="window-bar" aria-hidden="true">
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-title">code-samples.md — Kalamos</span>
+              </div>
+              <img
+                src="../assets/screenshots/code-blocks.png"
+                alt="行番号とシンタックスハイライトを有効にした Rust と TypeScript のコードブロック"
+                width="1920"
+                height="1400"
+                loading="lazy"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Showcase 4: Workflow -->
+      <section class="showcase" id="workflow">
+        <div class="container">
+          <div class="showcase-header">
+            <span class="eyebrow">下書きから公開・提出まで</span>
+            <h2 class="section-title">画像、ファイル管理、多形式エクスポートを一か所に</h2>
+            <p class="section-desc">技術記事の執筆からドキュメント納品まで、外部ツールを行き来せずに完結できます。</p>
+          </div>
+
+          <div class="feature-grid">
+            <article class="feature-card">
+              <h3>画像プレビューとカスタムアップロード</h3>
+              <p>ドラッグ＆ドロップや貼り付けで画像を自動的に <code>assets/</code> へ保存し相対リンクを挿入。<code>&lt;img&gt;</code> のサイズ／<code>zoom</code> 指定、静的サイト向けルートフォルダ（<code>typora-root-url</code>・<kbd>Cmd+Opt+R</kbd>）、<code>settings.json</code> による安全な CLI アップローダ連携を備えています。</p>
+              <ul class="feature-tags">
+                <li>インライン表示</li>
+                <li>ドラッグ＆ペースト</li>
+                <li>画像ルート設定</li>
+                <li>CLI アップローダ</li>
+              </ul>
+            </article>
+
+            <article class="feature-card">
+              <h3>ネイティブ PDF と Pandoc 入出力</h3>
+              <p><kbd>Cmd+Shift+E</kbd> で見出し階層に対応した PDFKit しおり付き A4 PDF を出力（数式・図表も描画）。任意の Pandoc を導入すれば DOCX・ODT・LaTeX・MediaWiki・EPUB への書き出しや、既存文書の Markdown インポートも可能です。</p>
+              <ul class="feature-tags">
+                <li>PDF＋しおり</li>
+                <li>DOCX · ODT · EPUB</li>
+                <li>LaTeX · MediaWiki</li>
+                <li>サンドボックス取込</li>
+              </ul>
+            </article>
+
+            <article class="feature-card">
+              <h3>サイドバー・アウトライン・文字数統計</h3>
+              <p><kbd>Cmd+Shift+O</kbd> でローカルフォルダを開き、ファイルツリー・ファイル一覧・アウトラインを切り替え。iCloud Drive や Dropbox 内の外部変更も自動反映し、ステータスバーに選択範囲対応の単語数・読了時間を表示します。</p>
+              <ul class="feature-tags">
+                <li>ツリー＆一覧</li>
+                <li>アウトライン＆[TOC]</li>
+                <li>変更リアルタイム監視</li>
+                <li>選択範囲カウント</li>
+              </ul>
+            </article>
+
+            <article class="feature-card">
+              <h3>細部まで行き届いた執筆体験</h3>
+              <p>ホバー表示＆ジャンプ対応の脚注、YAML Front Matter、見出しブックマークコピー（<kbd>Cmd+Shift+C</kbd>）、オフライン GitHub 絵文字補完（<code>:smile</code>）、半角・全角括弧の自動ペア補完を標準搭載しています。</p>
+              <ul class="feature-tags">
+                <li>脚注ポップアップ</li>
+                <li>Front Matter</li>
+                <li>絵文字 :shortcode</li>
+                <li>括弧自動ペア</li>
+              </ul>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- Showcase 5: Themes -->
+      <section class="showcase showcase--tinted">
+        <div class="container">
+          <div class="showcase-header">
+            <span class="eyebrow">テーマとカスタム CSS</span>
+            <h2 class="section-title">昼はパピルス、夜は墨色</h2>
+            <p class="section-desc">温かみのある <strong>Papyros</strong>、目に優しい <strong>Melan</strong>、システム連動を <kbd>Cmd+Shift+T</kbd> で瞬時に切り替え。<code>themes/</code> フォルダに CSS を置けば配色や文字サイズ、両端揃え、見出し自動連番まで自在にカスタマイズできます。</p>
+          </div>
+          <div class="showcase-media">
+            <div class="window-frame window-frame--dark">
+              <div class="window-bar" aria-hidden="true">
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-title">melan-theme.md — Kalamos</span>
+              </div>
+              <img
+                src="../assets/screenshots/dark-theme-melan.png"
+                alt="Melan ダークテーマで見出し、引用、カスタム CSS テーマの例を表示する Kalamos"
+                width="1920"
+                height="1400"
+                loading="lazy"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Showcase 6: Writing Modes -->
+      <section class="showcase">
+        <div class="container">
+          <div class="showcase-header">
+            <span class="eyebrow">ライティングモード</span>
+            <h2 class="section-title">今書いている一段落だけに集中する</h2>
+            <p class="section-desc"><strong>Ataraxia フォーカスモード</strong>（<kbd>F8</kbd>）で現在の段落以外をやさしく淡くし、<strong>Stichos タイプライターモード</strong>（<kbd>F9</kbd>）で入力行を常に画面中央に保ちます。</p>
+          </div>
+          <div class="showcase-media">
+            <div class="window-frame">
+              <div class="window-bar" aria-hidden="true">
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-title">essay.md — Kalamos</span>
+              </div>
+              <img
+                src="../assets/screenshots/writing-modes.png"
+                alt="現在の段落だけを鮮明に残し前後の段落を淡く表示する Kalamos の Ataraxia フォーカスモード"
+                width="1920"
+                height="1400"
+                loading="lazy"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Shortcuts Summary -->
+      <section class="showcase showcase--tinted" id="shortcuts">
+        <div class="container container--narrow">
+          <div class="showcase-header">
+            <span class="eyebrow">キーボードファースト</span>
+            <h2 class="section-title">主要ショートカット一覧</h2>
+            <p class="section-desc">ホームポジションから手を離さず、主要な操作をすべて完結できます。</p>
+          </div>
+
+          <div class="shortcuts-grid">
+            <div class="shortcut-row">
+              <span class="shortcut-label">ソースモード切り替え</span>
+              <kbd>Cmd+/</kbd>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">サイドバー / フォルダを開く</span>
+              <span><kbd>Cmd+Shift+L</kbd> / <kbd>Cmd+Shift+O</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">太字 / 斜体 / インラインコード</span>
+              <span><kbd>Cmd+B</kbd> · <kbd>Cmd+I</kbd> · <kbd>Cmd+Shift+`</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">テーブル挿入ダイアログ</span>
+              <kbd>Cmd+Opt+T</kbd>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">番号 / 箇条書き / タスクリスト</span>
+              <span><kbd>Cmd+Shift+[</kbd> · <kbd>]</kbd> · <kbd>X</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">コード行番号 / 数式自動番号</span>
+              <span><kbd>Cmd+Opt+L</kbd> / <kbd>Cmd+Opt+N</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">Ataraxia フォーカス / Stichos タイプライター</span>
+              <span><kbd>F8</kbd> / <kbd>F9</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">テーマを順番に切り替え</span>
+              <kbd>Cmd+Shift+T</kbd>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">PDF エクスポート（しおり付き）</span>
+              <kbd>Cmd+Shift+E</kbd>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">Pandoc エクスポート / インポート</span>
+              <span><kbd>Cmd+Opt+E</kbd> / <kbd>Cmd+Opt+I</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">画像ルート / 画像アップロード</span>
+              <span><kbd>Cmd+Opt+R</kbd> / <kbd>Cmd+Opt+U</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">括弧 / Markdown 自動ペア切り替え</span>
+              <span><kbd>Cmd+Opt+P</kbd> / <kbd>Cmd+Opt+Shift+P</kbd></span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- FAQ -->
+      <section class="showcase" id="faq">
+        <div class="container container--narrow">
+          <div class="showcase-header">
+            <span class="eyebrow">FAQ</span>
+            <h2 class="section-title">よくある質問</h2>
+          </div>
+
+          <div class="faq-list">
+            <details class="faq-item" open>
+              <summary>なぜ「Kalamos」という名前なのですか？</summary>
+              <div class="faq-answer">
+                <p><strong>Kalamos</strong>（<em>κάλαμος</em>、発音：<em>KA-la-mos</em>）は、古代ギリシャでパピルスに書くための「葦ペン」を指す言葉です。アプリ内の機能名も同じ世界観で統一しています：<strong>Papyros</strong>（パピルス・ライトテーマ）、<strong>Melan</strong>（墨・ダークテーマ）、<strong>Ataraxia</strong>（静寂なフォーカスモード）、<strong>Stichos</strong>（一行に集中するタイプライターモード）。</p>
+              </div>
+            </details>
+
+            <details class="faq-item">
+              <summary>Pandoc のインストールは必須ですか？</summary>
+              <div class="faq-answer">
+                <p>いいえ、必須ではありません。日常の編集、ライブプレビュー、MathJax、Mermaid 図表、しおり付きネイティブ PDF 出力はすべて単体で動作します。</p>
+                <p>DOCX・ODT・LaTeX・MediaWiki・EPUB への書き出しや Markdown への取り込みを使う場合のみ Pandoc（<code>brew install pandoc</code>、インポートは 2.15 以上）をインストールしてください。</p>
+              </div>
+            </details>
+
+            <details class="faq-item">
+              <summary>本当に無料・オフラインで使えますか？</summary>
+              <div class="faq-answer">
+                <p>はい。アカウント登録、試用期限、ライセンス認証、テレメトリ送信は一切ありません。フォント・MathJax・Mermaid・絵文字データもローカルに同梱されており、文書は標準の <code>.md</code> ファイルとしてお手元に残ります。</p>
+              </div>
+            </details>
+
+            <details class="faq-item">
+              <summary>未署名の macOS アプリを開くには？</summary>
+              <div class="faq-answer">
+                <p>現在、配布ビルドは Apple 公証未取得です。<strong>Kalamos.app</strong> を <code>/Applications</code> に入れた後、Finder で右クリックして「<strong>開く</strong>」を選ぶ（または <strong>システム設定 → プライバシーとセキュリティ</strong> で許可する）か、ターミナルで次を実行してください：</p>
+                <div class="code-chip">
+                  <code>xattr -cr /Applications/Kalamos.app</code>
+                  <button type="button" class="copy-btn" data-copy="xattr -cr /Applications/Kalamos.app" data-copied-label="コピー済み">コピー</button>
+                </div>
+              </div>
+            </details>
+
+            <details class="faq-item">
+              <summary>テーマのカスタマイズや画像アップローダ連携はできますか？</summary>
+              <div class="faq-answer">
+                <p>はい。<code>:root[data-custom-theme]</code> を使った <code>.css</code> ファイルを <code>~/Library/Application Support/io.kalamos.app/themes/</code> に置くことで配色・書体・見出し自動番号を自由に調整できます。画像アップロードは <code>~/Library/Application Support/io.kalamos.app/settings.json</code> で <code>uploadCommand</code>（PicGo CLI など）を設定し、<kbd>Cmd+Opt+U</kbd> で実行します。</p>
+              </div>
+            </details>
+          </div>
+        </div>
+      </section>
+
+      <!-- Bottom Download CTA -->
+      <section class="cta-section">
+        <div class="container container--narrow">
+          <div class="cta-box">
+            <img src="../assets/kalamos-icon.svg" alt="Kalamos アイコン" width="64" height="64" loading="lazy" />
+            <h2>静かな紙面で、書き始めよう</h2>
+            <p>GitHub Releases から最新の macOS 版をダウンロードするか、ソースからビルドできます。</p>
+            <div class="hero-actions">
+              <a class="btn btn-primary" href="https://github.com/kkdai/Kalamos/releases" rel="noopener">macOS 版をダウンロード</a>
+              <a class="btn btn-secondary" href="https://github.com/kkdai/Kalamos" rel="noopener">ソースとドキュメント</a>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="container footer-inner">
+        <span>Kalamos · Write, and it appears.</span>
+        <div class="footer-links">
+          <a href="https://github.com/kkdai/Kalamos" rel="noopener">GitHub</a>
+          <a href="https://github.com/kkdai/Kalamos/releases" rel="noopener">Releases</a>
+          <a href="../" hreflang="en">English</a>
+          <a href="../zh-TW/" hreflang="zh-Hant">繁體中文</a>
+          <a href="./" aria-current="page">日本語</a>
+          <a href="../ko/" hreflang="ko">한국어</a>
+        </div>
+      </div>
+    </footer>
+
+    <script src="../assets/site.js" defer></script>
+  </body>
+</html>

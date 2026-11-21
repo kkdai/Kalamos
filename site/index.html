@@ -1,0 +1,578 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Kalamos — Write, and it appears. | WYSIWYM Markdown Editor for macOS</title>
+    <meta
+      name="description"
+      content="Kalamos is a calm, offline, live-preview Markdown editor for macOS built with Tauri 2. Visual tables, MathJax, Mermaid diagrams, PDF bookmarks, Pandoc, and custom CSS themes."
+    />
+    <link rel="icon" type="image/svg+xml" href="assets/kalamos-icon.svg" />
+    <link rel="alternate" hreflang="en" href="https://kkdai.github.io/Kalamos/" />
+    <link rel="alternate" hreflang="zh-Hant" href="https://kkdai.github.io/Kalamos/zh-TW/" />
+    <link rel="alternate" hreflang="ja" href="https://kkdai.github.io/Kalamos/ja/" />
+    <link rel="alternate" hreflang="ko" href="https://kkdai.github.io/Kalamos/ko/" />
+    <link rel="alternate" hreflang="x-default" href="https://kkdai.github.io/Kalamos/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:title" content="Kalamos — Write, and it appears." />
+    <meta
+      property="og:description"
+      content="A calm, offline, live-preview Markdown editor for macOS with visual tables, MathJax, Mermaid diagrams, PDF bookmarks, and custom CSS themes."
+    />
+    <meta property="og:image" content="https://kkdai.github.io/Kalamos/assets/screenshots/hero-live-preview.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="stylesheet" href="assets/style.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <header class="site-header">
+      <div class="container header-inner">
+        <a class="brand" href="./">
+          <img class="brand-icon" src="assets/kalamos-icon.svg" alt="Kalamos reed pen icon" width="30" height="30" />
+          <span>Kalamos</span>
+        </a>
+        <div class="header-right">
+          <nav class="nav-links" aria-label="Primary">
+            <a href="#features">Features</a>
+            <a href="#workflow">Workflow</a>
+            <a href="#shortcuts">Shortcuts</a>
+            <a href="#faq">FAQ</a>
+            <a href="https://github.com/kkdai/Kalamos" rel="noopener">GitHub</a>
+          </nav>
+          <nav class="lang-switcher" aria-label="Language">
+            <span aria-current="page">EN</span>
+            <a href="zh-TW/" hreflang="zh-Hant">繁中</a>
+            <a href="ja/" hreflang="ja">日本語</a>
+            <a href="ko/" hreflang="ko">한국어</a>
+          </nav>
+        </div>
+      </div>
+    </header>
+
+    <main id="main">
+      <!-- Hero -->
+      <section class="hero">
+        <div class="container">
+          <img class="hero-icon" src="assets/kalamos-icon.svg" alt="Kalamos application icon" width="84" height="84" />
+          <h1 class="hero-title">Kalamos</h1>
+          <p class="hero-tagline">Write, and it appears.</p>
+          <p class="hero-lead">
+            A distraction-free, live-preview Markdown editor for macOS. Named after the Ancient Greek reed pen,
+            Kalamos turns plain GFM files into crisp paper as you type — free, offline, and without accounts.
+          </p>
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="https://github.com/kkdai/Kalamos/releases" rel="noopener">
+              Download for macOS
+            </a>
+            <a class="btn btn-secondary" href="https://github.com/kkdai/Kalamos" rel="noopener">
+              View on GitHub
+            </a>
+          </div>
+          <p class="hero-meta">macOS (.dmg) · Built with Tauri 2 &amp; CodeMirror 6 · Offline &amp; Standard GFM</p>
+
+          <div class="hero-shot">
+            <div class="window-frame">
+              <div class="window-bar" aria-hidden="true">
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-title">writing-notes.md — Kalamos</span>
+              </div>
+              <img
+                src="assets/screenshots/hero-live-preview.png"
+                alt="Kalamos live preview editor showing headings, bilingual CJK and English text, blockquote, bullet list, and interactive task checkboxes in the Papyros light theme"
+                width="1920"
+                height="1400"
+                loading="lazy"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Quiet Pillars -->
+      <section class="pillars" id="features">
+        <div class="container">
+          <div class="pillars-grid">
+            <div class="pillar">
+              <h3>Single-Pane Live Preview</h3>
+              <p>
+                No split panes or preview buttons. Syntax markers render the instant you close them and fade out when
+                your cursor moves away. Press <kbd>Cmd+/</kbd> for raw Source Mode anytime.
+              </p>
+            </div>
+            <div class="pillar">
+              <h3>Native CJK &amp; IME Care</h3>
+              <p>
+                Bold and italic work cleanly beside full-width punctuation, and decorations pause during IME composition
+                so Chinese, Japanese, and Korean typing never jumps.
+              </p>
+            </div>
+            <div class="pillar">
+              <h3>Your Files, Always Local</h3>
+              <p>
+                Standard GitHub Flavored Markdown with zero proprietary markup. Atomic saves, 1-second autosave, and
+                crash recovery keep every draft safe offline.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Showcase 1: Tables -->
+      <section class="showcase showcase--tinted">
+        <div class="container">
+          <div class="showcase-header">
+            <span class="eyebrow">Visual Tables</span>
+            <h2 class="section-title">Edit tables without fighting pipes</h2>
+            <p class="section-desc">
+              Press <kbd>Cmd+Opt+T</kbd> to pick dimensions from a visual grid, or type <code>|a|b|</code> and hit
+              Enter. Edit cells in place, drag column borders, and reshape rows or alignment from a floating toolbar
+              that never covers your text.
+            </p>
+          </div>
+          <div class="showcase-media">
+            <div class="window-frame">
+              <div class="window-bar" aria-hidden="true">
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-title">tables.md — Kalamos</span>
+              </div>
+              <img
+                src="assets/screenshots/table-editor.png"
+                alt="Kalamos visual GFM table editor with an active cell and the floating table toolbar above the table"
+                width="1920"
+                height="1400"
+                loading="lazy"
+              />
+            </div>
+          </div>
+          <div class="showcase-notes">
+            <div class="showcase-note">
+              <strong>In-Place Navigation</strong>
+              <span>Move across cells with Tab, Shift+Tab, and Enter; exit cleanly with Cmd+Enter.</span>
+            </div>
+            <div class="showcase-note">
+              <strong>CJK-Aware Formatting</strong>
+              <span>Underlying Markdown pipes stay neatly aligned, counting full-width characters as width 2.</span>
+            </div>
+            <div class="showcase-note">
+              <strong>Single-Step Undo</strong>
+              <span>Adding, deleting, or aligning rows and columns always reverts in one Cmd+Z.</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Showcase 2: Math & Diagrams -->
+      <section class="showcase">
+        <div class="container">
+          <div class="showcase-header">
+            <span class="eyebrow">Math &amp; Diagrams</span>
+            <h2 class="section-title">Equations and flowcharts, rendered offline</h2>
+            <p class="section-desc">
+              Typeset inline <code>$...$</code> and display <code>$$...$$</code> formulas with bundled MathJax 3
+              (including AMS, <code>mhchem</code> chemistry, and <code>bbox</code>), alongside theme-matched Mermaid,
+              flowchart.js, and sequence diagrams.
+            </p>
+          </div>
+          <div class="showcase-media">
+            <div class="window-frame">
+              <div class="window-bar" aria-hidden="true">
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-title">math-and-diagrams.md — Kalamos</span>
+              </div>
+              <img
+                src="assets/screenshots/math-diagrams.png"
+                alt="Kalamos rendering inline math, chemistry notation, a display integral with MathJax 3, and a Mermaid flowchart"
+                width="1920"
+                height="1400"
+                loading="lazy"
+              />
+            </div>
+          </div>
+          <div class="showcase-notes">
+            <div class="showcase-note">
+              <strong>Viewport-Only Rendering</strong>
+              <span>Only visible formulas are typeset, keeping 10,000-line documents responsive.</span>
+            </div>
+            <div class="showcase-note">
+              <strong>AMS Auto-Numbering</strong>
+              <span>Toggle sequential equation numbering across the document with Cmd+Opt+N.</span>
+            </div>
+            <div class="showcase-note">
+              <strong>Instant Error Feedback</strong>
+              <span>Syntax mistakes in diagrams report exact line numbers instead of blank boxes.</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Showcase 3: Code Blocks -->
+      <section class="showcase showcase--tinted">
+        <div class="container">
+          <div class="showcase-header">
+            <span class="eyebrow">Code Blocks</span>
+            <h2 class="section-title">Calm syntax highlighting for 100+ languages</h2>
+            <p class="section-desc">
+              Write technical posts and specifications with low-saturation syntax colors matched to your paper theme,
+              bundled JetBrains Mono ligatures, and toggleable line numbers via <kbd>Cmd+Opt+L</kbd>.
+            </p>
+          </div>
+          <div class="showcase-media">
+            <div class="window-frame">
+              <div class="window-bar" aria-hidden="true">
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-title">code-samples.md — Kalamos</span>
+              </div>
+              <img
+                src="assets/screenshots/code-blocks.png"
+                alt="Kalamos fenced code blocks in Rust and TypeScript with syntax highlighting and line numbers enabled"
+                width="1920"
+                height="1400"
+                loading="lazy"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Showcase 4: Workflow (Images, Export, Sidebar, Recovery) -->
+      <section class="showcase" id="workflow">
+        <div class="container">
+          <div class="showcase-header">
+            <span class="eyebrow">From Draft to Delivery</span>
+            <h2 class="section-title">Images, files, and multi-format export built in</h2>
+            <p class="section-desc">
+              Everything you need to move a technical article from local folder to finished document — without leaving
+              the editor.
+            </p>
+          </div>
+
+          <div class="feature-grid">
+            <article class="feature-card">
+              <h3>Images &amp; Custom Upload</h3>
+              <p>
+                Drag-and-drop or paste images to save them into a local <code>assets/</code> folder automatically.
+                Resize with <code>&lt;img&gt;</code> zoom attributes, resolve static-site root folders
+                (<code>typora-root-url</code> or <kbd>Cmd+Opt+R</kbd>), and upload to your image host via any CLI
+                uploader configured in <code>settings.json</code>.
+              </p>
+              <ul class="feature-tags">
+                <li>Inline Preview</li>
+                <li>Drag &amp; Paste</li>
+                <li>Image Root Folder</li>
+                <li>CLI Uploader</li>
+              </ul>
+            </article>
+
+            <article class="feature-card">
+              <h3>Native PDF &amp; Pandoc Export</h3>
+              <p>
+                Export crisp A4 PDFs (<kbd>Cmd+Shift+E</kbd>) with nested PDFKit bookmarks matching your headings —
+                complete with rendered math and diagrams. With optional Pandoc installed, export to DOCX, ODT, LaTeX,
+                MediaWiki, and EPUB, or import existing documents back into clean Markdown.
+              </p>
+              <ul class="feature-tags">
+                <li>PDF + Bookmarks</li>
+                <li>DOCX · ODT · EPUB</li>
+                <li>LaTeX · MediaWiki</li>
+                <li>Sandboxed Import</li>
+              </ul>
+            </article>
+
+            <article class="feature-card">
+              <h3>Sidebar, Outline &amp; Live Stats</h3>
+              <p>
+                Open any local folder (<kbd>Cmd+Shift+O</kbd>) to browse via File Tree, File List, or live Outline
+                navigation — fully compatible with iCloud Drive and Dropbox folders. Track reader-visible CJK + Latin
+                word counts, reading time, and live selection stats in the status bar.
+              </p>
+              <ul class="feature-tags">
+                <li>File Tree &amp; List</li>
+                <li>Outline &amp; [TOC]</li>
+                <li>Live File Watch</li>
+                <li>Selection Word Count</li>
+              </ul>
+            </article>
+
+            <article class="feature-card">
+              <h3>Thoughtful Writing Details</h3>
+              <p>
+                Hover footnotes with click-to-jump, YAML Front Matter, heading bookmark links (<kbd>Cmd+Shift+C</kbd>),
+                offline GitHub emoji autocomplete (<code>:smile</code>), and smart auto-pairing for ASCII and CJK
+                full-width brackets and quotes.
+              </p>
+              <ul class="feature-tags">
+                <li>Footnotes</li>
+                <li>Front Matter</li>
+                <li>Emoji :shortcodes</li>
+                <li>Auto-Pairing</li>
+              </ul>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- Showcase 5: Themes -->
+      <section class="showcase showcase--tinted">
+        <div class="container">
+          <div class="showcase-header">
+            <span class="eyebrow">Themes &amp; Custom CSS</span>
+            <h2 class="section-title">Papyros by day, Melan by night</h2>
+            <p class="section-desc">
+              Switch between warm papyrus light, calm ink dark, or system auto-switching with <kbd>Cmd+Shift+T</kbd>.
+              Drop any CSS file into the <code>themes/</code> folder to tailor colors, font scale, justified text, or
+              automatic heading counters.
+            </p>
+          </div>
+          <div class="showcase-media">
+            <div class="window-frame window-frame--dark">
+              <div class="window-bar" aria-hidden="true">
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-title">melan-theme.md — Kalamos</span>
+              </div>
+              <img
+                src="assets/screenshots/dark-theme-melan.png"
+                alt="Kalamos in the Melan dark theme displaying warm ink background, headings, blockquote, and CSS custom theme snippet"
+                width="1920"
+                height="1400"
+                loading="lazy"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Showcase 6: Writing Modes -->
+      <section class="showcase">
+        <div class="container">
+          <div class="showcase-header">
+            <span class="eyebrow">Writing Modes</span>
+            <h2 class="section-title">Stay inside the paragraph you are writing</h2>
+            <p class="section-desc">
+              Toggle <strong>Ataraxia</strong> Focus Mode (<kbd>F8</kbd>) to softly dim every block outside your
+              current paragraph, and pair it with <strong>Stichos</strong> Typewriter Mode (<kbd>F9</kbd>) to keep the
+              active line centered vertically on screen.
+            </p>
+          </div>
+          <div class="showcase-media">
+            <div class="window-frame">
+              <div class="window-bar" aria-hidden="true">
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-title">essay.md — Kalamos</span>
+              </div>
+              <img
+                src="assets/screenshots/writing-modes.png"
+                alt="Kalamos Ataraxia focus mode highlighting the active paragraph while softly dimming surrounding paragraphs"
+                width="1920"
+                height="1400"
+                loading="lazy"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Shortcuts Summary -->
+      <section class="showcase showcase--tinted" id="shortcuts">
+        <div class="container container--narrow">
+          <div class="showcase-header">
+            <span class="eyebrow">Keyboard First</span>
+            <h2 class="section-title">Essential shortcuts at your fingertips</h2>
+            <p class="section-desc">
+              Every core action is reachable without leaving the keyboard.
+            </p>
+          </div>
+
+          <div class="shortcuts-grid">
+            <div class="shortcut-row">
+              <span class="shortcut-label">Toggle Source Mode</span>
+              <kbd>Cmd+/</kbd>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">Toggle Sidebar / Open Folder</span>
+              <span><kbd>Cmd+Shift+L</kbd> / <kbd>Cmd+Shift+O</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">Bold / Italic / Inline Code</span>
+              <span><kbd>Cmd+B</kbd> · <kbd>Cmd+I</kbd> · <kbd>Cmd+Shift+`</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">Insert Table Dialog</span>
+              <kbd>Cmd+Opt+T</kbd>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">Ordered / Bullet / Task List</span>
+              <span><kbd>Cmd+Shift+[</kbd> · <kbd>]</kbd> · <kbd>X</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">Code Line Numbers / Math Numbering</span>
+              <span><kbd>Cmd+Opt+L</kbd> / <kbd>Cmd+Opt+N</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">Ataraxia Focus / Stichos Typewriter</span>
+              <span><kbd>F8</kbd> / <kbd>F9</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">Cycle Built-in &amp; Custom Themes</span>
+              <kbd>Cmd+Shift+T</kbd>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">Export PDF (with Bookmarks)</span>
+              <kbd>Cmd+Shift+E</kbd>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">Pandoc Export / Import</span>
+              <span><kbd>Cmd+Opt+E</kbd> / <kbd>Cmd+Opt+I</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">Image Root Folder / Upload Images</span>
+              <span><kbd>Cmd+Opt+R</kbd> / <kbd>Cmd+Opt+U</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">Bracket / Markdown Auto-Pairing</span>
+              <span><kbd>Cmd+Opt+P</kbd> / <kbd>Cmd+Opt+Shift+P</kbd></span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- FAQ -->
+      <section class="showcase" id="faq">
+        <div class="container container--narrow">
+          <div class="showcase-header">
+            <span class="eyebrow">FAQ</span>
+            <h2 class="section-title">Frequently asked questions</h2>
+          </div>
+
+          <div class="faq-list">
+            <details class="faq-item" open>
+              <summary>Why is it called Kalamos?</summary>
+              <div class="faq-answer">
+                <p>
+                  <strong>Kalamos</strong> (<em>κάλαμος</em>, pronounced <em>KA-la-mos</em>) is the Ancient Greek word
+                  for the reed pen used to write on papyrus. The names inside the app continue this motif:
+                  <strong>Papyros</strong> (light paper theme), <strong>Melan</strong> (dark ink theme),
+                  <strong>Ataraxia</strong> (undisturbed focus mode), and <strong>Stichos</strong> (single-line
+                  typewriter mode).
+                </p>
+              </div>
+            </details>
+
+            <details class="faq-item">
+              <summary>Do I need to install Pandoc?</summary>
+              <div class="faq-answer">
+                <p>
+                  No — Pandoc is completely optional. Everyday editing, live preview, MathJax, Mermaid diagrams, and
+                  native PDF export with bookmarks all work out of the box with zero external dependencies.
+                </p>
+                <p>
+                  Install Pandoc (<code>brew install pandoc</code>) only if you want to export to DOCX, ODT, LaTeX,
+                  MediaWiki, or EPUB, or import those formats into Markdown (Pandoc 2.15+ is required for sandboxed
+                  import).
+                </p>
+              </div>
+            </details>
+
+            <details class="faq-item">
+              <summary>Is Kalamos free and offline?</summary>
+              <div class="faq-answer">
+                <p>
+                  Yes. Kalamos has no accounts, no trials, no license keys, and no telemetry. Fonts, MathJax, Mermaid,
+                  and GitHub emoji data are bundled locally so everything works offline, and your notes remain plain
+                  <code>.md</code> files on disk.
+                </p>
+              </div>
+            </details>
+
+            <details class="faq-item">
+              <summary>How do I open an unsigned macOS build?</summary>
+              <div class="faq-answer">
+                <p>
+                  Release builds are not Apple-notarized yet. After dragging <strong>Kalamos.app</strong> to
+                  <code>/Applications</code>, right-click the app in Finder and choose <strong>Open</strong> (or allow
+                  it under <strong>System Settings → Privacy &amp; Security</strong>). You can also clear the
+                  quarantine attribute in Terminal:
+                </p>
+                <div class="code-chip">
+                  <code>xattr -cr /Applications/Kalamos.app</code>
+                  <button
+                    type="button"
+                    class="copy-btn"
+                    data-copy="xattr -cr /Applications/Kalamos.app"
+                    data-copied-label="Copied"
+                  >
+                    Copy
+                  </button>
+                </div>
+              </div>
+            </details>
+
+            <details class="faq-item">
+              <summary>Can I customize themes or configure an image uploader?</summary>
+              <div class="faq-answer">
+                <p>
+                  Yes. Place any <code>.css</code> file using <code>:root[data-custom-theme]</code> inside
+                  <code>~/Library/Application Support/io.kalamos.app/themes/</code> to customize colors, typography, or
+                  heading numbering. For image hosting, configure <code>uploadCommand</code> (such as PicGo CLI) in
+                  <code>~/Library/Application Support/io.kalamos.app/settings.json</code> and press
+                  <kbd>Cmd+Opt+U</kbd>.
+                </p>
+              </div>
+            </details>
+          </div>
+        </div>
+      </section>
+
+      <!-- Bottom Download CTA -->
+      <section class="cta-section">
+        <div class="container container--narrow">
+          <div class="cta-box">
+            <img src="assets/kalamos-icon.svg" alt="Kalamos icon" width="64" height="64" loading="lazy" />
+            <h2>Start writing on quiet paper</h2>
+            <p>
+              Download the latest macOS release from GitHub or build Kalamos directly from source.
+            </p>
+            <div class="hero-actions">
+              <a class="btn btn-primary" href="https://github.com/kkdai/Kalamos/releases" rel="noopener">
+                Download for macOS
+              </a>
+              <a class="btn btn-secondary" href="https://github.com/kkdai/Kalamos" rel="noopener">
+                Source &amp; Documentation
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="container footer-inner">
+        <span>Kalamos · Write, and it appears.</span>
+        <div class="footer-links">
+          <a href="https://github.com/kkdai/Kalamos" rel="noopener">GitHub</a>
+          <a href="https://github.com/kkdai/Kalamos/releases" rel="noopener">Releases</a>
+          <a href="./" aria-current="page">English</a>
+          <a href="zh-TW/" hreflang="zh-Hant">繁體中文</a>
+          <a href="ja/" hreflang="ja">日本語</a>
+          <a href="ko/" hreflang="ko">한국어</a>
+        </div>
+      </div>
+    </footer>
+
+    <script src="assets/site.js" defer></script>
+  </body>
+</html>
