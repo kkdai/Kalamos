@@ -208,4 +208,4 @@ npm run bench
 
 ## 라이선스
 
-TBD
+[MIT 라이선스](LICENSE)로 배포됩니다.

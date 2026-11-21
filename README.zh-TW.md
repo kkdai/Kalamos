@@ -208,4 +208,4 @@ npm run bench
 
 ## 授權
 
-TBD
+以 [MIT 授權](LICENSE) 釋出。

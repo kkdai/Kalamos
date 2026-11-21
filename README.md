@@ -208,4 +208,4 @@ npm run bench
 
 ## License
 
-TBD
+Released under the [MIT License](LICENSE).
