@@ -1,0 +1,474 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Kalamos — 落筆即成文 | macOS 所見即所得 Markdown 編輯器</title>
+    <meta name="description" content="Kalamos 是一款安靜、離線的 macOS 即時預覽 Markdown 編輯器，基於 Tauri 2 打造。支援視覺化表格、MathJax 公式、Mermaid 圖表、PDF 書籤、Pandoc 匯入匯出與自訂 CSS 主題。" />
+    <link rel="icon" type="image/svg+xml" href="../assets/kalamos-icon.svg" />
+    <link rel="alternate" hreflang="en" href="https://kkdai.github.io/Kalamos/" />
+    <link rel="alternate" hreflang="zh-Hant" href="https://kkdai.github.io/Kalamos/zh-TW/" />
+    <link rel="alternate" hreflang="ja" href="https://kkdai.github.io/Kalamos/ja/" />
+    <link rel="alternate" hreflang="ko" href="https://kkdai.github.io/Kalamos/ko/" />
+    <link rel="alternate" hreflang="x-default" href="https://kkdai.github.io/Kalamos/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="zh_TW" />
+    <meta property="og:title" content="Kalamos — 落筆即成文" />
+    <meta property="og:description" content="安靜、離線的 macOS 所見即所得 Markdown 編輯器：視覺化表格、MathJax、Mermaid 圖表、PDF 書籤與自訂 CSS 主題。" />
+    <meta property="og:image" content="https://kkdai.github.io/Kalamos/assets/screenshots/hero-live-preview-zh-TW.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="stylesheet" href="../assets/style.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">跳至主要內容</a>
+
+    <header class="site-header">
+      <div class="container header-inner">
+        <a class="brand" href="./">
+          <img class="brand-icon" src="../assets/kalamos-icon.svg" alt="Kalamos 蘆葦筆圖示" width="30" height="30" />
+          <span>Kalamos</span>
+        </a>
+        <div class="header-right">
+          <nav class="nav-links" aria-label="主導覽">
+            <a href="#features">特色</a>
+            <a href="#workflow">工作流</a>
+            <a href="#shortcuts">快捷鍵</a>
+            <a href="#faq">常見問題</a>
+            <a href="https://github.com/kkdai/Kalamos" rel="noopener">GitHub</a>
+          </nav>
+          <nav class="lang-switcher" aria-label="切換語言">
+            <a href="../" hreflang="en">EN</a>
+            <span aria-current="page">繁中</span>
+            <a href="../ja/" hreflang="ja">日本語</a>
+            <a href="../ko/" hreflang="ko">한국어</a>
+          </nav>
+        </div>
+      </div>
+    </header>
+
+    <main id="main">
+      <!-- Hero -->
+      <section class="hero">
+        <div class="container">
+          <img class="hero-icon" src="../assets/kalamos-icon.svg" alt="Kalamos 應用程式圖示" width="84" height="84" />
+          <h1 class="hero-title">Kalamos</h1>
+          <p class="hero-tagline">落筆即成文</p>
+          <p class="hero-lead">專為 macOS 打造的所見即所得（WYSIWYM）Markdown 桌面編輯器。以古希臘「蘆葦筆」為名，讓純文字 GFM 文件在你書寫的瞬間化作清朗紙面——免費、離線、無須帳號。</p>
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="https://github.com/kkdai/Kalamos/releases" rel="noopener">下載 macOS 版本</a>
+            <a class="btn btn-secondary" href="https://github.com/kkdai/Kalamos" rel="noopener">前往 GitHub</a>
+          </div>
+          <p class="hero-meta">macOS（.dmg）· Tauri 2 + CodeMirror 6 · 完全離線、標準 GFM</p>
+
+          <div class="hero-shot">
+            <div class="window-frame">
+              <div class="window-bar" aria-hidden="true">
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-title">writing-notes.md — Kalamos</span>
+              </div>
+              <img
+                src="../assets/screenshots/hero-live-preview-zh-TW.png"
+                alt="Kalamos 在 Papyros 淺色紙面主題下呈現繁體中文標題、內文、引用、清單與任務核取方塊的即時預覽畫面"
+                width="1920"
+                height="1400"
+                loading="lazy"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Quiet Pillars -->
+      <section class="pillars" id="features">
+        <div class="container">
+          <div class="pillars-grid">
+            <div class="pillar">
+              <h3>單一視窗即時預覽</h3>
+              <p>告別雙欄對照與反覆切換。打完結尾符號即刻渲染，游標離開後自動隱去語法標記；隨時按 <kbd>Cmd+/</kbd> 切換原始碼檢視。</p>
+            </div>
+            <div class="pillar">
+              <h3>中英混排與輸入法友善</h3>
+              <p>全形標點旁的粗體與斜體自然生效，CJK 輸入法組字期間凍結裝飾更新，打字流暢不跳動。</p>
+            </div>
+            <div class="pillar">
+              <h3>純本機、零私有標記</h3>
+              <p>以標準 GitHub Flavored Markdown 存檔於本機資料夾。原子寫入、1 秒自動存檔與異常救回，讓每份草稿安然無恙。</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Showcase 1: Tables -->
+      <section class="showcase showcase--tinted">
+        <div class="container">
+          <div class="showcase-header">
+            <span class="eyebrow">視覺化表格</span>
+            <h2 class="section-title">編輯表格，不再手算管線符號</h2>
+            <p class="section-desc">按 <kbd>Cmd+Opt+T</kbd> 以格線選取器插入表格，或在行尾輸入 <code>|a|b|</code> 按 Enter 直接轉換。格內即時編輯、拖曳欄界調寬，表格上方專屬留白區的浮動工具列絕不遮擋內文。</p>
+          </div>
+          <div class="showcase-media">
+            <div class="window-frame">
+              <div class="window-bar" aria-hidden="true">
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-title">tables.md — Kalamos</span>
+              </div>
+              <img
+                src="../assets/screenshots/table-editor.png"
+                alt="Kalamos 視覺化 GFM 表格編輯器，顯示聚焦中的儲存格與表格上方的浮動操作工具列"
+                width="1920"
+                height="1400"
+                loading="lazy"
+              />
+            </div>
+          </div>
+          <div class="showcase-notes">
+            <div class="showcase-note">
+              <strong>鍵盤流暢穿梭</strong>
+              <span>Tab、Shift+Tab、Enter 在儲存格間自然移動，按 Cmd+Enter 即可跳出表格。</span>
+            </div>
+            <div class="showcase-note">
+              <strong>中文字寬自動對齊</strong>
+              <span>全形字以寬度 2 計算，回寫的 Markdown 原始碼管線依然整齊俐落。</span>
+            </div>
+            <div class="showcase-note">
+              <strong>單步復原安心修改</strong>
+              <span>增刪行列、切換對齊或移動欄位，全部都能一次 Cmd+Z 完整還原。</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Showcase 2: Math & Diagrams -->
+      <section class="showcase">
+        <div class="container">
+          <div class="showcase-header">
+            <span class="eyebrow">數學公式與圖表</span>
+            <h2 class="section-title">公式與流程圖，離線清晰渲染</h2>
+            <p class="section-desc">內建離線 MathJax 3 引擎渲染行內 <code>$...$</code> 與區塊 <code>$$...$$</code> 公式（支援 AMS、<code>mhchem</code> 化學式與 <code>bbox</code>），並直接把 Mermaid、flowchart.js 與序列圖繪製為與主題配色一致的 SVG。</p>
+          </div>
+          <div class="showcase-media">
+            <div class="window-frame">
+              <div class="window-bar" aria-hidden="true">
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-title">math-and-diagrams.md — Kalamos</span>
+              </div>
+              <img
+                src="../assets/screenshots/math-diagrams.png"
+                alt="Kalamos 離線渲染行內數學公式、化學式、MathJax 積分公式與 Mermaid 流程圖"
+                width="1920"
+                height="1400"
+                loading="lazy"
+              />
+            </div>
+          </div>
+          <div class="showcase-notes">
+            <div class="showcase-note">
+              <strong>視口增量渲染</strong>
+              <span>僅排版畫面上可見的公式，萬行長文依然順暢不卡頓。</span>
+            </div>
+            <div class="showcase-note">
+              <strong>AMS 自動編號</strong>
+              <span>按 Cmd+Opt+N 開啟全篇連續公式編號，無需手動維護序號。</span>
+            </div>
+            <div class="showcase-note">
+              <strong>即時錯誤行號</strong>
+              <span>圖表語法有誤時直接標出錯誤原因與行號，不再只留一片空白。</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Showcase 3: Code Blocks -->
+      <section class="showcase showcase--tinted">
+        <div class="container">
+          <div class="showcase-header">
+            <span class="eyebrow">程式碼區塊</span>
+            <h2 class="section-title">百種語言語法高亮，克制耐讀</h2>
+            <p class="section-desc">涵蓋 100 種以上程式語言，採用呼應紙墨色調的低飽和度高亮配色，搭配內建 JetBrains Mono 連字等寬字體，並可用 <kbd>Cmd+Opt+L</kbd> 隨時開關行號。</p>
+          </div>
+          <div class="showcase-media">
+            <div class="window-frame">
+              <div class="window-bar" aria-hidden="true">
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-title">code-samples.md — Kalamos</span>
+              </div>
+              <img
+                src="../assets/screenshots/code-blocks.png"
+                alt="Kalamos 顯示 Rust 與 TypeScript 程式碼區塊語法高亮與行號"
+                width="1920"
+                height="1400"
+                loading="lazy"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Showcase 4: Workflow -->
+      <section class="showcase" id="workflow">
+        <div class="container">
+          <div class="showcase-header">
+            <span class="eyebrow">從草稿到交付</span>
+            <h2 class="section-title">圖片、側欄與多格式匯出一氣呵成</h2>
+            <p class="section-desc">無論撰寫技術部落格、規格文件還是長篇文章，從資料夾整理到轉檔交付都在同一個視窗內完成。</p>
+          </div>
+
+          <div class="feature-grid">
+            <article class="feature-card">
+              <h3>圖片管理與圖床上傳</h3>
+              <p>拖放或貼上圖片時自動存入文件旁的 <code>assets/</code> 資料夾並插入相對路徑。支援 <code>&lt;img&gt;</code> 尺寸與 <code>zoom</code> 縮放、靜態部落格根目錄（<code>typora-root-url</code> 或 <kbd>Cmd+Opt+R</kbd>），以及透過 <code>settings.json</code> 串接自訂 CLI 圖床上傳程式。</p>
+              <ul class="feature-tags">
+                <li>行內預覽</li>
+                <li>拖放與貼上</li>
+                <li>圖片根目錄</li>
+                <li>自訂 CLI 上傳</li>
+              </ul>
+            </article>
+
+            <article class="feature-card">
+              <h3>原生 PDF 書籤與 Pandoc</h3>
+              <p>按 <kbd>Cmd+Shift+E</kbd> 透過 macOS 原生管線匯出 A4 PDF，自動建立對應標題層級的巢狀 PDF 書籤，數學公式與圖表完整呈現。選用安裝 Pandoc 後更可匯出 DOCX、ODT、LaTeX、MediaWiki、EPUB，或反向匯入為乾淨的 Markdown。</p>
+              <ul class="feature-tags">
+                <li>PDF + 巢狀書籤</li>
+                <li>DOCX · ODT · EPUB</li>
+                <li>LaTeX · MediaWiki</li>
+                <li>沙盒安全匯入</li>
+              </ul>
+            </article>
+
+            <article class="feature-card">
+              <h3>側欄、大綱與字數統計</h3>
+              <p>按 <kbd>Cmd+Shift+O</kbd> 開啟本機資料夾，在檔案樹、檔案列表與大綱面板間自由切換，並即時監聽外部變更（完美相容 iCloud Drive 與 Dropbox）。狀態列同步統計中英字數、閱讀時間與框選範圍字數。</p>
+              <ul class="feature-tags">
+                <li>檔案樹與列表</li>
+                <li>大綱與 [TOC]</li>
+                <li>外部變更監聽</li>
+                <li>選取字數統計</li>
+              </ul>
+            </article>
+
+            <article class="feature-card">
+              <h3>細膩的寫作細節</h3>
+              <p>支援懸停預覽與點擊跳轉的註腳、YAML Front Matter、標題書籤連結（<kbd>Cmd+Shift+C</kbd>）、離線 GitHub Emoji 自動完成（<code>:smile</code>），以及半形與中文全形括號引號自動配對。</p>
+              <ul class="feature-tags">
+                <li>懸停註腳</li>
+                <li>Front Matter</li>
+                <li>Emoji 補全</li>
+                <li>全形括號配對</li>
+              </ul>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- Showcase 5: Themes -->
+      <section class="showcase showcase--tinted">
+        <div class="container">
+          <div class="showcase-header">
+            <span class="eyebrow">主題與自訂 CSS</span>
+            <h2 class="section-title">晝用莎草紙，夜執溫潤墨</h2>
+            <p class="section-desc">內建 <strong>Papyros（莎草紙）</strong>、<strong>Melan（墨）</strong>與跟隨系統外觀，按 <kbd>Cmd+Shift+T</kbd> 一鍵輪切。將自訂 <code>.css</code> 放入 <code>themes/</code> 資料夾即可自由調整色票、字級、兩端對齊或標題自動編號。</p>
+          </div>
+          <div class="showcase-media">
+            <div class="window-frame window-frame--dark">
+              <div class="window-bar" aria-hidden="true">
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-title">melan-theme.md — Kalamos</span>
+              </div>
+              <img
+                src="../assets/screenshots/dark-theme-melan.png"
+                alt="Kalamos 在 Melan 深色墨色主題下的排版、引用區塊與自訂 CSS 主題程式碼範例"
+                width="1920"
+                height="1400"
+                loading="lazy"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Showcase 6: Writing Modes -->
+      <section class="showcase">
+        <div class="container">
+          <div class="showcase-header">
+            <span class="eyebrow">寫作模式</span>
+            <h2 class="section-title">把思緒留在此刻正在寫的那一段</h2>
+            <p class="section-desc">開啟 <strong>Ataraxia 專注模式</strong>（<kbd>F8</kbd>）淡化非當前段落，搭配 <strong>Stichos 打字機模式</strong>（<kbd>F9</kbd>）讓游標所在行始終穩居視窗中央，長文寫作一氣呵成。</p>
+          </div>
+          <div class="showcase-media">
+            <div class="window-frame">
+              <div class="window-bar" aria-hidden="true">
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-title">essay.md — Kalamos</span>
+              </div>
+              <img
+                src="../assets/screenshots/writing-modes.png"
+                alt="Kalamos Ataraxia 專注模式畫面，僅當前編輯段落清晰呈現，前後段落柔和淡化"
+                width="1920"
+                height="1400"
+                loading="lazy"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Shortcuts Summary -->
+      <section class="showcase showcase--tinted" id="shortcuts">
+        <div class="container container--narrow">
+          <div class="showcase-header">
+            <span class="eyebrow">鍵盤優先</span>
+            <h2 class="section-title">常用快捷鍵一覽</h2>
+            <p class="section-desc">雙手無須離開鍵盤，所有核心操作皆可一鍵完成。</p>
+          </div>
+
+          <div class="shortcuts-grid">
+            <div class="shortcut-row">
+              <span class="shortcut-label">切換原始碼模式</span>
+              <kbd>Cmd+/</kbd>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">切換側欄 / 開啟資料夾</span>
+              <span><kbd>Cmd+Shift+L</kbd> / <kbd>Cmd+Shift+O</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">粗體 / 斜體 / 行內程式碼</span>
+              <span><kbd>Cmd+B</kbd> · <kbd>Cmd+I</kbd> · <kbd>Cmd+Shift+`</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">開啟插入表格對話框</span>
+              <kbd>Cmd+Opt+T</kbd>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">編號 / 項目符號 / 任務清單</span>
+              <span><kbd>Cmd+Shift+[</kbd> · <kbd>]</kbd> · <kbd>X</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">程式碼行號 / 公式自動編號</span>
+              <span><kbd>Cmd+Opt+L</kbd> / <kbd>Cmd+Opt+N</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">Ataraxia 專注 / Stichos 打字機</span>
+              <span><kbd>F8</kbd> / <kbd>F9</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">循環切換內建與自訂主題</span>
+              <kbd>Cmd+Shift+T</kbd>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">匯出 PDF（含書籤）</span>
+              <kbd>Cmd+Shift+E</kbd>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">Pandoc 匯出 / 匯入</span>
+              <span><kbd>Cmd+Opt+E</kbd> / <kbd>Cmd+Opt+I</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">圖片根目錄 / 上傳圖片</span>
+              <span><kbd>Cmd+Opt+R</kbd> / <kbd>Cmd+Opt+U</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">括號 / Markdown 自動配對</span>
+              <span><kbd>Cmd+Opt+P</kbd> / <kbd>Cmd+Opt+Shift+P</kbd></span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- FAQ -->
+      <section class="showcase" id="faq">
+        <div class="container container--narrow">
+          <div class="showcase-header">
+            <span class="eyebrow">FAQ</span>
+            <h2 class="section-title">常見問題</h2>
+          </div>
+
+          <div class="faq-list">
+            <details class="faq-item" open>
+              <summary>為什麼叫 Kalamos？</summary>
+              <div class="faq-answer">
+                <p><strong>Kalamos</strong>（<em>κάλαμος</em>，讀音 <em>KA-la-mos</em>）是古希臘人在莎草紙上寫字使用的「蘆葦筆」。介面中的各項功能命名皆延續這份書寫意象：<strong>Papyros</strong>（莎草紙淺色主題）、<strong>Melan</strong>（墨色深色主題）、<strong>Ataraxia</strong>（平靜無擾的專注模式）與 <strong>Stichos</strong>（單行置中的打字機模式）。</p>
+              </div>
+            </details>
+
+            <details class="faq-item">
+              <summary>需要安裝 Pandoc 嗎？</summary>
+              <div class="faq-answer">
+                <p>不一定——Pandoc 完全是選用的。日常編輯、即時預覽、MathJax、Mermaid 圖表與含書籤的原生 PDF 匯出皆可開箱即用，不需額外安裝工具。</p>
+                <p>只有需要匯出 DOCX、ODT、LaTeX、MediaWiki、EPUB，或將這些格式匯入轉成 Markdown 時，才需要安裝 Pandoc（<code>brew install pandoc</code>；匯入功能需 2.15 以上以支援沙盒模式）。</p>
+              </div>
+            </details>
+
+            <details class="faq-item">
+              <summary>Kalamos 真的免費且完全離線嗎？</summary>
+              <div class="faq-answer">
+                <p>是的。Kalamos 沒有帳號、沒有試用期、沒有序號驗證，也沒有任何遙測回傳。字型、MathJax、Mermaid 與 Emoji 資料全數內建於本機，所有筆記都以標準純文字 <code>.md</code> 儲存在你的電腦裡。</p>
+              </div>
+            </details>
+
+            <details class="faq-item">
+              <summary>下載的未簽章 macOS 應用程式如何開啟？</summary>
+              <div class="faq-answer">
+                <p>目前發佈版尚未進行 Apple 公證。將 <strong>Kalamos.app</strong> 拖入 <code>/Applications</code> 後，請在 Finder 對應用程式按右鍵選擇「<strong>打開</strong>」（或至「<strong>系統設定 → 隱私權與安全性</strong>」點選「仍要打開」），也可以在終端機執行以下指令移除隔離屬性：</p>
+                <div class="code-chip">
+                  <code>xattr -cr /Applications/Kalamos.app</code>
+                  <button type="button" class="copy-btn" data-copy="xattr -cr /Applications/Kalamos.app" data-copied-label="已複製">複製</button>
+                </div>
+              </div>
+            </details>
+
+            <details class="faq-item">
+              <summary>可以自訂主題或串接圖床上傳嗎？</summary>
+              <div class="faq-answer">
+                <p>可以。將使用 <code>:root[data-custom-theme]</code> 選擇器的 <code>.css</code> 檔放入 <code>~/Library/Application Support/io.kalamos.app/themes/</code> 即可覆寫色票、字體或標題自動編號。若要串接圖床，在 <code>~/Library/Application Support/io.kalamos.app/settings.json</code> 設定 <code>uploadCommand</code>（例如 PicGo CLI）後按 <kbd>Cmd+Opt+U</kbd> 即可上傳。</p>
+              </div>
+            </details>
+          </div>
+        </div>
+      </section>
+
+      <!-- Bottom Download CTA -->
+      <section class="cta-section">
+        <div class="container container--narrow">
+          <div class="cta-box">
+            <img src="../assets/kalamos-icon.svg" alt="Kalamos 圖示" width="64" height="64" loading="lazy" />
+            <h2>在安靜的紙面上開始書寫</h2>
+            <p>前往 GitHub Releases 下載最新 macOS 安裝檔，或直接從原始碼自行建置。</p>
+            <div class="hero-actions">
+              <a class="btn btn-primary" href="https://github.com/kkdai/Kalamos/releases" rel="noopener">下載 macOS 版本</a>
+              <a class="btn btn-secondary" href="https://github.com/kkdai/Kalamos" rel="noopener">原始碼與文件</a>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="container footer-inner">
+        <span>Kalamos · 落筆即成文</span>
+        <div class="footer-links">
+          <a href="https://github.com/kkdai/Kalamos" rel="noopener">GitHub</a>
+          <a href="https://github.com/kkdai/Kalamos/releases" rel="noopener">Releases</a>
+          <a href="../" hreflang="en">English</a>
+          <a href="./" aria-current="page">繁體中文</a>
+          <a href="../ja/" hreflang="ja">日本語</a>
+          <a href="../ko/" hreflang="ko">한국어</a>
+        </div>
+      </div>
+    </footer>
+
+    <script src="../assets/site.js" defer></script>
+  </body>
+</html>

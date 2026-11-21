@@ -1,0 +1,474 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Kalamos — 쓰는 순간, 그대로 문서가 됩니다. | macOS용 WYSIWYM Markdown 에디터</title>
+    <meta name="description" content="Kalamos는 Tauri 2로 만든 macOS용 오프라인 실시간 미리보기 Markdown 에디터입니다. 시각적 표 편집, MathJax 수식, Mermaid 다이어그램, 북마크 포함 PDF, Pandoc 변환, 커스텀 CSS 테마를 지원합니다." />
+    <link rel="icon" type="image/svg+xml" href="../assets/kalamos-icon.svg" />
+    <link rel="alternate" hreflang="en" href="https://kkdai.github.io/Kalamos/" />
+    <link rel="alternate" hreflang="zh-Hant" href="https://kkdai.github.io/Kalamos/zh-TW/" />
+    <link rel="alternate" hreflang="ja" href="https://kkdai.github.io/Kalamos/ja/" />
+    <link rel="alternate" hreflang="ko" href="https://kkdai.github.io/Kalamos/ko/" />
+    <link rel="alternate" hreflang="x-default" href="https://kkdai.github.io/Kalamos/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="ko_KR" />
+    <meta property="og:title" content="Kalamos — 쓰는 순간, 그대로 문서가 됩니다." />
+    <meta property="og:description" content="조용하고 가벼운 macOS용 오프라인 실시간 미리보기 Markdown 에디터. 표 편집, MathJax, Mermaid, 북마크 PDF, 커스텀 CSS 테마를 지원합니다." />
+    <meta property="og:image" content="https://kkdai.github.io/Kalamos/assets/screenshots/hero-live-preview-ko.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="stylesheet" href="../assets/style.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">본문으로 건너뛰기</a>
+
+    <header class="site-header">
+      <div class="container header-inner">
+        <a class="brand" href="./">
+          <img class="brand-icon" src="../assets/kalamos-icon.svg" alt="Kalamos 갈대 펜 아이콘" width="30" height="30" />
+          <span>Kalamos</span>
+        </a>
+        <div class="header-right">
+          <nav class="nav-links" aria-label="주요 메뉴">
+            <a href="#features">특징</a>
+            <a href="#workflow">워크플로</a>
+            <a href="#shortcuts">단축키</a>
+            <a href="#faq">FAQ</a>
+            <a href="https://github.com/kkdai/Kalamos" rel="noopener">GitHub</a>
+          </nav>
+          <nav class="lang-switcher" aria-label="언어 전환">
+            <a href="../" hreflang="en">EN</a>
+            <a href="../zh-TW/" hreflang="zh-Hant">繁中</a>
+            <a href="../ja/" hreflang="ja">日本語</a>
+            <span aria-current="page">한국어</span>
+          </nav>
+        </div>
+      </div>
+    </header>
+
+    <main id="main">
+      <!-- Hero -->
+      <section class="hero">
+        <div class="container">
+          <img class="hero-icon" src="../assets/kalamos-icon.svg" alt="Kalamos 앱 아이콘" width="84" height="84" />
+          <h1 class="hero-title">Kalamos</h1>
+          <p class="hero-tagline">쓰는 순간, 그대로 문서가 됩니다.</p>
+          <p class="hero-lead">macOS를 위한 조용한 실시간 미리보기(WYSIWYM) Markdown 에디터. 고대 그리스어 '갈대 펜'에서 이름을 따온 Kalamos는 표준 GFM 문서를 입력하는 즉시 단정한 종이처럼 렌더링합니다 — 무료, 오프라인, 계정 불필요.</p>
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="https://github.com/kkdai/Kalamos/releases" rel="noopener">macOS용 다운로드</a>
+            <a class="btn btn-secondary" href="https://github.com/kkdai/Kalamos" rel="noopener">GitHub에서 보기</a>
+          </div>
+          <p class="hero-meta">macOS (.dmg) · Tauri 2 + CodeMirror 6 · 완전 오프라인 · 표준 GFM</p>
+
+          <div class="hero-shot">
+            <div class="window-frame">
+              <div class="window-bar" aria-hidden="true">
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-title">writing-notes.md — Kalamos</span>
+              </div>
+              <img
+                src="../assets/screenshots/hero-live-preview-ko.png"
+                alt="Papyros 라이트 테마에서 한국어 제목, 본문, 인용문, 글머리 목록, 할 일 체크박스를 실시간 미리보기로 보여주는 Kalamos 화면"
+                width="1920"
+                height="1400"
+                loading="lazy"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Quiet Pillars -->
+      <section class="pillars" id="features">
+        <div class="container">
+          <div class="pillars-grid">
+            <div class="pillar">
+              <h3>단일 창 실시간 미리보기</h3>
+              <p>좌우 분할 창을 번갈아 볼 필요가 없습니다. 닫는 기호를 입력하는 즉시 렌더링되고 커서가 벗어나면 문법 기호가 숨겨집니다. 언제든 <kbd>Cmd+/</kbd>로 소스 모드를 열 수 있습니다.</p>
+            </div>
+            <div class="pillar">
+              <h3>CJK 및 IME 친화적 입력</h3>
+              <p>전각 문장부호 옆의 강조 구문을 정확히 처리하며, 한글·한자 등 IME 조합 중에는 장식 갱신을 멈춰 입력 화면이 흔들리지 않습니다.</p>
+            </div>
+            <div class="pillar">
+              <h3>로컬 파일 중심의 안정성</h3>
+              <p>독자 문법 없는 표준 GitHub Flavored Markdown 그대로 저장합니다. 원자적 파일 쓰기, 1초 자동 저장, 충돌 복구로 초안을 안전하게 지킵니다.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Showcase 1: Tables -->
+      <section class="showcase showcase--tinted">
+        <div class="container">
+          <div class="showcase-header">
+            <span class="eyebrow">시각적 표 편집</span>
+            <h2 class="section-title">파이프 기호 걱정 없이 표를 다루세요</h2>
+            <p class="section-desc"><kbd>Cmd+Opt+T</kbd>로 그리드 선택 대화상자를 열거나 <code>|a|b|</code> 입력 후 Enter로 즉시 표를 만드세요. 셀 안에서 바로 편집하고, 경계선 드래그로 너비를 조절하며, 본문을 가리지 않는 플로팅 툴바로 구조를 다듬을 수 있습니다.</p>
+          </div>
+          <div class="showcase-media">
+            <div class="window-frame">
+              <div class="window-bar" aria-hidden="true">
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-title">tables.md — Kalamos</span>
+              </div>
+              <img
+                src="../assets/screenshots/table-editor.png"
+                alt="활성화된 셀과 표 위쪽 플로팅 툴바가 표시된 Kalamos 시각적 표 편집기"
+                width="1920"
+                height="1400"
+                loading="lazy"
+              />
+            </div>
+          </div>
+          <div class="showcase-notes">
+            <div class="showcase-note">
+              <strong>자연스러운 셀 이동</strong>
+              <span>Tab, Shift+Tab, Enter로 셀을 오가고 Cmd+Enter로 표 밖으로 깔끔하게 빠져나옵니다.</span>
+            </div>
+            <div class="showcase-note">
+              <strong>전각 폭 자동 정렬</strong>
+              <span>한글·한자 같은 2폭 문자를 계산해 원본 Markdown 소스의 파이프 줄도 반듯하게 맞춥니다.</span>
+            </div>
+            <div class="showcase-note">
+              <strong>원스텝 실행 취소</strong>
+              <span>행·열 추가와 삭제, 정렬 변경 모두 Cmd+Z 한 번으로 깨끗하게 되돌립니다.</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Showcase 2: Math & Diagrams -->
+      <section class="showcase">
+        <div class="container">
+          <div class="showcase-header">
+            <span class="eyebrow">수식과 다이어그램</span>
+            <h2 class="section-title">수식과 순서도, 오프라인에서 선명하게</h2>
+            <p class="section-desc">내장 MathJax 3로 인라인 <code>$...$</code> 및 블록 <code>$$...$$</code> 수식(AMS, <code>mhchem</code> 화학식, <code>bbox</code> 포함)을 렌더링하고, Mermaid·flowchart.js·시퀀스 다이어그램을 테마 색상에 맞춘 SVG로 그립니다.</p>
+          </div>
+          <div class="showcase-media">
+            <div class="window-frame">
+              <div class="window-bar" aria-hidden="true">
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-title">math-and-diagrams.md — Kalamos</span>
+              </div>
+              <img
+                src="../assets/screenshots/math-diagrams.png"
+                alt="MathJax 3 인라인 수식, 화학식, 적분 블록과 Mermaid 순서도를 렌더링하는 Kalamos 화면"
+                width="1920"
+                height="1400"
+                loading="lazy"
+              />
+            </div>
+          </div>
+          <div class="showcase-notes">
+            <div class="showcase-note">
+              <strong>뷰포트 지연 렌더링</strong>
+              <span>화면에 보이는 수식만 조판하므로 10,000줄 이상의 긴 문서에서도 매끄럽습니다.</span>
+            </div>
+            <div class="showcase-note">
+              <strong>AMS 자동 번호 매기기</strong>
+              <span>Cmd+Opt+N으로 문서 전체의 디스플레이 수식에 연속 번호를 자동으로 붙입니다.</span>
+            </div>
+            <div class="showcase-note">
+              <strong>정확한 오류 줄 안내</strong>
+              <span>다이어그램 문법 오류가 있어도 빈 화면 대신 원인과 줄 번호를 바로 알려줍니다.</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Showcase 3: Code Blocks -->
+      <section class="showcase showcase--tinted">
+        <div class="container">
+          <div class="showcase-header">
+            <span class="eyebrow">코드 블록</span>
+            <h2 class="section-title">100여 개 언어를 차분한 배색으로 강조</h2>
+            <p class="section-desc">종이 테마와 어우러지는 저채도 구문 강조와 합자(ligature) 지원 JetBrains Mono를 내장했습니다. <kbd>Cmd+Opt+L</kbd>로 줄 번호 표시를 언제든 켜고 끌 수 있습니다.</p>
+          </div>
+          <div class="showcase-media">
+            <div class="window-frame">
+              <div class="window-bar" aria-hidden="true">
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-title">code-samples.md — Kalamos</span>
+              </div>
+              <img
+                src="../assets/screenshots/code-blocks.png"
+                alt="줄 번호와 구문 강조가 적용된 Rust 및 TypeScript 코드 블록 화면"
+                width="1920"
+                height="1400"
+                loading="lazy"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Showcase 4: Workflow -->
+      <section class="showcase" id="workflow">
+        <div class="container">
+          <div class="showcase-header">
+            <span class="eyebrow">초안에서 배포까지</span>
+            <h2 class="section-title">이미지, 파일 관리, 다중 형식 변환을 한 곳에서</h2>
+            <p class="section-desc">기술 블로그 글쓰기부터 문서 전달까지 에디터를 벗어나지 않고 자연스럽게 이어집니다.</p>
+          </div>
+
+          <div class="feature-grid">
+            <article class="feature-card">
+              <h3>이미지와 커스텀 업로더</h3>
+              <p>이미지를 끌어다 놓거나 붙여넣으면 문서 옆 <code>assets/</code> 폴더에 저장하고 상대 경로를 삽입합니다. <code>&lt;img&gt;</code> 크기·<code>zoom</code> 조절, 정적 블로그 루트 폴더(<code>typora-root-url</code> 또는 <kbd>Cmd+Opt+R</kbd>), <code>settings.json</code> 기반 CLI 업로더 연동을 지원합니다.</p>
+              <ul class="feature-tags">
+                <li>인라인 미리보기</li>
+                <li>드래그 &amp; 붙여넣기</li>
+                <li>이미지 루트 폴더</li>
+                <li>CLI 업로더</li>
+              </ul>
+            </article>
+
+            <article class="feature-card">
+              <h3>네이티브 PDF와 Pandoc 변환</h3>
+              <p><kbd>Cmd+Shift+E</kbd>로 제목 계층에 맞춘 중첩 PDFKit 북마크가 포함된 A4 PDF를 내보냅니다(수식·다이어그램 포함). 선택적으로 Pandoc을 설치하면 DOCX·ODT·LaTeX·MediaWiki·EPUB 내보내기와 문서 가져오기도 바로 사용할 수 있습니다.</p>
+              <ul class="feature-tags">
+                <li>PDF + 북마크</li>
+                <li>DOCX · ODT · EPUB</li>
+                <li>LaTeX · MediaWiki</li>
+                <li>샌드박스 가져오기</li>
+              </ul>
+            </article>
+
+            <article class="feature-card">
+              <h3>사이드바, 개요, 실시간 통계</h3>
+              <p><kbd>Cmd+Shift+O</kbd>로 로컬 폴더를 열어 파일 트리·파일 목록·개요 패널을 오가며 탐색하세요. iCloud Drive와 Dropbox 폴더의 외부 변경을 실시간 반영하며, 상태 표시줄에서 선택 영역 포함 단어 수와 읽기 시간을 확인합니다.</p>
+              <ul class="feature-tags">
+                <li>파일 트리 &amp; 목록</li>
+                <li>개요 &amp; [TOC]</li>
+                <li>실시간 폴더 감시</li>
+                <li>선택 영역 통계</li>
+              </ul>
+            </article>
+
+            <article class="feature-card">
+              <h3>글쓰기를 돕는 세심한 기능</h3>
+              <p>마우스 오버 미리보기와 클릭 이동을 지원하는 각주, YAML Front Matter, 제목 북마크 복사(<kbd>Cmd+Shift+C</kbd>), 오프라인 GitHub 이모지 자동 완성(<code>:smile</code>), 영문·전각 괄호 자동 짝 맞추기를 기본 제공합니다.</p>
+              <ul class="feature-tags">
+                <li>각주 미리보기</li>
+                <li>Front Matter</li>
+                <li>이모지 :shortcode</li>
+                <li>괄호 자동 짝</li>
+              </ul>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- Showcase 5: Themes -->
+      <section class="showcase showcase--tinted">
+        <div class="container">
+          <div class="showcase-header">
+            <span class="eyebrow">테마와 커스텀 CSS</span>
+            <h2 class="section-title">낮에는 파피루스, 밤에는 먹빛</h2>
+            <p class="section-desc">따뜻한 <strong>Papyros</strong>, 눈이 편안한 <strong>Melan</strong>, 시스템 자동 전환을 <kbd>Cmd+Shift+T</kbd>로 즉시 전환하세요. <code>themes/</code> 폴더에 CSS 파일을 넣으면 색상, 글꼴 크기, 양쪽 정렬, 자동 제목 번호까지 자유롭게 꾸밀 수 있습니다.</p>
+          </div>
+          <div class="showcase-media">
+            <div class="window-frame window-frame--dark">
+              <div class="window-bar" aria-hidden="true">
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-title">melan-theme.md — Kalamos</span>
+              </div>
+              <img
+                src="../assets/screenshots/dark-theme-melan.png"
+                alt="Melan 다크 테마에서 제목, 인용문, 커스텀 CSS 테마 예시를 표시하는 Kalamos 화면"
+                width="1920"
+                height="1400"
+                loading="lazy"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Showcase 6: Writing Modes -->
+      <section class="showcase">
+        <div class="container">
+          <div class="showcase-header">
+            <span class="eyebrow">글쓰기 모드</span>
+            <h2 class="section-title">지금 쓰고 있는 문단에만 온전히 머무세요</h2>
+            <p class="section-desc"><strong>Ataraxia 집중 모드</strong>(<kbd>F8</kbd>)로 현재 문단 외의 모든 블록을 부드럽게 흐리고, <strong>Stichos 타자기 모드</strong>(<kbd>F9</kbd>)로 입력 줄을 화면 세로 중앙에 유지하세요.</p>
+          </div>
+          <div class="showcase-media">
+            <div class="window-frame">
+              <div class="window-bar" aria-hidden="true">
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-title">essay.md — Kalamos</span>
+              </div>
+              <img
+                src="../assets/screenshots/writing-modes.png"
+                alt="현재 작성 중인 문단만 또렷하게 보여주고 주변 문단을 부드럽게 흐리는 Kalamos Ataraxia 집중 모드"
+                width="1920"
+                height="1400"
+                loading="lazy"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Shortcuts Summary -->
+      <section class="showcase showcase--tinted" id="shortcuts">
+        <div class="container container--narrow">
+          <div class="showcase-header">
+            <span class="eyebrow">키보드 우선</span>
+            <h2 class="section-title">핵심 단축키 요약</h2>
+            <p class="section-desc">키보드에서 손을 떼지 않고 모든 주요 기능을 실행할 수 있습니다.</p>
+          </div>
+
+          <div class="shortcuts-grid">
+            <div class="shortcut-row">
+              <span class="shortcut-label">소스 모드 전환</span>
+              <kbd>Cmd+/</kbd>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">사이드바 / 폴더 열기</span>
+              <span><kbd>Cmd+Shift+L</kbd> / <kbd>Cmd+Shift+O</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">굵게 / 기울임 / 인라인 코드</span>
+              <span><kbd>Cmd+B</kbd> · <kbd>Cmd+I</kbd> · <kbd>Cmd+Shift+`</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">표 삽입 대화상자</span>
+              <kbd>Cmd+Opt+T</kbd>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">번호 / 글머리 / 할 일 목록</span>
+              <span><kbd>Cmd+Shift+[</kbd> · <kbd>]</kbd> · <kbd>X</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">코드 줄 번호 / 수식 자동 번호</span>
+              <span><kbd>Cmd+Opt+L</kbd> / <kbd>Cmd+Opt+N</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">Ataraxia 집중 / Stichos 타자기</span>
+              <span><kbd>F8</kbd> / <kbd>F9</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">내장 및 커스텀 테마 순환</span>
+              <kbd>Cmd+Shift+T</kbd>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">PDF 내보내기(북마크 포함)</span>
+              <kbd>Cmd+Shift+E</kbd>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">Pandoc 내보내기 / 가져오기</span>
+              <span><kbd>Cmd+Opt+E</kbd> / <kbd>Cmd+Opt+I</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">이미지 루트 / 이미지 업로드</span>
+              <span><kbd>Cmd+Opt+R</kbd> / <kbd>Cmd+Opt+U</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">괄호 / Markdown 자동 짝 전환</span>
+              <span><kbd>Cmd+Opt+P</kbd> / <kbd>Cmd+Opt+Shift+P</kbd></span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- FAQ -->
+      <section class="showcase" id="faq">
+        <div class="container container--narrow">
+          <div class="showcase-header">
+            <span class="eyebrow">FAQ</span>
+            <h2 class="section-title">자주 묻는 질문</h2>
+          </div>
+
+          <div class="faq-list">
+            <details class="faq-item" open>
+              <summary>왜 이름이 Kalamos인가요?</summary>
+              <div class="faq-answer">
+                <p><strong>Kalamos</strong>(<em>κάλαμος</em>, 발음: <em>KA-la-mos</em>)는 고대 그리스인들이 파피루스 위에 글을 쓸 때 사용하던 '갈대 펜'을 뜻합니다. 앱 안의 주요 이름들도 이 모티프를 따릅니다: <strong>Papyros</strong>(파피루스 라이트 테마), <strong>Melan</strong>(먹색 다크 테마), <strong>Ataraxia</strong>(흔들림 없는 집중 모드), <strong>Stichos</strong>(한 줄에 집중하는 타자기 모드).</p>
+              </div>
+            </details>
+
+            <details class="faq-item">
+              <summary>Pandoc을 꼭 설치해야 하나요?</summary>
+              <div class="faq-answer">
+                <p>아니요, 선택 사항입니다. 일상적인 편집, 실시간 미리보기, MathJax, Mermaid 다이어그램, 북마크 포함 네이티브 PDF 내보내기는 모두 추가 설치 없이 바로 작동합니다.</p>
+                <p>DOCX, ODT, LaTeX, MediaWiki, EPUB 내보내기나 해당 형식을 Markdown으로 가져올 때만 Pandoc(<code>brew install pandoc</code>, 가져오기는 2.15 이상)을 설치하면 됩니다.</p>
+              </div>
+            </details>
+
+            <details class="faq-item">
+              <summary>정말 무료이고 오프라인으로 동작하나요?</summary>
+              <div class="faq-answer">
+                <p>네. 계정 가입, 평가판 제한, 라이선스 키, 텔레메트리가 전혀 없습니다. 서체, MathJax, Mermaid, 이모지 데이터가 모두 앱 안에 포함되어 오프라인에서도 완벽히 작동하며 문서는 표준 <code>.md</code> 파일로 로컬에 보관됩니다.</p>
+              </div>
+            </details>
+
+            <details class="faq-item">
+              <summary>서명되지 않은 macOS 빌드는 어떻게 여나요?</summary>
+              <div class="faq-answer">
+                <p>현재 릴리스 빌드는 Apple 공증이 적용되어 있지 않습니다. <strong>Kalamos.app</strong>을 <code>/Applications</code>에 옮긴 뒤 Finder에서 우클릭 → <strong>열기</strong>를 선택(또는 <strong>시스템 설정 → 개인정보 보호 및 보안</strong>에서 허용)하거나, 터미널에서 아래 명령으로 격리 속성을 해제할 수 있습니다:</p>
+                <div class="code-chip">
+                  <code>xattr -cr /Applications/Kalamos.app</code>
+                  <button type="button" class="copy-btn" data-copy="xattr -cr /Applications/Kalamos.app" data-copied-label="복사됨">복사</button>
+                </div>
+              </div>
+            </details>
+
+            <details class="faq-item">
+              <summary>테마를 직접 꾸미거나 이미지 업로더를 연결할 수 있나요?</summary>
+              <div class="faq-answer">
+                <p>네. <code>:root[data-custom-theme]</code> 선택자를 사용한 <code>.css</code> 파일을 <code>~/Library/Application Support/io.kalamos.app/themes/</code>에 넣으면 색상, 글꼴, 자동 제목 번호를 자유롭게 바꿀 수 있습니다. 이미지 호스팅은 <code>~/Library/Application Support/io.kalamos.app/settings.json</code>에 <code>uploadCommand</code>(예: PicGo CLI)를 설정한 뒤 <kbd>Cmd+Opt+U</kbd>로 실행합니다.</p>
+              </div>
+            </details>
+          </div>
+        </div>
+      </section>
+
+      <!-- Bottom Download CTA -->
+      <section class="cta-section">
+        <div class="container container--narrow">
+          <div class="cta-box">
+            <img src="../assets/kalamos-icon.svg" alt="Kalamos 아이콘" width="64" height="64" loading="lazy" />
+            <h2>조용한 종이 위에서 글을 시작하세요</h2>
+            <p>GitHub Releases에서 최신 macOS 버전을 내려받거나 소스에서 직접 빌드해 보세요.</p>
+            <div class="hero-actions">
+              <a class="btn btn-primary" href="https://github.com/kkdai/Kalamos/releases" rel="noopener">macOS용 다운로드</a>
+              <a class="btn btn-secondary" href="https://github.com/kkdai/Kalamos" rel="noopener">소스 및 문서</a>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="container footer-inner">
+        <span>Kalamos · Write, and it appears.</span>
+        <div class="footer-links">
+          <a href="https://github.com/kkdai/Kalamos" rel="noopener">GitHub</a>
+          <a href="https://github.com/kkdai/Kalamos/releases" rel="noopener">Releases</a>
+          <a href="../" hreflang="en">English</a>
+          <a href="../zh-TW/" hreflang="zh-Hant">繁體中文</a>
+          <a href="../ja/" hreflang="ja">日本語</a>
+          <a href="./" aria-current="page">한국어</a>
+        </div>
+      </div>
+    </footer>
+
+    <script src="../assets/site.js" defer></script>
+  </body>
+</html>
