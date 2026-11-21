@@ -11,12 +11,10 @@ import {
   toggleOrderedList,
   toggleTaskList,
 } from "./lists";
-import {
-  handleTableEnter,
-  handleTableShiftTab,
-  handleTableTab,
-  insertDefaultTable,
-} from "./tables";
+import { openInsertTableDialog } from "./table-insert-dialog";
+import { convertPipeRowToTable } from "./table-ops";
+import { tableKeymap } from "./table-toolbar";
+import { handleTableEnter, handleTableShiftTab, handleTableTab } from "./tables";
 
 export interface FileCommandHandlers {
   onOpenFile: () => void | Promise<void>;
@@ -197,7 +195,8 @@ export function createFileKeymap(handlers: FileCommandHandlers): KeyBinding[] {
   return [
     {
       key: "Enter",
-      run: (view) => handleTableEnter(view) || handleListEnter(view),
+      run: (view) =>
+        handleTableEnter(view) || convertPipeRowToTable(view) || handleListEnter(view),
     },
     {
       key: "Backspace",
@@ -214,8 +213,13 @@ export function createFileKeymap(handlers: FileCommandHandlers): KeyBinding[] {
     {
       key: "Mod-Alt-t",
       preventDefault: true,
-      run: (view) => insertDefaultTable(view),
+      run: (view) => {
+        void openInsertTableDialog(view);
+        return true;
+      },
     },
+    // #59 B: table structure shortcuts (only act inside a table).
+    ...tableKeymap,
     {
       key: "Mod-o",
       preventDefault: true,
@@ -391,7 +395,7 @@ export function bindWindowShortcuts(
       const view = getView?.();
       if (view) {
         event.preventDefault();
-        insertDefaultTable(view);
+        void openInsertTableDialog(view);
       }
       return;
     }
