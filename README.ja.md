@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>Write, and it appears. ／ 書いた瞬間に、そのままの姿へ。</strong><br />
-  Tauri 2 と CodeMirror 6 で構築した macOS 向け Typora 風 WYSIWYM ライブプレビュー Markdown エディタ。<br />
+  Tauri 2 と CodeMirror 6 で構築した macOS・Windows 向け Typora 風 WYSIWYM ライブプレビュー Markdown エディタ。<br />
   無料・完全オフライン・アカウント不要・テレメトリなし。
 </p>
 
@@ -64,7 +64,7 @@
 - **カスタム CLI アップローダ**（`IM-05`）：`Cmd+Opt+U`（または `uploadOnInsert` 設定）で PicGo CLI などの外部コマンドを呼び出し、ローカル画像をアップロードして URL へ自動置換します。安全のためアップロードコマンドは `settings.json` からのみ設定可能です。詳細は [docs/image-upload.md](docs/image-upload.md) を参照してください。
 
 ### エクスポートとインポート
-- **ネイティブ PDF エクスポート**（`EX-01`、`Cmd+Shift+E`）：JavaScript 無効の非表示 `WKWebView` と `NSPrintOperation` で A4 ページ組版し、`PDFKit` で見出し階層に対応したネスト済み PDF しおり（アウトライン）を自動付与します。数式やダイアグラムも描画されます。
+- **ネイティブ PDF エクスポート**（`EX-01`、`Cmd+Shift+E`）：見出し階層に対応したネスト済み PDF しおり（アウトライン）付きの A4 PDF を生成し、数式やダイアグラムも描画します（macOS では `WKWebView`・`NSPrintOperation`・`PDFKit`、Windows ではヘッドレス Microsoft Edge または Google Chrome を使用）。
 - **Pandoc エクスポート**（`EX-02`、`Cmd+Opt+E`）：**DOCX**、**ODT**（OpenOffice / LibreOffice）、**LaTeX**、**MediaWiki**、**EPUB** への書き出しに対応（別途 Pandoc が必要）。`[TOC]` やローカル画像パス、`<img>` サイズ指定も自動変換します。
 - **Pandoc インポート**（`EX-03`、`Cmd+Opt+I`）：**DOCX**、**ODT**、**EPUB**、**LaTeX**、**HTML**、**MediaWiki** を `$...$` / `$$...$$` 数式や抽出メディア付きのクリーンな GFM Markdown として取り込めます（`--sandbox` のため Pandoc 2.15 以上が必要）。
 
@@ -74,7 +74,7 @@
 
 ### テーマシステム
 - **内蔵テーマ**（`TH-01`）：**Papyros**（温かみのある紙色ライト）、**Melan**（墨色ダーク）、およびシステム連動（`prefers-color-scheme`）を用意。オープンソース書体（`Source Serif 4`、`Noto Serif TC`、`Inter`、`Noto Sans TC`、`JetBrains Mono`）を同梱しています。
-- **カスタム CSS テーマ**：`~/Library/Application Support/io.kalamos.app/themes/` に `.css` ファイルを配置することで、`--k-*` 変数、文字サイズ、両端揃え、見出しの自動連番まで自由にカスタマイズ可能です。テーマメニューまたは `Cmd+Shift+T` で切り替えられます。詳細は [docs/themes.md](docs/themes.md) を参照してください。
+- **カスタム CSS テーマ**：`~/Library/Application Support/io.kalamos.app/themes/`（macOS）または `%APPDATA%\io.kalamos.app\themes\`（Windows）に `.css` ファイルを配置することで、`--k-*` 変数、文字サイズ、両端揃え、見出しの自動連番まで自由にカスタマイズ可能です。テーマメニューまたは `Cmd+Shift+T` で切り替えられます。詳細は [docs/themes.md](docs/themes.md) を参照してください。
 
 <p align="center">
   <img src="site/assets/screenshots/dark-theme-melan.png" alt="Kalamos Melan ダークテーマ" width="760" />
@@ -122,13 +122,26 @@
 | | Pandoc エクスポート（DOCX/ODT/LaTeX/Wiki/EPUB） | `Cmd+Opt+E` |
 | | Pandoc インポート | `Cmd+Opt+I` |
 
+> **Windows でのショートカット**：上表の `Cmd` は `Ctrl` に、`Opt` は `Alt` に置き換えてください（例：`Cmd+Opt+T` → `Ctrl+Alt+T`）。
+
 ---
 
-## インストール（macOS）
+## 動作環境
 
-1. [GitHub Releases](https://github.com/kkdai/Kalamos/releases) から最新の `.dmg` をダウンロードします。
+- **macOS**：Apple Silicon（`aarch64`、M1 / M2 / M3 / M4）または Intel（`x64`）。
+- **Windows（実験的）**：**Windows 10 / 11（x64）** および **Microsoft Edge WebView2 ランタイム**（Windows 11 には標準搭載。Windows 10 で未導入の場合も、`.exe` / `.msi` インストーラ同梱のブートストラッパーが自動でダウンロード・導入します）。しおり付き A4 PDF エクスポートには **Microsoft Edge**（またはフォールバックとして Google Chrome）を使用します。
+- **任意**：DOCX / ODT / LaTeX / MediaWiki / EPUB の入出力には **Pandoc** が必要です（インポートは 2.15 以上）。
+
+## インストール
+
+### macOS（Apple Silicon / Intel）
+
+1. [GitHub Releases](https://github.com/kkdai/Kalamos/releases/latest) からお使いの Mac に対応する `.dmg` をダウンロードします：
+   - **Apple Silicon（M1 / M2 / M3 / M4）**：`Kalamos_<バージョン>_aarch64.dmg`
+   - **Intel Mac**：`Kalamos_<バージョン>_x64.dmg`
+   - *（任意）* `SHA256SUMS.txt` で SHA-256 チェックサムを検証できます。
 2. `.dmg` を開き、**Kalamos.app** を `/Applications` へドラッグします。
-3. **未署名ビルドの起動方法**：現在、リリースビルドは Apple 公証（Notarization）未取得のため、初回起動時に macOS Gatekeeper にブロックされる場合があります。次のいずれかで起動してください：
+3. **未公証ビルドの起動方法**：現在、リリースビルドは ad-hoc 署名のみで Apple 公証（Notarization）未取得のため、初回起動時に macOS Gatekeeper にブロックされる場合があります。次のいずれかで起動してください：
    - **方法 A（Finder）**：**Kalamos.app** を右クリック（または Control+クリック）→「**開く**」→ 確認ダイアログで「**開く**」を選択（または **システム設定 → プライバシーとセキュリティ** で「**このまま開く**」をクリック）。
    - **方法 B（ターミナル）**：隔離属性を解除します：
      ```bash
@@ -136,17 +149,33 @@
      ```
 4. **.md の既定アプリにする**：Finder で任意の `.md` ファイルを選択 →「**情報を見る**」（⌘I）→「**このアプリケーションで開く**」で **Kalamos** を選び →「**すべてを変更…**」。以後、`.md` のダブルクリック、Dock アイコンへのドロップ、`open -a Kalamos ファイル.md` で Kalamos が開きます。
 
+### Windows（x64・実験的）
+
+> **実験的・未署名**：Windows 版は現在**実験的**かつ**未署名**です（コード署名証明書は未適用）。インストーラの実行時に Windows Defender SmartScreen の警告が表示された場合は、「**詳細情報**」→「**実行**」をクリックしてください。
+
+1. [GitHub Releases](https://github.com/kkdai/Kalamos/releases/latest) から Windows 用インストーラをダウンロードします：
+   - **NSIS インストーラ（推奨・管理者権限不要）**：`Kalamos_<バージョン>_x64-setup.exe`
+   - **MSI インストーラ**：`Kalamos_<バージョン>_x64_en-US.msi`
+   - *（任意）* `SHA256SUMS.txt` で SHA-256 チェックサムを検証できます。
+2. インストーラを実行します。Windows Defender SmartScreen の警告が出た場合は、「**詳細情報**」→「**実行**」をクリックします。
+3. **WebView2 と PDF エクスポート**：Windows 11 には **WebView2** と **Microsoft Edge** が標準搭載されています。一部の Windows 10 環境（LTSC や旧ビルドなど）で WebView2 が未導入の場合、`.exe` / `.msi` インストーラ内蔵のブートストラッパーが自動導入します。しおり付き A4 PDF エクスポートには Microsoft Edge（または Google Chrome）を使用します。
+4. **ファイル関連付け**：インストーラは `.md`、`.markdown`、`.mdown`、`.mkd`、`.mkdn`、`.mdwn`、`.mdtxt` の関連付けを自動登録します。エクスプローラーでのダブルクリックや「Kalamos で開く」から直接開けます。
+5. **設定とカスタムテーマ**：`%APPDATA%\io.kalamos.app\`（`settings.json` および `themes\*.css`）に保存されます。
+
 ---
 
 ## ソースからのビルド
 
 ### 必要環境
-- **macOS** および Xcode Command Line Tools（`xcode-select --install`）
+- **macOS**（Xcode Command Line Tools：`xcode-select --install`）または **Windows 10/11（x64）**（Visual Studio 2022 C++ Build Tools と WebView2）
 - **Node.js** 22 以上および npm
 - **Rust** stable ツールチェーン（`rustup`）
 - **Pandoc** *（任意）* — DOCX / ODT / LaTeX / MediaWiki / EPUB のエクスポート・インポート利用時のみ必要（インポートには 2.15 以上が必要）：
   ```bash
+  # macOS
   brew install pandoc
+  # Windows
+  winget install JohnMacFarlane.Pandoc
   ```
 
 ### ビルド手順
@@ -155,7 +184,7 @@ npm ci
 npm run tauri build
 ```
 
-ビルドされた `.app` および `.dmg` は `src-tauri/target/release/bundle/` に生成されます。
+ビルドされたインストーラは `src-tauri/target/release/bundle/` に生成されます（macOS は `.app` / `.dmg`、Windows は `msi/*.msi` および `nsis/*-setup.exe`、単体実行ファイルは `src-tauri/target/release/kalamos.exe`）。
 
 ---
 
@@ -189,10 +218,10 @@ npm run bench
 
 ## 既知の制限事項
 
-- **macOS 専用**：ネイティブ PDF エクスポートが macOS の `WKWebView`・`NSPrintOperation`・`PDFKit` に依存しているため、Windows / Linux パッケージには現在未対応です。
-- **GUI 設定画面は未実装**：主要な切り替えはショートカットから行え `~/Library/Application Support/io.kalamos.app/settings.json` に自動保存されますが、画像アップローダ設定（`uploadCommand`、`uploadArgs`、`uploadOnInsert`）は同 JSON ファイルを直接編集する必要があります。
+- **プラットフォーム対応（macOS および実験的 Windows）**：macOS は `WKWebView`・`NSPrintOperation`・`PDFKit` でしおり付き PDF を生成し、Windows はヘッドレス Microsoft Edge（または Google Chrome）で A4 組版と `<h1>`–`<h6>` からの PDF アウトラインしおり生成を行います。
+- **環境設定と画像アップローダ設定**：一般・エディタ・外観・画像設定は環境設定ウィンドウ（`Cmd+,` / `Ctrl+,`）から変更でき、`~/Library/Application Support/io.kalamos.app/settings.json`（Windows は `%APPDATA%\io.kalamos.app\settings.json`）に保存されます。安全のため CLI アップローダ設定（`uploadCommand`、`uploadArgs`）は `settings.json` を直接編集してください。
 - **Pandoc は外部ツール**：多形式エクスポート（`EX-02`）とインポート（`EX-03`）には別途 Pandoc のインストールが必要です（サンドボックス実行を伴うインポートは 2.15 以上）。
-- **未署名ビルド**：配布 `.dmg` の初回起動時は macOS Gatekeeper での許可が必要です。
+- **未公証・未署名ビルド**：配布 `.dmg` は Apple 公証未取得のため初回起動時に右クリック →「開く」で許可が必要です。Windows 版は実験的・未署名のため SmartScreen 警告が表示されます（「詳細情報」→「実行」）。
 - **iPic プリセット未内蔵**：macOS 向け iPic の組み込みプリセットはありませんが、標準出力に URL を返す CLI ツールであれば `uploadCommand` に指定できます。
 - **設計上の対象外**：アカウント制、独自クラウド同期（iCloud / Dropbox フォルダを利用）、リアルタイム共同編集、プラグインマーケット、内蔵 AI アシスタントは提供しません。
 

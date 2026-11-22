@@ -3,8 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Kalamos — 書いた瞬間に、そのままの姿へ。| macOS 向け WYSIWYM Markdown エディタ</title>
-    <meta name="description" content="Kalamos は Tauri 2 で作られた macOS 向けの静かでオフラインなライブプレビュー Markdown エディタ。テーブル編集、MathJax 数式、Mermaid 図表、しおり付き PDF、Pandoc 連携、カスタム CSS テーマに対応。" />
+    <title>Kalamos — 書いた瞬間に、そのままの姿へ。| macOS・Windows 向け WYSIWYM Markdown エディタ</title>
+    <meta name="description" content="Kalamos は Tauri 2 で作られた macOS・Windows 向けの静かでオフラインなライブプレビュー Markdown エディタ。テーブル編集、MathJax 数式、Mermaid 図表、しおり付き PDF、Pandoc 連携、カスタム CSS テーマに対応。" />
     <link rel="icon" type="image/svg+xml" href="../assets/kalamos-icon.svg" />
     <link rel="alternate" hreflang="en" href="https://kkdai.github.io/Kalamos/" />
     <link rel="alternate" hreflang="zh-Hant" href="https://kkdai.github.io/Kalamos/zh-TW/" />
@@ -14,7 +14,7 @@
     <meta property="og:type" content="website" />
     <meta property="og:locale" content="ja_JP" />
     <meta property="og:title" content="Kalamos — 書いた瞬間に、そのままの姿へ。" />
-    <meta property="og:description" content="静かでオフラインな macOS 向けライブプレビュー Markdown エディタ。テーブル、MathJax、Mermaid、しおり付き PDF、カスタム CSS テーマを内蔵。" />
+    <meta property="og:description" content="静かでオフラインな macOS・Windows 向けライブプレビュー Markdown エディタ。テーブル、MathJax、Mermaid、しおり付き PDF、カスタム CSS テーマを内蔵。" />
     <meta property="og:image" content="https://kkdai.github.io/Kalamos/assets/screenshots/hero-live-preview-ja.png" />
     <meta name="twitter:card" content="summary_large_image" />
     <link rel="stylesheet" href="../assets/style.css" />
@@ -53,12 +53,46 @@
           <img class="hero-icon" src="../assets/kalamos-icon.svg" alt="Kalamos アプリアイコン" width="84" height="84" />
           <h1 class="hero-title">Kalamos</h1>
           <p class="hero-tagline">書いた瞬間に、そのままの姿へ。</p>
-          <p class="hero-lead">macOS 向けの静かな WYSIWYM ライブプレビュー Markdown エディタ。古代ギリシャ語の「葦ペン」に名を借り、標準的な GFM ファイルを打ったそばから紙面のように整えます。無料・オフライン・アカウント不要。</p>
-          <div class="hero-actions">
-            <a class="btn btn-primary" href="https://github.com/kkdai/Kalamos/releases" rel="noopener">macOS 版をダウンロード</a>
-            <a class="btn btn-secondary" href="https://github.com/kkdai/Kalamos" rel="noopener">GitHub で見る</a>
+          <p class="hero-lead">macOS・Windows 向けの静かな WYSIWYM ライブプレビュー Markdown エディタ。古代ギリシャ語の「葦ペン」に名を借り、標準的な GFM ファイルを打ったそばから紙面のように整えます。無料・オフライン・アカウント不要。</p>
+          <div class="download-actions" data-download-group>
+            <a
+              class="btn btn-download"
+              data-platform="macos-arm"
+              href="https://github.com/kkdai/Kalamos/releases/latest"
+              rel="noopener"
+            >
+              <span class="btn-download-title">macOS Apple Silicon</span>
+              <span class="btn-download-sub">M1–M4 · .dmg</span>
+            </a>
+            <a
+              class="btn btn-download"
+              data-platform="macos-intel"
+              href="https://github.com/kkdai/Kalamos/releases/latest"
+              rel="noopener"
+            >
+              <span class="btn-download-title">macOS Intel</span>
+              <span class="btn-download-sub">x64 · .dmg</span>
+            </a>
+            <a
+              class="btn btn-download"
+              data-platform="windows"
+              href="https://github.com/kkdai/Kalamos/releases/latest"
+              rel="noopener"
+            >
+              <span class="btn-download-title">
+                Windows
+                <span class="platform-badge">実験的</span>
+              </span>
+              <span class="btn-download-sub">Win 10/11 x64 · .exe / .msi</span>
+            </a>
           </div>
-          <p class="hero-meta">macOS（.dmg）· Tauri 2 + CodeMirror 6 · オフライン＆標準 GFM</p>
+          <p class="download-note">
+            Windows 版は実験的・未署名です（SmartScreen 警告時は「詳細情報」→「実行」）。macOS 版は未公証です（初回起動時は右クリック →「開く」）。
+          </p>
+          <p class="hero-meta">
+            Tauri 2 + CodeMirror 6 · オフライン＆標準 GFM ·
+            <a href="https://github.com/kkdai/Kalamos" rel="noopener">GitHub で見る</a>
+          </p>
 
           <div class="hero-shot">
             <div class="window-frame">
@@ -235,7 +269,7 @@
 
             <article class="feature-card">
               <h3>ネイティブ PDF と Pandoc 入出力</h3>
-              <p><kbd>Cmd+Shift+E</kbd> で見出し階層に対応した PDFKit しおり付き A4 PDF を出力（数式・図表も描画）。任意の Pandoc を導入すれば DOCX・ODT・LaTeX・MediaWiki・EPUB への書き出しや、既存文書の Markdown インポートも可能です。</p>
+              <p><kbd>Cmd+Shift+E</kbd> で見出し階層に対応したしおり付き A4 PDF を出力（数式・図表も描画。macOS は PDFKit、Windows はヘッドレス Edge／Chrome を使用）。任意の Pandoc を導入すれば DOCX・ODT・LaTeX・MediaWiki・EPUB への書き出しや、既存文書の Markdown インポートも可能です。</p>
               <ul class="feature-tags">
                 <li>PDF＋しおり</li>
                 <li>DOCX · ODT · EPUB</li>
@@ -331,7 +365,7 @@
           <div class="showcase-header">
             <span class="eyebrow">キーボードファースト</span>
             <h2 class="section-title">主要ショートカット一覧</h2>
-            <p class="section-desc">ホームポジションから手を離さず、主要な操作をすべて完結できます。</p>
+            <p class="section-desc">ホームポジションから手を離さず、主要な操作をすべて完結できます。Windows では <code>Cmd</code> を <code>Ctrl</code>、<code>Opt</code> を <code>Alt</code> に読み替えてください。</p>
           </div>
 
           <div class="shortcuts-grid">
@@ -407,7 +441,7 @@
               <summary>Pandoc のインストールは必須ですか？</summary>
               <div class="faq-answer">
                 <p>いいえ、必須ではありません。日常の編集、ライブプレビュー、MathJax、Mermaid 図表、しおり付きネイティブ PDF 出力はすべて単体で動作します。</p>
-                <p>DOCX・ODT・LaTeX・MediaWiki・EPUB への書き出しや Markdown への取り込みを使う場合のみ Pandoc（<code>brew install pandoc</code>、インポートは 2.15 以上）をインストールしてください。</p>
+                <p>DOCX・ODT・LaTeX・MediaWiki・EPUB への書き出しや Markdown への取り込みを使う場合のみ Pandoc（macOS は <code>brew install pandoc</code>、Windows は <code>winget install JohnMacFarlane.Pandoc</code>、インポートは 2.15 以上）をインストールしてください。</p>
               </div>
             </details>
 
@@ -419,7 +453,7 @@
             </details>
 
             <details class="faq-item">
-              <summary>未署名の macOS アプリを開くには？</summary>
+              <summary>未公証の macOS アプリを開くには？</summary>
               <div class="faq-answer">
                 <p>現在、配布ビルドは Apple 公証未取得です。<strong>Kalamos.app</strong> を <code>/Applications</code> に入れた後、Finder で右クリックして「<strong>開く</strong>」を選ぶ（または <strong>システム設定 → プライバシーとセキュリティ</strong> で許可する）か、ターミナルで次を実行してください：</p>
                 <div class="code-chip">
@@ -430,9 +464,17 @@
             </details>
 
             <details class="faq-item">
+              <summary>Windows 版の注意点はありますか？</summary>
+              <div class="faq-answer">
+                <p>Windows 版（<strong>Windows 10 / 11 x64</strong> 対応）は現在<strong>実験的</strong>かつ<strong>未署名</strong>です。<code>-setup.exe</code> または <code>.msi</code> インストーラの実行時に Windows Defender SmartScreen の警告が出た場合は、「<strong>詳細情報</strong>」→「<strong>実行</strong>」をクリックしてください。</p>
+                <p>動作には <strong>Microsoft Edge WebView2 ランタイム</strong>が必要です。Windows 11 には標準搭載されており、Windows 10 で未導入の場合もインストーラ内蔵のブートストラッパーが自動導入します。</p>
+              </div>
+            </details>
+
+            <details class="faq-item">
               <summary>テーマのカスタマイズや画像アップローダ連携はできますか？</summary>
               <div class="faq-answer">
-                <p>はい。<code>:root[data-custom-theme]</code> を使った <code>.css</code> ファイルを <code>~/Library/Application Support/io.kalamos.app/themes/</code> に置くことで配色・書体・見出し自動番号を自由に調整できます。画像アップロードは <code>~/Library/Application Support/io.kalamos.app/settings.json</code> で <code>uploadCommand</code>（PicGo CLI など）を設定し、<kbd>Cmd+Opt+U</kbd> で実行します。</p>
+                <p>はい。<code>:root[data-custom-theme]</code> を使った <code>.css</code> ファイルを <code>~/Library/Application Support/io.kalamos.app/themes/</code>（macOS）または <code>%APPDATA%\io.kalamos.app\themes\</code>（Windows）に置くことで配色・書体・見出し自動番号を自由に調整できます。画像アップロードは同フォルダ内の <code>settings.json</code> で <code>uploadCommand</code>（PicGo CLI など）を設定し、<kbd>Cmd+Opt+U</kbd> で実行します。</p>
               </div>
             </details>
           </div>
@@ -445,11 +487,45 @@
           <div class="cta-box">
             <img src="../assets/kalamos-icon.svg" alt="Kalamos アイコン" width="64" height="64" loading="lazy" />
             <h2>静かな紙面で、書き始めよう</h2>
-            <p>GitHub Releases から最新の macOS 版をダウンロードするか、ソースからビルドできます。</p>
-            <div class="hero-actions">
-              <a class="btn btn-primary" href="https://github.com/kkdai/Kalamos/releases" rel="noopener">macOS 版をダウンロード</a>
-              <a class="btn btn-secondary" href="https://github.com/kkdai/Kalamos" rel="noopener">ソースとドキュメント</a>
+            <p>GitHub Releases から最新の macOS 版または Windows 版をダウンロードするか、ソースからビルドできます。</p>
+            <div class="download-actions" data-download-group>
+              <a
+                class="btn btn-download"
+                data-platform="macos-arm"
+                href="https://github.com/kkdai/Kalamos/releases/latest"
+                rel="noopener"
+              >
+                <span class="btn-download-title">macOS Apple Silicon</span>
+                <span class="btn-download-sub">M1–M4 · .dmg</span>
+              </a>
+              <a
+                class="btn btn-download"
+                data-platform="macos-intel"
+                href="https://github.com/kkdai/Kalamos/releases/latest"
+                rel="noopener"
+              >
+                <span class="btn-download-title">macOS Intel</span>
+                <span class="btn-download-sub">x64 · .dmg</span>
+              </a>
+              <a
+                class="btn btn-download"
+                data-platform="windows"
+                href="https://github.com/kkdai/Kalamos/releases/latest"
+                rel="noopener"
+              >
+                <span class="btn-download-title">
+                  Windows
+                  <span class="platform-badge">実験的</span>
+                </span>
+                <span class="btn-download-sub">Win 10/11 x64 · .exe / .msi</span>
+              </a>
             </div>
+            <p class="download-note">
+              Windows 版は実験的・未署名です（SmartScreen 警告時は「詳細情報」→「実行」）。macOS 版は未公証です（初回起動時は右クリック →「開く」）。
+            </p>
+            <p class="cta-links">
+              <a href="https://github.com/kkdai/Kalamos" rel="noopener">GitHub でソースとドキュメントを見る</a>
+            </p>
           </div>
         </div>
       </section>
@@ -460,7 +536,7 @@
         <span>Kalamos · Write, and it appears.</span>
         <div class="footer-links">
           <a href="https://github.com/kkdai/Kalamos" rel="noopener">GitHub</a>
-          <a href="https://github.com/kkdai/Kalamos/releases" rel="noopener">Releases</a>
+          <a href="https://github.com/kkdai/Kalamos/releases/latest" rel="noopener">Releases</a>
           <a href="../" hreflang="en">English</a>
           <a href="../zh-TW/" hreflang="zh-Hant">繁體中文</a>
           <a href="./" aria-current="page">日本語</a>

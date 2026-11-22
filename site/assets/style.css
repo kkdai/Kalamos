@@ -348,10 +348,146 @@ summary:focus-visible {
   border-color: var(--accent-warm);
 }
 
+.download-actions {
+  margin-top: 32px;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.btn-download {
+  flex: 0 1 auto;
+  min-width: 196px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 13px 20px;
+  border-radius: var(--radius-md);
+  background-color: var(--bg-panel);
+  color: var(--ink);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-card);
+  text-align: center;
+}
+
+.btn-download:hover {
+  background-color: var(--bg-sand);
+  color: var(--ink);
+  border-color: var(--accent-warm);
+  transform: translateY(-1px);
+}
+
+.btn-download:active {
+  transform: translateY(0);
+}
+
+.btn-download-title {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.btn-download-sub {
+  font-size: 0.78rem;
+  font-weight: 400;
+  color: var(--ink-muted);
+  line-height: 1.3;
+}
+
+.platform-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  background-color: var(--bg);
+  color: var(--accent);
+  border: 1px solid var(--border);
+}
+
+.btn-download.is-recommended {
+  background-color: var(--ink);
+  color: var(--bg);
+  border-color: var(--ink);
+  box-shadow: 0 8px 24px -8px rgba(59, 42, 30, 0.38);
+}
+
+.btn-download.is-recommended:hover {
+  background-color: var(--accent-hover);
+  border-color: var(--accent-hover);
+  color: var(--accent-contrast);
+}
+
+.btn-download.is-recommended .btn-download-sub {
+  color: rgba(250, 246, 238, 0.78);
+}
+
+.btn-download.is-recommended .platform-badge {
+  background-color: rgba(250, 246, 238, 0.16);
+  color: var(--bg);
+  border-color: rgba(250, 246, 238, 0.3);
+}
+
+@media (prefers-color-scheme: dark) {
+  .btn-download.is-recommended {
+    background-color: var(--accent);
+    color: var(--accent-contrast);
+    border-color: var(--accent);
+    box-shadow: 0 8px 26px -8px rgba(0, 0, 0, 0.5);
+  }
+
+  .btn-download.is-recommended:hover {
+    background-color: var(--accent-hover);
+    border-color: var(--accent-hover);
+    color: var(--accent-contrast);
+  }
+
+  .btn-download.is-recommended .btn-download-sub {
+    color: rgba(26, 22, 19, 0.76);
+  }
+
+  .btn-download.is-recommended .platform-badge {
+    background-color: rgba(26, 22, 19, 0.14);
+    color: var(--accent-contrast);
+    border-color: rgba(26, 22, 19, 0.25);
+  }
+}
+
+.download-note {
+  margin: 16px auto 0;
+  max-width: 660px;
+  font-size: 0.84rem;
+  color: var(--ink-muted);
+  line-height: 1.6;
+}
+
 .hero-meta {
-  margin: 18px 0 0;
+  margin: 10px 0 0;
   font-size: 0.85rem;
   color: var(--ink-muted);
+}
+
+.hero-meta a,
+.cta-links a {
+  color: var(--accent);
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--border);
+}
+
+.hero-meta a:hover,
+.cta-links a:hover {
+  color: var(--accent-hover);
+  text-decoration-color: var(--accent-hover);
 }
 
 .hero-shot {
@@ -754,8 +890,45 @@ kbd {
   color: var(--ink-secondary);
 }
 
-.cta-box .hero-actions {
-  margin-top: 28px;
+.cta-box .hero-actions,
+.cta-box .download-actions {
+  margin-top: 26px;
+}
+
+.cta-box .btn-download {
+  background-color: var(--bg);
+}
+
+.cta-box .btn-download:hover {
+  background-color: var(--bg-panel);
+}
+
+.cta-box .btn-download.is-recommended {
+  background-color: var(--ink);
+}
+
+.cta-box .btn-download.is-recommended:hover {
+  background-color: var(--accent-hover);
+}
+
+@media (prefers-color-scheme: dark) {
+  .cta-box .btn-download.is-recommended {
+    background-color: var(--accent);
+  }
+
+  .cta-box .btn-download.is-recommended:hover {
+    background-color: var(--accent-hover);
+  }
+}
+
+.cta-box .download-note {
+  max-width: 600px;
+}
+
+.cta-links {
+  margin: 14px 0 0;
+  font-size: 0.88rem;
+  color: var(--ink-muted);
 }
 
 /* ==========================================================================
@@ -842,6 +1015,18 @@ kbd {
 
   .shortcut-row {
     font-size: 0.88rem;
+  }
+
+  .download-actions {
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .btn-download {
+    width: 100%;
+    max-width: 320px;
+    min-width: 0;
   }
 
   .footer-inner {
