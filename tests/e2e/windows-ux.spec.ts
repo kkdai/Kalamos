@@ -1,23 +1,18 @@
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
-import { boot, getDoc, nextFrames, selectRange, setDoc } from "./helpers";
+import { boot, getDoc, newPlatformContext, nextFrames, selectRange, setDoc } from "./helpers";
 
 /**
  * #89: Windows UX — shortcut labels, native-style tab bar & theme button layout,
  * keyboard shortcuts (including menu-only accelerators), close/quit unsaved-changes
  * checks (Ctrl+Q, Alt+F4, close button), backslash native paths, fonts, and LF/CRLF.
  *
- * Simulated in Playwright via Windows userAgent + navigator.platform = "Win32".
+ * Simulated in Playwright via `newPlatformContext(browser, "windows")`
+ * (userAgent + navigator.platform + navigator.userAgentData).
  */
 
-const WINDOWS_UA =
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
-
 async function openWindowsPage(browser: Browser): Promise<{ ctx: BrowserContext; page: Page }> {
-  const ctx = await browser.newContext({ userAgent: WINDOWS_UA });
+  const ctx = await newPlatformContext(browser, "windows");
   const page = await ctx.newPage();
-  await page.addInitScript(() => {
-    Object.defineProperty(navigator, "platform", { get: () => "Win32" });
-  });
   await boot(page);
   return { ctx, page };
 }
