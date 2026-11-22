@@ -188,6 +188,12 @@ The built installers will be generated under `src-tauri/target/release/bundle/` 
 
 ---
 
+## Releases
+
+See [docs/release.md](docs/release.md) for the release process.
+
+---
+
 ## Development & Testing
 
 ```bash

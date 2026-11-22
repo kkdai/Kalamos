@@ -1,6 +1,6 @@
 # 發佈流程（Release）
 
-Kalamos 透過 `.github/workflows/release.yml` 自動打包 macOS 與 Windows 安裝檔、產生 `SHA256SUMS.txt`，並建立 GitHub Draft Release，由維護者確認後手動公開。
+Kalamos 使用 [Changesets](https://github.com/changesets/changesets) 管理版本號與 `CHANGELOG.md`，並透過 `.github/workflows/release.yml` 在推送 `v*` tag 時自動打包 macOS 與 Windows 安裝檔、產生 `SHA256SUMS.txt`，以及建立 GitHub Draft Release，由維護者確認後手動公開。
 
 ## 產物一覽
 
@@ -14,29 +14,57 @@ Kalamos 透過 `.github/workflows/release.yml` 自動打包 macOS 與 Windows �
 
 > **目前限制**：macOS 產物使用 ad-hoc 簽章（尚未經過 Apple 公證），Windows 產物尚未經過程式碼簽章。首次安裝或開啟時需依 Release Notes 中的說明通過 Gatekeeper / SmartScreen 提示。
 
+## 一次性 Repo 設定
+
+若要讓 `.github/workflows/changesets.yml` 自動建立／更新版本 PR，請確認 GitHub repo 已啟用：
+
+**Settings → Actions → General → Workflow permissions → Allow GitHub Actions to create and approve pull requests**
+
 ## 正式發版步驟
 
-### 1. 更新版本號並開 PR
+### 1. 為變更加入 Changeset
 
-同時更新以下三個檔案的版本號（格式為 SemVer，例如 `0.4.0`）：
-
-- `package.json`（`version`）
-- `src-tauri/tauri.conf.json`（`version`）
-- `src-tauri/Cargo.toml`（`[package]` 底下的 `version`）
-
-若 `src-tauri/Cargo.toml` 版本有變動，順手執行一次 `cargo test --manifest-path src-tauri/Cargo.toml` 或 `cargo check --manifest-path src-tauri/Cargo.toml`，讓 `src-tauri/Cargo.lock` 同步更新。
-
-本機可用版本檢查腳本確認三個檔案一致（以及預計推送的 tag）：
+凡是有需要列入發行紀錄的 App 改動，在開發分支上執行：
 
 ```bash
-node scripts/check-release-version.mjs --tag v0.4.0
+npm run changeset
 ```
 
-確認測試通過後開 PR（例如 `chore: bump version to 0.4.0`），待 CI 綠燈並 review 通過。
+依提示選擇版本層級（`patch`、`minor` 或 `major`）並撰寫簡短的使用者向變更摘要，將產生的 `.changeset/*.md` 一併提交到 PR。
 
-### 2. 合併 PR 到 `main`
+> **外部貢獻者 PR 處理方式**：外部 PR 若未附帶 changeset，不需要因此擋下審查或合併；需要列入發行紀錄時，由維護者直接補上 `.changeset/*.md`（可補在原 PR 分支上，或在合併後另開小 PR 補上）。
 
-將版本更新 PR 合併至 `main`，並在本機拉取最新 `main`：
+### 2. 合併版本 PR（或本機執行 `npm run version-packages`）
+
+#### 方式一：透過 Changesets 自動版本 PR（建議）
+
+含 `.changeset/*.md` 的 PR 合併到 `main` 後，`.github/workflows/changesets.yml` 會自動執行 `npm run version-packages`（等同 `changeset version && node scripts/sync-version.mjs`），更新 `CHANGELOG.md` 並一次同步以下五個檔案的版本號，建立或更新標題為 `chore(release): bump version` 的版本 PR：
+
+- `package.json`
+- `package-lock.json`
+- `src-tauri/tauri.conf.json`
+- `src-tauri/Cargo.toml`
+- `src-tauri/Cargo.lock`
+
+該 workflow **不會**自動建立 Git tag 或發佈 Release，也不會發佈到 npm。
+
+> **注意：版本 PR 不會自動觸發 CI**
+> 由於 `.github/workflows/changesets.yml` 使用預設的 `GITHUB_TOKEN` 建立／更新 PR，依 GitHub Actions 防遞迴機制，這類 PR **不會自動觸發** `pull_request` 類型的 CI（`.github/workflows/ci.yml`）。準備合併版本 PR 前，請用以下任一方式手動觸發 CI，待版本檢查與所有測試綠燈後再合併：
+> - 在 GitHub PR 頁面點擊 **Close pull request**，再立即點擊 **Reopen pull request**；或
+> - 切到版本 PR 分支推送一個空 commit：`git commit --allow-empty -m "chore: trigger CI" && git push`。
+
+#### 方式二：在本機執行 `npm run version-packages`
+
+如果不使用自動版本 PR，維護者也可從最新 `main` 切分支在本機執行：
+
+```bash
+npm run version-packages
+node scripts/check-release-version.mjs
+```
+
+檢查 `CHANGELOG.md` 與五個版本檔的 diff 無誤後開 PR，待 CI 綠燈並合併至 `main`。
+
+合併完成後，在本機拉取最新 `main`：
 
 ```bash
 git checkout main
@@ -45,9 +73,12 @@ git pull origin main
 
 ### 3. 建立並推送 `v*` tag
 
+可先確認版本檔與即將推送的 tag 一致，再建立並推送 tag（例如 `v0.5.0`）：
+
 ```bash
-git tag v0.4.0
-git push origin v0.4.0
+node scripts/check-release-version.mjs --tag v0.5.0
+git tag v0.5.0
+git push origin v0.5.0
 ```
 
 推送 `v*` tag 會自動觸發 `.github/workflows/release.yml`：
@@ -55,11 +86,11 @@ git push origin v0.4.0
 1. `check-version`：比對 tag 與 `package.json`、`src-tauri/tauri.conf.json`、`src-tauri/Cargo.toml` 的版本號，若有任何不一致會立即失敗。
 2. `build`：平行建置 macOS（`aarch64`、`x86_64`）與 Windows（`x86_64`）安裝檔，並在 macOS 上自動執行 `codesign --verify --deep --strict` 與 `.dmg` 內的 `Applications` 捷徑檢查。
 3. `checksums`：彙整所有安裝檔並產生 `SHA256SUMS.txt`。
-4. `release`：建立標題為 `Kalamos v0.4.0` 的 **Draft Release**，附上所有安裝檔、`SHA256SUMS.txt` 以及包含安裝說明、未公證/未簽章提示與 SHA-256 的範本內文。
+4. `release`：執行 `scripts/generate-release-notes.mjs` 產生 Release Notes——若 `CHANGELOG.md` 中存在對應的 `## <version>` 段落，會自動填入「更新摘要」位置，否則保留 placeholder 供手動填寫——並建立標題為 `Kalamos v<version>` 的 **Draft Release**，附上所有安裝檔與 `SHA256SUMS.txt`。
 
 ### 4. 檢查 Draft Release 並實機確認
 
-前往 GitHub 的 **Releases** 頁面找到新建的 Draft（`Kalamos v0.4.0`）：
+前往 GitHub 的 **Releases** 頁面找到新建的 Draft（`Kalamos v0.5.0`）：
 
 1. 確認所有預期產物與 `SHA256SUMS.txt` 皆已附上。
 2. 下載 macOS `.dmg` 到本機驗證校驗碼與簽章：
@@ -71,7 +102,7 @@ git push origin v0.4.0
    codesign --verify --deep --strict --verbose=2 /Applications/Kalamos.app
    ```
 3. 若有 Windows 實機，下載 `-setup.exe` / `.msi` 確認安裝、開啟 `.md` 檔案關聯與啟動正常。
-4. 編輯 Draft Release 內文，將 `<!-- 發布前請在此補充... -->` 替換為本版本的更新摘要。
+4. 檢查 Draft Release 內文的更新摘要（若已從 `CHANGELOG.md` 自動帶入，確認措辭即可；若該版尚未寫入 `CHANGELOG.md`，請將 `<!-- 發布前請在此補充... -->` 替換為本版本的更新摘要）。
 
 ### 5. Publish Release
 
