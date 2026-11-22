@@ -34,3 +34,11 @@ language = "node"
 additional_dependencies = ["tsc-rs@0.8.0"]
 files = '^(src/.*\.[cm]?tsx?|tsconfig\.json|package(-lock)?\.json)$'
 pass_filenames = false
+
+[[repos.hooks]]
+id = "clippy"
+name = "Rust lint (Clippy)"
+entry = "cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings"
+language = "system"
+files = '^src-tauri/(.*\.rs|Cargo\.(toml|lock)|tauri\.conf\.json|capabilities/.*\.json)$'
+pass_filenames = false
