@@ -552,8 +552,8 @@ for (const theme of ["papyros", "melan"]) {
   });
 }
 
-test("AC1 document title is Kalamos (Tauri window title: manual)", async ({ page }) => {
-  await expect(page).toHaveTitle("Kalamos");
+test("AC1 document title follows the active tab (#81; Tauri window title: manual)", async ({ page }) => {
+  await expect(page).toHaveTitle("未命名");
 });
 
 for (const scheme of ["light", "dark"] as const) {

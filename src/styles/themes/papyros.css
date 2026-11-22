@@ -19,4 +19,12 @@
 
   /* Derived semi-transparent selection from --k-link (#A4552F) */
   --k-selection-bg: rgba(164, 85, 47, 0.22);
+
+  /* #81 tab bar */
+  --k-tab-track-bg: var(--k-surface);
+  --k-tab-track-border: color-mix(in srgb, var(--k-divider) 60%, var(--k-surface));
+  --k-tab-active-bg: color-mix(in srgb, var(--k-bg) 45%, #fff);
+  --k-tab-active-shadow: 0 1px 2px rgba(43, 38, 34, 0.12);
+  --k-tab-inactive-text: color-mix(in srgb, var(--k-text-muted) 80%, var(--k-surface));
+  --k-tab-close-hover-bg: color-mix(in srgb, var(--k-text-muted) 16%, transparent);
 }

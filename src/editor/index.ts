@@ -5,7 +5,13 @@ import "./images.css";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { languages } from "@codemirror/language-data";
-import { Annotation, Compartment, EditorState } from "@codemirror/state";
+import {
+  Annotation,
+  Compartment,
+  EditorState,
+  type Extension,
+  StateEffect,
+} from "@codemirror/state";
 import { EditorView, keymap } from "@codemirror/view";
 import { cjkEmphasisExtension } from "./cjk-emphasis";
 import { codeLineNumbersFacet } from "./code-blocks";
@@ -78,6 +84,22 @@ export interface SetContentOptions {
   dirty?: boolean;
 }
 
+/**
+ * #81: one document's editor state. The single EditorView shows one session at
+ * a time (`switchSession` swaps it in with view.setState), so each tab keeps
+ * its own undo history, selection and search state.
+ */
+export interface DocSession {
+  /** The latest state (read it through the editor: the active session's lives in the view). */
+  state: EditorState;
+  /** Content as loaded (kept byte-for-byte until the first edit, e.g. CRLF). */
+  unmodifiedContent: string;
+  /** Content last written to disk; null = never matches (restored / imported). */
+  savedContent: string | null;
+  hasUserEditsSinceLoad: boolean;
+  dirty: boolean;
+}
+
 export interface KalamosEditor {
   view: EditorView;
   getContent: () => string;
@@ -111,6 +133,17 @@ export interface KalamosEditor {
   isDirty: () => boolean;
   markClean: (savedContent: string) => void;
   markDirty: () => void;
+  /** #81: a new document session with the current global settings (not shown yet). */
+  createSession: (content: string, options?: SetContentOptions) => DocSession;
+  /** #81: the session the view is showing. */
+  getSession: () => DocSession;
+  /** #81: show another session; global settings (source mode, focus mode…) carry over. */
+  switchSession: (session: DocSession) => void;
+  getSessionContent: (session: DocSession) => string;
+  getSessionState: (session: DocSession) => EditorState;
+  isSessionDirty: (session: DocSession) => boolean;
+  markSessionClean: (session: DocSession, savedContent: string) => void;
+  markSessionDirty: (session: DocSession) => void;
   /** Path of the current document (null = untitled); used to resolve relative image paths. */
   setDocumentPath: (path: string | null) => void;
   /** IM-04: image root folder setting (null = none). */
@@ -135,10 +168,6 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
   const autoPairBracketsCompartment = new Compartment();
   const autoPairMarkdownCompartment = new Compartment();
   const initialContent = options.initialContent ?? "";
-  let unmodifiedContent = initialContent;
-  let savedContent: string | null = initialContent;
-  let hasUserEditsSinceLoad = false;
-  let dirty = false;
   let codeLineNumbers = Boolean(options.initialCodeLineNumbers);
   let mathAutoNumber = Boolean(options.initialMathAutoNumber);
   let focusMode = Boolean(options.initialFocusMode);
@@ -146,7 +175,28 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
   let autoPairBrackets = options.initialAutoPairBrackets ?? true;
   let autoPairMarkdown = Boolean(options.initialAutoPairMarkdown);
 
-  const initialSep = detectLineSeparator(initialContent);
+  let imageRootDir: string | null = null;
+
+  // Compartment contents are shared constants so a tab state can be compared
+  // with the current settings by identity (see globalSyncEffects).
+  const NONE: Extension = [];
+  const CRLF: Extension = EditorState.lineSeparator.of("\r\n");
+  const codeLineNumbersExt = [codeLineNumbersFacet.of(false), codeLineNumbersFacet.of(true)];
+  const mathAutoNumberExt = [mathAutoNumberFacet.of(false), mathAutoNumberFacet.of(true)];
+  const flag = (on: boolean) => (on ? 1 : 0);
+  const globalCompartments = (): Array<[Compartment, Extension]> => [
+    [codeLineNumbersCompartment, codeLineNumbersExt[flag(codeLineNumbers)]],
+    [mathAutoNumberCompartment, mathAutoNumberExt[flag(mathAutoNumber)]],
+    [focusModeCompartment, focusMode ? focusModeExtension : NONE],
+    [typewriterModeCompartment, typewriterMode ? typewriterModeExtension : NONE],
+    [autoPairBracketsCompartment, autoPairBrackets ? autoPairBracketsExtension : NONE],
+    [autoPairMarkdownCompartment, autoPairMarkdown ? autoPairMarkdownExtension : NONE],
+  ];
+  const lineSeparatorFor = (content: string): Extension =>
+    detectLineSeparator(content) === "\r\n" ? CRLF : NONE;
+
+  /** Extensions other modules appended to the view's state (word counter, outline…); every new tab state gets them too. */
+  const appendedExtensions: Extension[] = [];
 
   const sourceModeController = createSourceModeController({
     initialSourceMode: options.initialSourceMode,
@@ -185,19 +235,18 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
     },
   };
 
-  const state = EditorState.create({
-    doc: initialContent,
-    extensions: [
+  const buildExtensions = (content: string): Extension => [
       EditorView.editorAttributes.of({ "data-testid": "editor" }),
-      lineSeparatorCompartment.of(
-        initialSep === "\r\n" ? EditorState.lineSeparator.of("\r\n") : [],
-      ),
-      codeLineNumbersCompartment.of(codeLineNumbersFacet.of(codeLineNumbers)),
-      mathAutoNumberCompartment.of(mathAutoNumberFacet.of(mathAutoNumber)),
-      focusModeCompartment.of(focusMode ? focusModeExtension : []),
-      typewriterModeCompartment.of(typewriterMode ? typewriterModeExtension : []),
-      autoPairBracketsCompartment.of(autoPairBrackets ? autoPairBracketsExtension : []),
-      autoPairMarkdownCompartment.of(autoPairMarkdown ? autoPairMarkdownExtension : []),
+      lineSeparatorCompartment.of(lineSeparatorFor(content)),
+      ...globalCompartments().map(([compartment, ext]) => compartment.of(ext)),
+      EditorState.transactionExtender.of((tr) => {
+        for (const effect of tr.effects) {
+          if (effect.is(StateEffect.appendConfig) && !appendedExtensions.includes(effect.value)) {
+            appendedExtensions.push(effect.value);
+          }
+        }
+        return null;
+      }),
       emojiExtension,
       ...(options.onOpenRelativeLink
         ? [relativeLinkHandlerFacet.of(options.onOpenRelativeLink)]
@@ -218,7 +267,7 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
         completeHTMLTags: false,
         extensions: [mathMarkdownExtension, cjkEmphasisExtension, frontMatterExtension, footnoteExtension],
       }),
-      sourceModeController.extension,
+      sourceModeController.stateExtension(),
       kalamosSearchExtension,
       keymap.of([
         ...kalamosSearchKeymap,
@@ -232,44 +281,104 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
           Boolean(tr.annotation(ExternalLoadAnnotation)),
         );
         if (isExternal) return;
-        hasUserEditsSinceLoad = true;
-        const current = update.state.sliceDoc(0, update.state.doc.length);
-        dirty = current !== savedContent;
-        options.onUserChange?.(current);
+        current.hasUserEditsSinceLoad = true;
+        const text = update.state.sliceDoc(0, update.state.doc.length);
+        current.dirty = text !== current.savedContent;
+        options.onUserChange?.(text);
       }),
-    ],
-  });
+  ];
+
+  function newSessionRecord(state: EditorState, content: string, shouldBeDirty: boolean): DocSession {
+    return {
+      state,
+      unmodifiedContent: content,
+      savedContent: shouldBeDirty ? null : content,
+      hasUserEditsSinceLoad: false,
+      dirty: shouldBeDirty,
+    };
+  }
+
+  function createSessionState(content: string): EditorState {
+    let state = EditorState.create({
+      doc: content,
+      extensions: [buildExtensions(content), ...appendedExtensions],
+    });
+    if (imageRootDir !== null) {
+      state = state.update({ effects: setImageRootSettingEffect.of(imageRootDir) }).state;
+    }
+    return state;
+  }
+
+  let current: DocSession = newSessionRecord(
+    EditorState.create({ doc: initialContent, extensions: buildExtensions(initialContent) }),
+    initialContent,
+    false,
+  );
 
   const view = new EditorView({
-    state,
+    state: current.state,
     parent: options.parent,
   });
 
+  function getSessionState(session: DocSession): EditorState {
+    return session === current ? view.state : session.state;
+  }
+
+  function getSessionContent(session: DocSession): string {
+    if (!session.hasUserEditsSinceLoad) return session.unmodifiedContent;
+    const state = getSessionState(session);
+    return state.sliceDoc(0, state.doc.length);
+  }
+
   function getContent(): string {
-    if (!hasUserEditsSinceLoad) {
-      return unmodifiedContent;
-    }
-    return view.state.sliceDoc(0, view.state.doc.length);
+    return getSessionContent(current);
   }
 
   function setContent(content: string, setOptions?: SetContentOptions): void {
     const shouldBeDirty = Boolean(setOptions?.dirty);
-    unmodifiedContent = content;
-    savedContent = shouldBeDirty ? null : content;
-    hasUserEditsSinceLoad = false;
-    dirty = shouldBeDirty;
-    const sep = detectLineSeparator(content);
+    current.unmodifiedContent = content;
+    current.savedContent = shouldBeDirty ? null : content;
+    current.hasUserEditsSinceLoad = false;
+    current.dirty = shouldBeDirty;
     view.dispatch({
       changes: {
         from: 0,
         to: view.state.doc.length,
         insert: content,
       },
-      effects: lineSeparatorCompartment.reconfigure(
-        sep === "\r\n" ? EditorState.lineSeparator.of("\r\n") : [],
-      ),
+      effects: lineSeparatorCompartment.reconfigure(lineSeparatorFor(content)),
       annotations: ExternalLoadAnnotation.of(true),
     });
+  }
+
+  function createSession(content: string, setOptions?: SetContentOptions): DocSession {
+    const shouldBeDirty = Boolean(setOptions?.dirty);
+    return newSessionRecord(createSessionState(content), content, shouldBeDirty);
+  }
+
+  /** Effects that bring a (background) tab state in line with the current global settings. */
+  function globalSyncEffects(state: EditorState): StateEffect<unknown>[] {
+    const effects: StateEffect<unknown>[] = [];
+    for (const [compartment, ext] of globalCompartments()) {
+      if (compartment.get(state) !== ext) effects.push(compartment.reconfigure(ext));
+    }
+    const sourceEffect = sourceModeController.syncEffect(state);
+    if (sourceEffect) effects.push(sourceEffect);
+    if (state.field(imageRootSettingField) !== imageRootDir) {
+      effects.push(setImageRootSettingEffect.of(imageRootDir));
+    }
+    return effects;
+  }
+
+  function switchSession(next: DocSession): void {
+    if (next === current) return;
+    current.state = view.state;
+    let state = next.state;
+    const effects = globalSyncEffects(state);
+    if (effects.length > 0) state = state.update({ effects }).state;
+    next.state = state;
+    current = next;
+    view.setState(state);
   }
 
   function setCursor(pos: number): void {
@@ -298,9 +407,7 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
   function setCodeLineNumbers(enabled: boolean, notify = false): void {
     codeLineNumbers = enabled;
     view.dispatch({
-      effects: codeLineNumbersCompartment.reconfigure(
-        codeLineNumbersFacet.of(codeLineNumbers),
-      ),
+      effects: codeLineNumbersCompartment.reconfigure(codeLineNumbersExt[flag(codeLineNumbers)]),
     });
     if (notify) {
       options.onCodeLineNumbersChange?.(codeLineNumbers);
@@ -319,9 +426,7 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
   function setMathAutoNumber(enabled: boolean, notify = false): void {
     mathAutoNumber = enabled;
     view.dispatch({
-      effects: mathAutoNumberCompartment.reconfigure(
-        mathAutoNumberFacet.of(mathAutoNumber),
-      ),
+      effects: mathAutoNumberCompartment.reconfigure(mathAutoNumberExt[flag(mathAutoNumber)]),
     });
     if (notify) {
       options.onMathAutoNumberChange?.(mathAutoNumber);
@@ -340,7 +445,7 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
   function setFocusMode(enabled: boolean, notify = false): void {
     focusMode = enabled;
     view.dispatch({
-      effects: focusModeCompartment.reconfigure(focusMode ? focusModeExtension : []),
+      effects: focusModeCompartment.reconfigure(focusMode ? focusModeExtension : NONE),
     });
     if (notify) {
       options.onFocusModeChange?.(focusMode);
@@ -360,7 +465,7 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
     typewriterMode = enabled;
     view.dispatch({
       effects: [
-        typewriterModeCompartment.reconfigure(typewriterMode ? typewriterModeExtension : []),
+        typewriterModeCompartment.reconfigure(typewriterMode ? typewriterModeExtension : NONE),
         ...(typewriterMode
           ? [EditorView.scrollIntoView(view.state.selection.main.head, { y: "center" })]
           : []),
@@ -384,7 +489,7 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
     autoPairBrackets = enabled;
     view.dispatch({
       effects: autoPairBracketsCompartment.reconfigure(
-        autoPairBrackets ? autoPairBracketsExtension : [],
+        autoPairBrackets ? autoPairBracketsExtension : NONE,
       ),
     });
     if (notify) options.onAutoPairBracketsChange?.(autoPairBrackets);
@@ -403,7 +508,7 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
     autoPairMarkdown = enabled;
     view.dispatch({
       effects: autoPairMarkdownCompartment.reconfigure(
-        autoPairMarkdown ? autoPairMarkdownExtension : [],
+        autoPairMarkdown ? autoPairMarkdownExtension : NONE,
       ),
     });
     if (notify) options.onAutoPairMarkdownChange?.(autoPairMarkdown);
@@ -415,21 +520,28 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
   }
 
   function isDirty(): boolean {
-    return dirty;
+    return current.dirty;
   }
 
-  function markClean(justSavedContent: string): void {
-    savedContent = justSavedContent;
-    const current = getContent();
-    dirty = current !== savedContent;
-    if (!dirty) {
-      unmodifiedContent = justSavedContent;
-      hasUserEditsSinceLoad = false;
+  function markSessionClean(session: DocSession, justSavedContent: string): void {
+    session.savedContent = justSavedContent;
+    session.dirty = getSessionContent(session) !== justSavedContent;
+    if (!session.dirty) {
+      session.unmodifiedContent = justSavedContent;
+      session.hasUserEditsSinceLoad = false;
     }
   }
 
+  function markClean(justSavedContent: string): void {
+    markSessionClean(current, justSavedContent);
+  }
+
+  function markSessionDirty(session: DocSession): void {
+    session.dirty = true;
+  }
+
   function markDirty(): void {
-    dirty = true;
+    markSessionDirty(current);
   }
 
   function setDocumentPath(path: string | null): void {
@@ -438,6 +550,7 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
   }
 
   function setImageRootDir(path: string | null): void {
+    imageRootDir = path;
     if (view.state.field(imageRootSettingField) === path) return;
     view.dispatch({ effects: setImageRootSettingEffect.of(path) });
   }
@@ -487,6 +600,17 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
     isDirty,
     markClean,
     markDirty,
+    createSession,
+    getSession: () => {
+      current.state = view.state;
+      return current;
+    },
+    switchSession,
+    getSessionContent,
+    getSessionState,
+    isSessionDirty: (session) => session.dirty,
+    markSessionClean,
+    markSessionDirty,
     setDocumentPath,
     setImageRootDir,
     getImageRootDir,

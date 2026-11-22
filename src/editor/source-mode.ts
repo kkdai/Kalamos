@@ -1,4 +1,4 @@
-import { Compartment, type Extension } from "@codemirror/state";
+import { Compartment, type EditorState, type Extension, type StateEffect } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
 import { blocksExtension } from "./blocks";
 import { codeBlocksExtension } from "./code-blocks";
@@ -25,7 +25,13 @@ export interface SourceModeController {
   isSourceMode: () => boolean;
   setSourceMode: (view: EditorView, enabled: boolean, notify?: boolean) => void;
   toggleSourceMode: (view: EditorView) => boolean;
+  /** #81: like `extension`, but for the current mode (for a newly created tab state). */
+  stateExtension: () => Extension;
+  /** #81: effect that brings another tab's state in line with the current mode (null = already is). */
+  syncEffect: (state: EditorState) => StateEffect<unknown> | null;
 }
+
+const NO_PREVIEW: Extension = [];
 
 export function createSourceModeController(options?: {
   initialSourceMode?: boolean;
@@ -41,7 +47,7 @@ export function createSourceModeController(options?: {
   ): void {
     sourceMode = enabled;
     view.dispatch({
-      effects: compartment.reconfigure(enabled ? [] : richPreviewExtensions),
+      effects: compartment.reconfigure(enabled ? NO_PREVIEW : richPreviewExtensions),
     });
     if (notify) {
       options?.onSourceModeChange?.(sourceMode);
@@ -53,10 +59,17 @@ export function createSourceModeController(options?: {
     return sourceMode;
   }
 
+  const currentExtension = (): Extension => (sourceMode ? NO_PREVIEW : richPreviewExtensions);
+
   return {
-    extension: compartment.of(sourceMode ? [] : richPreviewExtensions),
+    extension: compartment.of(currentExtension()),
     isSourceMode: () => sourceMode,
     setSourceMode,
     toggleSourceMode,
+    stateExtension: () => compartment.of(currentExtension()),
+    syncEffect: (state) =>
+      compartment.get(state) === currentExtension()
+        ? null
+        : compartment.reconfigure(currentExtension()),
   };
 }
