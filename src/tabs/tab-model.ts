@@ -2,6 +2,9 @@
  * #81 A: pure helpers for the document tabs (naming, collision labels,
  * keyboard cycling, which tab becomes active after a close, reordering).
  */
+import { isMarkdownFilePath, MARKDOWN_EXTENSIONS } from "../platform";
+
+export { MARKDOWN_EXTENSIONS };
 
 export const UNTITLED_LABEL = "未命名";
 
@@ -111,13 +114,8 @@ export function moveItem<T>(items: readonly T[], from: number, to: number): T[] 
   return out;
 }
 
-/** Extensions Kalamos opens as documents (same list as open_with.rs / bundle.fileAssociations). */
-export const MARKDOWN_EXTENSIONS = ["md", "markdown", "mdown", "mkd", "mkdn", "mdwn", "mdtxt"];
-
 export function isMarkdownPath(path: string): boolean {
-  const name = baseNameOf(path);
-  const dot = name.lastIndexOf(".");
-  return dot > 0 && MARKDOWN_EXTENSIONS.includes(name.slice(dot + 1).toLowerCase());
+  return isMarkdownFilePath(path);
 }
 
 /**

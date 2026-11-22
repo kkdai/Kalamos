@@ -122,6 +122,8 @@ import {
   type RecoveryEntry,
   type Settings,
 } from "./ipc";
+import { isImportablePath } from "./export/pandoc";
+import { IS_WINDOWS, shortcutLabel } from "./platform";
 import { createSidebar, type SidebarController } from "./sidebar/sidebar";
 import { createTabBar, type TabBar } from "./tabs/tab-bar";
 import {
@@ -296,7 +298,15 @@ export interface KalamosApp {
   destroy: () => void;
 }
 
-export function createKalamosApp(root: Document | HTMLElement = document): KalamosApp {
+export interface CreateKalamosAppOptions {
+  /** Override whether the Windows-only top-left quick controls are shown (defaults to `IS_WINDOWS`). */
+  showQuickButtons?: boolean;
+}
+
+export function createKalamosApp(
+  root: Document | HTMLElement = document,
+  options?: CreateKalamosAppOptions,
+): KalamosApp {
   const editorContainer =
     root.querySelector<HTMLElement>("#editor-container") ??
     (root instanceof HTMLElement ? root : document.body);
@@ -1028,6 +1038,39 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
   };
   window.addEventListener("keydown", onPreferencesKeydown);
 
+  // Windows-only top-left floating quick controls (toggle sidebar + open Markdown file)
+  // until #89 adds a native Windows menu bar. macOS already exposes these in the menu bar.
+  let navWidgetEl: HTMLDivElement | null = null;
+  if (options?.showQuickButtons ?? IS_WINDOWS) {
+    navWidgetEl = document.createElement("div");
+    navWidgetEl.className = "k-sidebar-toggle-widget";
+
+    const sidebarToggleBtn = document.createElement("button");
+    sidebarToggleBtn.type = "button";
+    sidebarToggleBtn.className = "k-theme-btn";
+    sidebarToggleBtn.dataset.testid = "sidebar-toggle-button";
+    sidebarToggleBtn.title = shortcutLabel("切換側欄 (Cmd+Shift+L)");
+    sidebarToggleBtn.setAttribute("aria-label", "切換側欄");
+    sidebarToggleBtn.innerHTML = `<svg class="k-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 4v16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    sidebarToggleBtn.addEventListener("click", () => {
+      void sidebar.toggleVisible();
+    });
+
+    const openFileQuickBtn = document.createElement("button");
+    openFileQuickBtn.type = "button";
+    openFileQuickBtn.className = "k-theme-btn";
+    openFileQuickBtn.dataset.testid = "open-file-button";
+    openFileQuickBtn.title = shortcutLabel("開啟檔案 (Cmd+O)");
+    openFileQuickBtn.setAttribute("aria-label", "開啟檔案");
+    openFileQuickBtn.innerHTML = `<svg class="k-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 3v6h6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    openFileQuickBtn.addEventListener("click", () => {
+      void openDocument();
+    });
+
+    navWidgetEl.append(sidebarToggleBtn, openFileQuickBtn);
+    (editorContainer.parentElement ?? document.body).appendChild(navWidgetEl);
+  }
+
   const onSidebarKeydown = (event: KeyboardEvent) => {
     if (event.defaultPrevented) return;
     if (!(event.metaKey || event.ctrlKey) || !event.shiftKey || event.altKey) {
@@ -1615,10 +1658,21 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
       return close;
     });
     const unlistenDrop = await onFileDrop(async ({ paths, position }) => {
-      // Images go into the current document first; dropped Markdown files then open in tabs.
-      await dropImageFiles(paths, position);
-      for (const path of paths) {
-        if (isMarkdownPath(path)) await openPath(path, "tab");
+      // Images go into the current document first; dropped Markdown files then open in tabs;
+      // otherwise an importable file (DOCX/ODT/EPUB/…) imports via Pandoc into a new tab.
+      const imagePaths = paths.filter((p) => isImageFilePath(p));
+      if (imagePaths.length > 0) {
+        await dropImageFiles(imagePaths, position);
+      }
+      const mdPaths = paths.filter((p) => isMarkdownPath(p));
+      for (const path of mdPaths) {
+        await openPath(path, "tab");
+      }
+      if (imagePaths.length === 0 && mdPaths.length === 0) {
+        const importable = paths.find((p) => isImportablePath(p));
+        if (importable) {
+          await importDocument(importable);
+        }
       }
     }).catch(() => null);
     if (destroyed) {
@@ -1702,6 +1756,7 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
     }
     restoreBtn?.removeEventListener("click", onRestoreClick);
     discardBtn?.removeEventListener("click", onDiscardClick);
+    navWidgetEl?.remove();
     themeMenu.destroy();
     wordCounter.destroy();
     sidebar.destroy();

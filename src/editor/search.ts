@@ -18,6 +18,8 @@
  * - IME: nothing is searched while the query is being composed.
  */
 import "./search.css";
+import { shortcutLabel } from "../platform";
+import { unshifted } from "./keymaps";
 
 import {
   SearchQuery,
@@ -397,10 +399,16 @@ export function closeFind(view: EditorView): boolean {
 }
 
 export const kalamosSearchKeymap: readonly KeyBinding[] = [
-  { key: "Mod-f", preventDefault: true, run: (view) => openFind(view) },
+  { key: "Mod-f", run: unshifted((view) => openFind(view)) },
   { key: "Mod-Alt-f", preventDefault: true, run: (view) => openFind(view, { replace: true }) },
-  { key: "Mod-g", preventDefault: true, run: findNextMatch, shift: findPreviousMatch },
-  { key: "Mod-e", preventDefault: true, run: useSelectionForFind },
+  { key: "Mod-g", run: unshifted(findNextMatch), shift: findPreviousMatch },
+  {
+    key: "Mod-e",
+    run: unshifted((view) => {
+      useSelectionForFind(view);
+      return true;
+    }),
+  },
   { key: "Escape", run: closeFind },
 ];
 
@@ -523,8 +531,8 @@ class KalamosSearchPanel implements Panel {
     this.countEl.dataset.testid = "search-count";
     this.countEl.setAttribute("aria-live", "polite");
 
-    const prev = button("k-search-btn", "search-prev", "上一個（⇧⌘G）", icon(ICONS.up));
-    const next = button("k-search-btn", "search-next", "下一個（⌘G）", icon(ICONS.down));
+    const prev = button("k-search-btn", "search-prev", shortcutLabel("上一個（⇧⌘G）"), icon(ICONS.up));
+    const next = button("k-search-btn", "search-next", shortcutLabel("下一個（⌘G）"), icon(ICONS.down));
     const close = button("k-search-btn", "search-close", "關閉（Esc）", icon(ICONS.close));
 
     const findRow = document.createElement("div");
@@ -536,7 +544,7 @@ class KalamosSearchPanel implements Panel {
     replaceField.className = "k-search-field";
     replaceField.append(this.replaceInput);
     const replaceOne = button("k-search-text-btn", "replace-one", "取代（Enter）", "取代");
-    const replaceEvery = button("k-search-text-btn", "replace-all", "全部取代（⌘Enter）", "全部取代");
+    const replaceEvery = button("k-search-text-btn", "replace-all", shortcutLabel("全部取代（⌘Enter）"), "全部取代");
     const spacer = document.createElement("span");
     spacer.className = "k-search-spacer";
     this.replaceRow = document.createElement("div");

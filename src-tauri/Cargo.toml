@@ -8,7 +8,8 @@ license = "MIT"
 
 [lib]
 name = "kalamos_lib"
-crate-type = ["staticlib", "cdylib", "rlib"]
+# Desktop-only build; add "staticlib" and "cdylib" if mobile targets are enabled.
+crate-type = ["rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -25,6 +26,13 @@ thiserror = "1"
 base64 = "0.22"
 regex = "1"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
+# Canonical paths without the Windows `\\?\` verbatim prefix (no-op elsewhere).
+dunce = "1"
+
+[target.'cfg(any(target_os = "windows", target_os = "linux"))'.dependencies]
+# Windows / Linux hand "Open with" files to a second process: forward them to
+# the running instance instead of opening a second window.
+tauri-plugin-single-instance = "2"
 
 [dev-dependencies]
 tempfile = "3"

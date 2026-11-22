@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>Write, and it appears. ／ 落筆即成文</strong><br />
-  Typora 風格的所見即所得（WYSIWYM）macOS Markdown 桌面編輯器，基於 Tauri 2 與 CodeMirror 6 打造。<br />
+  Typora 風格的所見即所得（WYSIWYM）macOS / Windows Markdown 桌面編輯器，基於 Tauri 2 與 CodeMirror 6 打造。<br />
   免費、完全離線、免帳號、無遙測。
 </p>
 
@@ -122,7 +122,18 @@
 | | 透過 Pandoc 匯出（DOCX/ODT/LaTeX/Wiki/EPUB） | `Cmd+Opt+E` |
 | | 透過 Pandoc 匯入文件 | `Cmd+Opt+I` |
 
+> **Windows 快捷鍵對照**：上表所有 `Cmd` 對應 `Ctrl`、`Opt` 對應 `Alt`（例如 `Cmd+Opt+T` 在 Windows 為 `Ctrl+Alt+T`）。
+
 ---
+
+## 安裝方式（Windows，實驗性）
+
+> Windows 支援目前為**實驗性**且**尚未簽章**（首次執行時 Windows SmartScreen 會跳出警告）。GitHub Releases 尚未提供預先建置的 Windows 安裝檔（即將推出），目前請先從原始碼建置。
+
+1. 依下方[從原始碼建置](#從原始碼建置)步驟建置 Windows 安裝檔（`.msi` 或 `-setup.exe`）。
+2. **WebView2 與 PDF 匯出**：Windows 11 已內建 **WebView2** 與 **Microsoft Edge**；部分 Windows 10 環境（例如 LTSC 或未更新的系統）可能未預載 WebView2，MSI／NSIS 安裝程式已內含 WebView2 bootstrapper。無頭 A4 PDF 匯出與書籤生成會使用 Microsoft Edge（或以 Google Chrome 作為備援）。
+3. 安裝程式會自動註冊 `.md`、`.markdown`、`.mdown`、`.mkd`、`.mkdn`、`.mdwn`、`.mdtxt` 檔案關聯；在檔案總管雙擊或選擇「以 Kalamos 開啟」即可直接於執行中的視窗開啟。
+4. 設定檔與自訂主題目錄位於 `%APPDATA%\io.kalamos.app\`（`settings.json` 與 `themes\*.css`）。
 
 ## 安裝方式（macOS）
 
@@ -141,12 +152,15 @@
 ## 從原始碼建置
 
 ### 環境需求
-- **macOS** 與 Xcode Command Line Tools（`xcode-select --install`）
+- **macOS**（Xcode Command Line Tools：`xcode-select --install`）或 **Windows 10/11**（Visual Studio 2022 C++ Build Tools 與 WebView2）
 - **Node.js** 22 以上與 npm
 - **Rust** stable 工具鏈（`rustup`）
 - **Pandoc** *（選用）* —— 僅在使用 DOCX / ODT / LaTeX / MediaWiki / EPUB 匯出與匯入時需要（匯入需 2.15 以上）：
   ```bash
+  # macOS
   brew install pandoc
+  # Windows
+  winget install JohnMacFarlane.Pandoc
   ```
 
 ### 建置指令
@@ -155,7 +169,7 @@ npm ci
 npm run tauri build
 ```
 
-建置完成後，`.app` 與 `.dmg` 會輸出在 `src-tauri/target/release/bundle/`。
+建置完成後，安裝包會輸出在 `src-tauri/target/release/bundle/`（macOS 為 `.app` / `.dmg`；Windows 為 `msi/*.msi` 與 `nsis/*-setup.exe`，可直接執行的主程式在 `src-tauri/target/release/kalamos.exe`）。
 
 ---
 
@@ -189,10 +203,10 @@ npm run bench
 
 ## 已知限制
 
-- **目前僅支援 macOS**：原生 PDF 匯出依賴 macOS 的 `WKWebView`、`NSPrintOperation` 與 `PDFKit`，尚未提供 Windows / Linux 封裝。
-- **尚未提供圖形化偏好設定視窗**：多數開關可透過快捷鍵切換並自動儲存於 `~/Library/Application Support/io.kalamos.app/settings.json`；圖床上傳設定（`uploadCommand`、`uploadArgs`、`uploadOnInsert`）需直接編輯該檔案。
+- **平台支援（macOS 與實驗性 Windows）**：macOS 使用 `WKWebView`、`NSPrintOperation` 與 `PDFKit` 匯出含書籤的 PDF；Windows 使用系統內建的無頭 Microsoft Edge（或 Google Chrome）渲染 A4 PDF 並自動由 `<h1>`–`<h6>` 產生 PDF 書籤大綱。
+- **偏好設定與圖床上傳設定**：多數一般、編輯器、外觀與圖片設定皆可在偏好設定視窗（`Cmd+,` / `Ctrl+,`）調整並自動儲存於 `~/Library/Application Support/io.kalamos.app/settings.json`（Windows 為 `%APPDATA%\io.kalamos.app\settings.json`）；基於安全考量，圖床上傳指令（`uploadCommand`、`uploadArgs`）仍需直接編輯該檔案。
 - **Pandoc 為外部選用相依**：多格式匯出（`EX-02`）與匯入（`EX-03`）需自行安裝 Pandoc（匯入需 2.15 以上以支援 `--sandbox`）。
-- **未簽章建置**：下載的 `.dmg` 首次啟動時需手動通過 macOS Gatekeeper 驗證。
+- **未簽章建置**：macOS `.dmg` 首次啟動時需手動通過 Gatekeeper 驗證；Windows 建置目前未簽章，執行時會觸發 SmartScreen 警告。
 - **iPic 預設整合**：尚未內建 macOS iPic 預設設定；任何符合 stdout 網址輸出規則的命令列上傳工具皆可作為 `uploadCommand` 使用。
 - **刻意不納入的範疇**：不設帳號、不內建雲端同步（請搭配 iCloud / Dropbox 本機資料夾）、不做多人協作、外掛市集或內建 AI 寫作輔助。
 

@@ -68,7 +68,39 @@ fn main() {
     app.run();
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(target_os = "windows")]
 fn main() {
-    eprintln!("export_pdf_smoke only runs on macOS");
+    use std::time::Instant;
+
+    use kalamos_lib::export::{export_pdf_blocking, ExportHeading, EXPORT_TIMEOUT};
+
+    let args: Vec<String> = std::env::args().collect();
+    if args.len() < 4 {
+        eprintln!("usage: export_pdf_smoke <page.html> <headings.json> <out.pdf> [runs]");
+        std::process::exit(2);
+    }
+    let html = std::fs::read_to_string(&args[1]).expect("read html");
+    let headings: Vec<ExportHeading> =
+        serde_json::from_str(&std::fs::read_to_string(&args[2]).expect("read headings"))
+            .expect("parse headings");
+    let out = args[3].clone();
+    let runs: usize = args.get(4).and_then(|s| s.parse().ok()).unwrap_or(1);
+
+    let mut ok = true;
+    for run in 1..=runs {
+        let started = Instant::now();
+        match export_pdf_blocking(&html, &out, &headings, EXPORT_TIMEOUT) {
+            Ok(meta) => println!("run {run}: {} bytes in {:?}", meta.size, started.elapsed()),
+            Err(err) => {
+                ok = false;
+                println!("run {run}: FAILED {err}");
+            }
+        }
+    }
+    std::process::exit(if ok { 0 } else { 1 });
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+fn main() {
+    eprintln!("export_pdf_smoke only runs on macOS and Windows");
 }

@@ -165,7 +165,7 @@ pub fn import_image_impl(doc_path: &str, source_path: &str) -> Result<ImportedIm
     let assets = dir.join(ASSETS_DIR);
     // Already inside this document's assets folder: reference it instead of copying again.
     if let (Some(src_parent), Some(file_name)) = (source.parent(), source.file_name()) {
-        if let (Ok(a), Ok(b)) = (fs::canonicalize(src_parent), fs::canonicalize(&assets)) {
+        if let (Ok(a), Ok(b)) = (crate::platform::canonicalize(src_parent), crate::platform::canonicalize(&assets)) {
             if a == b {
                 return Ok(ImportedImage {
                     relative_path: relative_asset_path(&file_name.to_string_lossy()),
@@ -278,14 +278,21 @@ fn canonical_home<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Option<PathBu
         .path()
         .home_dir()
         .ok()
-        .or_else(|| std::env::var_os("HOME").map(PathBuf::from))?;
-    Some(fs::canonicalize(&home).unwrap_or(home))
+        .or_else(|| std::env::var_os("HOME").map(PathBuf::from))
+        .or_else(|| std::env::var_os("USERPROFILE").map(PathBuf::from))?;
+    Some(crate::platform::canonicalize(&home).unwrap_or(home))
 }
 
 /// Checks a requested asset folder (e.g. an image root that may come from a
 /// downloaded document's front matter) before it is allowed recursively.
 pub fn check_asset_dir(path: &Path, home: Option<&Path>) -> Result<PathBuf, AppError> {
-    let canonical = fs::canonicalize(path)
+    if path.as_os_str().is_empty() || !path.is_absolute() {
+        return Err(AppError::invalid_path(format!(
+            "Image root folder must be absolute: {}",
+            path.display()
+        )));
+    }
+    let canonical = crate::platform::canonicalize(path)
         .map_err(|_| AppError::invalid_path(format!("Not a folder: {}", path.display())))?;
     if is_too_broad(&canonical, home) {
         return Err(AppError::invalid_path(format!(
@@ -326,7 +333,7 @@ pub fn check_asset_file(path: &Path) -> Result<PathBuf, AppError> {
             path.display()
         )));
     }
-    let canonical = fs::canonicalize(path)
+    let canonical = crate::platform::canonicalize(path)
         .map_err(|_| AppError::not_found(format!("Image not found: {}", path.display())))?;
     if !canonical.is_file() {
         return Err(AppError::invalid_path(format!(
@@ -387,7 +394,7 @@ mod tests {
     #[test]
     fn check_asset_dir_canonicalizes_before_judging() {
         let dir = tempdir().expect("tempdir");
-        let home = fs::canonicalize(dir.path()).unwrap();
+        let home = crate::platform::canonicalize(dir.path()).unwrap();
         let blog = home.join("blog");
         fs::create_dir(&blog).unwrap();
 
@@ -396,12 +403,19 @@ mod tests {
         let err = check_asset_dir(&blog.join(".."), Some(&home)).unwrap_err();
         assert_eq!(err.kind, ErrorKind::InvalidPath);
         assert!(err.message.starts_with(TOO_BROAD_MESSAGE));
-        let err = check_asset_dir(Path::new("/"), Some(&home)).unwrap_err();
+        // The filesystem root (`/` on Unix, `C:\` on Windows) is always too broad.
+        let fs_root = home.ancestors().last().expect("filesystem root");
+        let err = check_asset_dir(fs_root, Some(&home)).unwrap_err();
         assert!(err.message.starts_with(TOO_BROAD_MESSAGE));
         // Missing folders are an InvalidPath error, not "too broad".
         let err = check_asset_dir(&home.join("missing"), Some(&home)).unwrap_err();
         assert_eq!(err.kind, ErrorKind::InvalidPath);
         assert!(!err.message.starts_with(TOO_BROAD_MESSAGE));
+        // Relative or empty folders are rejected without consulting cwd.
+        let err = check_asset_dir(Path::new("relative/root"), Some(&home)).unwrap_err();
+        assert_eq!(err.kind, ErrorKind::InvalidPath);
+        let err = check_asset_dir(Path::new(""), Some(&home)).unwrap_err();
+        assert_eq!(err.kind, ErrorKind::InvalidPath);
     }
 
     const PNG: &[u8] = &[0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 13];
@@ -592,7 +606,7 @@ mod tests {
         fs::write(images.join("UPPER.JPG"), JPG).unwrap();
         let via_parent = posts.join("../images/pic.png");
         let got = check_asset_file(&via_parent).unwrap();
-        assert_eq!(got, fs::canonicalize(images.join("pic.png")).unwrap());
+        assert_eq!(got, crate::platform::canonicalize(images.join("pic.png")).unwrap());
         assert!(check_asset_file(&posts.join("../images/UPPER.JPG")).is_ok());
     }
 
@@ -627,7 +641,7 @@ mod tests {
         );
         assert_eq!(
             check_asset_file(&root.join("link.png")).unwrap(),
-            fs::canonicalize(root.join("real.png")).unwrap()
+            crate::platform::canonicalize(root.join("real.png")).unwrap()
         );
     }
 }

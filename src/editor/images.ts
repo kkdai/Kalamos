@@ -18,6 +18,7 @@ import {
   WidgetType,
 } from "@codemirror/view";
 import { allowAssetDir, allowAssetFile, isAssetDirTooBroadError, localFileUrl } from "../ipc";
+import { IS_WINDOWS, isDrivePath, pathRoot } from "../platform";
 import {
   findTyporaRootUrl,
   hasImageSize,
@@ -73,25 +74,36 @@ export const imageRootSettingField = StateField.define<string | null>({
  * setting. A relative front matter root resolves against the document folder
  * (ignored for untitled documents, which then fall back to the setting).
  */
+function fileUrlToLocalPath(raw: string): string {
+  const pathname = safeDecode(new URL(raw).pathname);
+  // `file:///C:/dir/pic.png` has pathname `/C:/dir/pic.png`.
+  return /^\/[A-Za-z]:\//.test(pathname) ? pathname.slice(1) : pathname;
+}
+
 export function resolveImageRoot(
   frontMatterRoot: string | null,
   docPath: string | null,
   settingRoot: string | null,
+  windows: boolean = IS_WINDOWS,
 ): string | null {
   let fm = frontMatterRoot?.trim() ?? "";
   if (/^file:\/\//i.test(fm)) {
     try {
-      fm = safeDecode(new URL(fm).pathname);
+      fm = fileUrlToLocalPath(fm);
     } catch {
       fm = "";
     }
+  } else if (windows && isDrivePath(fm)) {
+    fm = fm.replace(/\\/g, "/");
   }
-  if (fm && !/^[a-z][a-z0-9+.-]*:/i.test(fm)) {
-    if (fm.startsWith("/")) return joinPath("/", fm);
+  if (fm && ((windows && isDrivePath(fm)) || !/^[a-z][a-z0-9+.-]*:/i.test(fm))) {
+    const fmRoot = pathRoot(fm);
+    if (fmRoot) return joinPath(fmRoot, fm.slice(fmRoot.length));
     if (docPath) return joinPath(dirname(docPath), fm);
   }
-  const setting = settingRoot?.trim() ?? "";
-  return setting.startsWith("/") ? joinPath("/", setting) : null;
+  const setting = (settingRoot?.trim() ?? "").replace(/\\/g, "/");
+  const sRoot = pathRoot(setting);
+  return sRoot ? joinPath(sRoot, setting.slice(sRoot.length)) : null;
 }
 
 /** Effective image root for an editor state. */
@@ -127,19 +139,34 @@ function safeDecode(text: string): string {
 }
 
 export function dirname(path: string): string {
-  const trimmed = path.replace(/\/+$/, "");
+  const norm = path.replace(/\\/g, "/");
+  const root = pathRoot(norm);
+  const trimmed = norm.replace(/\/+$/, "");
+  if (root && `${trimmed}/` === root) return root === "/" ? "/" : trimmed;
   const idx = trimmed.lastIndexOf("/");
   if (idx < 0) return "";
   if (idx === 0) return "/";
-  return trimmed.slice(0, idx);
+  const slice = trimmed.slice(0, idx);
+  return /^[A-Za-z]:$/.test(slice) ? `${slice}/` : slice;
 }
 
 /** Joins `base` (absolute folder) and `relative`, collapsing `.` and `..`. */
 export function joinPath(base: string, relative: string): string {
-  const parts = relative.startsWith("/")
+  const normBase = base.replace(/\\/g, "/");
+  const normRel = relative.replace(/\\/g, "/");
+  const relRoot = pathRoot(normRel);
+  const root =
+    relRoot && !(relRoot === "/" && pathRoot(normBase) && pathRoot(normBase) !== "/")
+      ? relRoot
+      : pathRoot(normBase) || "/";
+  const parts = relRoot
     ? []
-    : base.split("/").filter((p) => p.length > 0);
-  for (const segment of relative.split("/")) {
+    : normBase
+        .slice(pathRoot(normBase).length)
+        .split("/")
+        .filter((p) => p.length > 0);
+  const relTail = relRoot ? normRel.slice(relRoot.length) : normRel;
+  for (const segment of relTail.split("/")) {
     if (!segment || segment === ".") continue;
     if (segment === "..") {
       parts.pop();
@@ -147,7 +174,10 @@ export function joinPath(base: string, relative: string): string {
       parts.push(segment);
     }
   }
-  return `/${parts.join("/")}`;
+  if (parts.length === 0) {
+    return root === "/" ? "/" : root.replace(/\/+$/, "");
+  }
+  return `${root}${parts.join("/")}`;
 }
 
 /** Strips `<...>` brackets and surrounding whitespace from a link destination. */
@@ -184,18 +214,27 @@ export function resolveImageSrc(
   let localPath: string;
   if (/^file:\/\//i.test(src)) {
     try {
-      localPath = safeDecode(new URL(src).pathname);
+      localPath = fileUrlToLocalPath(src);
     } catch {
       return { kind: "invalid", reason: "bad file URL" };
     }
-  } else if (/^[a-z][a-z0-9+.-]*:/i.test(src)) {
+  } else if (!isDrivePath(src) && /^[a-z][a-z0-9+.-]*:/i.test(src)) {
     return { kind: "invalid", reason: "unsupported scheme" };
   } else {
     const withoutSuffix = src.replace(/[?#].*$/, "");
-    const decoded = safeDecode(withoutSuffix);
-    if (decoded.startsWith("/")) {
+    const decoded = safeDecode(withoutSuffix).replace(/\\/g, "/");
+    if (isDrivePath(decoded)) {
+      const dRoot = pathRoot(decoded);
+      localPath = joinPath(dRoot, decoded.slice(dRoot.length));
+    } else if (decoded.startsWith("/")) {
       const fromSlash = joinPath("/", decoded);
-      localPath = root ? joinPath(root, fromSlash.slice(1)) : fromSlash;
+      if (root) {
+        localPath = joinPath(root, fromSlash.slice(1));
+      } else if (docPath && pathRoot(docPath) && pathRoot(docPath) !== "/") {
+        localPath = joinPath(pathRoot(docPath), fromSlash.slice(1));
+      } else {
+        localPath = fromSlash;
+      }
     } else {
       if (!docPath) return { kind: "needs-save" };
       localPath = joinPath(dirname(docPath), decoded);

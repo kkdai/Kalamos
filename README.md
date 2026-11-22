@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>Write, and it appears.</strong><br />
-  A Typora-style WYSIWYM live-preview Markdown desktop editor for macOS, built with Tauri 2 and CodeMirror 6.<br />
+  A Typora-style WYSIWYM live-preview Markdown desktop editor for macOS & Windows, built with Tauri 2 and CodeMirror 6.<br />
   Free, offline, no account, no telemetry.
 </p>
 
@@ -122,7 +122,18 @@
 | | Export via Pandoc (DOCX/ODT/LaTeX/Wiki/EPUB) | `Cmd+Opt+E` |
 | | Import via Pandoc | `Cmd+Opt+I` |
 
+> **Windows shortcuts**: every `Cmd` above maps to `Ctrl` and `Opt` maps to `Alt` (e.g. `Cmd+Opt+T` is `Ctrl+Alt+T`).
+
 ---
+
+## Installation (Windows — Experimental)
+
+> Windows support is currently **experimental** and **unsigned** (Windows SmartScreen may show a warning on first launch). Prebuilt Windows installers are not published on GitHub Releases yet (coming soon) — build from source below for now.
+
+1. Build the Windows installer (`.msi` or `-setup.exe`) from source using the steps under [Building from Source](#building-from-source).
+2. **WebView2 & PDF export**: Windows 11 ships with **WebView2** and **Microsoft Edge**. On Windows 10 (especially LTSC or older builds), WebView2 may not be pre-installed — the MSI / NSIS installers include the WebView2 bootstrapper. Headless A4 PDF export with document outline bookmarks uses Microsoft Edge (or Google Chrome as fallback).
+3. The installer registers `.md`, `.markdown`, `.mdown`, `.mkd`, `.mkdn`, `.mdwn`, and `.mdtxt` file associations; double-clicking or choosing **Open with Kalamos** in File Explorer opens the file in the running window.
+4. Settings and custom CSS themes live in `%APPDATA%\io.kalamos.app\` (`settings.json` and `themes\*.css`).
 
 ## Installation (macOS)
 
@@ -141,12 +152,15 @@
 ## Building from Source
 
 ### Prerequisites
-- **macOS** with Xcode Command Line Tools (`xcode-select --install`)
+- **macOS** with Xcode Command Line Tools (`xcode-select --install`), or **Windows 10/11** with Visual Studio 2022 C++ Build Tools and WebView2
 - **Node.js** 22+ and npm
 - **Rust** stable toolchain (`rustup`)
 - **Pandoc** *(optional)* — only needed for DOCX / ODT / LaTeX / MediaWiki / EPUB export and import (2.15+ required for import):
   ```bash
+  # macOS
   brew install pandoc
+  # Windows
+  winget install JohnMacFarlane.Pandoc
   ```
 
 ### Build Commands
@@ -155,7 +169,7 @@ npm ci
 npm run tauri build
 ```
 
-The built `.app` and `.dmg` bundles will be generated under `src-tauri/target/release/bundle/`.
+The built installers will be generated under `src-tauri/target/release/bundle/` (`.app` and `.dmg` on macOS; `msi/*.msi` and `nsis/*-setup.exe` on Windows, with the standalone binary at `src-tauri/target/release/kalamos.exe`).
 
 ---
 
@@ -189,10 +203,10 @@ npm run bench
 
 ## Known Limitations
 
-- **macOS only**: Native PDF export relies on macOS `WKWebView`, `NSPrintOperation`, and `PDFKit`; Windows and Linux packaging are not supported yet.
-- **No GUI Preferences window yet**: Most toggles work via shortcuts and persist automatically in `~/Library/Application Support/io.kalamos.app/settings.json`; image uploader settings (`uploadCommand`, `uploadArgs`, `uploadOnInsert`) are edited directly in that file.
+- **macOS & Windows (experimental)**: macOS uses `WKWebView`, `NSPrintOperation`, and `PDFKit` for bookmarked PDF export; Windows uses headless Microsoft Edge (or Google Chrome) to paginate onto A4 and build PDF outline bookmarks from `<h1>`–`<h6>`.
+- **Preferences & CLI uploader config**: Preferences (`Cmd+,` / `Ctrl+,`) manage general, editor, appearance, and image settings and persist to `~/Library/Application Support/io.kalamos.app/settings.json` (`%APPDATA%\io.kalamos.app\settings.json` on Windows); for security, CLI image uploader commands (`uploadCommand`, `uploadArgs`) are edited directly in `settings.json`.
 - **Pandoc is external**: Multi-format export (`EX-02`) and import (`EX-03`) require installing Pandoc separately (2.15+ for sandboxed import).
-- **Unsigned macOS builds**: Prebuilt `.dmg` releases require manual Gatekeeper approval on first launch.
+- **Unsigned builds**: Prebuilt macOS `.dmg` releases require manual Gatekeeper approval on first launch; Windows builds are currently unsigned and trigger SmartScreen warnings.
 - **iPic preset**: macOS iPic is not built in as a preset; any CLI image uploader matching the stdout URL contract can be configured as `uploadCommand`.
 - **Out of scope by design**: No accounts, cloud sync service (use local iCloud/Dropbox folders), real-time collaboration, plugin marketplace, or built-in AI assistant.
 

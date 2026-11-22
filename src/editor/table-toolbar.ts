@@ -11,6 +11,7 @@ import {
   type TableAction,
 } from "./table-ops";
 import { findTableAtPos } from "./tables";
+import { shortcutLabel } from "../platform";
 
 /**
  * #59 B: floating table toolbar + context menu + shortcuts.
@@ -316,7 +317,7 @@ export function openTableContextMenu(
       if (spec.shortcut) {
         const kbd = doc.createElement("span");
         kbd.className = "k-table-menu-shortcut";
-        kbd.textContent = spec.shortcut;
+        kbd.textContent = shortcutLabel(spec.shortcut);
         item.append(kbd);
       }
       item.disabled = isActionDisabled(spec.action, target);
@@ -422,7 +423,7 @@ class TableToolbarView implements PluginValue {
         btn.type = "button";
         btn.className = "k-table-toolbar-btn";
         btn.dataset.action = spec.action;
-        btn.title = spec.title;
+        btn.title = shortcutLabel(spec.title);
         btn.setAttribute("aria-label", spec.label);
         if (spec.icon) btn.append(alignIcon(doc, spec.icon));
         else btn.textContent = spec.label;

@@ -1,5 +1,5 @@
-import type { EditorState } from "@codemirror/state";
-import type { EditorView, KeyBinding } from "@codemirror/view";
+import { Prec, type EditorState } from "@codemirror/state";
+import { EditorView, type Command, type KeyBinding } from "@codemirror/view";
 import { expandSpanBeforeCursor } from "./live-preview";
 import {
   copyHeadingBookmark,
@@ -202,6 +202,36 @@ export function toggleLink(view: EditorView): boolean {
   return true;
 }
 
+const lastKeydownShift = new WeakMap<EditorView, boolean>();
+
+/**
+ * Records `event.shiftKey` on every keydown before CodeMirror's `keymap`
+ * (`Prec.default`) runs. Needed by `unshifted()` below.
+ */
+export const trackKeydownExtension = Prec.highest(
+  EditorView.domEventHandlers({
+    keydown(event, view) {
+      lastKeydownShift.set(view, event.shiftKey);
+      return false;
+    },
+  }),
+);
+
+/**
+ * Guards an unshifted single-letter CodeMirror binding (e.g. `Mod-o`) against
+ * firing when Shift is held. CodeMirror's `keymap` drops `Shift-` for
+ * single-character keys (`modifiers(name, event, !isChar)`), so when Caps Lock
+ * is on — or synthetic events send lowercase `key: "o"` with `shiftKey: true`
+ * (e.g. Playwright `Control+Shift+o` on Windows) — `Mod-o` would otherwise
+ * hijack `Mod+Shift+O` before `Shift` bindings or window listeners see it.
+ */
+export function unshifted(cmd: Command): Command {
+  return (view) => {
+    if (lastKeydownShift.get(view)) return false;
+    return cmd(view);
+  };
+}
+
 export function createFileKeymap(handlers: FileCommandHandlers): KeyBinding[] {
   return [
     {
@@ -233,19 +263,17 @@ export function createFileKeymap(handlers: FileCommandHandlers): KeyBinding[] {
     ...tableKeymap,
     {
       key: "Mod-o",
-      preventDefault: true,
-      run: () => {
+      run: unshifted(() => {
         void handlers.onOpenFile();
         return true;
-      },
+      }),
     },
     {
       key: "Mod-s",
-      preventDefault: true,
-      run: () => {
+      run: unshifted(() => {
         void handlers.onSaveFile();
         return true;
-      },
+      }),
     },
     {
       key: "Mod-Shift-s",
@@ -257,11 +285,10 @@ export function createFileKeymap(handlers: FileCommandHandlers): KeyBinding[] {
     },
     {
       key: "Mod-n",
-      preventDefault: true,
-      run: () => {
+      run: unshifted(() => {
         void handlers.onNewFile();
         return true;
-      },
+      }),
     },
     {
       key: "Mod-/",
@@ -273,13 +300,11 @@ export function createFileKeymap(handlers: FileCommandHandlers): KeyBinding[] {
     },
     {
       key: "Mod-b",
-      preventDefault: true,
-      run: (view) => toggleStrong(view),
+      run: unshifted((view) => toggleStrong(view)),
     },
     {
       key: "Mod-i",
-      preventDefault: true,
-      run: (view) => toggleEmphasis(view),
+      run: unshifted((view) => toggleEmphasis(view)),
     },
     {
       key: "Mod-Shift-`",
@@ -293,8 +318,7 @@ export function createFileKeymap(handlers: FileCommandHandlers): KeyBinding[] {
     },
     {
       key: "Mod-k",
-      preventDefault: true,
-      run: (view) => toggleLink(view),
+      run: unshifted((view) => toggleLink(view)),
     },
     {
       key: "Mod-Shift-[",
@@ -356,11 +380,10 @@ export function createFileKeymap(handlers: FileCommandHandlers): KeyBinding[] {
     },
     {
       key: "Mod-Alt-p",
-      preventDefault: true,
-      run: () => {
+      run: unshifted(() => {
         void handlers.onToggleAutoPairBrackets?.();
         return true;
-      },
+      }),
     },
     {
       key: "Mod-Alt-Shift-p",
