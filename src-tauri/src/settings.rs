@@ -18,6 +18,20 @@ pub enum SidebarTab {
     Search,
 }
 
+/// #74: what the app shows when it starts.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub enum StartupBehavior {
+    /// Reopen the last folder in the sidebar (behaviour before #74).
+    #[default]
+    RestoreFolder,
+    /// Start with an empty document and no folder.
+    Blank,
+}
+
+pub const DEFAULT_FONT_SIZE: u32 = 17;
+pub const DEFAULT_CONTENT_WIDTH: u32 = 720;
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Settings {
@@ -44,6 +58,14 @@ pub struct Settings {
     pub auto_pair_brackets: bool,
     /// ED-09: auto-close Markdown * _ ` ~ (Cmd+Opt+Shift+P).
     pub auto_pair_markdown: bool,
+    /// #74 preferences: startup behaviour.
+    pub startup_behavior: StartupBehavior,
+    /// #74 preferences: autosave named documents after typing stops.
+    pub auto_save: bool,
+    /// #74 preferences: editor font size in px (`--k-font-size`).
+    pub font_size: u32,
+    /// #74 preferences: content column width in px (`--k-max-width`).
+    pub content_width: u32,
 }
 
 impl Default for Settings {
@@ -64,6 +86,10 @@ impl Default for Settings {
             upload_on_insert: false,
             auto_pair_brackets: true,
             auto_pair_markdown: false,
+            startup_behavior: StartupBehavior::RestoreFolder,
+            auto_save: true,
+            font_size: DEFAULT_FONT_SIZE,
+            content_width: DEFAULT_CONTENT_WIDTH,
         }
     }
 }
@@ -161,6 +187,10 @@ mod tests {
         assert_eq!(v["uploadOnInsert"], false);
         assert_eq!(v["autoPairBrackets"], true);
         assert_eq!(v["autoPairMarkdown"], false);
+        assert_eq!(v["startupBehavior"], "restoreFolder");
+        assert_eq!(v["autoSave"], true);
+        assert_eq!(v["fontSize"], 17);
+        assert_eq!(v["contentWidth"], 720);
     }
 
     #[test]
@@ -183,6 +213,10 @@ mod tests {
             upload_on_insert: true,
             auto_pair_brackets: false,
             auto_pair_markdown: true,
+            startup_behavior: StartupBehavior::Blank,
+            auto_save: false,
+            font_size: 20,
+            content_width: 960,
         };
         set_settings_in(dir.path(), &updated).expect("set_settings");
         let loaded = get_settings_in(dir.path()).expect("get_settings");
@@ -364,6 +398,40 @@ mod tests {
             serde_json::from_str(&fs::read_to_string(&settings_path).unwrap()).unwrap();
         assert_eq!(raw["autoPairBrackets"], false);
         assert_eq!(raw["autoPairMarkdown"], true);
+        assert_eq!(get_settings_in(dir.path()).unwrap(), loaded);
+    }
+
+    #[test]
+    fn reads_settings_written_before_the_preferences_window() {
+        let dir = tempdir().expect("tempdir");
+        let settings_path = dir.path().join("settings.json");
+        // A settings file written before #74 (v0.1.1).
+        fs::write(
+            &settings_path,
+            r#"{ "theme": "melan", "lastFolder": "/tmp/kalamos-test/notes", "autoPairBrackets": false,
+                 "uploadCommand": "/tmp/kalamos-test/bin/picgo", "uploadArgs": ["upload"] }"#,
+        )
+        .expect("write settings.json");
+        let mut loaded = get_settings_in(dir.path()).expect("load settings");
+        assert_eq!(loaded.theme, "melan");
+        assert!(!loaded.auto_pair_brackets);
+        assert_eq!(loaded.startup_behavior, StartupBehavior::RestoreFolder);
+        assert!(loaded.auto_save);
+        assert_eq!(loaded.font_size, DEFAULT_FONT_SIZE);
+        assert_eq!(loaded.content_width, DEFAULT_CONTENT_WIDTH);
+
+        loaded.startup_behavior = StartupBehavior::Blank;
+        loaded.auto_save = false;
+        loaded.font_size = 19;
+        loaded.content_width = 880;
+        set_settings_in(dir.path(), &loaded).expect("save settings");
+        let raw: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(&settings_path).unwrap()).unwrap();
+        assert_eq!(raw["startupBehavior"], "blank");
+        assert_eq!(raw["autoSave"], false);
+        assert_eq!(raw["fontSize"], 19);
+        assert_eq!(raw["contentWidth"], 880);
+        assert_eq!(raw["uploadCommand"], "/tmp/kalamos-test/bin/picgo");
         assert_eq!(get_settings_in(dir.path()).unwrap(), loaded);
     }
 
