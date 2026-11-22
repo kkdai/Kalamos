@@ -87,7 +87,10 @@ export function insertRow(
  * header (a header-only table is valid). The header row itself cannot be
  * deleted: returns null.
  */
-export function deleteRow(table: ParsedTable, cell: TableCellRef): TableOpResult | null {
+export function deleteRow(
+  table: ParsedTable,
+  cell: TableCellRef,
+): TableOpResult | null {
   if (cell.row < 1 || cell.row > table.bodyRows.length) return null;
   const m = modelOf(table);
   m.body.splice(cell.row - 1, 1);
@@ -109,13 +112,19 @@ export function insertColumn(
 }
 
 /** Delete the column at `cell.col`; deleting the only column deletes the table. */
-export function deleteColumn(table: ParsedTable, cell: TableCellRef): TableOpResult {
+export function deleteColumn(
+  table: ParsedTable,
+  cell: TableCellRef,
+): TableOpResult {
   const m = modelOf(table);
   if (m.header.length <= 1) return deleteTable(table);
   m.header.splice(cell.col, 1);
   m.styles.splice(cell.col, 1);
   for (const row of m.body) row.splice(cell.col, 1);
-  return result(m, { row: cell.row, col: Math.min(cell.col, m.header.length - 1) });
+  return result(m, {
+    row: cell.row,
+    col: Math.min(cell.col, m.header.length - 1),
+  });
 }
 
 /**
@@ -133,7 +142,10 @@ export function setColumnAlign(
 }
 
 /** Alignment written in the delimiter row of `col`, or null for `---`. */
-export function columnAlign(table: ParsedTable, col: number): ColumnAlign | null {
+export function columnAlign(
+  table: ParsedTable,
+  col: number,
+): ColumnAlign | null {
   const style = table.delimiterStyles[col] ?? "default";
   return style === "default" ? null : style;
 }
@@ -252,11 +264,16 @@ export function applyTableOp(
  * and select its first header cell. A non-empty line gets the table on the
  * next lines, separated by a blank line so it doesn't join the paragraph.
  */
-export function insertTable(view: EditorView, rows: number, cols: number): boolean {
+export function insertTable(
+  view: EditorView,
+  rows: number,
+  cols: number,
+): boolean {
   const { state } = view;
   const line = state.doc.lineAt(state.selection.main.head);
   const markdown = newTableMarkdown(rows, cols);
-  const isBlank = (n: number) => n < 1 || n > state.doc.lines || state.doc.line(n).text.trim() === "";
+  const isBlank = (n: number) =>
+    n < 1 || n > state.doc.lines || state.doc.line(n).text.trim() === "";
   const blank = isBlank(line.number);
   // On a blank line the table replaces it; otherwise it goes after the line.
   // A blank line separates it from text before and after.
@@ -303,11 +320,19 @@ export function pipeRowCells(state: EditorState): string[] | null {
   if (sel.main.head < line.from + text.trimEnd().length) return null;
   if (!/^\s{0,3}\|.*\|\s*$/.test(text)) return null;
   // Already a table (header of an existing one, or a row of one above).
-  if (line.number < state.doc.lines && state.doc.line(line.number + 1).text.includes("|")) return null;
-  if (line.number > 1 && state.doc.line(line.number - 1).text.includes("|")) return null;
-  for (let node: ReturnType<ReturnType<typeof syntaxTree>["resolveInner"]> | null = syntaxTree(
-    state,
-  ).resolveInner(line.from, 1); node; node = node.parent) {
+  if (
+    line.number < state.doc.lines &&
+    state.doc.line(line.number + 1).text.includes("|")
+  )
+    return null;
+  if (line.number > 1 && state.doc.line(line.number - 1).text.includes("|"))
+    return null;
+  for (
+    let node: ReturnType<ReturnType<typeof syntaxTree>["resolveInner"]> | null =
+      syntaxTree(state).resolveInner(line.from, 1);
+    node;
+    node = node.parent
+  ) {
     if (NO_AUTO_TABLE_NODES.has(node.name)) return null;
   }
   const cells = splitTableCellsWithRanges(text, line.from).map((c) => c.text);
@@ -327,7 +352,8 @@ export function convertPipeRowToTable(view: EditorView): boolean {
     [emptyRow(cells.length)],
   );
   // A table can't continue a paragraph line: separate it with a blank line.
-  const prevBlank = line.number === 1 || state.doc.line(line.number - 1).text.trim() === "";
+  const prevBlank =
+    line.number === 1 || state.doc.line(line.number - 1).text.trim() === "";
   const prefix = prevBlank ? "" : "\n";
   const tableFrom = line.from + prefix.length;
   const range = cellRangeInMarkdown(markdown, tableFrom, { row: 1, col: 0 });

@@ -1,5 +1,11 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
@@ -7,7 +13,10 @@ import { describe, it } from "node:test";
 import { checkRepoVersions } from "../scripts/check-release-version.mjs";
 import { syncVersion } from "../scripts/sync-version.mjs";
 
-function createFixtureRepo(dir, { targetVersion, oldVersion = "0.4.0", eol = "\n" }) {
+function createFixtureRepo(
+  dir,
+  { targetVersion, oldVersion = "0.4.0", eol = "\n" },
+) {
   mkdirSync(join(dir, "src-tauri"), { recursive: true });
 
   writeFileSync(
@@ -89,7 +98,9 @@ describe("syncVersion", () => {
       const check = checkRepoVersions(dir, "v0.5.0");
       assert.deepEqual(check, { version: "0.5.0", tag: "v0.5.0" });
 
-      const lock = JSON.parse(readFileSync(join(dir, "package-lock.json"), "utf8"));
+      const lock = JSON.parse(
+        readFileSync(join(dir, "package-lock.json"), "utf8"),
+      );
       assert.equal(lock.version, "0.5.0");
       assert.equal(lock.packages[""].version, "0.5.0");
       assert.equal(lock.packages["node_modules/example"].version, "1.2.3");
@@ -116,12 +127,21 @@ describe("syncVersion", () => {
       assert.deepEqual(check, { version: "0.5.1-rc.1", tag: "v0.5.1-rc.1" });
 
       const cargoToml = readFileSync(join(dir, "src-tauri/Cargo.toml"), "utf8");
-      assert.match(cargoToml, /name = "kalamos"\r\nversion = "0\.5\.1-rc\.1"\r\n/);
+      assert.match(
+        cargoToml,
+        /name = "kalamos"\r\nversion = "0\.5\.1-rc\.1"\r\n/,
+      );
 
       const cargoLock = readFileSync(join(dir, "src-tauri/Cargo.lock"), "utf8");
-      assert.match(cargoLock, /name = "kalamos"\r\nversion = "0\.5\.1-rc\.1"\r\n/);
+      assert.match(
+        cargoLock,
+        /name = "kalamos"\r\nversion = "0\.5\.1-rc\.1"\r\n/,
+      );
 
-      const tauriConf = readFileSync(join(dir, "src-tauri/tauri.conf.json"), "utf8");
+      const tauriConf = readFileSync(
+        join(dir, "src-tauri/tauri.conf.json"),
+        "utf8",
+      );
       assert.ok(tauriConf.includes("\r\n"));
     } finally {
       rmSync(dir, { recursive: true, force: true });

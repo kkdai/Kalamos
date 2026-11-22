@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 import { boot, getDoc, newPlatformContext } from "./helpers";
 
 /** #88 (S4): drag-and-drop dispatch for Markdown files, Pandoc-importable files, and mixed images + Markdown. */
@@ -7,19 +7,30 @@ test.beforeEach(async ({ page }) => {
   await boot(page);
 });
 
-async function runWithApp<T>(page: Page, fn: string, arg?: unknown): Promise<T> {
+async function runWithApp<T>(
+  page: Page,
+  fn: string,
+  arg?: unknown,
+): Promise<T> {
   return page.evaluate(
     async ({ fn, arg }) => {
       const main = await import("/src/main.ts" as string);
       const ipc = await import("/src/ipc.ts" as string);
       const app = main.getActiveApp();
-      return new Function("app", "ipc", "arg", `return (async () => { ${fn} })();`)(app, ipc, arg);
+      return new Function(
+        "app",
+        "ipc",
+        "arg",
+        `return (async () => { ${fn} })();`,
+      )(app, ipc, arg);
     },
     { fn, arg },
   );
 }
 
-test("#88 drop: Markdown files open in tabs using tab rules and ignore non-Markdown files", async ({ page }) => {
+test("#88 drop: Markdown files open in tabs using tab rules and ignore non-Markdown files", async ({
+  page,
+}) => {
   await runWithApp(
     page,
     `ipc.seedMockFile('/tmp/kalamos-test/one.md', '# First');
@@ -42,7 +53,9 @@ test("#88 drop: Markdown files open in tabs using tab rules and ignore non-Markd
   expect(await getDoc(page)).toBe("# First");
 });
 
-test("#88 drop: importable DOCX file imports via Pandoc into a new untitled tab", async ({ page }) => {
+test("#88 drop: importable DOCX file imports via Pandoc into a new untitled tab", async ({
+  page,
+}) => {
   await runWithApp(
     page,
     `ipc.seedMockFile('/tmp/kalamos-test/existing.md', 'Existing doc');
@@ -55,11 +68,16 @@ test("#88 drop: importable DOCX file imports via Pandoc into a new untitled tab"
   await expect(tabs).toHaveCount(2);
   await expect(tabs.nth(1)).toHaveAttribute("data-active", "true");
   await expect(tabs.nth(1)).toHaveAttribute("data-dirty", "true");
-  const canned = await runWithApp<string>(page, "return ipc.MOCK_PANDOC_IMPORT_MARKDOWN;");
+  const canned = await runWithApp<string>(
+    page,
+    "return ipc.MOCK_PANDOC_IMPORT_MARKDOWN;",
+  );
   expect(await getDoc(page)).toBe(canned);
 });
 
-test("#88 drop: mixed image + Markdown inserts image in current doc and opens Markdown in a tab", async ({ page }) => {
+test("#88 drop: mixed image + Markdown inserts image in current doc and opens Markdown in a tab", async ({
+  page,
+}) => {
   await runWithApp(
     page,
     `ipc.seedMockFile('/tmp/kalamos-test/doc.md', 'Body\\n');
@@ -78,7 +96,9 @@ test("#88 drop: mixed image + Markdown inserts image in current doc and opens Ma
   expect(await getDoc(page)).toContain("![](assets/pic.png)");
 });
 
-test("#88 UI: top-left floating quick buttons show only on Windows and Preferences use Ctrl/Alt labels", async ({ browser }) => {
+test("#88 UI: top-left floating quick buttons show only on Windows and Preferences use Ctrl/Alt labels", async ({
+  browser,
+}) => {
   // macOS: no top-left floating quick buttons (actions live in the native menu bar).
   const macCtx = await newPlatformContext(browser, "macos");
   try {
@@ -97,17 +117,26 @@ test("#88 UI: top-left floating quick buttons show only on Windows and Preferenc
     await boot(winPage);
     await expect(winPage.getByTestId("open-file-button")).toBeVisible();
     await expect(winPage.getByTestId("sidebar-toggle-button")).toBeVisible();
-    await expect(winPage.getByTestId("open-file-button")).toHaveAttribute("title", "開啟檔案 (Ctrl+O)");
+    await expect(winPage.getByTestId("open-file-button")).toHaveAttribute(
+      "title",
+      "開啟檔案 (Ctrl+O)",
+    );
 
     await runWithApp(winPage, "await app.preferences.open('editor');");
-    await expect(winPage.getByTestId("preferences")).toContainText("Ctrl+Alt+P");
-    await expect(winPage.getByTestId("preferences")).not.toContainText("Cmd+Opt+P");
+    await expect(winPage.getByTestId("preferences")).toContainText(
+      "Ctrl+Alt+P",
+    );
+    await expect(winPage.getByTestId("preferences")).not.toContainText(
+      "Cmd+Opt+P",
+    );
   } finally {
     await winCtx.close();
   }
 });
 
-test("#88 Windows shortcuts: Control+Shift+o opens folder even with lowercase key (Caps Lock / synthetic)", async ({ browser }) => {
+test("#88 Windows shortcuts: Control+Shift+o opens folder even with lowercase key (Caps Lock / synthetic)", async ({
+  browser,
+}) => {
   const winCtx = await newPlatformContext(browser, "windows");
   try {
     const winPage = await winCtx.newPage();
@@ -118,15 +147,28 @@ test("#88 Windows shortcuts: Control+Shift+o opens folder even with lowercase ke
     );
     await winPage.getByTestId("editor").click();
     await winPage.keyboard.press("Control+Shift+o");
-    await expect(winPage.getByTestId("sidebar-folder-title")).toContainText("demo");
-    await expect(winPage.locator("#sidebar")).toHaveAttribute("data-visible", "true");
+    await expect(winPage.getByTestId("sidebar-folder-title")).toContainText(
+      "demo",
+    );
+    await expect(winPage.locator("#sidebar")).toHaveAttribute(
+      "data-visible",
+      "true",
+    );
 
     // Control+o still opens a file, and Control+Shift+s on a saved file still triggers Save As.
     await winPage.getByTestId("editor").click();
     await winPage.keyboard.press("Control+o");
-    await expect.poll(() => runWithApp<string | null>(winPage, "return app.getCurrentPath();")).toBe("/demo/welcome.md");
+    await expect
+      .poll(() =>
+        runWithApp<string | null>(winPage, "return app.getCurrentPath();"),
+      )
+      .toBe("/demo/welcome.md");
     await winPage.keyboard.press("Control+Shift+s");
-    await expect.poll(() => runWithApp<string | null>(winPage, "return app.getCurrentPath();")).toBe("/demo/copy.md");
+    await expect
+      .poll(() =>
+        runWithApp<string | null>(winPage, "return app.getCurrentPath();"),
+      )
+      .toBe("/demo/copy.md");
   } finally {
     await winCtx.close();
   }

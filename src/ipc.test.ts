@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
-  seedMockUploadSettings,
+  type AppError,
   clearRecovery,
   createFile,
   DEFAULT_SETTINGS,
+  type FsChangedPayload,
   getSettings,
   listFiles,
   listRecovery,
@@ -18,13 +19,12 @@ import {
   seedMockCustomTheme,
   seedMockDir,
   seedMockFile,
+  seedMockUploadSettings,
   setSettings,
   trashPath,
   triggerMockFsChanged,
   watchFolder,
   writeRecovery,
-  type AppError,
-  type FsChangedPayload,
 } from "./ipc";
 
 describe("ipc in-memory mock (api.yaml contract)", () => {
@@ -112,7 +112,10 @@ describe("ipc in-memory mock (api.yaml contract)", () => {
     });
 
     await setSettings({ ...updated, focusMode: true, typewriterMode: true });
-    expect(await getSettings()).toMatchObject({ focusMode: true, typewriterMode: true });
+    expect(await getSettings()).toMatchObject({
+      focusMode: true,
+      typewriterMode: true,
+    });
 
     // IM-05: the app can never set the upload command / args (only the file can)…
     await setSettings({
@@ -121,10 +124,19 @@ describe("ipc in-memory mock (api.yaml contract)", () => {
       uploadArgs: ["-c", "touch /tmp/kalamos-test/pwned"],
       uploadOnInsert: true,
     });
-    expect(await getSettings()).toMatchObject({ uploadCommand: null, uploadArgs: [], uploadOnInsert: true });
+    expect(await getSettings()).toMatchObject({
+      uploadCommand: null,
+      uploadArgs: [],
+      uploadOnInsert: true,
+    });
     // …and app writes keep what the user put in the file.
     seedMockUploadSettings("/tmp/kalamos-test/bin/picgo", ["upload"]);
-    await setSettings({ ...(await getSettings()), uploadCommand: null, uploadArgs: [], theme: "papyros" });
+    await setSettings({
+      ...(await getSettings()),
+      uploadCommand: null,
+      uploadArgs: [],
+      theme: "papyros",
+    });
     expect(await getSettings()).toMatchObject({
       theme: "papyros",
       uploadCommand: "/tmp/kalamos-test/bin/picgo",
@@ -142,7 +154,9 @@ describe("ipc in-memory mock (api.yaml contract)", () => {
     expect(tree.children![0].kind).toBe("dir");
     expect(tree.children![0].name).toBe("guides");
     expect(tree.children![0].children).toHaveLength(1);
-    expect(tree.children![0].children![0].path).toBe("/demo/guides/shortcuts.md");
+    expect(tree.children![0].children![0].path).toBe(
+      "/demo/guides/shortcuts.md",
+    );
 
     const welcomeContent = await openFile("/demo/welcome.md");
     for (const prefix of ["# ", "## ", "### ", "#### ", "##### ", "###### "]) {

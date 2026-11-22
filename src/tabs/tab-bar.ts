@@ -90,7 +90,9 @@ export function createTabBar(options: TabBarOptions): TabBar {
   let suppressClick = false;
 
   function scrollActiveIntoView(): void {
-    const activeEl = track.querySelector<HTMLElement>('.k-tab[data-active="true"]');
+    const activeEl = track.querySelector<HTMLElement>(
+      '.k-tab[data-active="true"]',
+    );
     if (!activeEl) return;
     const left = activeEl.offsetLeft;
     const right = left + activeEl.offsetWidth;
@@ -152,9 +154,9 @@ export function createTabBar(options: TabBarOptions): TabBar {
 
   /** Index (among the other tabs) the dragged tab would land at for this pointer x. */
   function dropIndexAt(clientX: number, draggedId: string): number {
-    const others = Array.from(track.querySelectorAll<HTMLElement>(".k-tab")).filter(
-      (el) => el.dataset.tabId !== draggedId,
-    );
+    const others = Array.from(
+      track.querySelectorAll<HTMLElement>(".k-tab"),
+    ).filter((el) => el.dataset.tabId !== draggedId);
     let index = 0;
     for (const el of others) {
       const rect = el.getBoundingClientRect();
@@ -165,7 +167,11 @@ export function createTabBar(options: TabBarOptions): TabBar {
 
   const onMouseDown = (event: MouseEvent) => {
     // Keep the editor's focus and selection; the middle button must not start autoscroll.
-    if (tabFromEvent(event) || event.target === newBtn || newBtn.contains(event.target as Node)) {
+    if (
+      tabFromEvent(event) ||
+      event.target === newBtn ||
+      newBtn.contains(event.target as Node)
+    ) {
       event.preventDefault();
     }
   };
@@ -174,11 +180,18 @@ export function createTabBar(options: TabBarOptions): TabBar {
     if (event.button !== 0) return;
     const tab = tabFromEvent(event);
     if (!tab || (event.target as Element).closest(".k-tab-close")) return;
-    drag = { id: tab.dataset.tabId!, el: tab, pointerId: event.pointerId, startX: event.clientX, dragging: false };
+    drag = {
+      id: tab.dataset.tabId!,
+      el: tab,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      dragging: false,
+    };
   };
 
   const onPointerMove = (event: PointerEvent) => {
-    if (!drag || event.pointerId !== drag.pointerId || !options.onReorder) return;
+    if (!drag || event.pointerId !== drag.pointerId || !options.onReorder)
+      return;
     const dx = event.clientX - drag.startX;
     if (!drag.dragging) {
       if (Math.abs(dx) < DRAG_THRESHOLD_PX) return;

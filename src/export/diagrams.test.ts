@@ -7,7 +7,9 @@ const mermaidMock = vi.hoisted(() => ({
   parse: vi.fn(async (text: string) => {
     const bad = text.split("\n").findIndex((l) => l.includes("BAD"));
     if (bad >= 0) {
-      const err = new Error(`Parse error on line ${bad + 1}:\n...BAD\n---^\nExpecting 'SPACE'`) as Error & {
+      const err = new Error(
+        `Parse error on line ${bad + 1}:\n...BAD\n---^\nExpecting 'SPACE'`,
+      ) as Error & {
         hash: unknown;
       };
       err.hash = { loc: { first_line: bad + 1 } };
@@ -30,11 +32,16 @@ const mermaidMock = vi.hoisted(() => ({
 
 vi.mock("mermaid", () => ({ default: mermaidMock }));
 
-import { clearDiagramCache, readDiagramTheme, renderDiagram } from "../editor/diagrams";
-import { PRINT_DIAGRAM_THEME, isStaticSvg, scopeSvgIds } from "./diagrams";
+import {
+  clearDiagramCache,
+  readDiagramTheme,
+  renderDiagram,
+} from "../editor/diagrams";
+import { isStaticSvg, PRINT_DIAGRAM_THEME, scopeSvgIds } from "./diagrams";
 import { buildExportHtml } from "./html";
 
-const body = (html: string) => html.slice(html.indexOf("<body>"), html.indexOf("</body>"));
+const body = (html: string) =>
+  html.slice(html.indexOf("<body>"), html.indexOf("</body>"));
 const fence = (info: string, src: string) => `\`\`\`${info}\n${src}\n\`\`\``;
 
 beforeEach(() => {
@@ -56,8 +63,11 @@ describe("#37 diagrams in the export HTML", () => {
       fence("sequence", "Alice->Bob: Hello"),
       fence("js", "let notADiagram = 1;"),
     ].join("\n\n");
-    const html = body((await buildExportHtml(md, { title: "t", docPath: null })).html);
-    const figures = html.match(/<figure class="k-diagram" data-kind="(\w+)"><svg/g) ?? [];
+    const html = body(
+      (await buildExportHtml(md, { title: "t", docPath: null })).html,
+    );
+    const figures =
+      html.match(/<figure class="k-diagram" data-kind="(\w+)"><svg/g) ?? [];
     expect(figures).toHaveLength(3);
     expect(html).toContain('data-kind="mermaid"');
     expect(html).toContain('data-kind="flow"');
@@ -71,21 +81,39 @@ describe("#37 diagrams in the export HTML", () => {
 
   it("exports a broken diagram as its code plus a short red error line", async () => {
     const md = fence("mermaid", "flowchart TD\n  A --> BAD");
-    const html = body((await buildExportHtml(md, { title: "t", docPath: null })).html);
+    const html = body(
+      (await buildExportHtml(md, { title: "t", docPath: null })).html,
+    );
     expect(html).not.toContain("<svg");
-    expect(html).toContain('<pre class="k-code" data-lang="mermaid"><code>flowchart TD\n  A --&gt; BAD</code></pre>');
-    expect(html).toContain('<p class="k-diagram-error">圖表語法錯誤（第 2 行）：Parse error on line 2:</p>');
+    expect(html).toContain(
+      '<pre class="k-code" data-lang="mermaid"><code>flowchart TD\n  A --&gt; BAD</code></pre>',
+    );
+    expect(html).toContain(
+      '<p class="k-diagram-error">圖表語法錯誤（第 2 行）：Parse error on line 2:</p>',
+    );
   });
 
   it("an unclosed fence stays plain code", async () => {
-    const html = body((await buildExportHtml("```mermaid\nflowchart TD\nA-->B", { title: "t", docPath: null })).html);
+    const html = body(
+      (
+        await buildExportHtml("```mermaid\nflowchart TD\nA-->B", {
+          title: "t",
+          docPath: null,
+        })
+      ).html,
+    );
     expect(html).not.toContain("<svg");
     expect(mermaidMock.render).not.toHaveBeenCalled();
   });
 
   it("never outputs scripts, foreignObject or event handlers", async () => {
-    const md = [fence("mermaid", "flowchart TD\nA-->B"), fence("sequence", "A->B: hi")].join("\n\n");
-    const html = body((await buildExportHtml(md, { title: "t", docPath: null })).html);
+    const md = [
+      fence("mermaid", "flowchart TD\nA-->B"),
+      fence("sequence", "A->B: hi"),
+    ].join("\n\n");
+    const html = body(
+      (await buildExportHtml(md, { title: "t", docPath: null })).html,
+    );
     expect(html).toContain("<svg");
     expect(html).not.toMatch(/<script/i);
     expect(html).not.toMatch(/foreignObject/i);
@@ -95,13 +123,24 @@ describe("#37 diagrams in the export HTML", () => {
 
   it("gives every diagram its own ids, even identical (cached) ones", async () => {
     const same = fence("mermaid", "flowchart TD\nA-->B");
-    const html = body((await buildExportHtml(`${same}\n\n${same}`, { title: "t", docPath: null })).html);
+    const html = body(
+      (
+        await buildExportHtml(`${same}\n\n${same}`, {
+          title: "t",
+          docPath: null,
+        })
+      ).html,
+    );
     expect(mermaidMock.render).toHaveBeenCalledTimes(1); // second one came from the cache
     const ids = [...html.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]);
     expect(ids.length).toBeGreaterThanOrEqual(6);
     expect(new Set(ids).size).toBe(ids.length);
-    expect(ids.filter((id) => id.startsWith("k-export-diagram-1-"))).toHaveLength(3);
-    expect(ids.filter((id) => id.startsWith("k-export-diagram-2-"))).toHaveLength(3);
+    expect(
+      ids.filter((id) => id.startsWith("k-export-diagram-1-")),
+    ).toHaveLength(3);
+    expect(
+      ids.filter((id) => id.startsWith("k-export-diagram-2-")),
+    ).toHaveLength(3);
     // References and style selectors follow the renamed ids.
     for (const m of html.matchAll(/url\(#([^)]+)\)|#(k-export-[\w-]+)\s/g)) {
       expect(ids).toContain(m[1] ?? m[2]);
@@ -117,7 +156,10 @@ describe("#37 diagrams in the export HTML", () => {
     await renderDiagram("mermaid", "flowchart TD\nX-->Y", editorTheme);
     expect(mermaidMock.initialize.mock.calls.at(-1)?.[0].darkMode).toBe(true);
     // …the export still switches Mermaid to the light print theme.
-    await buildExportHtml(fence("mermaid", "flowchart TD\nA-->B"), { title: "t", docPath: null });
+    await buildExportHtml(fence("mermaid", "flowchart TD\nA-->B"), {
+      title: "t",
+      docPath: null,
+    });
     const config = mermaidMock.initialize.mock.calls.at(-1)?.[0] as {
       darkMode: boolean;
       themeVariables: Record<string, unknown>;
@@ -133,9 +175,12 @@ describe("#37 diagrams in the export HTML", () => {
   });
 
   it("renders 20 diagrams sequentially in reasonable time", async () => {
-    const md = Array.from({ length: 20 }, (_, i) => fence("mermaid", `flowchart TD\nA${i}-->B${i}`)).join("\n\n");
+    const md = Array.from({ length: 20 }, (_, i) =>
+      fence("mermaid", `flowchart TD\nA${i}-->B${i}`),
+    ).join("\n\n");
     const t0 = performance.now();
-    const html = (await buildExportHtml(md, { title: "t", docPath: null })).html;
+    const html = (await buildExportHtml(md, { title: "t", docPath: null }))
+      .html;
     expect(performance.now() - t0).toBeLessThan(5000);
     expect(html.match(/<figure class="k-diagram"/g)).toHaveLength(20);
     expect(mermaidMock.render).toHaveBeenCalledTimes(20);
@@ -158,7 +203,9 @@ describe("#37 helpers", () => {
   });
 
   it("isStaticSvg rejects executable content but not label text", () => {
-    expect(isStaticSvg('<svg><text>one = two, javascript: rocks</text></svg>')).toBe(true);
+    expect(
+      isStaticSvg("<svg><text>one = two, javascript: rocks</text></svg>"),
+    ).toBe(true);
     expect(isStaticSvg("<svg><script>x</script></svg>")).toBe(false);
     expect(isStaticSvg('<svg onload="x"></svg>')).toBe(false);
     expect(isStaticSvg("<svg><foreignObject/></svg>")).toBe(false);

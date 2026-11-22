@@ -11,7 +11,9 @@ const mermaidMock = vi.hoisted(() => ({
     const lines = text.split("\n");
     const bad = lines.findIndex((l) => l.includes("BAD"));
     if (bad >= 0) {
-      const err = new Error(`Parse error on line ${bad + 1}:\n...BAD\n---^`) as Error & {
+      const err = new Error(
+        `Parse error on line ${bad + 1}:\n...BAD\n---^`,
+      ) as Error & {
         hash: unknown;
       };
       err.hash = { loc: { first_line: bad + 1 } };
@@ -33,6 +35,7 @@ import {
   buildDiagramDecorations,
   clearDiagramCache,
   collectDiagramBlocks,
+  type DiagramTheme,
   DiagramWidget,
   diagramRefreshEffect,
   diagramStateField,
@@ -47,7 +50,6 @@ import {
   resolveDiagramKind,
   sequenceToMermaid,
   setDiagramThemeEffect,
-  type DiagramTheme,
 } from "./diagrams";
 import { createSourceModeController } from "./source-mode";
 
@@ -69,10 +71,12 @@ interface WidgetInfo {
 
 function widgets(state: EditorState): WidgetInfo[] {
   const out: WidgetInfo[] = [];
-  state.field(diagramStateField).decorations.between(0, state.doc.length, (from, to, v) => {
-    const w = v.spec.widget;
-    if (w instanceof DiagramWidget) out.push({ from, to, widget: w });
-  });
+  state
+    .field(diagramStateField)
+    .decorations.between(0, state.doc.length, (from, to, v) => {
+      const w = v.spec.widget;
+      if (w instanceof DiagramWidget) out.push({ from, to, widget: w });
+    });
   return out;
 }
 
@@ -126,7 +130,9 @@ describe("block detection", () => {
     expect(blocks).toHaveLength(1);
     expect(blocks[0].source).toBe("flowchart TD\n  A --> B");
     expect(blocks[0].active).toBe(false);
-    expect(collectDiagramBlocks(createState("```mermaid\nflowchart TD\nA-->B"))).toHaveLength(0);
+    expect(
+      collectDiagramBlocks(createState("```mermaid\nflowchart TD\nA-->B")),
+    ).toHaveLength(0);
   });
 });
 
@@ -136,7 +142,9 @@ describe("decorations", () => {
     const ws = widgets(state);
     expect(ws).toHaveLength(1);
     expect(ws[0].widget.isPreview).toBe(false);
-    expect(state.sliceDoc(ws[0].from, ws[0].to)).toBe("```mermaid\nflowchart TD\n  A --> B\n```");
+    expect(state.sliceDoc(ws[0].from, ws[0].to)).toBe(
+      "```mermaid\nflowchart TD\n  A --> B\n```",
+    );
   });
 
   it("cursor inside: source stays, a preview widget follows the closing fence", () => {
@@ -151,7 +159,9 @@ describe("decorations", () => {
 
   it("moving the cursor in and out switches widget kind", () => {
     let state = createState(FLOW_DOC);
-    state = state.update({ selection: { anchor: FLOW_DOC.indexOf("A -->") } }).state;
+    state = state.update({
+      selection: { anchor: FLOW_DOC.indexOf("A -->") },
+    }).state;
     expect(widgets(state)[0].widget.isPreview).toBe(true);
     state = state.update({ selection: { anchor: 0 } }).state;
     expect(widgets(state)[0].widget.isPreview).toBe(false);
@@ -160,8 +170,13 @@ describe("decorations", () => {
   it("typing inside updates the preview source", () => {
     const pos = FLOW_DOC.indexOf("A --> B") + "A --> B".length;
     let state = createState(FLOW_DOC, pos);
-    state = state.update({ changes: { from: pos, insert: "\n  B --> C" }, userEvent: "input.type" }).state;
-    expect(widgets(state)[0].widget.source).toBe("flowchart TD\n  A --> B\n  B --> C");
+    state = state.update({
+      changes: { from: pos, insert: "\n  B --> C" },
+      userEvent: "input.type",
+    }).state;
+    expect(widgets(state)[0].widget.source).toBe(
+      "flowchart TD\n  A --> B\n  B --> C",
+    );
   });
 
   it("IME composition maps decorations without rebuilding; compositionend refreshes", () => {
@@ -186,7 +201,8 @@ describe("decorations", () => {
   });
 
   it("buildDiagramDecorations covers every diagram kind", () => {
-    const doc = "```flow\na=>start: A\n```\n\n```sequence\nA->B: hi\n```\n\n```mermaid\ngantt\n```\n\nx";
+    const doc =
+      "```flow\na=>start: A\n```\n\n```sequence\nA->B: hi\n```\n\n```mermaid\ngantt\n```\n\nx";
     const set = buildDiagramDecorations(createState(doc));
     const kinds: string[] = [];
     set.between(0, doc.length, (_f, _t, v) => {
@@ -202,7 +218,11 @@ describe("rendering", () => {
     await settle();
     expect(isDiagramEngineLoaded()).toBe(true);
     const cfg = mermaidMock.initialize.mock.calls[0][0];
-    expect(cfg).toMatchObject({ startOnLoad: false, securityLevel: "strict", htmlLabels: false });
+    expect(cfg).toMatchObject({
+      startOnLoad: false,
+      securityLevel: "strict",
+      htmlLabels: false,
+    });
     const el = view.dom.querySelector<HTMLElement>("[data-testid=diagram]");
     expect(el?.dataset.state).toBe("rendered");
     const svg = el!.querySelector("svg");
@@ -216,7 +236,9 @@ describe("rendering", () => {
     const doc = "```mermaid\nflowchart TD\n  A --> BAD\n```\n\nend";
     const view = mount(doc);
     await settle();
-    const err = view.dom.querySelector<HTMLElement>("[data-testid=diagram-error]");
+    const err = view.dom.querySelector<HTMLElement>(
+      "[data-testid=diagram-error]",
+    );
     expect(err).not.toBeNull();
     expect(err!.dataset.line).toBe("2");
     expect(err!.textContent).toContain("第 2 行");
@@ -237,7 +259,9 @@ describe("rendering", () => {
     await renderDiagram("mermaid", "flowchart TD\nA-->B", t1);
     await renderDiagram("mermaid", "flowchart TD\nA-->B", t1);
     expect(mermaidMock.render).toHaveBeenCalledTimes(1);
-    expect(getCachedDiagram("mermaid", "flowchart TD\nA-->B", t1)?.svg).toContain("<svg");
+    expect(
+      getCachedDiagram("mermaid", "flowchart TD\nA-->B", t1)?.svg,
+    ).toContain("<svg");
     await renderDiagram("mermaid", "flowchart TD\nA-->B", t2);
     expect(mermaidMock.render).toHaveBeenCalledTimes(2);
 
@@ -247,8 +271,12 @@ describe("rendering", () => {
       await renderDiagram("mermaid", `flowchart TD\nN${i}`, t1);
     }
     expect(getDiagramCacheSize()).toBe(MAX_DIAGRAM_CACHE_ENTRIES);
-    expect(getCachedDiagram("mermaid", "flowchart TD\nA-->B", t1)).toBeDefined();
-    expect(getCachedDiagram("mermaid", "flowchart TD\nA-->B", t2)).toBeUndefined();
+    expect(
+      getCachedDiagram("mermaid", "flowchart TD\nA-->B", t1),
+    ).toBeDefined();
+    expect(
+      getCachedDiagram("mermaid", "flowchart TD\nA-->B", t2),
+    ).toBeUndefined();
   });
 
   it("flow / sequence errors map back to the source line", async () => {
@@ -269,7 +297,10 @@ describe("source mode", () => {
       state: EditorState.create({
         doc: FLOW_DOC,
         selection: EditorSelection.cursor(FLOW_DOC.length),
-        extensions: [markdown({ base: markdownLanguage }), controller.extension],
+        extensions: [
+          markdown({ base: markdownLanguage }),
+          controller.extension,
+        ],
       }),
       parent,
     });
@@ -323,7 +354,9 @@ describe("translations", () => {
 
   it("mermaid config never allows directives to lower security", () => {
     const cfg = mermaidConfig(readDiagramTheme());
-    expect(cfg.secure).toEqual(expect.arrayContaining(["securityLevel", "htmlLabels"]));
+    expect(cfg.secure).toEqual(
+      expect.arrayContaining(["securityLevel", "htmlLabels"]),
+    );
     expect(cfg.theme).toBe("base");
   });
 });

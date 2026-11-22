@@ -15,7 +15,12 @@
 import "./writing-modes.css";
 
 import { syntaxTree } from "@codemirror/language";
-import { EditorState, type Extension, type Range, type Transaction } from "@codemirror/state";
+import {
+  EditorState,
+  type Extension,
+  type Range,
+  type Transaction,
+} from "@codemirror/state";
 import {
   Decoration,
   type DecorationSet,
@@ -48,8 +53,10 @@ function topLevelAt(state: EditorState, pos: number): SyntaxNode | null {
   const tree = syntaxTree(state);
   for (const side of [-1, 1] as const) {
     let node: SyntaxNode | null = tree.resolveInner(pos, side);
-    while (node && node.parent && node.parent.name !== "Document") node = node.parent;
-    if (node && node.name !== "Document" && node.from <= pos && pos <= node.to) return node;
+    while (node && node.parent && node.parent.name !== "Document")
+      node = node.parent;
+    if (node && node.name !== "Document" && node.from <= pos && pos <= node.to)
+      return node;
   }
   return null;
 }
@@ -61,7 +68,11 @@ function listItemAt(list: SyntaxNode, pos: number): SyntaxNode | null {
   while (node) {
     let next: SyntaxNode | null = null;
     for (let c: SyntaxNode | null = node.firstChild; c; c = c.nextSibling) {
-      if (c.from <= pos && pos <= c.to && (c.name === "ListItem" || LIST_NAMES.has(c.name))) {
+      if (
+        c.from <= pos &&
+        pos <= c.to &&
+        (c.name === "ListItem" || LIST_NAMES.has(c.name))
+      ) {
         next = c;
         if (c.name === "ListItem") found = c;
         break;
@@ -144,7 +155,8 @@ export function dimmedLineStarts(
     let pos = state.doc.lineAt(r.from).from;
     while (pos <= r.to && pos <= state.doc.length) {
       const line = state.doc.lineAt(pos);
-      if (line.from > last && !isInSpans(current, line.from)) out.push(line.from);
+      if (line.from > last && !isInSpans(current, line.from))
+        out.push(line.from);
       last = Math.max(last, line.from);
       if (line.to >= state.doc.length) break;
       pos = line.to + 1;
@@ -168,10 +180,13 @@ export const focusModePlugin = ViewPlugin.fromClass(
     rebuild(): void {
       const { view } = this;
       this.current = currentBlocks(view.state);
-      const ranges = view.visibleRanges.length > 0 ? view.visibleRanges : [view.viewport];
-      const decos: Array<Range<Decoration>> = dimmedLineStarts(view.state, ranges, this.current).map(
-        (from) => dimLine.range(from),
-      );
+      const ranges =
+        view.visibleRanges.length > 0 ? view.visibleRanges : [view.viewport];
+      const decos: Array<Range<Decoration>> = dimmedLineStarts(
+        view.state,
+        ranges,
+        this.current,
+      ).map((from) => dimLine.range(from));
       this.decorations = Decoration.set(decos);
       this.scheduleWidgetPass();
     }
@@ -184,26 +199,35 @@ export const focusModePlugin = ViewPlugin.fromClass(
         read: () => {
           const updates: Array<[Element, boolean]> = [];
           for (const el of Array.from(view.contentDOM.children)) {
-            if (el.classList.contains("cm-line") || el.classList.contains("cm-widgetBuffer")) continue;
+            if (
+              el.classList.contains("cm-line") ||
+              el.classList.contains("cm-widgetBuffer")
+            )
+              continue;
             let pos: number;
             try {
               pos = view.posAtDOM(el);
             } catch {
               continue;
             }
-            updates.push([el, !isInSpans(this.current, view.state.doc.lineAt(pos).from)]);
+            updates.push([
+              el,
+              !isInSpans(this.current, view.state.doc.lineAt(pos).from),
+            ]);
           }
           return updates;
         },
         write: (updates) => {
-          for (const [el, dim] of updates) el.classList.toggle(FOCUS_DIM_CLASS, dim);
+          for (const [el, dim] of updates)
+            el.classList.toggle(FOCUS_DIM_CLASS, dim);
         },
       });
     }
 
     update(update: ViewUpdate): void {
       if (this.isComposing || update.view.composing) {
-        if (update.docChanged) this.decorations = this.decorations.map(update.changes);
+        if (update.docChanged)
+          this.decorations = this.decorations.map(update.changes);
         return;
       }
       if (
@@ -219,7 +243,9 @@ export const focusModePlugin = ViewPlugin.fromClass(
     }
 
     destroy(): void {
-      for (const el of Array.from(this.view.contentDOM.querySelectorAll(`.${FOCUS_DIM_CLASS}`))) {
+      for (const el of Array.from(
+        this.view.contentDOM.querySelectorAll(`.${FOCUS_DIM_CLASS}`),
+      )) {
         el.classList.remove(FOCUS_DIM_CLASS);
       }
     }
@@ -259,14 +285,19 @@ export const focusModeExtension: Extension = [
 /** Should this transaction re-centre the cursor line? */
 export function wantsTypewriterScroll(tr: Transaction): boolean {
   if (!tr.docChanged && !tr.selection) return false;
-  if (tr.isUserEvent("select.pointer") || tr.isUserEvent("input.type.compose")) return false;
+  if (tr.isUserEvent("select.pointer") || tr.isUserEvent("input.type.compose"))
+    return false;
   // Keyboard commands and typing ask CodeMirror to scroll the cursor into view.
   return tr.scrollIntoView;
 }
 
 const typewriterExtender = EditorState.transactionExtender.of((tr) => {
   if (!wantsTypewriterScroll(tr)) return null;
-  return { effects: EditorView.scrollIntoView(tr.newSelection.main.head, { y: "center" }) };
+  return {
+    effects: EditorView.scrollIntoView(tr.newSelection.main.head, {
+      y: "center",
+    }),
+  };
 });
 
 const typewriterCompositionEnd = EditorView.domEventHandlers({
@@ -275,7 +306,9 @@ const typewriterCompositionEnd = EditorView.domEventHandlers({
       if (view.composing) return;
       try {
         view.dispatch({
-          effects: EditorView.scrollIntoView(view.state.selection.main.head, { y: "center" }),
+          effects: EditorView.scrollIntoView(view.state.selection.main.head, {
+            y: "center",
+          }),
         });
       } catch {
         // view destroyed
@@ -291,6 +324,7 @@ export const typewriterModeExtension: Extension = [
   EditorView.editorAttributes.of({ class: "k-typewriter-mode" }),
 ];
 
-export const FOCUS_MODE_MESSAGE = (on: boolean): string => `Ataraxia 專注模式：${on ? "開" : "關"}`;
+export const FOCUS_MODE_MESSAGE = (on: boolean): string =>
+  `Ataraxia 專注模式：${on ? "開" : "關"}`;
 export const TYPEWRITER_MODE_MESSAGE = (on: boolean): string =>
   `Stichos 打字機模式：${on ? "開" : "關"}`;

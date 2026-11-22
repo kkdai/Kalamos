@@ -71,7 +71,10 @@ describe("Fenced Code Blocks (BL-02) & Math Formulas (BL-03)", () => {
     // Place cursor in trailing paragraph outside the fenced code block
     app.editor.setCursor(doc.length - 2);
 
-    await ensureCodeBlockLanguagesLoaded(app.editor.view.state, app.editor.view);
+    await ensureCodeBlockLanguagesLoaded(
+      app.editor.view.state,
+      app.editor.view,
+    );
 
     // Language badge appears at top-right when cursor is outside the fenced block
     const badge = app.editor.view.contentDOM.querySelector<HTMLElement>(
@@ -113,7 +116,9 @@ describe("Fenced Code Blocks (BL-02) & Math Formulas (BL-03)", () => {
     );
     expect(hiddenFences.length).toBe(2);
     expect(
-      app.editor.view.contentDOM.querySelector('[data-testid="code-lang-badge"]'),
+      app.editor.view.contentDOM.querySelector(
+        '[data-testid="code-lang-badge"]',
+      ),
     ).not.toBeNull();
 
     // Move cursor inside code block
@@ -121,13 +126,16 @@ describe("Fenced Code Blocks (BL-02) & Math Formulas (BL-03)", () => {
     app.editor.setCursor(insidePos);
 
     expect(
-      app.editor.view.contentDOM.querySelectorAll(".k-code-fence-hidden").length,
+      app.editor.view.contentDOM.querySelectorAll(".k-code-fence-hidden")
+        .length,
     ).toBe(0);
     expect(
       app.editor.view.contentDOM.querySelectorAll(".k-code-fence-mark").length,
     ).toBe(2);
     expect(
-      app.editor.view.contentDOM.querySelector('[data-testid="code-lang-badge"]'),
+      app.editor.view.contentDOM.querySelector(
+        '[data-testid="code-lang-badge"]',
+      ),
     ).toBeNull();
   });
 
@@ -341,8 +349,9 @@ describe("Fenced Code Blocks (BL-02) & Math Formulas (BL-03)", () => {
     // Initially mathAutoNumber is false -> no equation numbers
     expect(app.editor.isMathAutoNumber()).toBe(false);
     expect(
-      app.editor.view.contentDOM.querySelectorAll('[data-testid="math-eq-number"]')
-        .length,
+      app.editor.view.contentDOM.querySelectorAll(
+        '[data-testid="math-eq-number"]',
+      ).length,
     ).toBe(0);
 
     // Toggle mathAutoNumber ON via Cmd+Opt+N

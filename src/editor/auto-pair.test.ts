@@ -1,5 +1,9 @@
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
-import { EditorSelection, EditorState, type Extension } from "@codemirror/state";
+import {
+  EditorSelection,
+  EditorState,
+  type Extension,
+} from "@codemirror/state";
 import { EditorView, runScopeHandlers } from "@codemirror/view";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { getSettings, resetMockState } from "../ipc";
@@ -11,7 +15,12 @@ import {
   autoPairMarkdownExtension,
 } from "./auto-pair";
 
-function mount(doc: string, cursor: number, extensions: Extension[], anchor = cursor): EditorView {
+function mount(
+  doc: string,
+  cursor: number,
+  extensions: Extension[],
+  anchor = cursor,
+): EditorView {
   const parent = document.createElement("div");
   document.body.appendChild(parent);
   return new EditorView({
@@ -45,7 +54,11 @@ function backspace(view: EditorView): void {
   const event = new KeyboardEvent("keydown", { key: "Backspace", keyCode: 8 });
   if (!runScopeHandlers(view, event, "editor")) {
     const { head } = view.state.selection.main;
-    if (head > 0) view.dispatch({ changes: { from: head - 1, to: head }, selection: { anchor: head - 1 } });
+    if (head > 0)
+      view.dispatch({
+        changes: { from: head - 1, to: head },
+        selection: { anchor: head - 1 },
+      });
   }
 }
 
@@ -53,7 +66,9 @@ function docWithCursor(view: EditorView): string {
   const s = view.state;
   const { from, to } = s.selection.main;
   const doc = s.doc.toString();
-  return from === to ? `${doc.slice(0, from)}|${doc.slice(from)}` : `${doc.slice(0, from)}[${doc.slice(from, to)}]${doc.slice(to)}`;
+  return from === to
+    ? `${doc.slice(0, from)}|${doc.slice(from)}`
+    : `${doc.slice(0, from)}[${doc.slice(from, to)}]${doc.slice(to)}`;
 }
 
 describe("ED-09 bracket / quote pairing", () => {
@@ -215,7 +230,12 @@ describe("ED-09 settings in the app", () => {
     expect(editor.getContent()).toBe("()");
 
     window.dispatchEvent(
-      new KeyboardEvent("keydown", { key: "π", code: "KeyP", metaKey: true, altKey: true }),
+      new KeyboardEvent("keydown", {
+        key: "π",
+        code: "KeyP",
+        metaKey: true,
+        altKey: true,
+      }),
     );
     await new Promise((r) => setTimeout(r, 0));
     expect(editor.isAutoPairBrackets()).toBe(false);
@@ -228,7 +248,13 @@ describe("ED-09 settings in the app", () => {
     expect(editor.getContent()).toBe("(");
 
     window.dispatchEvent(
-      new KeyboardEvent("keydown", { key: "∏", code: "KeyP", metaKey: true, altKey: true, shiftKey: true }),
+      new KeyboardEvent("keydown", {
+        key: "∏",
+        code: "KeyP",
+        metaKey: true,
+        altKey: true,
+        shiftKey: true,
+      }),
     );
     await new Promise((r) => setTimeout(r, 0));
     expect(editor.isAutoPairMarkdown()).toBe(true);

@@ -1,5 +1,18 @@
-import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
-import { boot, getDoc, newPlatformContext, nextFrames, selectRange, setDoc } from "./helpers";
+import {
+  type Browser,
+  type BrowserContext,
+  expect,
+  type Page,
+  test,
+} from "@playwright/test";
+import {
+  boot,
+  getDoc,
+  newPlatformContext,
+  nextFrames,
+  selectRange,
+  setDoc,
+} from "./helpers";
 
 /**
  * #89: Windows UX — shortcut labels, native-style tab bar & theme button layout,
@@ -10,36 +23,58 @@ import { boot, getDoc, newPlatformContext, nextFrames, selectRange, setDoc } fro
  * (userAgent + navigator.platform + navigator.userAgentData).
  */
 
-async function openWindowsPage(browser: Browser): Promise<{ ctx: BrowserContext; page: Page }> {
+async function openWindowsPage(
+  browser: Browser,
+): Promise<{ ctx: BrowserContext; page: Page }> {
   const ctx = await newPlatformContext(browser, "windows");
   const page = await ctx.newPage();
   await boot(page);
   return { ctx, page };
 }
 
-async function runWithApp<T>(page: Page, fn: string, arg?: unknown): Promise<T> {
+async function runWithApp<T>(
+  page: Page,
+  fn: string,
+  arg?: unknown,
+): Promise<T> {
   return page.evaluate(
     async ({ fn, arg }) => {
       const main = await import("/src/main.ts" as string);
       const ipc = await import("/src/ipc.ts" as string);
       const app = main.getActiveApp();
-      return new Function("app", "ipc", "arg", `return (async () => { ${fn} })();`)(app, ipc, arg);
+      return new Function(
+        "app",
+        "ipc",
+        "arg",
+        `return (async () => { ${fn} })();`,
+      )(app, ipc, arg);
     },
     { fn, arg },
   );
 }
 
-test("#89 Windows shortcut labels use Ctrl/Alt/Shift everywhere with no macOS symbols", async ({ browser }) => {
+test("#89 Windows shortcut labels use Ctrl/Alt/Shift everywhere with no macOS symbols", async ({
+  browser,
+}) => {
   const { ctx, page } = await openWindowsPage(browser);
   try {
     // Theme button tooltip.
-    await expect(page.getByTestId("theme-menu-button")).toHaveAttribute("title", "切換主題 (Ctrl+Shift+T)");
+    await expect(page.getByTestId("theme-menu-button")).toHaveAttribute(
+      "title",
+      "切換主題 (Ctrl+Shift+T)",
+    );
 
     // Tab bar tooltips (visible with 2+ tabs).
     await page.locator(".cm-content").click();
     await page.keyboard.press("Control+t");
-    await expect(page.getByTestId("tab-new")).toHaveAttribute("title", "新增分頁（Ctrl+T）");
-    await expect(page.getByTestId("tab-close").first()).toHaveAttribute("title", "關閉分頁（Ctrl+W）");
+    await expect(page.getByTestId("tab-new")).toHaveAttribute(
+      "title",
+      "新增分頁（Ctrl+T）",
+    );
+    await expect(page.getByTestId("tab-close").first()).toHaveAttribute(
+      "title",
+      "關閉分頁（Ctrl+W）",
+    );
 
     // Sidebar tooltips & empty hints.
     await page.keyboard.press("Control+Shift+L");
@@ -47,16 +82,29 @@ test("#89 Windows shortcut labels use Ctrl/Alt/Shift everywhere with no macOS sy
       "title",
       "開啟資料夾 (Ctrl+Shift+O)",
     );
-    await expect(page.locator(".k-sidebar-empty")).toHaveText("尚未開啟資料夾（Ctrl+Shift+O）");
+    await expect(page.locator(".k-sidebar-empty")).toHaveText(
+      "尚未開啟資料夾（Ctrl+Shift+O）",
+    );
     await page.getByTestId("sidebar-tab-search").click();
-    await expect(page.getByTestId("folder-search-status")).toHaveText("請先開啟資料夾（Ctrl+Shift+O）才能搜尋");
+    await expect(page.getByTestId("folder-search-status")).toHaveText(
+      "請先開啟資料夾（Ctrl+Shift+O）才能搜尋",
+    );
 
     // Find & replace bar tooltips.
     await page.locator(".cm-content").click();
     await page.keyboard.press("Control+Alt+f");
-    await expect(page.getByTestId("search-prev")).toHaveAttribute("title", "上一個（Ctrl+Shift+G）");
-    await expect(page.getByTestId("search-next")).toHaveAttribute("title", "下一個（Ctrl+G）");
-    await expect(page.getByTestId("replace-all")).toHaveAttribute("title", "全部取代（Ctrl+Enter）");
+    await expect(page.getByTestId("search-prev")).toHaveAttribute(
+      "title",
+      "上一個（Ctrl+Shift+G）",
+    );
+    await expect(page.getByTestId("search-next")).toHaveAttribute(
+      "title",
+      "下一個（Ctrl+G）",
+    );
+    await expect(page.getByTestId("replace-all")).toHaveAttribute(
+      "title",
+      "全部取代（Ctrl+Enter）",
+    );
     await page.keyboard.press("Escape");
 
     // Preferences: general, editor, appearance, images — no ⌘/⌥/⇧/Cmd+/Opt+/Finder.
@@ -88,25 +136,43 @@ test("#89 Windows shortcut labels use Ctrl/Alt/Shift everywhere with no macOS sy
   }
 });
 
-test("#89 Windows tab bar, quick buttons & theme button layout: aligned with no overlap or excess gap", async ({ browser }) => {
+test("#89 Windows tab bar, quick buttons & theme button layout: aligned with no overlap or excess gap", async ({
+  browser,
+}) => {
   const { ctx, page } = await openWindowsPage(browser);
   try {
     // Windows keeps top-left quick buttons with Ctrl shortcut tooltips.
     await expect(page.getByTestId("sidebar-toggle-button")).toBeVisible();
     await expect(page.getByTestId("open-file-button")).toBeVisible();
-    await expect(page.getByTestId("sidebar-toggle-button")).toHaveAttribute("title", "切換側欄 (Ctrl+Shift+L)");
-    await expect(page.getByTestId("open-file-button")).toHaveAttribute("title", "開啟檔案 (Ctrl+O)");
+    await expect(page.getByTestId("sidebar-toggle-button")).toHaveAttribute(
+      "title",
+      "切換側欄 (Ctrl+Shift+L)",
+    );
+    await expect(page.getByTestId("open-file-button")).toHaveAttribute(
+      "title",
+      "開啟檔案 (Ctrl+O)",
+    );
 
     await runWithApp(page, "app.newTab();");
     await nextFrames(page, 3);
 
     const measure = async () =>
       page.evaluate(() => {
-        const quick = document.querySelector<HTMLElement>(".k-sidebar-toggle-widget")!.getBoundingClientRect();
-        const track = document.querySelector<HTMLElement>(".k-tabbar-track")!.getBoundingClientRect();
-        const newBtn = document.querySelector<HTMLElement>('[data-testid="tab-new"]')!.getBoundingClientRect();
-        const themeBtn = document.querySelector<HTMLElement>('[data-testid="theme-menu-button"]')!.getBoundingClientRect();
-        const sidebar = document.querySelector<HTMLElement>('[data-testid="sidebar"]')!.getBoundingClientRect();
+        const quick = document
+          .querySelector<HTMLElement>(".k-sidebar-toggle-widget")!
+          .getBoundingClientRect();
+        const track = document
+          .querySelector<HTMLElement>(".k-tabbar-track")!
+          .getBoundingClientRect();
+        const newBtn = document
+          .querySelector<HTMLElement>('[data-testid="tab-new"]')!
+          .getBoundingClientRect();
+        const themeBtn = document
+          .querySelector<HTMLElement>('[data-testid="theme-menu-button"]')!
+          .getBoundingClientRect();
+        const sidebar = document
+          .querySelector<HTMLElement>('[data-testid="sidebar"]')!
+          .getBoundingClientRect();
         return { quick, track, newBtn, themeBtn, sidebar };
       });
 
@@ -116,7 +182,9 @@ test("#89 Windows tab bar, quick buttons & theme button layout: aligned with no 
     expect(closed.quick.left).toBe(16);
     expect(closed.track.left - closed.quick.right).toBeGreaterThanOrEqual(8);
     expect(closed.track.left - closed.quick.right).toBeLessThanOrEqual(14);
-    expect(closed.themeBtn.left - closed.newBtn.right).toBeGreaterThanOrEqual(8);
+    expect(closed.themeBtn.left - closed.newBtn.right).toBeGreaterThanOrEqual(
+      8,
+    );
     expect(closed.themeBtn.left - closed.newBtn.right).toBeLessThanOrEqual(14);
     expect(Math.abs(closed.quick.top - closed.themeBtn.top)).toBeLessThan(2);
     expect(Math.abs(closed.newBtn.top - closed.themeBtn.top)).toBeLessThan(2);
@@ -135,7 +203,9 @@ test("#89 Windows tab bar, quick buttons & theme button layout: aligned with no 
   }
 });
 
-test("#89 Windows shortcuts: headings, quote, code/math blocks, strike, outline, zoom", async ({ browser }) => {
+test("#89 Windows shortcuts: headings, quote, code/math blocks, strike, outline, zoom", async ({
+  browser,
+}) => {
   const { ctx, page } = await openWindowsPage(browser);
   try {
     await setDoc(page, "Hello", 2);
@@ -161,16 +231,25 @@ test("#89 Windows shortcuts: headings, quote, code/math blocks, strike, outline,
 
     // Outline toggle via Ctrl+Shift+1 (must not trigger Heading 1!).
     await page.keyboard.press("Control+Shift+1");
-    await expect(page.getByTestId("sidebar")).toHaveAttribute("data-visible", "true");
-    expect(await runWithApp<string>(page, "return app.sidebar.getTab();")).toBe("outline");
+    await expect(page.getByTestId("sidebar")).toHaveAttribute(
+      "data-visible",
+      "true",
+    );
+    expect(await runWithApp<string>(page, "return app.sidebar.getTab();")).toBe(
+      "outline",
+    );
     expect(await getDoc(page)).toBe("~~Hello~~");
 
     // Zoom via Ctrl+Shift+= / Ctrl+Shift+- / Ctrl+Shift+0.
     await page.keyboard.press("Control+Shift+Equal");
-    expect(await runWithApp<number>(page, "return ipc.getMockZoom();")).toBe(1.1);
+    expect(await runWithApp<number>(page, "return ipc.getMockZoom();")).toBe(
+      1.1,
+    );
     await page.keyboard.press("Control+Shift+Minus");
     await page.keyboard.press("Control+Shift+Minus");
-    expect(await runWithApp<number>(page, "return ipc.getMockZoom();")).toBe(0.9);
+    expect(await runWithApp<number>(page, "return ipc.getMockZoom();")).toBe(
+      0.9,
+    );
     await page.keyboard.press("Control+Shift+0");
     expect(await runWithApp<number>(page, "return ipc.getMockZoom();")).toBe(1);
   } finally {
@@ -178,7 +257,9 @@ test("#89 Windows shortcuts: headings, quote, code/math blocks, strike, outline,
   }
 });
 
-test("#89 Windows close & quit checks all tabs' unsaved changes for Ctrl+Q, Alt+F4, and close button", async ({ browser }) => {
+test("#89 Windows close & quit checks all tabs' unsaved changes for Ctrl+Q, Alt+F4, and close button", async ({
+  browser,
+}) => {
   const { ctx, page } = await openWindowsPage(browser);
   try {
     await page.locator(".cm-content").click();
@@ -187,24 +268,44 @@ test("#89 Windows close & quit checks all tabs' unsaved changes for Ctrl+Q, Alt+
     await page.keyboard.type("draft two");
 
     // 1. Ctrl+Q with cancel keeps the app open and lists every unsaved tab.
-    await runWithApp(page, "ipc.setMockDialogHandlers({ saveChanges: () => 'cancel' });");
+    await runWithApp(
+      page,
+      "ipc.setMockDialogHandlers({ saveChanges: () => 'cancel' });",
+    );
     await page.keyboard.press("Control+q");
     await nextFrames(page, 3);
-    expect(await runWithApp<number>(page, "return ipc.getMockQuitCount();")).toBe(0);
-    expect(await runWithApp<string[]>(page, "return ipc.getMockSaveChangesPrompts();")).toEqual([
+    expect(
+      await runWithApp<number>(page, "return ipc.getMockQuitCount();"),
+    ).toBe(0);
+    expect(
+      await runWithApp<string[]>(
+        page,
+        "return ipc.getMockSaveChangesPrompts();",
+      ),
+    ).toEqual([
       "以下 2 份文件有未儲存的變更：\n・未命名\n・未命名 2\n\n要在關閉前儲存嗎？",
     ]);
 
     // 2. Window close button (onCloseRequested) with cancel keeps window open.
-    expect(await runWithApp<boolean>(page, "return ipc.triggerMockCloseRequested();")).toBe(false);
+    expect(
+      await runWithApp<boolean>(
+        page,
+        "return ipc.triggerMockCloseRequested();",
+      ),
+    ).toBe(false);
     await expect(page.getByTestId("tab")).toHaveCount(2);
 
     // 3. Alt+F4 with cancel keeps app open, then with discard quits.
     await page.keyboard.press("Alt+F4");
     await nextFrames(page, 3);
-    expect(await runWithApp<number>(page, "return ipc.getMockQuitCount();")).toBe(0);
+    expect(
+      await runWithApp<number>(page, "return ipc.getMockQuitCount();"),
+    ).toBe(0);
 
-    await runWithApp(page, "ipc.setMockDialogHandlers({ saveChanges: () => 'discard' });");
+    await runWithApp(
+      page,
+      "ipc.setMockDialogHandlers({ saveChanges: () => 'discard' });",
+    );
     await page.keyboard.press("Alt+F4");
     await expect
       .poll(() => runWithApp<number>(page, "return ipc.getMockQuitCount();"))
@@ -214,7 +315,9 @@ test("#89 Windows close & quit checks all tabs' unsaved changes for Ctrl+Q, Alt+
   }
 });
 
-test("#89 Windows native backslash paths, font stacks, and LF/CRLF line endings", async ({ browser }) => {
+test("#89 Windows native backslash paths, font stacks, and LF/CRLF line endings", async ({
+  browser,
+}) => {
   const { ctx, page } = await openWindowsPage(browser);
   try {
     // 1. Colliding tab labels & tooltips display Windows backslashes.
@@ -226,9 +329,18 @@ test("#89 Windows native backslash paths, font stacks, and LF/CRLF line endings"
        await app.openDocument('C:/work/beta/docs/README.md');`,
     );
     const tabs = page.getByTestId("tab");
-    await expect(tabs).toHaveText(["README.md — alpha\\docs", "README.md — beta\\docs"]);
-    await expect(tabs.nth(0)).toHaveAttribute("title", "C:\\work\\alpha\\docs\\README.md");
-    await expect(tabs.nth(1)).toHaveAttribute("title", "C:\\work\\beta\\docs\\README.md");
+    await expect(tabs).toHaveText([
+      "README.md — alpha\\docs",
+      "README.md — beta\\docs",
+    ]);
+    await expect(tabs.nth(0)).toHaveAttribute(
+      "title",
+      "C:\\work\\alpha\\docs\\README.md",
+    );
+    await expect(tabs.nth(1)).toHaveAttribute(
+      "title",
+      "C:\\work\\beta\\docs\\README.md",
+    );
 
     // 2. Sidebar folder title tooltip and folder search relative dir use backslashes.
     await runWithApp(
@@ -236,23 +348,37 @@ test("#89 Windows native backslash paths, font stacks, and LF/CRLF line endings"
       `ipc.seedMockFile('C:/work/alpha/guides/sub/tip.md', 'needle here');
        await app.openFolder('C:/work/alpha');`,
     );
-    await expect(page.getByTestId("sidebar-folder-title")).toHaveAttribute("title", "C:\\work\\alpha");
+    await expect(page.getByTestId("sidebar-folder-title")).toHaveAttribute(
+      "title",
+      "C:\\work\\alpha",
+    );
     await page.getByTestId("sidebar-tab-search").click();
     await page.getByTestId("folder-search-input").fill("needle");
     await page.getByTestId("folder-search-input").press("Enter");
-    await expect(page.locator(".k-folder-search-file-dir").first()).toHaveText("guides\\sub");
-    await expect(page.getByTestId("folder-search-file").first()).toHaveAttribute(
-      "title",
-      "C:\\work\\alpha\\guides\\sub\\tip.md",
+    await expect(page.locator(".k-folder-search-file-dir").first()).toHaveText(
+      "guides\\sub",
     );
+    await expect(
+      page.getByTestId("folder-search-file").first(),
+    ).toHaveAttribute("title", "C:\\work\\alpha\\guides\\sub\\tip.md");
 
     // 3. Preferences image root and export status messages display backslashes.
-    await runWithApp(page, "await app.setImageRootDir('C:/work/assets'); await app.preferences.open('images');");
-    await expect(page.getByTestId("pref-image-root")).toHaveText("C:\\work\\assets");
+    await runWithApp(
+      page,
+      "await app.setImageRootDir('C:/work/assets'); await app.preferences.open('images');",
+    );
+    await expect(page.getByTestId("pref-image-root")).toHaveText(
+      "C:\\work\\assets",
+    );
     await page.keyboard.press("Escape");
 
-    await runWithApp(page, "await app.exportDocumentAs('docx', 'C:/work/Report.docx');");
-    await expect(page.getByTestId("status")).toHaveText("已匯出 DOCX：C:\\work\\Report.docx");
+    await runWithApp(
+      page,
+      "await app.exportDocumentAs('docx', 'C:/work/Report.docx');",
+    );
+    await expect(page.getByTestId("status")).toHaveText(
+      "已匯出 DOCX：C:\\work\\Report.docx",
+    );
 
     // 4. Font stacks include Windows CJK & Latin fallbacks.
     const fonts = await page.evaluate(() => {

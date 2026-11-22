@@ -138,7 +138,9 @@ function parseArgs(argv) {
   }
   const validLangs = Object.keys(HERO_DOCS);
   if (lang !== "all" && !validLangs.includes(lang)) {
-    throw new Error(`Invalid --lang "${lang}". Expected one of: all, ${validLangs.join(", ")}`);
+    throw new Error(
+      `Invalid --lang "${lang}". Expected one of: all, ${validLangs.join(", ")}`,
+    );
   }
   if (heroOnly && sharedOnly) {
     throw new Error("Cannot combine --hero-only and --shared-only");
@@ -183,7 +185,8 @@ async function nextFrames(page, n = 4) {
     (count) =>
       new Promise((resolve) => {
         let left = count;
-        const tick = () => (--left <= 0 ? resolve() : requestAnimationFrame(tick));
+        const tick = () =>
+          --left <= 0 ? resolve() : requestAnimationFrame(tick);
         requestAnimationFrame(tick);
       }),
     n,
@@ -201,7 +204,10 @@ async function bootApp(page) {
   await page.waitForTimeout(200);
 }
 
-async function resetApp(page, { theme = "papyros", sidebar = false, tab = "tree" } = {}) {
+async function resetApp(
+  page,
+  { theme = "papyros", sidebar = false, tab = "tree" } = {},
+) {
   await page.evaluate(
     async ({ theme, sidebar, tab }) => {
       const main = await import("/src/main.ts");
@@ -284,9 +290,16 @@ async function captureAll() {
         "Every edit keeps the underlying Markdown pipes neatly aligned — including double-width CJK characters — and reverts in a single Undo step.",
       ].join("\n");
       await setDoc(page, tableDoc, 0);
-      const targetCell = page.locator('.k-table-wrapper td[data-row="2"][data-col="0"] .k-table-cell-content').first();
+      const targetCell = page
+        .locator(
+          '.k-table-wrapper td[data-row="2"][data-col="0"] .k-table-cell-content',
+        )
+        .first();
       await targetCell.click();
-      await page.waitForSelector('[data-testid="table-toolbar"]', { state: "visible", timeout: 5000 });
+      await page.waitForSelector('[data-testid="table-toolbar"]', {
+        state: "visible",
+        timeout: 5000,
+      });
       await page.evaluate(async () => {
         const main = await import("/src/main.ts");
         main.getActiveApp().editor.view.scrollDOM.scrollTop = 0;
@@ -317,11 +330,18 @@ async function captureAll() {
         "",
       ].join("\n");
       await setDoc(page, mathDiagDoc, mathDiagDoc.length);
-      await page.waitForFunction(() => {
-        const mathSvg = document.querySelector('[data-testid="math-block"] svg');
-        const diagSvg = document.querySelector('[data-testid="diagram"][data-state="rendered"] svg');
-        return Boolean(mathSvg && diagSvg);
-      }, { timeout: 15_000 });
+      await page.waitForFunction(
+        () => {
+          const mathSvg = document.querySelector(
+            '[data-testid="math-block"] svg',
+          );
+          const diagSvg = document.querySelector(
+            '[data-testid="diagram"][data-state="rendered"] svg',
+          );
+          return Boolean(mathSvg && diagSvg);
+        },
+        { timeout: 15_000 },
+      );
       await nextFrames(page, 6);
       await page.waitForTimeout(300);
       await page.screenshot({ path: path.join(OUT_DIR, "math-diagrams.png") });
@@ -341,7 +361,7 @@ async function captureAll() {
         "```rust",
         "/// Atomic file save: write to a temp file, then rename into place.",
         "pub fn save_atomic(path: &std::path::Path, text: &str) -> std::io::Result<()> {",
-        "    let temp = path.with_extension(\"md.tmp\");",
+        '    let temp = path.with_extension("md.tmp");',
         "    std::fs::write(&temp, text)?;",
         "    std::fs::rename(&temp, path)",
         "}",
@@ -386,7 +406,9 @@ async function captureAll() {
       await setDoc(page, darkDoc, darkDoc.length);
       await nextFrames(page, 6);
       await page.waitForTimeout(250);
-      await page.screenshot({ path: path.join(OUT_DIR, "dark-theme-melan.png") });
+      await page.screenshot({
+        path: path.join(OUT_DIR, "dark-theme-melan.png"),
+      });
       console.log("Captured dark-theme-melan.png");
 
       // 6. Writing Modes: Ataraxia Focus Mode + Stichos Typewriter Mode
@@ -402,7 +424,8 @@ async function captureAll() {
         "",
         "Press `F8` or `F9` again at any moment to return to the full page view — your preferences persist automatically between sessions.",
       ].join("\n");
-      const focusPos = focusDoc.indexOf("in crisp ink.") + "in crisp ink.".length;
+      const focusPos =
+        focusDoc.indexOf("in crisp ink.") + "in crisp ink.".length;
       await setDoc(page, focusDoc, focusPos);
       await page.evaluate(async () => {
         const main = await import("/src/main.ts");

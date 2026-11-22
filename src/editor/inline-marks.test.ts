@@ -18,16 +18,27 @@ import { mathMarkdownExtension } from "./math";
 
 /** #54: inline spans render with the cursor right after them; source only inside. */
 
-function stateOf(doc: string, selection: EditorSelection | number): EditorState {
+function stateOf(
+  doc: string,
+  selection: EditorSelection | number,
+): EditorState {
   const state = EditorState.create({
     doc,
-    selection: typeof selection === "number" ? EditorSelection.cursor(selection) : selection,
+    selection:
+      typeof selection === "number"
+        ? EditorSelection.cursor(selection)
+        : selection,
     extensions: [
       EditorState.allowMultipleSelections.of(true),
       markdown({
         base: markdownLanguage,
         addKeymap: false,
-        extensions: [mathMarkdownExtension, cjkEmphasisExtension, frontMatterExtension, footnoteExtension],
+        extensions: [
+          mathMarkdownExtension,
+          cjkEmphasisExtension,
+          frontMatterExtension,
+          footnoteExtension,
+        ],
       }),
       livePreviewExtension,
       imagePreviewExtension,
@@ -44,7 +55,8 @@ const markClasses = (doc: string, cursor: EditorSelection | number) =>
 
 describe("#54 isSelectionInsideSpan", () => {
   it("counts a cursor strictly inside, not on the outer edges", () => {
-    const sel = (pos: number) => EditorSelection.create([EditorSelection.cursor(pos)]);
+    const sel = (pos: number) =>
+      EditorSelection.create([EditorSelection.cursor(pos)]);
     expect(isSelectionInsideSpan(sel(0), 0, 8)).toBe(false);
     expect(isSelectionInsideSpan(sel(8), 0, 8)).toBe(false);
     expect(isSelectionInsideSpan(sel(1), 0, 8)).toBe(true);
@@ -52,7 +64,8 @@ describe("#54 isSelectionInsideSpan", () => {
   });
 
   it("counts a selection overlapping the span, not one that only touches it", () => {
-    const range = (a: number, b: number) => EditorSelection.create([EditorSelection.range(a, b)]);
+    const range = (a: number, b: number) =>
+      EditorSelection.create([EditorSelection.range(a, b)]);
     expect(isSelectionInsideSpan(range(6, 10), 0, 8)).toBe(true);
     expect(isSelectionInsideSpan(range(8, 10), 0, 8)).toBe(false);
     expect(isSelectionInsideSpan(range(0, 8), 0, 8)).toBe(true);
@@ -70,9 +83,15 @@ describe("#54 inline span decorations", () => {
 
   it("right after the closing mark: hidden; right before the opening mark: hidden", () => {
     for (const [doc, end] of cases) {
-      expect(markClasses(doc, end).every((c) => c === "k-mark-hidden")).toBe(true);
-      expect(markClasses(doc, 0).every((c) => c === "k-mark-hidden")).toBe(true);
-      expect(markClasses(`${doc} x`, end).every((c) => c === "k-mark-hidden")).toBe(true);
+      expect(markClasses(doc, end).every((c) => c === "k-mark-hidden")).toBe(
+        true,
+      );
+      expect(markClasses(doc, 0).every((c) => c === "k-mark-hidden")).toBe(
+        true,
+      );
+      expect(
+        markClasses(`${doc} x`, end).every((c) => c === "k-mark-hidden"),
+      ).toBe(true);
     }
   });
 
@@ -83,7 +102,9 @@ describe("#54 inline span decorations", () => {
       }
     }
     // Inside a link's URL.
-    expect(markClasses("[link](https://x.y)", 10).every((c) => c === "k-mark")).toBe(true);
+    expect(
+      markClasses("[link](https://x.y)", 10).every((c) => c === "k-mark"),
+    ).toBe(true);
   });
 
   it("nested spans: only the span holding the cursor shows its marks", () => {
@@ -91,17 +112,31 @@ describe("#54 inline span decorations", () => {
     // Cursor right after `*b*` (inside the strong span).
     const specs = collectLivePreviewSpecs(stateOf(doc, 7));
     const em = specs.filter((s) => s.from === 4 || s.from === 6);
-    expect(em.map((s) => s.className)).toEqual(["k-mark-hidden", "k-mark-hidden"]);
+    expect(em.map((s) => s.className)).toEqual([
+      "k-mark-hidden",
+      "k-mark-hidden",
+    ]);
     expect(specs.find((s) => s.from === 0)?.className).toBe("k-mark");
   });
 
   it("CJK: `中文**粗體**` renders with the cursor right after `**`", () => {
-    expect(markClasses("中文**粗體**", 8)).toEqual(["k-mark-hidden", "k-mark-hidden"]);
+    expect(markClasses("中文**粗體**", 8)).toEqual([
+      "k-mark-hidden",
+      "k-mark-hidden",
+    ]);
   });
 
   it("block markers keep the #49 rule (cursor on the marker reveals it)", () => {
-    expect(collectLivePreviewSpecs(stateOf("## h", 2))).toContainEqual({ from: 0, to: 3, className: "k-mark" });
-    expect(collectLivePreviewSpecs(stateOf("## h", 4))).toContainEqual({ from: 0, to: 3, className: "k-mark-hidden" });
+    expect(collectLivePreviewSpecs(stateOf("## h", 2))).toContainEqual({
+      from: 0,
+      to: 3,
+      className: "k-mark",
+    });
+    expect(collectLivePreviewSpecs(stateOf("## h", 4))).toContainEqual({
+      from: 0,
+      to: 3,
+      className: "k-mark-hidden",
+    });
   });
 });
 
@@ -124,7 +159,10 @@ describe("#54 Backspace and arrows", () => {
     expect(expandSpanBeforeCursor(v)).toBe(true);
     expect(v.state.doc.toString()).toBe("x **bold**");
     expect(v.state.field(expandedSpanField)).toEqual({ from: 2, to: 10 });
-    expect(markClasses("x **bold**", 10)).toEqual(["k-mark-hidden", "k-mark-hidden"]);
+    expect(markClasses("x **bold**", 10)).toEqual([
+      "k-mark-hidden",
+      "k-mark-hidden",
+    ]);
     expect(
       collectLivePreviewSpecs(v.state)
         .filter((s) => s.className.startsWith("k-mark"))
@@ -147,7 +185,8 @@ describe("#54 Backspace and arrows", () => {
     const doc = "a ![i](p.png) b";
     // The transaction filter (part of imagePreviewExtension) adjusts the move.
     const headAfter = (from: number, to: number, userEvent: string) =>
-      stateOf(doc, from).update({ selection: { anchor: to }, userEvent }).newSelection.main.head;
+      stateOf(doc, from).update({ selection: { anchor: to }, userEvent })
+        .newSelection.main.head;
     expect(headAfter(13, 2, "select")).toBe(12); // ArrowLeft from after the image
     expect(headAfter(2, 13, "select")).toBe(3); // ArrowRight from before it
     // Pointer clicks and ordinary one-step moves are untouched.
@@ -161,6 +200,10 @@ describe("#54 Backspace and arrows", () => {
       extensions: [markdown({ base: markdownLanguage })],
     });
     ensureSyntaxTree(plain, doc.length, 5000);
-    expect(enterImageOnArrow(plain.update({ selection: { anchor: 2 }, userEvent: "select" }))).toBe(12);
+    expect(
+      enterImageOnArrow(
+        plain.update({ selection: { anchor: 2 }, userEvent: "select" }),
+      ),
+    ).toBe(12);
   });
 });

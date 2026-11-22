@@ -17,7 +17,6 @@
 
 import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
 import { syntaxTree } from "@codemirror/language";
-import type { SyntaxNode } from "@lezer/common";
 import {
   EditorSelection,
   EditorState,
@@ -28,9 +27,11 @@ import {
   type Transaction,
 } from "@codemirror/state";
 import { EditorView, keymap } from "@codemirror/view";
+import type { SyntaxNode } from "@lezer/common";
 import { mapPosClamped } from "./positions";
 
-export const AUTO_PAIR_BRACKETS_MESSAGE = (on: boolean): string => `自動配對括號：${on ? "開" : "關"}`;
+export const AUTO_PAIR_BRACKETS_MESSAGE = (on: boolean): string =>
+  `自動配對括號：${on ? "開" : "關"}`;
 export const AUTO_PAIR_MARKDOWN_MESSAGE = (on: boolean): string =>
   `自動配對 Markdown 符號：${on ? "開" : "關"}`;
 
@@ -101,7 +102,8 @@ export const markdownPairField = StateField.define<MarkdownPairState>({
       if (e.is(addCloserEffect)) closers = [...closers, ...e.value];
       if (e.is(setEmptyPairEffect)) emptyPairAt = e.value;
     }
-    if (closers === value.closers && emptyPairAt === value.emptyPairAt) return value;
+    if (closers === value.closers && emptyPairAt === value.emptyPairAt)
+      return value;
     return { closers, emptyPairAt };
   },
 });
@@ -121,22 +123,32 @@ const CODE_NODES = new Set([
 ]);
 
 function insideCode(state: EditorState, pos: number): boolean {
-  for (let node: SyntaxNode | null = syntaxTree(state).resolveInner(pos, -1); node; node = node.parent) {
+  for (
+    let node: SyntaxNode | null = syntaxTree(state).resolveInner(pos, -1);
+    node;
+    node = node.parent
+  ) {
     if (CODE_NODES.has(node.name)) return true;
   }
   return false;
 }
 
 function isWordChar(state: EditorState, pos: number, ch: string): boolean {
-  return ch !== "" && state.charCategorizer(pos)(ch) === 0 /* CharCategory.Word */;
+  return (
+    ch !== "" && state.charCategorizer(pos)(ch) === 0 /* CharCategory.Word */
+  );
 }
 
 /**
  * Transaction for typing a Markdown pair symbol, or null to let the default
  * input happen. Exported for tests.
  */
-export function markdownPairTransaction(state: EditorState, symbol: string): Transaction | null {
-  if (!(MARKDOWN_PAIR_SYMBOLS as readonly string[]).includes(symbol)) return null;
+export function markdownPairTransaction(
+  state: EditorState,
+  symbol: string,
+): Transaction | null {
+  if (!(MARKDOWN_PAIR_SYMBOLS as readonly string[]).includes(symbol))
+    return null;
   const sel = state.selection;
   if (sel.ranges.length !== 1) return null;
   const range = sel.main;
@@ -145,7 +157,10 @@ export function markdownPairTransaction(state: EditorState, symbol: string): Tra
 
   // Wrap a selection: *selected*.
   if (!range.empty) {
-    if (state.doc.lineAt(range.from).number !== state.doc.lineAt(range.to).number) return null;
+    if (
+      state.doc.lineAt(range.from).number !== state.doc.lineAt(range.to).number
+    )
+      return null;
     if (insideCode(state, range.from) && symbol !== "`") return null;
     return state.update({
       changes: [
@@ -165,7 +180,12 @@ export function markdownPairTransaction(state: EditorState, symbol: string): Tra
   const closerHere = field.closers.includes(pos);
 
   // `*|*` + `*` → `**|**` (bold, strikethrough `~~`, code ``…``).
-  if (field.emptyPairAt === pos && prev === symbol && next === symbol && closerHere) {
+  if (
+    field.emptyPairAt === pos &&
+    prev === symbol &&
+    next === symbol &&
+    closerHere
+  ) {
     return state.update({
       changes: { from: pos, insert: symbol + symbol },
       selection: EditorSelection.cursor(pos + 1),
@@ -184,10 +204,12 @@ export function markdownPairTransaction(state: EditorState, symbol: string): Tra
   }
   if (insideCode(state, pos)) return null;
   // List markers / horizontal rules at the start of a line: `* item`, `***`.
-  if (state.sliceDoc(line.from, pos).trim() === "" && symbol !== "`") return null;
+  if (state.sliceDoc(line.from, pos).trim() === "" && symbol !== "`")
+    return null;
   // Intraword (`snake_case`, `2*3`) or before a word: no pairing.
   if (isWordChar(state, pos, prev) || isWordChar(state, pos, next)) return null;
-  if (next !== "" && !/\s/.test(next) && !CLOSE_BEFORE.includes(next)) return null;
+  if (next !== "" && !/\s/.test(next) && !CLOSE_BEFORE.includes(next))
+    return null;
 
   return state.update({
     changes: { from: pos, insert: symbol + symbol },
@@ -224,16 +246,19 @@ export function deleteMarkdownPair(view: EditorView): boolean {
   return true;
 }
 
-const markdownPairInputHandler = EditorView.inputHandler.of((view, from, to, text) => {
-  if (view.composing || view.compositionStarted || view.state.readOnly) return false;
-  if (text.length !== 1) return false;
-  const sel = view.state.selection.main;
-  if (from !== sel.from || to !== sel.to) return false;
-  const tr = markdownPairTransaction(view.state, text);
-  if (!tr) return false;
-  view.dispatch(tr);
-  return true;
-});
+const markdownPairInputHandler = EditorView.inputHandler.of(
+  (view, from, to, text) => {
+    if (view.composing || view.compositionStarted || view.state.readOnly)
+      return false;
+    if (text.length !== 1) return false;
+    const sel = view.state.selection.main;
+    if (from !== sel.from || to !== sel.to) return false;
+    const tr = markdownPairTransaction(view.state, text);
+    if (!tr) return false;
+    view.dispatch(tr);
+    return true;
+  },
+);
 
 /** Markdown `* _ \` ~` pairing (setting `autoPairMarkdown`). */
 export const autoPairMarkdownExtension: Extension = [

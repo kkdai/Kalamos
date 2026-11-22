@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { describe, it } from "node:test";
@@ -36,8 +36,12 @@ describe("extractCargoVersion", () => {
   });
 
   it("throws when [package].version is missing", () => {
-    const toml = '[package]\nname = "kalamos"\n[dependencies]\nversion = "1.0.0"\n';
-    assert.throws(() => extractCargoVersion(toml), /Could not find \[package\]\.version/);
+    const toml =
+      '[package]\nname = "kalamos"\n[dependencies]\nversion = "1.0.0"\n';
+    assert.throws(
+      () => extractCargoVersion(toml),
+      /Could not find \[package\]\.version/,
+    );
   });
 });
 
@@ -158,7 +162,10 @@ describe("checkRepoVersions", () => {
     const dir = mkdtempSync(join(tmpdir(), "kalamos-ver-"));
     try {
       mkdirSync(join(dir, "src-tauri"));
-      writeFileSync(join(dir, "package.json"), JSON.stringify({ version: "1.0.0" }));
+      writeFileSync(
+        join(dir, "package.json"),
+        JSON.stringify({ version: "1.0.0" }),
+      );
       writeFileSync(
         join(dir, "src-tauri/tauri.conf.json"),
         JSON.stringify({ version: "1.0.0" }),
@@ -195,6 +202,6 @@ describe("formatReleaseNotes", () => {
     assert.match(notes, /未經 Apple 公證/);
     assert.match(notes, /SmartScreen/);
     assert.match(notes, /SHA256SUMS\.txt/);
-    assert.match(notes, /aaaa  Kalamos_0\.4\.0_aarch64\.dmg/);
+    assert.match(notes, /aaaa {2}Kalamos_0\.4\.0_aarch64\.dmg/);
   });
 });

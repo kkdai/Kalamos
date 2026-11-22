@@ -15,6 +15,13 @@ export function clampPos(pos: number, length: number): number {
 }
 
 /** `changes.mapPos(pos, assoc)`, clamped before and after. */
-export function mapPosClamped(changes: ChangeDesc, pos: number, assoc = -1): number {
-  return clampPos(changes.mapPos(clampPos(pos, changes.length), assoc), changes.newLength);
+export function mapPosClamped(
+  changes: ChangeDesc,
+  pos: number,
+  assoc = -1,
+): number {
+  return clampPos(
+    changes.mapPos(clampPos(pos, changes.length), assoc),
+    changes.newLength,
+  );
 }

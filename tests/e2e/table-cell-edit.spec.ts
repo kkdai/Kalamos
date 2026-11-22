@@ -1,5 +1,13 @@
-import { expect, test, type Page } from "@playwright/test";
-import { MOD, boot, getDoc, getSelection, nextFrames, setCursor, setDoc } from "./helpers";
+import { expect, type Page, test } from "@playwright/test";
+import {
+  boot,
+  getDoc,
+  getSelection,
+  MOD,
+  nextFrames,
+  setCursor,
+  setDoc,
+} from "./helpers";
 
 /**
  * #59 A: tables are an editable grid in live preview — every cell is edited
@@ -11,9 +19,13 @@ test.beforeEach(async ({ page }) => {
 });
 
 const cell = (page: Page, row: number, col: number) =>
-  page.getByTestId("table-widget").locator(`[data-row="${row}"][data-col="${col}"] .k-table-cell-content`);
+  page
+    .getByTestId("table-widget")
+    .locator(`[data-row="${row}"][data-col="${col}"] .k-table-cell-content`);
 
-async function activeCell(page: Page): Promise<{ row: number; col: number } | null> {
+async function activeCell(
+  page: Page,
+): Promise<{ row: number; col: number } | null> {
   return page.evaluate(() => {
     const el = document.activeElement as HTMLElement | null;
     if (!el?.classList.contains("k-table-cell-content")) return null;
@@ -26,17 +38,32 @@ function rows(doc: string): string[][] {
   return doc
     .split("\n")
     .filter((l) => l.startsWith("|"))
-    .map((l) => l.split(/(?<!\\)\|/).slice(1, -1).map((c) => c.trim()));
+    .map((l) =>
+      l
+        .split(/(?<!\\)\|/)
+        .slice(1, -1)
+        .map((c) => c.trim()),
+    );
 }
 
-test("#59 insert 3×3 → type cells with Tab → source mode shows the correct markdown", async ({ page }) => {
+test("#59 insert 3×3 → type cells with Tab → source mode shows the correct markdown", async ({
+  page,
+}) => {
   await setDoc(page, "", 0);
   await page.keyboard.press(`${MOD}+Alt+KeyT`);
   await page.keyboard.press("Enter"); // #59 B: insert dialog, default 3 × 3
   await nextFrames(page);
   await expect(page.getByTestId("table-widget")).toHaveCount(1);
   expect(await activeCell(page)).toEqual({ row: 0, col: 0 });
-  for (const [i, text] of ["名稱", "數量", "備註", "蘋果", "12", "a|b", "香蕉"].entries()) {
+  for (const [i, text] of [
+    "名稱",
+    "數量",
+    "備註",
+    "蘋果",
+    "12",
+    "a|b",
+    "香蕉",
+  ].entries()) {
     if (i > 0) await page.keyboard.press("Tab");
     await page.keyboard.type(text);
   }
@@ -58,12 +85,16 @@ test("#59 insert 3×3 → type cells with Tab → source mode shows the correct 
   await expect(cell(page, 1, 2)).toHaveText("a|b");
 });
 
-test("#59 typing in a cell keeps the grid, the same cell DOM, and focus", async ({ page }) => {
+test("#59 typing in a cell keeps the grid, the same cell DOM, and focus", async ({
+  page,
+}) => {
   const src = "| a | b |\n| --- | --- |\n| 1 | 2 |\n\nend";
   await setDoc(page, src, src.length);
   await cell(page, 1, 1).click();
   await page.evaluate(() => {
-    document.querySelector<HTMLElement>('[data-row="1"][data-col="1"]')!.dataset.marker = "same";
+    document.querySelector<HTMLElement>(
+      '[data-row="1"][data-col="1"]',
+    )!.dataset.marker = "same";
   });
   await page.keyboard.press("End");
   await page.keyboard.type("345 六七");
@@ -72,14 +103,17 @@ test("#59 typing in a cell keeps the grid, the same cell DOM, and focus", async 
   expect(await activeCell(page)).toEqual({ row: 1, col: 1 });
 });
 
-test("#59 a dispatch from elsewhere mid-typing never steals focus from the cell", async ({ page }) => {
+test("#59 a dispatch from elsewhere mid-typing never steals focus from the cell", async ({
+  page,
+}) => {
   const src = "| a | b |\n| --- | --- |\n| 1 | 2 |\n\nend";
   await setDoc(page, src, src.length);
   await cell(page, 1, 0).click();
   await page.keyboard.press("End");
   await page.keyboard.type("x");
   await page.evaluate(async () => {
-    const view = (await import("/src/main.ts" as string)).getActiveApp().editor.view;
+    const view = (await import("/src/main.ts" as string)).getActiveApp().editor
+      .view;
     view.dispatch({ changes: { from: view.state.doc.length, insert: "!" } });
     view.dispatch({ selection: view.state.selection });
   });
@@ -91,16 +125,23 @@ test("#59 a dispatch from elsewhere mid-typing never steals focus from the cell"
   expect(doc.endsWith("end!")).toBe(true);
 });
 
-test("#59 IME composition in a cell: nothing written mid-composition, no RangeError, undo works", async ({ page }) => {
+test("#59 IME composition in a cell: nothing written mid-composition, no RangeError, undo works", async ({
+  page,
+}) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  const src = "| 名稱 | 數量 |\n| --- | --- |\n| 蘋果 | 十二 |\n\n結尾[^1]\n\n[^1]: 註腳";
+  const src =
+    "| 名稱 | 數量 |\n| --- | --- |\n| 蘋果 | 十二 |\n\n結尾[^1]\n\n[^1]: 註腳";
   await setDoc(page, src, src.length);
   await cell(page, 1, 1).click();
   await page.keyboard.press(`${MOD}+a`);
   const cdp = await page.context().newCDPSession(page);
   for (const step of ["ㄧ", "ㄧˋ", "一", "一ㄅ", "一百"]) {
-    await cdp.send("Input.imeSetComposition", { text: step, selectionStart: step.length, selectionEnd: step.length });
+    await cdp.send("Input.imeSetComposition", {
+      text: step,
+      selectionStart: step.length,
+      selectionEnd: step.length,
+    });
     await nextFrames(page);
     expect(await getDoc(page)).toBe(src);
     expect(await activeCell(page)).toEqual({ row: 1, col: 1 });
@@ -134,7 +175,9 @@ test("#59 Cmd+Z / Cmd+Shift+Z inside a cell", async ({ page }) => {
   expect(await activeCell(page)).toEqual({ row: 1, col: 1 });
 });
 
-test("#59 keyboard: Enter, arrows, Shift+Enter, Cmd+Enter", async ({ page }) => {
+test("#59 keyboard: Enter, arrows, Shift+Enter, Cmd+Enter", async ({
+  page,
+}) => {
   const src = "intro\n\n| a | b |\n| --- | --- |\n| 1 | 2 |\n\nend";
   await setDoc(page, src, src.length);
   await cell(page, 0, 0).click();
@@ -169,10 +212,14 @@ test("#59 keyboard: Enter, arrows, Shift+Enter, Cmd+Enter", async ({ page }) => 
   await cell(page, 1, 0).click();
   await page.keyboard.press(`${MOD}+Enter`); // jump out to a new paragraph
   await page.keyboard.type("P");
-  expect(await getDoc(page)).toMatch(/\| 1 +\| 2<br>x +\|\n\nP\n\nafter\n\nend$/);
+  expect(await getDoc(page)).toMatch(
+    /\| 1 +\| 2<br>x +\|\n\nP\n\nafter\n\nend$/,
+  );
 });
 
-test("#59 paste is plain text; Cmd+B / Cmd+I wrap the selection", async ({ page }) => {
+test("#59 paste is plain text; Cmd+B / Cmd+I wrap the selection", async ({
+  page,
+}) => {
   const src = "| a | b |\n| --- | --- |\n| 1 | 2 |\n\nend";
   await setDoc(page, src, src.length);
   await cell(page, 1, 0).click();
@@ -182,7 +229,11 @@ test("#59 paste is plain text; Cmd+B / Cmd+I wrap the selection", async ({ page 
     data.setData("text/plain", "p|q\nr");
     data.setData("text/html", "<b>bold</b>");
     document.activeElement!.dispatchEvent(
-      new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }),
+      new ClipboardEvent("paste", {
+        clipboardData: data,
+        bubbles: true,
+        cancelable: true,
+      }),
     );
   });
   expect((await getDoc(page)).split("\n")[2]).toBe("| p\\|q<br>r | 2 |");
@@ -199,7 +250,9 @@ test("#59 paste is plain text; Cmd+B / Cmd+I wrap the selection", async ({ page 
   await expect(cell(page, 1, 1).locator(".k-strong")).toHaveCount(1);
 });
 
-test("#59 replacing the document while a cell is focused is safe", async ({ page }) => {
+test("#59 replacing the document while a cell is focused is safe", async ({
+  page,
+}) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   const src = "| a | b |\n| --- | --- |\n| 1 | 2 |\n\nend";
@@ -212,14 +265,20 @@ test("#59 replacing the document while a cell is focused is safe", async ({ page
   expect(errors).toEqual([]);
 });
 
-test("#59 a selection inside a table (e.g. a search hit) marks the cell and does not steal focus", async ({ page }) => {
+test("#59 a selection inside a table (e.g. a search hit) marks the cell and does not steal focus", async ({
+  page,
+}) => {
   const src = "| a | b |\n| --- | --- |\n| 1 | needle |\n\nend";
   await setDoc(page, src, src.length);
   await page.evaluate(async () => {
-    const view = (await import("/src/main.ts" as string)).getActiveApp().editor.view;
+    const view = (await import("/src/main.ts" as string)).getActiveApp().editor
+      .view;
     view.contentDOM.blur();
     const at = view.state.doc.toString().indexOf("needle");
-    view.dispatch({ selection: { anchor: at, head: at + 6 }, scrollIntoView: true });
+    view.dispatch({
+      selection: { anchor: at, head: at + 6 },
+      scrollIntoView: true,
+    });
   });
   await nextFrames(page);
   await expect(page.locator(".k-table-cell-active")).toHaveCount(1);
@@ -227,20 +286,32 @@ test("#59 a selection inside a table (e.g. a search hit) marks the cell and does
   expect(await activeCell(page)).toBeNull();
 });
 
-test("#59 row drag handles float in the first column's padding: body text lines up with the header", async ({ page }) => {
-  const src = "| 名稱 | 數量 |\n| --- | --- |\n| 蘋果 | 1 |\n| 香蕉 | 2 |\n\nend";
+test("#59 row drag handles float in the first column's padding: body text lines up with the header", async ({
+  page,
+}) => {
+  const src =
+    "| 名稱 | 數量 |\n| --- | --- |\n| 蘋果 | 1 |\n| 香蕉 | 2 |\n\nend";
   await setDoc(page, src, src.length);
   const headerLeft = (await cell(page, 0, 0).boundingBox())!.x;
   for (const row of [1, 2]) {
-    expect(Math.abs((await cell(page, row, 0).boundingBox())!.x - headerLeft)).toBeLessThan(1);
+    expect(
+      Math.abs((await cell(page, row, 0).boundingBox())!.x - headerLeft),
+    ).toBeLessThan(1);
   }
   // Hidden until the row is hovered, then visible left of the table.
-  const handle = page.getByTestId("table-widget").locator(".k-table-row-handle").first();
+  const handle = page
+    .getByTestId("table-widget")
+    .locator(".k-table-row-handle")
+    .first();
   await expect(handle).toHaveCSS("opacity", "0");
   await page.getByTestId("table-widget").locator("tbody tr").first().hover();
   await expect(handle).toHaveCSS("opacity", "1");
   // Inside the first cell's left padding: left of the text, never over it.
-  const tdLeft = (await page.getByTestId("table-widget").locator("tbody td").first().boundingBox())!.x;
+  const tdLeft = (await page
+    .getByTestId("table-widget")
+    .locator("tbody td")
+    .first()
+    .boundingBox())!.x;
   const box = (await handle.boundingBox())!;
   expect(box.x).toBeGreaterThanOrEqual(tdLeft);
   expect(box.x + box.width).toBeLessThanOrEqual(headerLeft + 1);

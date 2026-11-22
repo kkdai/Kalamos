@@ -5,13 +5,13 @@ import { createKalamosApp, type KalamosApp } from "../main";
 import {
   clearTableColumnWidths,
   formatMarkdownTable,
+  formatParsedTable,
   getDisplayWidth,
   handleTableEnter,
   handleTableShiftTab,
   handleTableTab,
-  reorderTableBodyRow,
-  formatParsedTable,
   parseTableInRange,
+  reorderTableBodyRow,
   splitTableCellsWithRanges,
   tableCellMatrix,
   tableColumnWidthsMap,
@@ -95,7 +95,6 @@ describe("Tables (BL-01) — block widget, alignment, CJK width, Tab navigation,
     expect(tds[2].querySelector(".k-em")).toBeNull();
     expect(tds[2].textContent).toBe("*跳脫* a | b");
 
-
     // #59: focusing a cell edits it in place — the grid stays, the cell shows
     // its raw inline markdown (`\|` displayed as `|`) and CM's selection moves
     // into that cell's source.
@@ -174,9 +173,9 @@ describe("Tables (BL-01) — block widget, alignment, CJK width, Tab navigation,
     linkSpans[2].dispatchEvent(
       new MouseEvent("click", { bubbles: true, metaKey: true }),
     );
-    expect(
-      view.state.doc.lineAt(view.state.selection.main.head).text,
-    ).toBe("# 目標標題");
+    expect(view.state.doc.lineAt(view.state.selection.main.head).text).toBe(
+      "# 目標標題",
+    );
   });
 
   it("caches table ranges in StateField and updates cursor moves in < 5ms on a 10,000-line document with 20 tables", async () => {
@@ -254,11 +253,9 @@ describe("Tables (BL-01) — block widget, alignment, CJK width, Tab navigation,
     await app.init();
     const { view } = app.editor;
 
-    const rawTable = [
-      "| 品項 | 數量 |",
-      "| :--- | ---: |",
-      "| 筆 | 1 |",
-    ].join("\n");
+    const rawTable = ["| 品項 | 數量 |", "| :--- | ---: |", "| 筆 | 1 |"].join(
+      "\n",
+    );
     app.editor.setContent(rawTable);
 
     // Put cursor in first header cell ("品項")
@@ -304,17 +301,17 @@ describe("Tables (BL-01) — block widget, alignment, CJK width, Tab navigation,
     // Tab on the last cell -> appends a new row and places cursor in its first cell
     expect(handleTableTab(view)).toBe(true);
     expect(view.state.doc.lines).toBe(4);
-    expect(
-      view.state.doc.lineAt(view.state.selection.main.head).number,
-    ).toBe(4);
+    expect(view.state.doc.lineAt(view.state.selection.main.head).number).toBe(
+      4,
+    );
 
     // Fill row 4, then Enter -> inserts another row (line 5)
     view.dispatch(view.state.replaceSelection("鉛筆"));
     expect(handleTableEnter(view)).toBe(true);
     expect(view.state.doc.lines).toBe(5);
-    expect(
-      view.state.doc.lineAt(view.state.selection.main.head).number,
-    ).toBe(5);
+    expect(view.state.doc.lineAt(view.state.selection.main.head).number).toBe(
+      5,
+    );
 
     // Enter on the empty last row (5) -> leaves the table (#32): the empty row
     // is removed and the cursor sits in a new paragraph after a blank line.
@@ -324,7 +321,9 @@ describe("Tables (BL-01) — block widget, alignment, CJK width, Tab navigation,
     expect(lines[3]).toMatch(/^\| 鉛筆 +\| +\|$/);
     expect(lines[4]).toBe("");
     expect(lines[5]).toBe("");
-    expect(view.state.doc.lineAt(view.state.selection.main.head).number).toBe(6);
+    expect(view.state.doc.lineAt(view.state.selection.main.head).number).toBe(
+      6,
+    );
   });
 
   it("Cmd+Opt+T opens the insert dialog (#59); 插入 inserts a 3x3 table with the cursor in the first header cell", async () => {
@@ -342,9 +341,13 @@ describe("Tables (BL-01) — block widget, alignment, CJK width, Tab navigation,
       }),
     );
 
-    const dialog = document.querySelector<HTMLElement>('[data-testid="table-insert-dialog"]');
+    const dialog = document.querySelector<HTMLElement>(
+      '[data-testid="table-insert-dialog"]',
+    );
     expect(dialog).not.toBeNull();
-    dialog!.querySelector<HTMLButtonElement>('[data-testid="table-dialog-ok"]')!.click();
+    dialog!
+      .querySelector<HTMLButtonElement>('[data-testid="table-dialog-ok"]')!
+      .click();
     await Promise.resolve();
     await Promise.resolve();
 
@@ -354,7 +357,9 @@ describe("Tables (BL-01) — block widget, alignment, CJK width, Tab navigation,
     expect(lines[0].split("|")).toHaveLength(5);
     const head = view.state.selection.main.head;
     expect(head).toBe(2);
-    expect(document.querySelector('[data-testid="table-insert-dialog"]')).toBeNull();
+    expect(
+      document.querySelector('[data-testid="table-insert-dialog"]'),
+    ).toBeNull();
   });
 
   it("reorders body rows via drag & drop in a single undoable transaction and stores column widths in memory only", async () => {
@@ -498,7 +503,9 @@ describe("Tables — #32 extra cells, exit on empty row, re-align on leave", () 
     const view = await boot(src, src.indexOf("|   |") + 2);
     expect(handleTableEnter(view)).toBe(true);
     view.dispatch(view.state.replaceSelection("mid"));
-    expect(view.state.doc.toString()).toBe("| a | b |\n| --- | --- |\n| 1 | 2 |\n\nmid\n\nend");
+    expect(view.state.doc.toString()).toBe(
+      "| a | b |\n| --- | --- |\n| 1 | 2 |\n\nmid\n\nend",
+    );
   });
 
   it("Enter on a non-empty last row or on the delimiter row still inserts a row", async () => {
@@ -547,7 +554,10 @@ describe("Tables — #32 extra cells, exit on empty row, re-align on leave", () 
     const edited = view.state.doc.toString();
 
     let composing = true;
-    Object.defineProperty(view, "composing", { configurable: true, get: () => composing });
+    Object.defineProperty(view, "composing", {
+      configurable: true,
+      get: () => composing,
+    });
     app!.editor.setCursor(view.state.doc.length);
     await flush();
     expect(view.state.doc.toString()).toBe(edited);

@@ -5,7 +5,11 @@ import {
   setMockDialogHandlers,
   triggerMockOpenFiles,
 } from "./ipc";
-import { createKalamosApp, openWithStatusMessage, type KalamosApp } from "./main";
+import {
+  createKalamosApp,
+  type KalamosApp,
+  openWithStatusMessage,
+} from "./main";
 
 function setupDom(): void {
   document.body.innerHTML = `
@@ -67,7 +71,10 @@ describe("#67 open with Kalamos (Finder / Dock / open -a)", () => {
       paths: ["/tmp/kalamos-test/a.md", "/tmp/kalamos-test/b.md"],
     });
     // The blank untitled tab was reused for the first file.
-    expect(app.getTabs().map((t) => t.path)).toEqual(["/tmp/kalamos-test/a.md", "/tmp/kalamos-test/b.md"]);
+    expect(app.getTabs().map((t) => t.path)).toEqual([
+      "/tmp/kalamos-test/a.md",
+      "/tmp/kalamos-test/b.md",
+    ]);
     expect(app.getCurrentPath()).toBe("/tmp/kalamos-test/b.md");
     expect(app.getStatusText()).toBe("");
   });
@@ -75,7 +82,9 @@ describe("#67 open with Kalamos (Finder / Dock / open -a)", () => {
   it("#81 B a file that is already open is switched to, not opened twice", async () => {
     app = createKalamosApp(document);
     await app.init();
-    await triggerMockOpenFiles({ paths: ["/tmp/kalamos-test/a.md", "/tmp/kalamos-test/b.md"] });
+    await triggerMockOpenFiles({
+      paths: ["/tmp/kalamos-test/a.md", "/tmp/kalamos-test/b.md"],
+    });
     await triggerMockOpenFiles({ paths: ["/tmp/kalamos-test/a.md"] });
     expect(app.getTabs()).toHaveLength(2);
     expect(app.getCurrentPath()).toBe("/tmp/kalamos-test/a.md");
@@ -110,7 +119,10 @@ describe("#67 open with Kalamos (Finder / Dock / open -a)", () => {
     userTypeText(app, "draft");
     await triggerMockOpenFiles({ paths: ["/tmp/kalamos-test/a.md"] });
     await app.init();
-    expect(app.getTabs().map((t) => t.path)).toEqual([null, "/tmp/kalamos-test/a.md"]);
+    expect(app.getTabs().map((t) => t.path)).toEqual([
+      null,
+      "/tmp/kalamos-test/a.md",
+    ]);
   });
 
   it("status message lists refused files", () => {

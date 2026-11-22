@@ -3,20 +3,27 @@ import {
   createMenuDispatcher,
   DUPLICATE_WINDOW_MS,
   formatAccelerator,
+  MENU_SPEC,
   MENU_THEN_KEY_WINDOW_MS,
+  type MenuNode,
   matchesKey,
   menuActions,
-  MENU_SPEC,
   menuSpecFor,
   parseAccelerator,
-  type MenuNode,
 } from "./menu-dispatch";
 
 function key(init: KeyboardEventInit): KeyboardEvent {
-  return new KeyboardEvent("keydown", { bubbles: true, cancelable: true, ...init });
+  return new KeyboardEvent("keydown", {
+    bubbles: true,
+    cancelable: true,
+    ...init,
+  });
 }
 
-function setup(commands: Record<string, () => unknown>, extra: Partial<Parameters<typeof createMenuDispatcher>[0]> = {}) {
+function setup(
+  commands: Record<string, () => unknown>,
+  extra: Partial<Parameters<typeof createMenuDispatcher>[0]> = {},
+) {
   let clock = 1000;
   const target = document.createElement("div");
   document.body.append(target);
@@ -53,8 +60,14 @@ describe("#74 menu accelerators", () => {
       alt: false,
       shift: true,
     });
-    expect(parseAccelerator("CmdOrCtrl+,")).toMatchObject({ code: "Comma", cmdOrCtrl: true });
-    expect(parseAccelerator("F8")).toMatchObject({ key: "F8", cmdOrCtrl: false });
+    expect(parseAccelerator("CmdOrCtrl+,")).toMatchObject({
+      code: "Comma",
+      cmdOrCtrl: true,
+    });
+    expect(parseAccelerator("F8")).toMatchObject({
+      key: "F8",
+      cmdOrCtrl: false,
+    });
     expect(parseAccelerator("CmdOrCtrl+Shift+[").code).toBe("BracketLeft");
     expect(parseAccelerator("CmdOrCtrl+Shift+`").code).toBe("Backquote");
     expect(() => parseAccelerator("Hyper+K")).toThrow();
@@ -62,26 +75,63 @@ describe("#74 menu accelerators", () => {
 
   it("#81 Ctrl+Tab matches Ctrl only, not Cmd", () => {
     const m = parseAccelerator("Ctrl+Shift+Tab");
-    expect(m).toMatchObject({ code: "Tab", ctrl: true, shift: true, cmdOrCtrl: false });
-    expect(matchesKey(m, key({ code: "Tab", key: "Tab", ctrlKey: true, shiftKey: true }))).toBe(true);
-    expect(matchesKey(m, key({ code: "Tab", key: "Tab", metaKey: true, shiftKey: true }))).toBe(false);
+    expect(m).toMatchObject({
+      code: "Tab",
+      ctrl: true,
+      shift: true,
+      cmdOrCtrl: false,
+    });
+    expect(
+      matchesKey(
+        m,
+        key({ code: "Tab", key: "Tab", ctrlKey: true, shiftKey: true }),
+      ),
+    ).toBe(true);
+    expect(
+      matchesKey(
+        m,
+        key({ code: "Tab", key: "Tab", metaKey: true, shiftKey: true }),
+      ),
+    ).toBe(false);
   });
 
   it("CmdOrCtrl matches Cmd or Ctrl, but not both or neither", () => {
     const m = parseAccelerator("CmdOrCtrl+S");
     expect(matchesKey(m, key({ code: "KeyS", metaKey: true }))).toBe(true);
     expect(matchesKey(m, key({ code: "KeyS", ctrlKey: true }))).toBe(true);
-    expect(matchesKey(m, key({ code: "KeyS", metaKey: true, ctrlKey: true }))).toBe(false);
+    expect(
+      matchesKey(m, key({ code: "KeyS", metaKey: true, ctrlKey: true })),
+    ).toBe(false);
     expect(matchesKey(m, key({ code: "KeyS" }))).toBe(false);
-    expect(matchesKey(parseAccelerator("F8"), key({ key: "F8", metaKey: true }))).toBe(false);
+    expect(
+      matchesKey(parseAccelerator("F8"), key({ key: "F8", metaKey: true })),
+    ).toBe(false);
   });
 
   it("matches keydowns by physical key and exact modifiers", () => {
     const m = parseAccelerator("CmdOrCtrl+Alt+E");
     // Option changes event.key on macOS; event.code is what counts.
-    expect(matchesKey(m, key({ key: "´", code: "KeyE", metaKey: true, altKey: true }))).toBe(true);
-    expect(matchesKey(m, key({ key: "e", code: "KeyE", metaKey: true }))).toBe(false);
-    expect(matchesKey(m, key({ key: "e", code: "KeyE", metaKey: true, altKey: true, shiftKey: true }))).toBe(false);
+    expect(
+      matchesKey(
+        m,
+        key({ key: "´", code: "KeyE", metaKey: true, altKey: true }),
+      ),
+    ).toBe(true);
+    expect(matchesKey(m, key({ key: "e", code: "KeyE", metaKey: true }))).toBe(
+      false,
+    );
+    expect(
+      matchesKey(
+        m,
+        key({
+          key: "e",
+          code: "KeyE",
+          metaKey: true,
+          altKey: true,
+          shiftKey: true,
+        }),
+      ),
+    ).toBe(false);
   });
 });
 
@@ -90,7 +140,10 @@ describe("#74 menu dispatcher", () => {
     const save = vi.fn();
     const setTheme = vi.fn();
     const afterRun = vi.fn();
-    const { dispatcher } = setup({ "file.save": save, "view.setTheme": setTheme }, { afterRun });
+    const { dispatcher } = setup(
+      { "file.save": save, "view.setTheme": setTheme },
+      { afterRun },
+    );
     expect(dispatcher.dispatch("file.save")).toBe(true);
     expect(dispatcher.dispatch("view.setTheme", "melan")).toBe(true);
     expect(save).toHaveBeenCalledTimes(1);
@@ -162,7 +215,9 @@ describe("#74 menu dispatcher", () => {
 
   it("a key press well after a menu click is a new press", () => {
     const page = vi.fn();
-    const { target, dispatcher, advance } = setup({ "view.focusMode": vi.fn() });
+    const { target, dispatcher, advance } = setup({
+      "view.focusMode": vi.fn(),
+    });
     target.addEventListener("keydown", page);
     dispatcher.dispatch("view.focusMode");
     advance(MENU_THEN_KEY_WINDOW_MS + 1);
@@ -186,7 +241,10 @@ describe("#74 menu dispatcher", () => {
 
   it("canRun can block an action", () => {
     const bold = vi.fn();
-    const { dispatcher } = setup({ "fmt.bold": bold }, { canRun: (a) => a !== "fmt.bold" });
+    const { dispatcher } = setup(
+      { "fmt.bold": bold },
+      { canRun: (a) => a !== "fmt.bold" },
+    );
     expect(dispatcher.dispatch("fmt.bold")).toBe(false);
     expect(bold).not.toHaveBeenCalled();
   });
@@ -207,7 +265,8 @@ function collectPredefined(nodes: MenuNode[]): string[] {
   const out: string[] = [];
   for (const node of nodes) {
     if (node.type === "predefined") out.push(node.item);
-    else if (node.type === "submenu" || node.type === "themes") out.push(...collectPredefined(node.items));
+    else if (node.type === "submenu" || node.type === "themes")
+      out.push(...collectPredefined(node.items));
   }
   return out;
 }
@@ -233,15 +292,39 @@ describe("#89 platform-aware menu spec & shortcut labels", () => {
 
     const topLabels = (nodes: MenuNode[]) =>
       nodes.filter((n) => n.type === "submenu").map((n) => n.label);
-    expect(topLabels(mac)).toEqual(["Kalamos", "檔案", "編輯", "段落", "格式", "檢視", "視窗", "說明"]);
-    expect(topLabels(win)).toEqual(["檔案", "編輯", "段落", "格式", "檢視", "視窗", "說明"]);
+    expect(topLabels(mac)).toEqual([
+      "Kalamos",
+      "檔案",
+      "編輯",
+      "段落",
+      "格式",
+      "檢視",
+      "視窗",
+      "說明",
+    ]);
+    expect(topLabels(win)).toEqual([
+      "檔案",
+      "編輯",
+      "段落",
+      "格式",
+      "檢視",
+      "視窗",
+      "說明",
+    ]);
 
     assertCleanSeparators(mac);
     assertCleanSeparators(win);
 
     // Windows drops macOS-only predefined items.
     const winPredefined = new Set(collectPredefined(win));
-    for (const macOnly of ["services", "hide", "hideOthers", "showAll", "fullscreen", "bringAllToFront"]) {
+    for (const macOnly of [
+      "services",
+      "hide",
+      "hideOthers",
+      "showAll",
+      "fullscreen",
+      "bringAllToFront",
+    ]) {
       expect(winPredefined.has(macOnly), macOnly).toBe(false);
     }
     expect(winPredefined.has("about")).toBe(true);
@@ -250,13 +333,31 @@ describe("#89 platform-aware menu spec & shortcut labels", () => {
     const fileSub = win.find((n) => n.type === "submenu" && n.label === "檔案");
     expect(fileSub?.type).toBe("submenu");
     if (fileSub?.type === "submenu") {
-      expect(fileSub.items.some((n) => n.type === "action" && n.id === "app.preferences" && n.accel === "CmdOrCtrl+,")).toBe(true);
-      expect(fileSub.items.some((n) => n.type === "action" && n.id === "app.quit" && n.accel === "CmdOrCtrl+Q")).toBe(true);
+      expect(
+        fileSub.items.some(
+          (n) =>
+            n.type === "action" &&
+            n.id === "app.preferences" &&
+            n.accel === "CmdOrCtrl+,",
+        ),
+      ).toBe(true);
+      expect(
+        fileSub.items.some(
+          (n) =>
+            n.type === "action" &&
+            n.id === "app.quit" &&
+            n.accel === "CmdOrCtrl+Q",
+        ),
+      ).toBe(true);
     }
     const helpSub = win.find((n) => n.type === "submenu" && n.label === "說明");
     expect(helpSub?.type).toBe("submenu");
     if (helpSub?.type === "submenu") {
-      expect(helpSub.items.some((n) => n.type === "predefined" && n.item === "about")).toBe(true);
+      expect(
+        helpSub.items.some(
+          (n) => n.type === "predefined" && n.item === "about",
+        ),
+      ).toBe(true);
     }
 
     // Both platforms expose unique IDs & accelerators and the exact same action set.
@@ -266,7 +367,15 @@ describe("#89 platform-aware menu spec & shortcut labels", () => {
       const accels = actions.map((a) => a.accel?.toLowerCase()).filter(Boolean);
       expect(new Set(accels).size).toBe(accels.length);
     }
-    expect(menuActions(mac).map((a) => a.id).sort()).toEqual(menuActions(win).map((a) => a.id).sort());
+    expect(
+      menuActions(mac)
+        .map((a) => a.id)
+        .sort(),
+    ).toEqual(
+      menuActions(win)
+        .map((a) => a.id)
+        .sort(),
+    );
   });
 
   it("formats Tauri accelerators per platform (⌘/⌥/⇧ on macOS, Ctrl/Alt/Shift on Windows)", () => {
@@ -277,7 +386,9 @@ describe("#89 platform-aware menu spec & shortcut labels", () => {
     expect(formatAccelerator("CmdOrCtrl+Alt+Q", "macos")).toBe("⌥⌘Q");
     expect(formatAccelerator("CmdOrCtrl+Alt+Q", "windows")).toBe("Ctrl+Alt+Q");
     expect(formatAccelerator("CmdOrCtrl+Shift+S", "macos")).toBe("⇧⌘S");
-    expect(formatAccelerator("CmdOrCtrl+Shift+S", "windows")).toBe("Ctrl+Shift+S");
+    expect(formatAccelerator("CmdOrCtrl+Shift+S", "windows")).toBe(
+      "Ctrl+Shift+S",
+    );
     expect(formatAccelerator("Ctrl+Tab", "macos")).toBe("⌃⇥");
     expect(formatAccelerator("Ctrl+Tab", "windows")).toBe("Ctrl+Tab");
     expect(formatAccelerator("F8", "macos")).toBe("F8");

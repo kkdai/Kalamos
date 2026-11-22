@@ -19,10 +19,13 @@ describe("#59 cell text ⇄ source round trip", () => {
     ["a  b", "a  b"],
     ["\\\\\\|", "\\|"],
   ];
-  it.each(cases)("source %j shows as %j and writes back unchanged", (raw, display) => {
-    expect(cellRawToDisplay(raw)).toBe(display);
-    expect(cellDisplayToRaw(display)).toBe(raw);
-  });
+  it.each(cases)(
+    "source %j shows as %j and writes back unchanged",
+    (raw, display) => {
+      expect(cellRawToDisplay(raw)).toBe(display);
+      expect(cellDisplayToRaw(display)).toBe(raw);
+    },
+  );
 
   it("reads <br/> and <br /> as line breaks; writes them back as <br>", () => {
     expect(cellRawToDisplay("a<br/>b<br />c<BR>d")).toBe("a\nb\nc\nd");
@@ -92,14 +95,23 @@ describe("#59 in-cell editing in the real editor", () => {
 
   const view = () => app!.editor.view;
   const tableFrom = () => TABLE.indexOf("| 名稱");
-  const widget = () => view().contentDOM.querySelector<HTMLElement>('[data-testid="table-widget"]');
+  const widget = () =>
+    view().contentDOM.querySelector<HTMLElement>(
+      '[data-testid="table-widget"]',
+    );
   const cellEl = (row: number, col: number) =>
-    widget()!.querySelector<HTMLElement>(`[data-row="${row}"][data-col="${col}"] .k-table-cell-content`)!;
+    widget()!.querySelector<HTMLElement>(
+      `[data-row="${row}"][data-col="${col}"] .k-table-cell-content`,
+    )!;
   const doc = () => view().state.doc.toString();
   const flush = () => new Promise<void>((r) => setTimeout(r, 0));
 
   /** Simulate typing: replace the cell text and fire `input`. */
-  function typeInto(el: HTMLElement, text: string, opts: { composing?: boolean } = {}) {
+  function typeInto(
+    el: HTMLElement,
+    text: string,
+    opts: { composing?: boolean } = {},
+  ) {
     el.textContent = text;
     const range = document.createRange();
     range.selectNodeContents(el);
@@ -107,11 +119,23 @@ describe("#59 in-cell editing in the real editor", () => {
     const sel = document.getSelection()!;
     sel.removeAllRanges();
     sel.addRange(range);
-    el.dispatchEvent(new InputEvent("input", { bubbles: true, isComposing: Boolean(opts.composing) }));
+    el.dispatchEvent(
+      new InputEvent("input", {
+        bubbles: true,
+        isComposing: Boolean(opts.composing),
+      }),
+    );
   }
 
   function key(el: HTMLElement, k: string, init: KeyboardEventInit = {}) {
-    el.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true, ...init }));
+    el.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: k,
+        bubbles: true,
+        cancelable: true,
+        ...init,
+      }),
+    );
   }
 
   it("the table stays a grid while the cursor is inside it; the delimiter row shows source", () => {
@@ -161,11 +185,15 @@ describe("#59 in-cell editing in the real editor", () => {
     focusTableCell(view(), tableFrom(), 2, 1);
     const el = cellEl(2, 1);
     const before = doc();
-    el.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true }));
+    el.dispatchEvent(
+      new CompositionEvent("compositionstart", { bubbles: true }),
+    );
     typeInto(el, "ㄧ", { composing: true });
     typeInto(el, "一百", { composing: true });
     expect(doc()).toBe(before);
-    el.dispatchEvent(new CompositionEvent("compositionend", { bubbles: true, data: "一百" }));
+    el.dispatchEvent(
+      new CompositionEvent("compositionend", { bubbles: true, data: "一百" }),
+    );
     expect(doc()).toBe(before.replace("| 2 |", "| 一百 |"));
   });
 
@@ -188,9 +216,14 @@ describe("#59 in-cell editing in the real editor", () => {
     focusTableCell(view(), tableFrom(), 1, 1); // "1" selected
     const el = cellEl(1, 1);
     // jsdom has no DataTransfer: a minimal stand-in.
-    const data: Record<string, string> = { "text/plain": "a|b\r\nc", "text/html": "<b>ignored</b>" };
+    const data: Record<string, string> = {
+      "text/plain": "a|b\r\nc",
+      "text/html": "<b>ignored</b>",
+    };
     const paste = new Event("paste", { bubbles: true, cancelable: true });
-    Object.defineProperty(paste, "clipboardData", { value: { getData: (t: string) => data[t] ?? "" } });
+    Object.defineProperty(paste, "clipboardData", {
+      value: { getData: (t: string) => data[t] ?? "" },
+    });
     el.dispatchEvent(paste);
     expect(paste.defaultPrevented).toBe(true);
     expect(doc()).toContain("| a\\|b<br>c |");
@@ -244,7 +277,9 @@ describe("#59 in-cell editing in the real editor", () => {
     key(cellEl(3, 1), "Enter");
     await flush();
     expect(widget()!.querySelectorAll("tbody tr")).toHaveLength(2);
-    expect(view().hasFocus || document.activeElement === view().contentDOM).toBe(true);
+    expect(
+      view().hasFocus || document.activeElement === view().contentDOM,
+    ).toBe(true);
     expect(getActiveTableCell(view().state)).toBeNull();
   });
 
@@ -269,10 +304,14 @@ describe("#59 in-cell editing in the real editor", () => {
   it("ArrowUp in the header leaves above; ArrowDown in the last row leaves below", () => {
     focusTableCell(view(), tableFrom(), 0, 0);
     key(cellEl(0, 0), "ArrowUp");
-    expect(view().state.doc.lineAt(view().state.selection.main.head).number).toBe(2);
+    expect(
+      view().state.doc.lineAt(view().state.selection.main.head).number,
+    ).toBe(2);
     focusTableCell(view(), tableFrom(), 2, 1);
     key(cellEl(2, 1), "ArrowDown");
-    expect(view().state.doc.lineAt(view().state.selection.main.head).number).toBe(7);
+    expect(
+      view().state.doc.lineAt(view().state.selection.main.head).number,
+    ).toBe(7);
   });
 
   it("a literal <br>, a trailing backslash and pipes typed into cells keep the table intact", () => {
@@ -284,7 +323,9 @@ describe("#59 in-cell editing in the real editor", () => {
     expect(doc().split("\n")[2]).toBe("|&lt;br>|c:\\path\\ |");
     const active = getActiveTableCell(view().state)!;
     expect(active.table.colCount).toBe(2);
-    expect(active.table.bodyRows[0].cells.map((c) => cellRawToDisplay(c.text))).toEqual(["<br>", "c:\\path\\"]);
+    expect(
+      active.table.bodyRows[0].cells.map((c) => cellRawToDisplay(c.text)),
+    ).toEqual(["<br>", "c:\\path\\"]);
     cellEl(1, 1).blur();
     cellEl(1, 0).blur();
     // Rendered as literal text, not a line break.

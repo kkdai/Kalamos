@@ -34,9 +34,7 @@
         "font-src": "'self' data:",
         "connect-src": "'self' ipc: http://ipc.localhost ws://localhost:1420"
       },
-      "dangerousDisableAssetCspModification": [
-        "style-src"
-      ],
+      "dangerousDisableAssetCspModification": ["style-src"],
       "assetProtocol": {
         "enable": true,
         "scope": []
@@ -55,22 +53,12 @@
     ],
     "fileAssociations": [
       {
-        "ext": [
-          "md",
-          "markdown",
-          "mdown",
-          "mkd",
-          "mkdn",
-          "mdwn",
-          "mdtxt"
-        ],
+        "ext": ["md", "markdown", "mdown", "mkd", "mkdn", "mdwn", "mdtxt"],
         "name": "Markdown Document",
         "description": "Markdown document",
         "role": "Editor",
         "mimeType": "text/markdown",
-        "contentTypes": [
-          "net.daringfireball.markdown"
-        ]
+        "contentTypes": ["net.daringfireball.markdown"]
       }
     ],
     "macOS": {
@@ -83,10 +71,7 @@
       },
       "nsis": {
         "installMode": "currentUser",
-        "languages": [
-          "English",
-          "TradChinese"
-        ],
+        "languages": ["English", "TradChinese"],
         "displayLanguageSelector": false
       }
     }

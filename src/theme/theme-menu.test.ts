@@ -1,9 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import {
-  getSettings,
-  resetMockState,
-  seedMockCustomTheme,
-} from "../ipc";
+import { getSettings, resetMockState, seedMockCustomTheme } from "../ipc";
 import { createKalamosApp, type KalamosApp } from "../main";
 import { CUSTOM_THEME_STYLE_ID } from "./theme-menu";
 
@@ -66,7 +62,9 @@ describe("Theme Menu & Custom CSS (TH-01)", () => {
     expect(menuEl.dataset.visible).toBe("true");
 
     const options = Array.from(
-      menuEl.querySelectorAll<HTMLButtonElement>('[data-testid="theme-option"]'),
+      menuEl.querySelectorAll<HTMLButtonElement>(
+        '[data-testid="theme-option"]',
+      ),
     );
     // Menu option buttons must not carry `data-theme`, which would trigger
     // `[data-theme="papyros"|"melan"]` CSS variable overrides on the button itself.
@@ -201,9 +199,9 @@ describe("Theme Menu & Custom CSS (TH-01)", () => {
     );
     await new Promise((r) => setTimeout(r, 0));
     expect(app.themeMenu.getCurrentTheme()).toBe("custom:night");
-    expect(document.getElementById(CUSTOM_THEME_STYLE_ID)?.textContent).toContain(
-      ":root[data-custom-theme]",
-    );
+    expect(
+      document.getElementById(CUSTOM_THEME_STYLE_ID)?.textContent,
+    ).toContain(":root[data-custom-theme]");
     expect((await getSettings()).theme).toBe("custom:night");
   });
 });

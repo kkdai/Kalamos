@@ -337,14 +337,20 @@ mod tests {
         assert_eq!(loaded.image_root_dir, None);
         assert!(loaded.math_auto_number);
 
-        fs::write(&settings_path, r#"{ "imageRootDir": "/Users/me/blog" }"#)
-            .expect("write settings.json");
+        fs::write(
+            &settings_path,
+            r#"{ "imageRootDir": "/tmp/kalamos-test/blog" }"#,
+        )
+        .expect("write settings.json");
         let loaded = get_settings_in(dir.path()).expect("load settings");
-        assert_eq!(loaded.image_root_dir.as_deref(), Some("/Users/me/blog"));
+        assert_eq!(
+            loaded.image_root_dir.as_deref(),
+            Some("/tmp/kalamos-test/blog")
+        );
         assert_eq!(loaded.theme, "system");
 
         let v = serde_json::to_value(&loaded).unwrap();
-        assert_eq!(v["imageRootDir"], "/Users/me/blog");
+        assert_eq!(v["imageRootDir"], "/tmp/kalamos-test/blog");
     }
 
     #[test]

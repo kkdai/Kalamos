@@ -18,11 +18,8 @@
  * - IME: nothing is searched while the query is being composed.
  */
 import "./search.css";
-import { shortcutLabel } from "../platform";
-import { unshifted } from "./keymaps";
 
 import {
-  SearchQuery,
   closeSearchPanel,
   findNext,
   findPrevious,
@@ -30,11 +27,16 @@ import {
   openSearchPanel,
   replaceAll,
   replaceNext,
+  SearchQuery,
   search,
   searchPanelOpen,
   setSearchQuery,
 } from "@codemirror/search";
-import { EditorSelection, type EditorState, type Extension } from "@codemirror/state";
+import {
+  EditorSelection,
+  type EditorState,
+  type Extension,
+} from "@codemirror/state";
 import {
   EditorView,
   type KeyBinding,
@@ -42,7 +44,14 @@ import {
   ViewPlugin,
   type ViewUpdate,
 } from "@codemirror/view";
-import { cellRawToDisplay, findTableAtPos, focusTableCell, type ParsedTable } from "./tables";
+import { shortcutLabel } from "../platform";
+import { unshifted } from "./keymaps";
+import {
+  cellRawToDisplay,
+  findTableAtPos,
+  focusTableCell,
+  type ParsedTable,
+} from "./tables";
 
 /** Matches counted for the "n / total" label; beyond this it shows "n / 9999+". */
 export const MATCH_COUNT_LIMIT = 9999;
@@ -102,7 +111,8 @@ export function findMatchFrom(
       for (;;) {
         const r = cursor.next();
         if (r.done) return null;
-        if (r.value.from !== r.value.to) return { from: r.value.from, to: r.value.to };
+        if (r.value.from !== r.value.to)
+          return { from: r.value.from, to: r.value.to };
       }
     } catch {
       return null;
@@ -113,13 +123,17 @@ export function findMatchFrom(
 }
 
 /** Index of the match equal to `sel` (binary search), or -1. */
-export function currentMatchIndex(ranges: MatchRange[], sel: MatchRange): number {
+export function currentMatchIndex(
+  ranges: MatchRange[],
+  sel: MatchRange,
+): number {
   let lo = 0;
   let hi = ranges.length - 1;
   while (lo <= hi) {
     const mid = (lo + hi) >> 1;
     const r = ranges[mid];
-    if (r.from < sel.from || (r.from === sel.from && r.to < sel.to)) lo = mid + 1;
+    if (r.from < sel.from || (r.from === sel.from && r.to < sel.to))
+      lo = mid + 1;
     else if (r.from > sel.from || r.to > sel.to) hi = mid - 1;
     else return mid;
   }
@@ -148,7 +162,12 @@ export interface MatchLabelInput {
   current: number;
 }
 
-export function matchLabel({ query, total, capped, current }: MatchLabelInput): string {
+export function matchLabel({
+  query,
+  total,
+  capped,
+  current,
+}: MatchLabelInput): string {
   if (!query.search) return "";
   if (!query.valid) return query.regexp ? "正規表示式無效" : "";
   if (total === 0) return "無結果";
@@ -165,7 +184,10 @@ export function selectionToQueryText(text: string, regexp: boolean): string {
       .replace(/\t/g, "\\t");
   }
   // Non-literal string queries read \n, \t, \r and \\ as escapes.
-  return text.replace(/\\/g, "\\\\").replace(/\r?\n/g, "\\n").replace(/\t/g, "\\t");
+  return text
+    .replace(/\\/g, "\\\\")
+    .replace(/\r?\n/g, "\\n")
+    .replace(/\t/g, "\\t");
 }
 
 export interface TableHit {
@@ -175,21 +197,30 @@ export interface TableHit {
   col: number;
 }
 
-function cellOf(table: ParsedTable, from: number, to: number): { row: number; col: number } | null {
+function cellOf(
+  table: ParsedTable,
+  from: number,
+  to: number,
+): { row: number; col: number } | null {
   const rows = [table.headerRow, ...table.bodyRows];
   for (let r = 0; r < rows.length; r++) {
     const row = rows[r];
     if (from > row.to || to < row.from) continue;
     for (let c = 0; c < row.cells.length; c++) {
       const cell = row.cells[c];
-      if (from >= cell.contentFrom && to <= cell.contentTo) return { row: r, col: c };
+      if (from >= cell.contentFrom && to <= cell.contentTo)
+        return { row: r, col: c };
     }
   }
   return null;
 }
 
 /** The table cell whose content holds `from..to`, or null. */
-export function tableHitAt(state: EditorState, from: number, to: number): TableHit | null {
+export function tableHitAt(
+  state: EditorState,
+  from: number,
+  to: number,
+): TableHit | null {
   const table = findTableAtPos(state, from);
   if (!table || from < table.from || to > table.to) return null;
   const cell = cellOf(table, from, to);
@@ -230,7 +261,10 @@ function selectionSeed(view: EditorView): string | null {
   return text;
 }
 
-function withSearch(query: SearchQuery, patch: Partial<ConstructorParameters<typeof SearchQuery>[0]>): SearchQuery {
+function withSearch(
+  query: SearchQuery,
+  patch: Partial<ConstructorParameters<typeof SearchQuery>[0]>,
+): SearchQuery {
   return new SearchQuery({
     search: query.search,
     caseSensitive: query.caseSensitive,
@@ -244,7 +278,9 @@ function withSearch(query: SearchQuery, patch: Partial<ConstructorParameters<typ
 
 function seedQuery(view: EditorView, seed: string): void {
   const prev = getSearchQuery(view.state);
-  const next = withSearch(prev, { search: selectionToQueryText(seed, prev.regexp) });
+  const next = withSearch(prev, {
+    search: selectionToQueryText(seed, prev.regexp),
+  });
   if (!next.eq(prev)) view.dispatch({ effects: setSearchQuery.of(next) });
 }
 
@@ -253,14 +289,19 @@ function isTypewriter(view: EditorView): boolean {
 }
 
 function scrollEffect(view: EditorView, range: MatchRange) {
-  return EditorView.scrollIntoView(EditorSelection.range(range.from, range.to), {
-    y: isTypewriter(view) ? "center" : "nearest",
-    yMargin: 48,
-  });
+  return EditorView.scrollIntoView(
+    EditorSelection.range(range.from, range.to),
+    {
+      y: isTypewriter(view) ? "center" : "nearest",
+      yMargin: 48,
+    },
+  );
 }
 
 function findTableCellDom(view: EditorView, hit: TableHit): HTMLElement | null {
-  for (const wrapper of view.contentDOM.querySelectorAll<HTMLElement>(".k-table-wrapper")) {
+  for (const wrapper of view.contentDOM.querySelectorAll<HTMLElement>(
+    ".k-table-wrapper",
+  )) {
     let pos: number;
     try {
       pos = view.posAtDOM(wrapper);
@@ -268,7 +309,9 @@ function findTableCellDom(view: EditorView, hit: TableHit): HTMLElement | null {
       continue;
     }
     if (pos !== hit.table.from) continue;
-    return wrapper.querySelector<HTMLElement>(`[data-row="${hit.row}"][data-col="${hit.col}"]`);
+    return wrapper.querySelector<HTMLElement>(
+      `[data-row="${hit.row}"][data-col="${hit.col}"]`,
+    );
   }
   return null;
 }
@@ -283,7 +326,10 @@ function revealTableCellLater(view: EditorView): void {
     const hit = tableHitAt(view.state, sel.from, sel.to);
     const td = hit ? findTableCellDom(view, hit) : null;
     if (td && typeof td.scrollIntoView === "function") {
-      td.scrollIntoView({ block: isTypewriter(view) ? "center" : "nearest", inline: "nearest" });
+      td.scrollIntoView({
+        block: isTypewriter(view) ? "center" : "nearest",
+        inline: "nearest",
+      });
     }
   });
 }
@@ -297,7 +343,11 @@ function afterNavigate(view: EditorView, focusEditor: boolean): void {
   const sel = view.state.selection.main;
   const hit = tableHitAt(view.state, sel.from, sel.to);
   if (!hit) return;
-  if (focusEditor) focusTableCell(view, hit.table.from, hit.row, hit.col, { from: sel.from, to: sel.to });
+  if (focusEditor)
+    focusTableCell(view, hit.table.from, hit.row, hit.col, {
+      from: sel.from,
+      to: sel.to,
+    });
   revealTableCellLater(view);
 }
 
@@ -307,7 +357,10 @@ function afterNavigate(view: EditorView, focusEditor: boolean): void {
  */
 export function revealRange(view: EditorView, from: number, to: number): void {
   const len = view.state.doc.length;
-  const range = { from: Math.max(0, Math.min(from, len)), to: Math.max(0, Math.min(to, len)) };
+  const range = {
+    from: Math.max(0, Math.min(from, len)),
+    to: Math.max(0, Math.min(to, len)),
+  };
   view.dispatch({
     selection: EditorSelection.single(range.from, range.to),
     effects: scrollEffect(view, range),
@@ -335,14 +388,19 @@ export function lineColumnToRange(
 }
 
 /** Cmd+F (find) / Cmd+Opt+F (find + replace). */
-export function openFind(view: EditorView, options: { replace?: boolean } = {}): boolean {
+export function openFind(
+  view: EditorView,
+  options: { replace?: boolean } = {},
+): boolean {
   const seed = selectionSeed(view);
   if (!searchPanelOpen(view.state)) openSearchPanel(view);
   if (seed) seedQuery(view, seed);
   const panel = panels.get(view);
   if (panel) {
     panel.setReplaceVisible(Boolean(options.replace));
-    panel.focus(options.replace && getSearchQuery(view.state).search ? "replace" : "find");
+    panel.focus(
+      options.replace && getSearchQuery(view.state).search ? "replace" : "find",
+    );
   }
   return true;
 }
@@ -366,7 +424,8 @@ function navigate(view: EditorView, dir: 1 | -1): boolean {
 /** Cmd+G / Enter. */
 export const findNextMatch = (view: EditorView): boolean => navigate(view, 1);
 /** Cmd+Shift+G / Shift+Enter. */
-export const findPreviousMatch = (view: EditorView): boolean => navigate(view, -1);
+export const findPreviousMatch = (view: EditorView): boolean =>
+  navigate(view, -1);
 
 /** Replace the current hit (or select the next one) — @codemirror/search replaceNext. */
 export function replaceCurrent(view: EditorView): boolean {
@@ -387,12 +446,17 @@ export function closeFind(view: EditorView): boolean {
   if (!searchPanelOpen(view.state)) return false;
   const panel = panels.get(view);
   const doc = view.dom.ownerDocument;
-  const hadFocus = editorHasFocus(view) || Boolean(panel?.dom.contains(doc.activeElement));
+  const hadFocus =
+    editorHasFocus(view) || Boolean(panel?.dom.contains(doc.activeElement));
   closeSearchPanel(view);
   if (hadFocus) {
     const sel = view.state.selection.main;
     const hit = tableHitAt(view.state, sel.from, sel.to);
-    if (hit) focusTableCell(view, hit.table.from, hit.row, hit.col, { from: sel.from, to: sel.to });
+    if (hit)
+      focusTableCell(view, hit.table.from, hit.row, hit.col, {
+        from: sel.from,
+        to: sel.to,
+      });
     else if (!view.hasFocus) view.focus();
   }
   return true;
@@ -400,7 +464,11 @@ export function closeFind(view: EditorView): boolean {
 
 export const kalamosSearchKeymap: readonly KeyBinding[] = [
   { key: "Mod-f", run: unshifted((view) => openFind(view)) },
-  { key: "Mod-Alt-f", preventDefault: true, run: (view) => openFind(view, { replace: true }) },
+  {
+    key: "Mod-Alt-f",
+    preventDefault: true,
+    run: (view) => openFind(view, { replace: true }),
+  },
   { key: "Mod-g", run: unshifted(findNextMatch), shift: findPreviousMatch },
   {
     key: "Mod-e",
@@ -491,7 +559,14 @@ function isDocumentEditingShortcut(e: KeyboardEvent): boolean {
       /^Digit[0-6]$/.test(e.code)
     );
   }
-  return ["Backquote", "BracketLeft", "BracketRight", "KeyX", "KeyC", "KeyD"].includes(e.code);
+  return [
+    "Backquote",
+    "BracketLeft",
+    "BracketRight",
+    "KeyX",
+    "KeyC",
+    "KeyD",
+  ].includes(e.code);
 }
 
 class KalamosSearchPanel implements Panel {
@@ -520,14 +595,25 @@ class KalamosSearchPanel implements Panel {
     dom.setAttribute("role", "search");
     this.dom = dom;
 
-    this.toggleReplace = button("k-search-btn k-search-toggle", "search-toggle-replace", "切換取代", icon(ICONS.chevron));
+    this.toggleReplace = button(
+      "k-search-btn k-search-toggle",
+      "search-toggle-replace",
+      "切換取代",
+      icon(ICONS.chevron),
+    );
     this.toggleReplace.setAttribute("aria-expanded", "false");
 
     this.findInput = field("search-input", "尋找");
     this.caseBtn = button("k-search-opt", "search-case", "區分大小寫", "Aa");
-    this.wordBtn = button("k-search-opt k-search-opt-word", "search-word", "全字比對", "ab");
+    this.wordBtn = button(
+      "k-search-opt k-search-opt-word",
+      "search-word",
+      "全字比對",
+      "ab",
+    );
     this.regexBtn = button("k-search-opt", "search-regex", "正規表示式", ".*");
-    for (const b of [this.caseBtn, this.wordBtn, this.regexBtn]) b.setAttribute("aria-pressed", "false");
+    for (const b of [this.caseBtn, this.wordBtn, this.regexBtn])
+      b.setAttribute("aria-pressed", "false");
     const options = document.createElement("div");
     options.className = "k-search-options";
     options.append(this.caseBtn, this.wordBtn, this.regexBtn);
@@ -540,20 +626,52 @@ class KalamosSearchPanel implements Panel {
     this.countEl.dataset.testid = "search-count";
     this.countEl.setAttribute("aria-live", "polite");
 
-    const prev = button("k-search-btn", "search-prev", shortcutLabel("上一個（⇧⌘G）"), icon(ICONS.up));
-    const next = button("k-search-btn", "search-next", shortcutLabel("下一個（⌘G）"), icon(ICONS.down));
-    const close = button("k-search-btn", "search-close", "關閉（Esc）", icon(ICONS.close));
+    const prev = button(
+      "k-search-btn",
+      "search-prev",
+      shortcutLabel("上一個（⇧⌘G）"),
+      icon(ICONS.up),
+    );
+    const next = button(
+      "k-search-btn",
+      "search-next",
+      shortcutLabel("下一個（⌘G）"),
+      icon(ICONS.down),
+    );
+    const close = button(
+      "k-search-btn",
+      "search-close",
+      "關閉（Esc）",
+      icon(ICONS.close),
+    );
 
     const findRow = document.createElement("div");
     findRow.className = "k-search-row";
-    findRow.append(this.toggleReplace, this.findField, this.countEl, prev, next, close);
+    findRow.append(
+      this.toggleReplace,
+      this.findField,
+      this.countEl,
+      prev,
+      next,
+      close,
+    );
 
     this.replaceInput = field("replace-input", "取代");
     const replaceField = document.createElement("div");
     replaceField.className = "k-search-field";
     replaceField.append(this.replaceInput);
-    const replaceOne = button("k-search-text-btn", "replace-one", "取代（Enter）", "取代");
-    const replaceEvery = button("k-search-text-btn", "replace-all", shortcutLabel("全部取代（⌘Enter）"), "全部取代");
+    const replaceOne = button(
+      "k-search-text-btn",
+      "replace-one",
+      "取代（Enter）",
+      "取代",
+    );
+    const replaceEvery = button(
+      "k-search-text-btn",
+      "replace-all",
+      shortcutLabel("全部取代（⌘Enter）"),
+      "全部取代",
+    );
     const spacer = document.createElement("span");
     spacer.className = "k-search-spacer";
     this.replaceRow = document.createElement("div");
@@ -589,7 +707,10 @@ class KalamosSearchPanel implements Panel {
 
     for (const b of [this.caseBtn, this.wordBtn, this.regexBtn]) {
       b.addEventListener("click", () => {
-        b.setAttribute("aria-pressed", b.getAttribute("aria-pressed") === "true" ? "false" : "true");
+        b.setAttribute(
+          "aria-pressed",
+          b.getAttribute("aria-pressed") === "true" ? "false" : "true",
+        );
         this.commit(true);
       });
     }
@@ -640,11 +761,17 @@ class KalamosSearchPanel implements Panel {
     this.replaceVisible = visible;
     this.replaceRow.hidden = !visible;
     this.dom.dataset.replace = visible ? "true" : "false";
-    this.toggleReplace.setAttribute("aria-expanded", visible ? "true" : "false");
+    this.toggleReplace.setAttribute(
+      "aria-expanded",
+      visible ? "true" : "false",
+    );
   }
 
   focus(which: "find" | "replace"): void {
-    const input = which === "replace" && this.replaceVisible ? this.replaceInput : this.findInput;
+    const input =
+      which === "replace" && this.replaceVisible
+        ? this.replaceInput
+        : this.findInput;
     input.focus();
     input.select();
   }
@@ -681,7 +808,8 @@ class KalamosSearchPanel implements Panel {
     const q = this.query;
     if (!this.composing) {
       if (this.findInput.value !== q.search) this.findInput.value = q.search;
-      if (this.replaceInput.value !== q.replace) this.replaceInput.value = q.replace;
+      if (this.replaceInput.value !== q.replace)
+        this.replaceInput.value = q.replace;
     }
     this.caseBtn.setAttribute("aria-pressed", String(q.caseSensitive));
     this.wordBtn.setAttribute("aria-pressed", String(q.wholeWord));
@@ -725,10 +853,19 @@ class KalamosSearchPanel implements Panel {
     let handled = true;
     if (e.key === "Escape") {
       closeFind(view);
-    } else if (e.key === "Enter" && e.target === this.findInput && !mod && !e.altKey) {
+    } else if (
+      e.key === "Enter" &&
+      e.target === this.findInput &&
+      !mod &&
+      !e.altKey
+    ) {
       if (e.shiftKey) findPreviousMatch(view);
       else findNextMatch(view);
-    } else if (e.key === "Enter" && e.target === this.replaceInput && !e.altKey) {
+    } else if (
+      e.key === "Enter" &&
+      e.target === this.replaceInput &&
+      !e.altKey
+    ) {
       this.commit(false);
       if (mod) replaceAllMatches(view);
       else replaceCurrent(view);
@@ -768,19 +905,32 @@ interface HighlightRegistryLike {
   delete(name: string): void;
 }
 
-function highlightApi(): { registry: HighlightRegistryLike; Ctor: new (...ranges: Range[]) => unknown } | null {
-  const css = (globalThis as { CSS?: { highlights?: HighlightRegistryLike } }).CSS;
-  const Ctor = (globalThis as { Highlight?: new (...ranges: Range[]) => unknown }).Highlight;
+function highlightApi(): {
+  registry: HighlightRegistryLike;
+  Ctor: new (...ranges: Range[]) => unknown;
+} | null {
+  const css = (globalThis as { CSS?: { highlights?: HighlightRegistryLike } })
+    .CSS;
+  const Ctor = (
+    globalThis as { Highlight?: new (...ranges: Range[]) => unknown }
+  ).Highlight;
   if (!css?.highlights || typeof Ctor !== "function") return null;
   return { registry: css.highlights, Ctor };
 }
 
 /** A DOM Range over the first occurrence of `needle` in `root`'s text at or after `start`. */
-function textRangeIn(root: HTMLElement, needle: string, start: number): { range: Range; end: number } | null {
+function textRangeIn(
+  root: HTMLElement,
+  needle: string,
+  start: number,
+): { range: Range; end: number } | null {
   if (!needle) return null;
   const nodes: Text[] = [];
   let text = "";
-  const walker = root.ownerDocument.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const walker = root.ownerDocument.createTreeWalker(
+    root,
+    NodeFilter.SHOW_TEXT,
+  );
   for (let n = walker.nextNode(); n; n = walker.nextNode()) {
     nodes.push(n as Text);
     text += (n as Text).data;
@@ -788,11 +938,15 @@ function textRangeIn(root: HTMLElement, needle: string, start: number): { range:
   const idx = text.indexOf(needle, start);
   if (idx < 0) return null;
   const end = idx + needle.length;
-  const locate = (offset: number, preferEnd: boolean): [Text, number] | null => {
+  const locate = (
+    offset: number,
+    preferEnd: boolean,
+  ): [Text, number] | null => {
     let acc = 0;
     for (const node of nodes) {
       const len = node.data.length;
-      if (offset < acc + len || (preferEnd && offset === acc + len)) return [node, offset - acc];
+      if (offset < acc + len || (preferEnd && offset === acc + len))
+        return [node, offset - acc];
       acc += len;
     }
     return null;
@@ -867,7 +1021,9 @@ const tableSearchMarks = ViewPlugin.fromClass(
       const sel = state.selection.main;
       const all: Range[] = [];
       const current: Range[] = [];
-      for (const wrapper of view.contentDOM.querySelectorAll<HTMLElement>(".k-table-wrapper")) {
+      for (const wrapper of view.contentDOM.querySelectorAll<HTMLElement>(
+        ".k-table-wrapper",
+      )) {
         let pos: number;
         try {
           pos = view.posAtDOM(wrapper);
@@ -877,11 +1033,16 @@ const tableSearchMarks = ViewPlugin.fromClass(
         const table = findTableAtPos(state, pos);
         if (!table || table.from !== pos) continue;
         const searchFrom = new Map<HTMLElement, number>();
-        for (const m of collectMatches(state, query, 2000, table.from, table.to).ranges) {
+        for (const m of collectMatches(state, query, 2000, table.from, table.to)
+          .ranges) {
           const cell = cellOf(table, m.from, m.to);
           if (!cell) continue;
-          const td = wrapper.querySelector<HTMLElement>(`[data-row="${cell.row}"][data-col="${cell.col}"]`);
-          const content = td?.querySelector<HTMLElement>(".k-table-cell-content");
+          const td = wrapper.querySelector<HTMLElement>(
+            `[data-row="${cell.row}"][data-col="${cell.col}"]`,
+          );
+          const content = td?.querySelector<HTMLElement>(
+            ".k-table-cell-content",
+          );
           if (!td || !content) continue;
           const isCurrent = m.from === sel.from && m.to === sel.to;
           if (isCurrent) {
@@ -890,7 +1051,11 @@ const tableSearchMarks = ViewPlugin.fromClass(
           }
           if (!api) continue;
           const needle = cellRawToDisplay(state.sliceDoc(m.from, m.to));
-          const found = textRangeIn(content, needle, searchFrom.get(content) ?? 0);
+          const found = textRangeIn(
+            content,
+            needle,
+            searchFrom.get(content) ?? 0,
+          );
           if (!found) continue;
           searchFrom.set(content, found.end);
           (isCurrent ? current : all).push(found.range);

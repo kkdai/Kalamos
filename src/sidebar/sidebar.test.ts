@@ -1,22 +1,22 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  DEFAULT_SETTINGS,
   getSettings,
   listRecovery,
-  setSettings,
-  DEFAULT_SETTINGS,
   openFile,
   readMockFile,
   resetMockState,
   seedMockDir,
   seedMockFile,
   setMockDialogHandlers,
+  setSettings,
   triggerMockFsChanged,
 } from "../ipc";
 import {
   createKalamosApp,
+  type KalamosApp,
   NAMED_AUTOSAVE_DELAY_MS,
   UNTITLED_RECOVERY_INTERVAL_MS,
-  type KalamosApp,
 } from "../main";
 
 function setupDom(): HTMLElement {
@@ -193,7 +193,9 @@ describe("Sidebar — file tree, file list, fs-changed, context menu, and shortc
     app = createKalamosApp(document);
     await app.init();
 
-    const sidebarEl = document.querySelector<HTMLElement>('[data-testid="sidebar"]')!;
+    const sidebarEl = document.querySelector<HTMLElement>(
+      '[data-testid="sidebar"]',
+    )!;
     expect(sidebarEl.dataset.visible).toBe("false");
 
     // Cmd+Shift+L shows sidebar
@@ -343,8 +345,17 @@ describe("Sidebar — file tree, file list, fs-changed, context menu, and shortc
     await app.init();
     await app.openFolder("/demo");
 
-    const statusEl = document.querySelector<HTMLElement>('[data-testid="status"]')!;
-    const invalidNames = ["", "   ", "../escape.md", "sub/nested.md", "a\\b.md", ".hidden.md"];
+    const statusEl = document.querySelector<HTMLElement>(
+      '[data-testid="status"]',
+    )!;
+    const invalidNames = [
+      "",
+      "   ",
+      "../escape.md",
+      "sub/nested.md",
+      "a\\b.md",
+      ".hidden.md",
+    ];
 
     for (const bad of invalidNames) {
       statusEl.textContent = "";
@@ -377,7 +388,10 @@ describe("Sidebar — file tree, file list, fs-changed, context menu, and shortc
     userTypeText(app, "\n追加修改內容");
     expect(app.editor.isDirty()).toBe(true);
 
-    const renamedOk = await app.sidebar.renameItem("/demo/notes.md", "notes-v2.md");
+    const renamedOk = await app.sidebar.renameItem(
+      "/demo/notes.md",
+      "notes-v2.md",
+    );
     expect(renamedOk).toBe(true);
     expect(app.getCurrentPath()).toBe("/demo/notes-v2.md");
 
@@ -462,7 +476,9 @@ describe("Sidebar — opening a folder reveals it (#32 / BUG-2)", () => {
     expect(app.sidebar.getTab()).toBe("tree");
     const el = document.querySelector<HTMLElement>('[data-testid="sidebar"]')!;
     expect(el.dataset.visible).toBe("true");
-    expect(el.querySelectorAll('[data-testid="file-item"]').length).toBeGreaterThan(0);
+    expect(
+      el.querySelectorAll('[data-testid="file-item"]').length,
+    ).toBeGreaterThan(0);
 
     const settings = await getSettings();
     expect(settings.sidebarVisible).toBe(true);

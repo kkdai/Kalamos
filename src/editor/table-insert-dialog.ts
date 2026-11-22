@@ -1,7 +1,12 @@
 import "./table-toolbar.css";
 
 import type { EditorView } from "@codemirror/view";
-import { clampInt, insertTable, MAX_TABLE_COLS, MAX_TABLE_ROWS } from "./table-ops";
+import {
+  clampInt,
+  insertTable,
+  MAX_TABLE_COLS,
+  MAX_TABLE_ROWS,
+} from "./table-ops";
 
 /**
  * #59 B: 「插入表格」 dialog (Cmd+Opt+T). Rows (header included) and columns
@@ -40,7 +45,12 @@ export function pickTableSize(
     title.className = "k-table-dialog-title";
     title.textContent = "插入表格";
 
-    const field = (label: string, value: number, max: number, testid: string) => {
+    const field = (
+      label: string,
+      value: number,
+      max: number,
+      testid: string,
+    ) => {
       const wrap = doc.createElement("label");
       wrap.className = "k-table-dialog-field";
       const text = doc.createElement("span");
@@ -55,8 +65,18 @@ export function pickTableSize(
       wrap.append(text, input);
       return { wrap, input };
     };
-    const rowsField = field("列數（含表頭）", initial.rows, MAX_TABLE_ROWS, "table-dialog-rows");
-    const colsField = field("欄數", initial.cols, MAX_TABLE_COLS, "table-dialog-cols");
+    const rowsField = field(
+      "列數（含表頭）",
+      initial.rows,
+      MAX_TABLE_ROWS,
+      "table-dialog-rows",
+    );
+    const colsField = field(
+      "欄數",
+      initial.cols,
+      MAX_TABLE_COLS,
+      "table-dialog-cols",
+    );
     const fields = doc.createElement("div");
     fields.className = "k-table-dialog-fields";
     fields.append(rowsField.wrap, colsField.wrap);
@@ -82,7 +102,9 @@ export function pickTableSize(
 
     const highlight = (rows: number, cols: number) => {
       for (const cell of pickerCells) {
-        const on = Number(cell.dataset.rows) <= rows && Number(cell.dataset.cols) <= cols;
+        const on =
+          Number(cell.dataset.rows) <= rows &&
+          Number(cell.dataset.cols) <= cols;
         cell.classList.toggle("is-selected", on);
       }
       sizeLabel.textContent = `${rows} 列 × ${cols} 欄`;
@@ -98,13 +120,21 @@ export function pickTableSize(
     rowsField.input.addEventListener("input", syncFromFields);
     colsField.input.addEventListener("input", syncFromFields);
     picker.addEventListener("mouseover", (event) => {
-      const cell = (event.target as HTMLElement).closest<HTMLElement>(".k-table-picker-cell");
+      const cell = (event.target as HTMLElement).closest<HTMLElement>(
+        ".k-table-picker-cell",
+      );
       if (cell) highlight(Number(cell.dataset.rows), Number(cell.dataset.cols));
     });
     picker.addEventListener("mouseleave", syncFromFields);
     picker.addEventListener("click", (event) => {
-      const cell = (event.target as HTMLElement).closest<HTMLElement>(".k-table-picker-cell");
-      if (cell) finish({ rows: Number(cell.dataset.rows), cols: Number(cell.dataset.cols) });
+      const cell = (event.target as HTMLElement).closest<HTMLElement>(
+        ".k-table-picker-cell",
+      );
+      if (cell)
+        finish({
+          rows: Number(cell.dataset.rows),
+          cols: Number(cell.dataset.cols),
+        });
     });
 
     const actions = doc.createElement("div");
@@ -156,7 +186,9 @@ export function pickTableSize(
 }
 
 /** Open the dialog and insert the chosen table at the cursor. */
-export async function openInsertTableDialog(view: EditorView): Promise<boolean> {
+export async function openInsertTableDialog(
+  view: EditorView,
+): Promise<boolean> {
   if (view.state.readOnly) return false;
   const size = await pickTableSize(view.dom.ownerDocument);
   view.focus();

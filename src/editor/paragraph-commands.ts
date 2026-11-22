@@ -38,10 +38,13 @@ export function setHeadingLevel(view: EditorView, level: number): boolean {
   const changes: Array<{ from: number; to: number; insert: string }> = [];
   for (const line of lines) {
     const m = HEADING_RE.exec(line.text);
-    const content = m ? line.text.slice(m[0].length) : line.text.replace(/^\s{0,3}/, "");
+    const content = m
+      ? line.text.slice(m[0].length)
+      : line.text.replace(/^\s{0,3}/, "");
     const prefix = allAtTarget || target === 0 ? "" : `${"#".repeat(target)} `;
     const insert = `${prefix}${content}`;
-    if (insert !== line.text) changes.push({ from: line.from, to: line.to, insert });
+    if (insert !== line.text)
+      changes.push({ from: line.from, to: line.to, insert });
   }
   if (changes.length === 0) return true;
   const changeSet = view.state.changes(changes);
@@ -70,27 +73,36 @@ export function toggleBlockquote(view: EditorView): boolean {
   const changeSet = view.state.changes(changes);
   view.dispatch({
     changes: changeSet,
-    selection: EditorSelection.cursor(changeSet.mapPos(lines[lines.length - 1].to, 1)),
+    selection: EditorSelection.cursor(
+      changeSet.mapPos(lines[lines.length - 1].to, 1),
+    ),
     scrollIntoView: true,
     userEvent: "input",
   });
   return true;
 }
 
-function insertFencedBlock(view: EditorView, open: string, close: string): boolean {
+function insertFencedBlock(
+  view: EditorView,
+  open: string,
+  close: string,
+): boolean {
   const { state } = view;
   const { from, to } = state.selection.main;
   const startLine = state.doc.lineAt(from);
   const endLine = state.doc.lineAt(to);
   if (isTableRow(startLine.text)) return false;
-  const selected = from === to ? "" : state.sliceDoc(startLine.from, endLine.to);
+  const selected =
+    from === to ? "" : state.sliceDoc(startLine.from, endLine.to);
   const body = selected || (startLine.text.trim() === "" ? "" : null);
   if (body !== null) {
     // Wrap the selected lines (or fill the empty line) with the fence.
     const insert = `${open}\n${body}\n${close}`;
     view.dispatch({
       changes: { from: startLine.from, to: endLine.to, insert },
-      selection: EditorSelection.cursor(startLine.from + open.length + 1 + body.length),
+      selection: EditorSelection.cursor(
+        startLine.from + open.length + 1 + body.length,
+      ),
       scrollIntoView: true,
       userEvent: "input",
     });

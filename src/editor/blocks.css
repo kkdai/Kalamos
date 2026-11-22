@@ -12,14 +12,25 @@
 
 .cm-line.k-quote-depth-1 {
   padding-left: calc(var(--k-quote-gap) + 4px);
-  background: linear-gradient(to right, var(--k-accent) var(--k-quote-bar), transparent 0) no-repeat;
+  background: linear-gradient(
+      to right,
+      var(--k-accent) var(--k-quote-bar),
+      transparent 0
+    )
+    no-repeat;
 }
 
 .cm-line.k-quote-depth-2 {
   padding-left: calc(2 * var(--k-quote-gap) + 4px);
   background:
-    linear-gradient(to right, var(--k-accent) var(--k-quote-bar), transparent 0) no-repeat 0 0,
-    linear-gradient(to right, var(--k-divider) var(--k-quote-bar), transparent 0) no-repeat var(--k-quote-gap) 0;
+    linear-gradient(to right, var(--k-accent) var(--k-quote-bar), transparent 0)
+    no-repeat 0 0,
+    linear-gradient(
+      to right,
+      var(--k-divider) var(--k-quote-bar),
+      transparent 0
+    )
+    no-repeat var(--k-quote-gap) 0;
 }
 
 .cm-line.k-quote-depth-3,
@@ -28,9 +39,20 @@
 .cm-line.k-quote-depth-6 {
   padding-left: calc(3 * var(--k-quote-gap) + 4px);
   background:
-    linear-gradient(to right, var(--k-accent) var(--k-quote-bar), transparent 0) no-repeat 0 0,
-    linear-gradient(to right, var(--k-divider) var(--k-quote-bar), transparent 0) no-repeat var(--k-quote-gap) 0,
-    linear-gradient(to right, var(--k-divider) var(--k-quote-bar), transparent 0) no-repeat calc(2 * var(--k-quote-gap)) 0;
+    linear-gradient(to right, var(--k-accent) var(--k-quote-bar), transparent 0)
+    no-repeat 0 0,
+    linear-gradient(
+      to right,
+      var(--k-divider) var(--k-quote-bar),
+      transparent 0
+    )
+    no-repeat var(--k-quote-gap) 0,
+    linear-gradient(
+      to right,
+      var(--k-divider) var(--k-quote-bar),
+      transparent 0
+    )
+    no-repeat calc(2 * var(--k-quote-gap)) 0;
 }
 
 /* Horizontal rule */

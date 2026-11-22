@@ -51,15 +51,21 @@ describe("extractChangelogSection", () => {
     const section = extractChangelogSection(SAMPLE_CHANGELOG, "0.4.0");
     assert.equal(
       section,
-      ["### Minor Changes", "", "- Windows support", "- Automated release workflow"].join(
-        "\n",
-      ),
+      [
+        "### Minor Changes",
+        "",
+        "- Windows support",
+        "- Automated release workflow",
+      ].join("\n"),
     );
   });
 
   it("extracts the last section in the changelog", () => {
     const section = extractChangelogSection(SAMPLE_CHANGELOG, "0.3.0");
-    assert.equal(section, ["### Minor Changes", "", "- Multi-document tabs"].join("\n"));
+    assert.equal(
+      section,
+      ["### Minor Changes", "", "- Multi-document tabs"].join("\n"),
+    );
   });
 
   it("matches prerelease versions and does not confuse them with base versions", () => {
@@ -75,9 +81,12 @@ describe("extractChangelogSection", () => {
     const section = extractChangelogSection(crlfChangelog, "0.4.0");
     assert.equal(
       section,
-      ["### Minor Changes", "", "- Windows support", "- Automated release workflow"].join(
-        "\n",
-      ),
+      [
+        "### Minor Changes",
+        "",
+        "- Windows support",
+        "- Automated release workflow",
+      ].join("\n"),
     );
   });
 
@@ -108,7 +117,10 @@ describe("extractChangelogSection", () => {
 
   it("returns an empty string when the version is absent or empty", () => {
     assert.equal(extractChangelogSection(SAMPLE_CHANGELOG, "9.9.9"), "");
-    assert.equal(extractChangelogSection("# kalamos\n\n## 0.4.0\n\n## 0.3.0\n", "0.4.0"), "");
+    assert.equal(
+      extractChangelogSection("# kalamos\n\n## 0.4.0\n\n## 0.3.0\n", "0.4.0"),
+      "",
+    );
     assert.equal(extractChangelogSection("", "0.4.0"), "");
   });
 });
@@ -121,7 +133,10 @@ describe("formatReleaseNotes", () => {
       changelogText: SAMPLE_CHANGELOG,
     });
 
-    assert.match(notes, /## Kalamos v0\.4\.0\n\n### Minor Changes\n\n- Windows support/);
+    assert.match(
+      notes,
+      /## Kalamos v0\.4\.0\n\n### Minor Changes\n\n- Windows support/,
+    );
     assert.doesNotMatch(notes, /發布前請在此補充/);
     assert.doesNotMatch(notes, /Multi-document tabs/);
     assert.match(notes, /### 安裝方式/);
@@ -153,7 +168,15 @@ describe("generate-release-notes CLI", () => {
 
       execFileSync(
         process.execPath,
-        [SCRIPT_PATH, "--version", "0.4.0", "--checksums", checksumsPath, "--output", outputPath],
+        [
+          SCRIPT_PATH,
+          "--version",
+          "0.4.0",
+          "--checksums",
+          checksumsPath,
+          "--output",
+          outputPath,
+        ],
         { cwd: dir },
       );
       const withoutChangelog = readFileSync(outputPath, "utf8");
@@ -162,7 +185,15 @@ describe("generate-release-notes CLI", () => {
       writeFileSync(join(dir, "CHANGELOG.md"), SAMPLE_CHANGELOG, "utf8");
       execFileSync(
         process.execPath,
-        [SCRIPT_PATH, "--version", "0.4.0", "--checksums", checksumsPath, "--output", outputPath],
+        [
+          SCRIPT_PATH,
+          "--version",
+          "0.4.0",
+          "--checksums",
+          checksumsPath,
+          "--output",
+          outputPath,
+        ],
         { cwd: dir },
       );
       const withChangelog = readFileSync(outputPath, "utf8");

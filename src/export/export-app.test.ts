@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+  type FileMeta,
   getMockPdfExports,
   resetMockState,
   seedMockFile,
   setMockDialogHandlers,
   setMockExportPdfHandler,
-  type FileMeta,
 } from "../ipc";
 import { createKalamosApp, type KalamosApp } from "../main";
 import { EXPORTING_PDF_MESSAGE } from "./pdf";
@@ -21,7 +21,12 @@ function setupDom(): void {
 
 function pressExportShortcut(): void {
   window.dispatchEvent(
-    new KeyboardEvent("keydown", { key: "E", code: "KeyE", metaKey: true, shiftKey: true }),
+    new KeyboardEvent("keydown", {
+      key: "E",
+      code: "KeyE",
+      metaKey: true,
+      shiftKey: true,
+    }),
   );
 }
 
@@ -92,7 +97,9 @@ describe("EX-01 export PDF from the app", () => {
     app.editor.setContent("# 未命名標題\n", { dirty: true });
     setMockDialogHandlers({ save: (p) => `/tmp/${p}` });
 
-    setMockExportPdfHandler(() => Promise.reject({ kind: "Io", message: "匯出 PDF 逾時（60 秒）" }));
+    setMockExportPdfHandler(() =>
+      Promise.reject({ kind: "Io", message: "匯出 PDF 逾時（60 秒）" }),
+    );
     expect(await app.exportDocumentPdf()).toBe(false);
     expect(app.getStatusText()).toBe("匯出 PDF 失敗：匯出 PDF 逾時（60 秒）");
     expect(document.getElementById("status")!.dataset.error).toBe("true");
@@ -102,7 +109,9 @@ describe("EX-01 export PDF from the app", () => {
     expect(await app.exportDocumentPdf()).toBe(true);
     const [job] = getMockPdfExports();
     expect(job.outPath).toBe("/tmp/未命名.pdf");
-    expect(job.headings).toEqual([{ level: 1, text: "未命名標題", id: "未命名標題" }]);
+    expect(job.headings).toEqual([
+      { level: 1, text: "未命名標題", id: "未命名標題" },
+    ]);
     expect(app.getStatusText()).toBe("已匯出 PDF：/tmp/未命名.pdf");
   });
 

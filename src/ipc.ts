@@ -167,7 +167,9 @@ type DialogSaveHandler = (
 type DialogAskHandler = (message: string) => boolean | Promise<boolean>;
 /** #81: answer of the 儲存 / 不儲存 / 取消 prompt. */
 export type SaveChangesChoice = "save" | "discard" | "cancel";
-type DialogSaveChangesHandler = (message: string) => SaveChangesChoice | Promise<SaveChangesChoice>;
+type DialogSaveChangesHandler = (
+  message: string,
+) => SaveChangesChoice | Promise<SaveChangesChoice>;
 type DialogPromptHandler = (
   message: string,
   defaultValue?: string,
@@ -188,7 +190,9 @@ const mockSaveChangesPrompts: string[] = [];
 let mockWindowTitle = "Kalamos";
 let mockPromptDialogHandler: DialogPromptHandler | null = null;
 let mockSaveInterceptor: MockSaveInterceptor | null = null;
-const mockCloseListeners = new Set<() => boolean | void | Promise<boolean | void>>();
+const mockCloseListeners = new Set<
+  () => boolean | void | Promise<boolean | void>
+>();
 const mockFsChangedListeners = new Set<FsChangedListener>();
 
 export function isTauri(): boolean {
@@ -201,7 +205,8 @@ export function isTauri(): boolean {
 
 function nextMockTimestampMs(): number {
   const now = Date.now();
-  lastMockTimestampMs = now > lastMockTimestampMs ? now : lastMockTimestampMs + 1;
+  lastMockTimestampMs =
+    now > lastMockTimestampMs ? now : lastMockTimestampMs + 1;
   return lastMockTimestampMs;
 }
 
@@ -216,7 +221,10 @@ function normalizePath(rawPath: string): string {
   return trimmed.replace(/\/+$/, "");
 }
 
-function registerAncestorDirs(fileOrDirPath: string, includeSelf = false): void {
+function registerAncestorDirs(
+  fileOrDirPath: string,
+  includeSelf = false,
+): void {
   const norm = normalizePath(fileOrDirPath);
   if (!norm) return;
   const isAbsolute = norm.startsWith("/");
@@ -404,7 +412,11 @@ export function seedMockDir(path: string): void {
   registerAncestorDirs(norm, true);
 }
 
-export function seedMockFile(path: string, content: string, mtimeMs?: number): void {
+export function seedMockFile(
+  path: string,
+  content: string,
+  mtimeMs?: number,
+): void {
   const norm = normalizePath(path);
   if (!norm) return;
   registerAncestorDirs(norm, false);
@@ -461,7 +473,10 @@ export async function saveFile(
     }
     const norm = normalizePath(path);
     if (mockDirs.has(norm)) {
-      throw createAppError("InvalidPath", `Target path is a directory: ${path}`);
+      throw createAppError(
+        "InvalidPath",
+        `Target path is a directory: ${path}`,
+      );
     }
     const mtimeMs = nextMockTimestampMs();
     const size = new TextEncoder().encode(content).byteLength;
@@ -549,7 +564,8 @@ function buildMockTree(dirPath: string): TreeNode {
   }
 
   for (const fileName of childFileNames) {
-    const childPath = dirPath === "/" ? `/${fileName}` : `${dirPath}/${fileName}`;
+    const childPath =
+      dirPath === "/" ? `/${fileName}` : `${dirPath}/${fileName}`;
     children.push({
       name: fileName,
       path: childPath,
@@ -663,7 +679,10 @@ export function makeSearchSnippet(
   const total = chars.length;
   const hitFrom = Array.from(line.slice(0, start)).length;
   const hitTo = hitFrom + Array.from(line.slice(start, end)).length;
-  let from = total <= SNIPPET_MAX_CHARS ? 0 : Math.max(0, hitFrom - SNIPPET_CONTEXT_CHARS);
+  let from =
+    total <= SNIPPET_MAX_CHARS
+      ? 0
+      : Math.max(0, hitFrom - SNIPPET_CONTEXT_CHARS);
   let to = Math.min(total, from + SNIPPET_MAX_CHARS);
   if (to - from < SNIPPET_MAX_CHARS) from = Math.max(0, to - SNIPPET_MAX_CHARS);
   const ws = (c: string) => /\s/u.test(c);
@@ -693,7 +712,9 @@ function lastChar(s: string): string | undefined {
 }
 
 function buildMockMatcher(query: string, opts: FolderSearchOptions): RegExp {
-  const source = opts.regex ? query : query.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&");
+  const source = opts.regex
+    ? query
+    : query.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&");
   const flags = opts.caseSensitive ? "g" : "gi";
   try {
     return new RegExp(source, `${flags}u`);
@@ -701,14 +722,25 @@ function buildMockMatcher(query: string, opts: FolderSearchOptions): RegExp {
     try {
       return new RegExp(source, flags);
     } catch (err) {
-      throw createAppError("Parse", `Invalid regular expression: ${err instanceof Error ? err.message : String(err)}`);
+      throw createAppError(
+        "Parse",
+        `Invalid regular expression: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
   }
 }
 
-function mockSearchInFolder(root: string, query: string, opts: FolderSearchOptions): FolderSearchResults {
+function mockSearchInFolder(
+  root: string,
+  query: string,
+  opts: FolderSearchOptions,
+): FolderSearchResults {
   const norm = assertValidMockDir(root);
-  const result: FolderSearchResults = { hits: [], truncated: false, filesSearched: 0 };
+  const result: FolderSearchResults = {
+    hits: [],
+    truncated: false,
+    filesSearched: 0,
+  };
   if (!query) return result;
   const matcher = buildMockMatcher(query, opts);
   const prefix = norm === "/" ? "/" : `${norm}/`;
@@ -744,15 +776,23 @@ function mockSearchInFolder(root: string, query: string, opts: FolderSearchOptio
         const start = m.index;
         const end = start + m[0].length;
         if (opts.wholeWord) {
-          const left = isWordChar(lastChar(line.slice(0, start))) && isWordChar(Array.from(m[0])[0]);
-          const right = isWordChar(lastChar(m[0])) && isWordChar(Array.from(line.slice(end))[0]);
+          const left =
+            isWordChar(lastChar(line.slice(0, start))) &&
+            isWordChar(Array.from(m[0])[0]);
+          const right =
+            isWordChar(lastChar(m[0])) &&
+            isWordChar(Array.from(line.slice(end))[0]);
           if (left || right) continue;
         }
         if (result.hits.length >= FOLDER_SEARCH_MAX_RESULTS) {
           result.truncated = true;
           return result;
         }
-        const { snippet, matchStart, matchEnd } = makeSearchSnippet(line, start, end);
+        const { snippet, matchStart, matchEnd } = makeSearchSnippet(
+          line,
+          start,
+          end,
+        );
         result.hits.push({
           path,
           line: i + 1,
@@ -856,7 +896,8 @@ export async function renamePath(from: string, to: string): Promise<null> {
     mockDirs.delete(d);
   }
   for (const d of dirsToMove) {
-    const relocated = d === normFrom ? normTo : `${normTo}${d.slice(normFrom.length)}`;
+    const relocated =
+      d === normFrom ? normTo : `${normTo}${d.slice(normFrom.length)}`;
     registerAncestorDirs(relocated, true);
   }
 
@@ -1010,11 +1051,16 @@ export async function setSettings(settings: Settings): Promise<null> {
     // Like Rust set_settings: the upload command / args are only ever read from
     // the settings file, never written by the app (IM-05 defence in depth).
     uploadCommand: mockSettings.uploadCommand ?? DEFAULT_SETTINGS.uploadCommand,
-    uploadArgs: [...(mockSettings.uploadArgs ?? DEFAULT_SETTINGS.uploadArgs ?? [])],
+    uploadArgs: [
+      ...(mockSettings.uploadArgs ?? DEFAULT_SETTINGS.uploadArgs ?? []),
+    ],
     uploadOnInsert: settings.uploadOnInsert ?? DEFAULT_SETTINGS.uploadOnInsert,
-    autoPairBrackets: settings.autoPairBrackets ?? DEFAULT_SETTINGS.autoPairBrackets,
-    autoPairMarkdown: settings.autoPairMarkdown ?? DEFAULT_SETTINGS.autoPairMarkdown,
-    startupBehavior: settings.startupBehavior ?? DEFAULT_SETTINGS.startupBehavior,
+    autoPairBrackets:
+      settings.autoPairBrackets ?? DEFAULT_SETTINGS.autoPairBrackets,
+    autoPairMarkdown:
+      settings.autoPairMarkdown ?? DEFAULT_SETTINGS.autoPairMarkdown,
+    startupBehavior:
+      settings.startupBehavior ?? DEFAULT_SETTINGS.startupBehavior,
     autoSave: settings.autoSave ?? DEFAULT_SETTINGS.autoSave,
     fontSize: settings.fontSize ?? DEFAULT_SETTINGS.fontSize,
     contentWidth: settings.contentWidth ?? DEFAULT_SETTINGS.contentWidth,
@@ -1064,7 +1110,10 @@ export async function readThemeCss(id: string): Promise<string> {
     return invoke<string>("read_theme_css", { id });
   }
   if (!id || !id.startsWith("custom:")) {
-    throw createAppError("InvalidPath", `Theme id must start with 'custom:': ${id}`);
+    throw createAppError(
+      "InvalidPath",
+      `Theme id must start with 'custom:': ${id}`,
+    );
   }
   const stem = id.slice("custom:".length);
   if (!isValidThemeStem(stem)) {
@@ -1143,9 +1192,17 @@ export interface SaveChangesLabels {
   cancel: string;
 }
 
-export const SAVE_CHANGES_LABELS: SaveChangesLabels = { yes: "儲存", no: "不儲存", cancel: "取消" };
+export const SAVE_CHANGES_LABELS: SaveChangesLabels = {
+  yes: "儲存",
+  no: "不儲存",
+  cancel: "取消",
+};
 /** #81 B: closing the window / quitting with several unsaved documents. */
-export const SAVE_ALL_CHANGES_LABELS: SaveChangesLabels = { yes: "全部儲存", no: "不儲存", cancel: "取消" };
+export const SAVE_ALL_CHANGES_LABELS: SaveChangesLabels = {
+  yes: "全部儲存",
+  no: "不儲存",
+  cancel: "取消",
+};
 
 /** #81: 儲存 / 不儲存 / 取消 before closing a tab (or the window) with unsaved changes. */
 export async function askSaveChanges(
@@ -1205,7 +1262,9 @@ export async function promptMockInput(
 /** The handler returns false to keep the window open (#81 B: 取消 at the unsaved prompt). */
 export type WindowCloseHandler = () => boolean | void | Promise<boolean | void>;
 
-export async function onWindowCloseRequested(handler: WindowCloseHandler): Promise<() => void> {
+export async function onWindowCloseRequested(
+  handler: WindowCloseHandler,
+): Promise<() => void> {
   if (isTauri()) {
     return getCurrentWindow().onCloseRequested(async (event) => {
       if ((await handler()) === false) event.preventDefault();
@@ -1275,15 +1334,23 @@ function dirnameOf(path: string): string {
 }
 
 function encodeMarkdownPath(name: string): string {
-  return name.replace(/[% ()<>]/g, (ch) =>
-    `%${ch.charCodeAt(0).toString(16).toUpperCase().padStart(2, "0")}`,
+  return name.replace(
+    /[% ()<>]/g,
+    (ch) => `%${ch.charCodeAt(0).toString(16).toUpperCase().padStart(2, "0")}`,
   );
 }
 
-function mockImportUnique(docPath: string, stem: string, ext: string): ImportedImage {
+function mockImportUnique(
+  docPath: string,
+  stem: string,
+  ext: string,
+): ImportedImage {
   const dir = dirnameOf(docPath);
   if (!dir) {
-    throw createAppError("InvalidPath", `Cannot resolve document folder: ${docPath}`);
+    throw createAppError(
+      "InvalidPath",
+      `Cannot resolve document folder: ${docPath}`,
+    );
   }
   const assetsDir = `${dir === "/" ? "" : dir}/assets`;
   for (let n = 0; n < 10000; n++) {
@@ -1314,7 +1381,10 @@ export async function importImage(
     return invoke<ImportedImage>("import_image", { docPath, sourcePath });
   }
   if (!docPath || !docPath.trim()) {
-    throw createAppError("InvalidPath", "Document must be saved before importing images");
+    throw createAppError(
+      "InvalidPath",
+      "Document must be saved before importing images",
+    );
   }
   const fileName = normalizePath(sourcePath).split("/").pop() ?? "";
   const dot = fileName.lastIndexOf(".");
@@ -1335,7 +1405,10 @@ export async function importImageBytes(
     return invoke<ImportedImage>("import_image_bytes", { docPath, bytes, ext });
   }
   if (!docPath || !docPath.trim()) {
-    throw createAppError("InvalidPath", "Document must be saved before importing images");
+    throw createAppError(
+      "InvalidPath",
+      "Document must be saved before importing images",
+    );
   }
   const lower = mockValidateImageExt(ext);
   if (!bytes) {
@@ -1378,8 +1451,15 @@ export async function allowAssetDir(path: string): Promise<null> {
     return null;
   }
   // Like the Rust command: refuse `/` and the home folder or any ancestor of it.
-  if (norm === "/" || MOCK_HOME_DIR === norm || MOCK_HOME_DIR.startsWith(`${norm}/`)) {
-    throw createAppError("InvalidPath", `${ASSET_DIR_TOO_BROAD_MESSAGE}: ${path}`);
+  if (
+    norm === "/" ||
+    MOCK_HOME_DIR === norm ||
+    MOCK_HOME_DIR.startsWith(`${norm}/`)
+  ) {
+    throw createAppError(
+      "InvalidPath",
+      `${ASSET_DIR_TOO_BROAD_MESSAGE}: ${path}`,
+    );
   }
   mockAllowedAssetDirs.add(norm);
   return null;
@@ -1387,7 +1467,18 @@ export async function allowAssetDir(path: string): Promise<null> {
 
 /** Image types the asset scope may expose one file at a time (matches Rust `DISPLAY_IMAGE_EXTS`). */
 export const DISPLAY_IMAGE_EXTS = [
-  "png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "ico", "avif", "tiff", "tif", "heic",
+  "png",
+  "jpg",
+  "jpeg",
+  "gif",
+  "webp",
+  "svg",
+  "bmp",
+  "ico",
+  "avif",
+  "tiff",
+  "tif",
+  "heic",
 ];
 
 /**
@@ -1437,7 +1528,9 @@ export function localFileUrl(path: string): string {
 }
 
 /** Listen for files dropped onto the window (Tauri drag & drop gives real paths). */
-export async function onFileDrop(listener: FileDropListener): Promise<() => void> {
+export async function onFileDrop(
+  listener: FileDropListener,
+): Promise<() => void> {
   if (isTauri()) {
     return getCurrentWebview().onDragDropEvent((event) => {
       if (event.payload.type !== "drop") return;
@@ -1460,7 +1553,9 @@ export async function onFileDrop(listener: FileDropListener): Promise<() => void
   };
 }
 
-export async function triggerMockFileDrop(payload: FileDropPayload): Promise<void> {
+export async function triggerMockFileDrop(
+  payload: FileDropPayload,
+): Promise<void> {
   for (const listener of Array.from(mockFileDropListeners)) {
     await listener(payload);
   }
@@ -1521,7 +1616,9 @@ export async function takePendingOpenFiles(): Promise<OpenFilesRequest> {
  * Mock stand-in for `RunEvent::Opened`: queued until `takePendingOpenFiles`
  * runs (cold launch), delivered to listeners afterwards (app already running).
  */
-export async function triggerMockOpenFiles(req: Partial<OpenFilesRequest>): Promise<void> {
+export async function triggerMockOpenFiles(
+  req: Partial<OpenFilesRequest>,
+): Promise<void> {
   const full: OpenFilesRequest = {
     paths: [...(req.paths ?? [])],
     rejected: [...(req.rejected ?? [])],
@@ -1554,11 +1651,15 @@ export interface MockPdfExport {
 }
 
 const mockPdfExports: MockPdfExport[] = [];
-type MockExportPdfHandler = (job: MockPdfExport) => FileMeta | Promise<FileMeta>;
+type MockExportPdfHandler = (
+  job: MockPdfExport,
+) => FileMeta | Promise<FileMeta>;
 let mockExportPdfHandler: MockExportPdfHandler | null = null;
 
 /** Save dialog for the exported PDF (`defaultPath` = suggested file path or name). */
-export async function pickSavePdfPath(defaultPath: string): Promise<string | null> {
+export async function pickSavePdfPath(
+  defaultPath: string,
+): Promise<string | null> {
   if (isTauri()) {
     const selected = await saveDialog({
       defaultPath: toNativePath(defaultPath),
@@ -1579,13 +1680,21 @@ export async function exportPdf(
   headings: PdfHeading[],
 ): Promise<FileMeta> {
   if (isTauri()) {
-    const meta = await invoke<FileMeta>("export_pdf", { html, outPath, headings });
+    const meta = await invoke<FileMeta>("export_pdf", {
+      html,
+      outPath,
+      headings,
+    });
     return { ...meta, path: toSlashPath(meta.path) };
   }
   if (!outPath || !outPath.trim()) {
     throw createAppError("InvalidPath", "Path must not be empty");
   }
-  const job: MockPdfExport = { outPath: normalizePath(outPath), html, headings };
+  const job: MockPdfExport = {
+    outPath: normalizePath(outPath),
+    html,
+    headings,
+  };
   if (mockExportPdfHandler) {
     return mockExportPdfHandler(job);
   }
@@ -1601,7 +1710,9 @@ export function getMockPdfExports(): MockPdfExport[] {
   return mockPdfExports.slice();
 }
 
-export function setMockExportPdfHandler(handler: MockExportPdfHandler | null): void {
+export function setMockExportPdfHandler(
+  handler: MockExportPdfHandler | null,
+): void {
   mockExportPdfHandler = handler;
 }
 
@@ -1637,13 +1748,27 @@ const DEFAULT_MOCK_PANDOC_STATUS: PandocStatus = {
 };
 let mockPandocStatus: PandocStatus = { ...DEFAULT_MOCK_PANDOC_STATUS };
 const mockPandocExports: PandocExportRequest[] = [];
-type MockPandocExportHandler = (req: PandocExportRequest) => FileMeta | Promise<FileMeta>;
-type MockPandocImportHandler = (path: string) => PandocImportResult | Promise<PandocImportResult>;
+type MockPandocExportHandler = (
+  req: PandocExportRequest,
+) => FileMeta | Promise<FileMeta>;
+type MockPandocImportHandler = (
+  path: string,
+) => PandocImportResult | Promise<PandocImportResult>;
 let mockPandocExportHandler: MockPandocExportHandler | null = null;
 let mockPandocImportHandler: MockPandocImportHandler | null = null;
 
 const PANDOC_FORMATS_MOCK = ["docx", "odt", "latex", "mediawiki", "epub"];
-const PANDOC_IMPORT_EXTS_MOCK = ["docx", "odt", "epub", "tex", "latex", "html", "htm", "wiki", "mediawiki"];
+const PANDOC_IMPORT_EXTS_MOCK = [
+  "docx",
+  "odt",
+  "epub",
+  "tex",
+  "latex",
+  "html",
+  "htm",
+  "wiki",
+  "mediawiki",
+];
 const PANDOC_MISSING = "找不到 Pandoc：請先安裝（brew install pandoc）";
 const PANDOC_TOO_OLD_FOR_IMPORT = "Pandoc 版本過舊，匯入需要 2.15 以上";
 
@@ -1669,7 +1794,9 @@ export async function pandocStatus(recheck = false): Promise<PandocStatus> {
 }
 
 /** Convert `markdown` with pandoc to `format`, written atomically to `outPath`. */
-export async function exportPandoc(req: PandocExportRequest): Promise<FileMeta> {
+export async function exportPandoc(
+  req: PandocExportRequest,
+): Promise<FileMeta> {
   if (isTauri()) {
     const meta = await invoke<FileMeta>("export_pandoc", {
       docPath: req.docPath,
@@ -1681,14 +1808,18 @@ export async function exportPandoc(req: PandocExportRequest): Promise<FileMeta> 
     });
     return { ...meta, path: toSlashPath(meta.path) };
   }
-  if (!mockPandocStatus.available) throw createAppError("NotFound", PANDOC_MISSING);
+  if (!mockPandocStatus.available)
+    throw createAppError("NotFound", PANDOC_MISSING);
   if (!req.outPath || !req.outPath.trim()) {
     throw createAppError("InvalidPath", "Path must not be empty");
   }
   if (!PANDOC_FORMATS_MOCK.includes(req.format)) {
     throw createAppError("InvalidPath", `不支援的匯出格式：${req.format}`);
   }
-  const job: PandocExportRequest = { ...req, outPath: normalizePath(req.outPath) };
+  const job: PandocExportRequest = {
+    ...req,
+    outPath: normalizePath(req.outPath),
+  };
   if (mockPandocExportHandler) return mockPandocExportHandler(job);
   mockPandocExports.push(job);
   return {
@@ -1704,16 +1835,19 @@ export async function importPandoc(path: string): Promise<PandocImportResult> {
     const res = await invoke<PandocImportResult>("import_pandoc", { path });
     return { ...res, mediaDir: toSlashPath(res.mediaDir) };
   }
-  if (!path || !path.trim()) throw createAppError("InvalidPath", "Path must not be empty");
+  if (!path || !path.trim())
+    throw createAppError("InvalidPath", "Path must not be empty");
   const ext = path.slice(path.lastIndexOf(".") + 1).toLowerCase();
   if (!path.includes(".") || !PANDOC_IMPORT_EXTS_MOCK.includes(ext)) {
     throw createAppError("InvalidPath", `不支援匯入的檔案類型：.${ext}`);
   }
-  if (!mockPandocStatus.available) throw createAppError("NotFound", PANDOC_MISSING);
+  if (!mockPandocStatus.available)
+    throw createAppError("NotFound", PANDOC_MISSING);
   if (!mockSupportsSandbox(mockPandocStatus.version)) {
     throw createAppError("Io", PANDOC_TOO_OLD_FOR_IMPORT);
   }
-  if (mockPandocImportHandler) return mockPandocImportHandler(normalizePath(path));
+  if (mockPandocImportHandler)
+    return mockPandocImportHandler(normalizePath(path));
   return { markdown: MOCK_PANDOC_IMPORT_MARKDOWN, mediaDir: null };
 }
 
@@ -1735,7 +1869,9 @@ export async function pickSaveExportPath(
 }
 
 /** Open dialog for a file to import. */
-export async function pickImportPath(extensions: string[]): Promise<string | null> {
+export async function pickImportPath(
+  extensions: string[],
+): Promise<string | null> {
   if (isTauri()) {
     const selected = await openDialog({
       multiple: false,
@@ -1763,11 +1899,15 @@ export function getMockPandocExports(): PandocExportRequest[] {
   return mockPandocExports.slice();
 }
 
-export function setMockPandocExportHandler(handler: MockPandocExportHandler | null): void {
+export function setMockPandocExportHandler(
+  handler: MockPandocExportHandler | null,
+): void {
   mockPandocExportHandler = handler;
 }
 
-export function setMockPandocImportHandler(handler: MockPandocImportHandler | null): void {
+export function setMockPandocImportHandler(
+  handler: MockPandocImportHandler | null,
+): void {
   mockPandocImportHandler = handler;
 }
 
@@ -1775,14 +1915,17 @@ export function setMockPandocImportHandler(handler: MockPandocImportHandler | nu
 // Image upload (IM-05)
 // ---------------------------------------------------------------------------
 
-export const UPLOADER_NOT_CONFIGURED_MESSAGE = "尚未設定圖床上傳指令（見 docs/image-upload.md）";
+export const UPLOADER_NOT_CONFIGURED_MESSAGE =
+  "尚未設定圖床上傳指令（見 docs/image-upload.md）";
 
 export interface UploadResult {
   /** One URL per path, same order. */
   urls: string[];
 }
 
-type MockUploadHandler = (paths: string[]) => UploadResult | Promise<UploadResult>;
+type MockUploadHandler = (
+  paths: string[],
+) => UploadResult | Promise<UploadResult>;
 let mockUploadHandler: MockUploadHandler | null = null;
 const mockUploadCalls: string[][] = [];
 
@@ -1805,8 +1948,15 @@ export async function uploadImages(paths: string[]): Promise<UploadResult> {
 }
 
 /** Mock stand-in for the user editing `uploadCommand` / `uploadArgs` in settings.json. */
-export function seedMockUploadSettings(uploadCommand: string | null, uploadArgs: string[] = []): void {
-  mockSettings = { ...mockSettings, uploadCommand, uploadArgs: [...uploadArgs] };
+export function seedMockUploadSettings(
+  uploadCommand: string | null,
+  uploadArgs: string[] = [],
+): void {
+  mockSettings = {
+    ...mockSettings,
+    uploadCommand,
+    uploadArgs: [...uploadArgs],
+  };
 }
 
 export function setMockUploadHandler(handler: MockUploadHandler | null): void {
@@ -1840,7 +1990,9 @@ let mockZoom = 1;
 let mockThemesDirOpened = 0;
 
 /** A native menu item was chosen (Rust emits `menu-action`). */
-export async function onMenuAction(listener: MenuActionListener): Promise<() => void> {
+export async function onMenuAction(
+  listener: MenuActionListener,
+): Promise<() => void> {
   if (isTauri()) {
     return listen<MenuActionPayload>(MENU_ACTION_EVENT, (event) => {
       void listener(event.payload);
@@ -1853,7 +2005,10 @@ export async function onMenuAction(listener: MenuActionListener): Promise<() => 
 }
 
 /** Test hook: act as if a native menu item had been chosen. */
-export async function emitMockMenuAction(action: string, arg: string | null = null): Promise<void> {
+export async function emitMockMenuAction(
+  action: string,
+  arg: string | null = null,
+): Promise<void> {
   for (const listener of Array.from(mockMenuActionListeners)) {
     await listener({ action, arg });
   }

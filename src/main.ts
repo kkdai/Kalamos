@@ -8,38 +8,23 @@ import "./styles/themes/papyros.css";
 import "./styles/themes/melan.css";
 import "./styles/editor.css";
 
+import type { StateEffect } from "@codemirror/state";
+import type { EditorView } from "@codemirror/view";
 import { createEditor, type DocSession, type KalamosEditor } from "./editor";
-import { pickExportFormat } from "./export/format-picker";
-import { buildExportHtml } from "./export/html";
 import {
-  defaultExportPath,
-  ensureExportExtension,
-  EXPORTING_MESSAGE,
-  exportedMessage,
-  formatInfo,
-  importedMessage,
-  IMPORTING_MESSAGE,
-  PANDOC_IMPORT_EXTENSIONS,
-  PANDOC_MISSING_MESSAGE,
-  type PandocFormat,
-  prepareMarkdownForPandoc,
-} from "./export/pandoc";
+  AUTO_PAIR_BRACKETS_MESSAGE,
+  AUTO_PAIR_MARKDOWN_MESSAGE,
+} from "./editor/auto-pair";
 import {
-  defaultPdfPath,
-  documentTitle,
-  ensurePdfExtension,
-  EXPORTING_PDF_MESSAGE,
-  exportedPdfMessage,
-} from "./export/pdf";
+  collectUploadTargetsInRange,
+  uploadImagesInEditor,
+} from "./editor/image-upload";
 import {
+  imageExtFromMime,
   insertImageMarkdown,
   isImageFilePath,
-  imageExtFromMime,
   readFileAsBase64,
 } from "./editor/images";
-import { collectUploadTargetsInRange, uploadImagesInEditor } from "./editor/image-upload";
-import type { EditorView } from "@codemirror/view";
-import type { StateEffect } from "@codemirror/state";
 import {
   bindWindowShortcuts,
   toggleEmphasis,
@@ -48,6 +33,13 @@ import {
   toggleStrikethrough,
   toggleStrong,
 } from "./editor/keymaps";
+import {
+  jumpToHeadingSlug,
+  resolveRelativeMarkdownPath,
+  toggleBulletList,
+  toggleOrderedList,
+  toggleTaskList,
+} from "./editor/lists";
 import {
   insertCodeBlock,
   insertMathBlock,
@@ -62,17 +54,82 @@ import {
   revealRange,
 } from "./editor/search";
 import { openInsertTableDialog } from "./editor/table-insert-dialog";
-import { FOCUS_MODE_MESSAGE, TYPEWRITER_MODE_MESSAGE } from "./editor/writing-modes";
-import { AUTO_PAIR_BRACKETS_MESSAGE, AUTO_PAIR_MARKDOWN_MESSAGE } from "./editor/auto-pair";
 import { createWordCounter, type WordCounter } from "./editor/word-count-view";
 import {
-  jumpToHeadingSlug,
-  resolveRelativeMarkdownPath,
-  toggleBulletList,
-  toggleOrderedList,
-  toggleTaskList,
-} from "./editor/lists";
-import { createMenuDispatcher, type MenuCommand, type MenuDispatcher } from "./menu/menu-dispatch";
+  FOCUS_MODE_MESSAGE,
+  TYPEWRITER_MODE_MESSAGE,
+} from "./editor/writing-modes";
+import { pickExportFormat } from "./export/format-picker";
+import { buildExportHtml } from "./export/html";
+import {
+  defaultExportPath,
+  EXPORTING_MESSAGE,
+  ensureExportExtension,
+  exportedMessage,
+  formatInfo,
+  IMPORTING_MESSAGE,
+  importedMessage,
+  isImportablePath,
+  PANDOC_IMPORT_EXTENSIONS,
+  PANDOC_MISSING_MESSAGE,
+  type PandocFormat,
+  prepareMarkdownForPandoc,
+} from "./export/pandoc";
+import {
+  defaultPdfPath,
+  documentTitle,
+  EXPORTING_PDF_MESSAGE,
+  ensurePdfExtension,
+  exportedPdfMessage,
+} from "./export/pdf";
+import {
+  allowAssetDir,
+  askSaveChanges,
+  clearRecovery,
+  DEFAULT_SETTINGS,
+  exportPandoc,
+  exportPdf,
+  getSettings,
+  importImage,
+  importImageBytes,
+  importPandoc,
+  isAssetDirTooBroadError,
+  listRecovery,
+  type MenuSyncState,
+  type OpenFilesRequest,
+  onFileDrop,
+  onMenuAction,
+  onOpenFilesRequested,
+  onWindowCloseRequested,
+  openFile,
+  openThemesDir,
+  pandocStatus,
+  pickImportPath,
+  pickOpenFilePath,
+  pickOpenFolderPath,
+  pickSaveExportPath,
+  pickSaveFilePath,
+  pickSavePdfPath,
+  quitApp,
+  type RecoveryEntry,
+  SAVE_ALL_CHANGES_LABELS,
+  type Settings,
+  saveFile,
+  setSettings,
+  setWebviewZoom,
+  setWindowTitle,
+  syncMenuState,
+  takePendingOpenFiles,
+  UPLOADER_NOT_CONFIGURED_MESSAGE,
+  uploadImages,
+  writeRecovery,
+} from "./ipc";
+import {
+  createMenuDispatcher,
+  type MenuCommand,
+  type MenuDispatcher,
+} from "./menu/menu-dispatch";
+import { IS_WINDOWS, shortcutLabel, toNativePath } from "./platform";
 import {
   clampContentWidth,
   clampFontSize,
@@ -80,50 +137,6 @@ import {
   type PreferencesController,
   type PreferencesPatch,
 } from "./preferences/preferences";
-import {
-  allowAssetDir,
-  askSaveChanges,
-  isAssetDirTooBroadError,
-  clearRecovery,
-  DEFAULT_SETTINGS,
-  exportPandoc,
-  exportPdf,
-  getSettings,
-  importPandoc,
-  pandocStatus,
-  pickImportPath,
-  pickSaveExportPath,
-  importImage,
-  importImageBytes,
-  listRecovery,
-  onFileDrop,
-  onMenuAction,
-  openThemesDir,
-  setWebviewZoom,
-  syncMenuState,
-  type MenuSyncState,
-  onOpenFilesRequested,
-  onWindowCloseRequested,
-  openFile,
-  pickOpenFilePath,
-  pickOpenFolderPath,
-  pickSaveFilePath,
-  pickSavePdfPath,
-  quitApp,
-  SAVE_ALL_CHANGES_LABELS,
-  saveFile,
-  setSettings,
-  setWindowTitle,
-  takePendingOpenFiles,
-  UPLOADER_NOT_CONFIGURED_MESSAGE,
-  uploadImages,
-  writeRecovery,
-  type OpenFilesRequest,
-  type RecoveryEntry,
-  type Settings,
-} from "./ipc";
-import { isImportablePath } from "./export/pandoc";
-import { IS_WINDOWS, shortcutLabel, toNativePath } from "./platform";
 import { createSidebar, type SidebarController } from "./sidebar/sidebar";
 import { createTabBar, type TabBar } from "./tabs/tab-bar";
 import {
@@ -139,8 +152,8 @@ import {
 } from "./tabs/tab-model";
 import {
   applyThemeWithCustomCss,
-  createThemeMenu,
   CUSTOM_THEME_STYLE_ID,
+  createThemeMenu,
   type ThemeMenuController,
 } from "./theme/theme-menu";
 
@@ -167,7 +180,10 @@ export function applyTheme(theme: string): void {
 }
 
 function generateDocId(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+  if (
+    typeof crypto !== "undefined" &&
+    typeof crypto.randomUUID === "function"
+  ) {
     return crypto.randomUUID();
   }
   return `doc-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
@@ -194,12 +210,17 @@ export const IMAGE_ROOT_STATUS_PREFIX = "圖片根目錄：";
 export const IMAGE_ROOT_CLEARED_MESSAGE = "已清除圖片根目錄";
 export const IMAGE_ROOT_TOO_BROAD_PREFIX = "圖片根目錄範圍過大：";
 
-export const ZOOM_LEVELS = [0.5, 0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3];
+export const ZOOM_LEVELS = [
+  0.5, 0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3,
+];
 
 /** #74 檢視 > 放大 / 縮小: the next zoom level in `direction` (+1 / -1). */
 export function nextZoomLevel(current: number, direction: 1 | -1): number {
   if (direction > 0) {
-    return ZOOM_LEVELS.find((z) => z > current + 1e-6) ?? ZOOM_LEVELS[ZOOM_LEVELS.length - 1];
+    return (
+      ZOOM_LEVELS.find((z) => z > current + 1e-6) ??
+      ZOOM_LEVELS[ZOOM_LEVELS.length - 1]
+    );
   }
   const smaller = ZOOM_LEVELS.filter((z) => z < current - 1e-6);
   return smaller.length > 0 ? smaller[smaller.length - 1] : ZOOM_LEVELS[0];
@@ -279,7 +300,10 @@ export interface KalamosApp {
   setImageRootDir: (path: string | null) => Promise<void>;
   getImageRootDir: () => string | null;
   /** EX-02: export via Pandoc (Cmd+Opt+E); asks for the format / path when omitted. */
-  exportDocumentAs: (format?: PandocFormat, explicitPath?: string) => Promise<boolean>;
+  exportDocumentAs: (
+    format?: PandocFormat,
+    explicitPath?: string,
+  ) => Promise<boolean>;
   isExportingPandoc: () => boolean;
   /** EX-03: import a DOCX / ODT / EPUB / LaTeX / HTML / MediaWiki file as a new untitled document (Cmd+Opt+I). */
   importDocument: (explicitPath?: string) => Promise<boolean>;
@@ -319,8 +343,12 @@ export function createKalamosApp(
     editorContainer.parentElement?.insertBefore(sidebarEl, editorContainer);
   }
   const recoveryBanner = root.querySelector<HTMLElement>("#recovery-banner");
-  const restoreBtn = root.querySelector<HTMLButtonElement>("#recovery-restore-btn");
-  const discardBtn = root.querySelector<HTMLButtonElement>("#recovery-discard-btn");
+  const restoreBtn = root.querySelector<HTMLButtonElement>(
+    "#recovery-restore-btn",
+  );
+  const discardBtn = root.querySelector<HTMLButtonElement>(
+    "#recovery-discard-btn",
+  );
   const statusEl = root.querySelector<HTMLElement>("#status");
 
   let pendingRecovery: RecoveryEntry | null = null;
@@ -375,7 +403,11 @@ export function createKalamosApp(
         if (tab === active) syncDocumentPath();
         renderTabs();
         await clearRecovery(tab.docId).catch(() => null);
-        if (tabs.includes(tab) && editor.isSessionDirty(tab.doc) && tab.path !== null) {
+        if (
+          tabs.includes(tab) &&
+          editor.isSessionDirty(tab.doc) &&
+          tab.path !== null
+        ) {
           scheduleNamedAutosave(tab);
         }
       }
@@ -387,8 +419,12 @@ export function createKalamosApp(
         renderTabs();
       }
       setStatus(formatErrorMessage("存檔失敗", err), true);
-      const latestContent = open ? editor.getSessionContent(tab.doc) : contentToSave;
-      await writeRecovery(tab.docId, latestContent, targetPath).catch(() => null);
+      const latestContent = open
+        ? editor.getSessionContent(tab.doc)
+        : contentToSave;
+      await writeRecovery(tab.docId, latestContent, targetPath).catch(
+        () => null,
+      );
       return false;
     }
   }
@@ -402,12 +438,19 @@ export function createKalamosApp(
     const targetPath = tab.path;
     tab.autosaveTimer = setTimeout(() => {
       tab.autosaveTimer = null;
-      if (tabs.includes(tab) && tab.path === targetPath && editor.isSessionDirty(tab.doc)) {
-        void persistFileToPath(targetPath, tab, editor.getSessionContent(tab.doc));
+      if (
+        tabs.includes(tab) &&
+        tab.path === targetPath &&
+        editor.isSessionDirty(tab.doc)
+      ) {
+        void persistFileToPath(
+          targetPath,
+          tab,
+          editor.getSessionContent(tab.doc),
+        );
       }
     }, NAMED_AUTOSAVE_DELAY_MS);
   }
-
 
   async function persistEditorSettingPatch(
     patch: Partial<Settings>,
@@ -505,12 +548,17 @@ export function createKalamosApp(
   // ---- #81: document tabs ----
 
   let tabSeq = 0;
-  function makeTab(doc: DocSession, path: string | null, docId = generateDocId()): DocumentTab {
+  function makeTab(
+    doc: DocSession,
+    path: string | null,
+    docId = generateDocId(),
+  ): DocumentTab {
     return {
       id: `tab-${++tabSeq}`,
       docId,
       path,
-      untitledNumber: path === null ? nextUntitledNumber(untitledNumbersInUse()) : 0,
+      untitledNumber:
+        path === null ? nextUntitledNumber(untitledNumbersInUse()) : 0,
       doc,
       scrollTop: 0,
       scrollSnapshot: null,
@@ -581,7 +629,8 @@ export function createKalamosApp(
     active = target;
     syncDocumentPath();
     view.scrollDOM.scrollTop = target.scrollTop;
-    if (target.scrollSnapshot) view.dispatch({ effects: target.scrollSnapshot });
+    if (target.scrollSnapshot)
+      view.dispatch({ effects: target.scrollSnapshot });
     sidebar.setActiveFile(target.path);
     sidebar.outline.refreshNow();
     wordCounter.flush();
@@ -612,7 +661,11 @@ export function createKalamosApp(
     tabs[index] = next;
     if (next.path === null) {
       // The replaced tab's number is free again.
-      next.untitledNumber = nextUntitledNumber(tabs.filter((t) => t !== next && t.path === null).map((t) => t.untitledNumber));
+      next.untitledNumber = nextUntitledNumber(
+        tabs
+          .filter((t) => t !== next && t.path === null)
+          .map((t) => t.untitledNumber),
+      );
     }
     showTab(next);
   }
@@ -656,12 +709,18 @@ export function createKalamosApp(
     // Autosave is on: a named file is simply written, as when switching documents.
     if (tab.path !== null && currentSettings.autoSave !== false) {
       clearAutosaveTimer(tab);
-      return persistFileToPath(tab.path, tab, editor.getSessionContent(tab.doc));
+      return persistFileToPath(
+        tab.path,
+        tab,
+        editor.getSessionContent(tab.doc),
+      );
     }
     // Show the tab being asked about.
     if (tab !== active) showTab(tab);
     const label = currentLabels().get(tab.id) ?? "";
-    const choice = await askSaveChanges(`「${label}」有未儲存的變更，要在關閉前儲存嗎？`);
+    const choice = await askSaveChanges(
+      `「${label}」有未儲存的變更，要在關閉前儲存嗎？`,
+    );
     if (choice === "cancel" || !tabs.includes(tab)) return false;
     if (choice === "discard") {
       clearAutosaveTimer(tab);
@@ -670,7 +729,11 @@ export function createKalamosApp(
     }
     if (tab.path !== null) {
       clearAutosaveTimer(tab);
-      return persistFileToPath(tab.path, tab, editor.getSessionContent(tab.doc));
+      return persistFileToPath(
+        tab.path,
+        tab,
+        editor.getSessionContent(tab.doc),
+      );
     }
     if (tab !== active) showTab(tab);
     return saveDocumentAs();
@@ -713,12 +776,18 @@ export function createKalamosApp(
   // Cmd+T new tab, Cmd+W close tab, Ctrl+Tab / Ctrl+Shift+Tab next / previous tab.
   const onTabKeydown = (event: KeyboardEvent) => {
     if (event.defaultPrevented || preferences.isOpen()) return;
-    if (event.key === "Tab" && event.ctrlKey && !event.metaKey && !event.altKey) {
+    if (
+      event.key === "Tab" &&
+      event.ctrlKey &&
+      !event.metaKey &&
+      !event.altKey
+    ) {
       event.preventDefault();
       cycleTab(event.shiftKey ? -1 : 1);
       return;
     }
-    if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return;
+    if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey)
+      return;
     if (event.metaKey && event.ctrlKey) return;
     if (event.code === "KeyT" || event.key.toLowerCase() === "t") {
       event.preventDefault();
@@ -764,10 +833,8 @@ export function createKalamosApp(
       document.body,
   });
 
-  const unbindShortcuts = bindWindowShortcuts(
-    window,
-    windowHandlers,
-    () => (preferences.isOpen() ? null : editor.view),
+  const unbindShortcuts = bindWindowShortcuts(window, windowHandlers, () =>
+    preferences.isOpen() ? null : editor.view,
   );
 
   const sidebar = createSidebar({
@@ -780,7 +847,12 @@ export function createKalamosApp(
     onOpenSearchHit: async (hit) => {
       // #73 B / #81 B: an open document is switched to, never reopened.
       if (!(await openPath(hit.path, "tab"))) return;
-      const range = lineColumnToRange(editor.view.state, hit.line, hit.column, hit.length);
+      const range = lineColumnToRange(
+        editor.view.state,
+        hit.line,
+        hit.column,
+        hit.length,
+      );
       revealRange(editor.view, range.from, range.to);
     },
     onPathRenamed: (from, to) => {
@@ -789,7 +861,8 @@ export function createKalamosApp(
         if (tab.path === null) continue;
         let renamed: string | null = null;
         if (tab.path === from) renamed = to;
-        else if (tab.path.startsWith(`${from}/`)) renamed = `${to}${tab.path.slice(from.length)}`;
+        else if (tab.path.startsWith(`${from}/`))
+          renamed = `${to}${tab.path.slice(from.length)}`;
         if (renamed === null) continue;
         tab.path = renamed;
         if (tab === active) {
@@ -805,7 +878,8 @@ export function createKalamosApp(
     onPathTrashed: (trashedPath) => {
       for (const tab of tabs) {
         if (tab.path === null) continue;
-        if (tab.path !== trashedPath && !tab.path.startsWith(`${trashedPath}/`)) continue;
+        if (tab.path !== trashedPath && !tab.path.startsWith(`${trashedPath}/`))
+          continue;
         clearAutosaveTimer(tab);
         tab.path = null;
         tab.untitledNumber = nextUntitledNumber(untitledNumbersInUse());
@@ -843,8 +917,14 @@ export function createKalamosApp(
   function applyLayoutSettings(): void {
     if (typeof document === "undefined") return;
     const style = document.documentElement.style;
-    style.setProperty("--k-font-size", `${clampFontSize(currentSettings.fontSize ?? 17)}px`);
-    style.setProperty("--k-max-width", `${clampContentWidth(currentSettings.contentWidth ?? 720)}px`);
+    style.setProperty(
+      "--k-font-size",
+      `${clampFontSize(currentSettings.fontSize ?? 17)}px`,
+    );
+    style.setProperty(
+      "--k-max-width",
+      `${clampContentWidth(currentSettings.contentWidth ?? 720)}px`,
+    );
     editor.view.requestMeasure();
   }
 
@@ -871,7 +951,10 @@ export function createKalamosApp(
       uploadCommand: currentSettings.uploadCommand ?? null,
       uploadArgs: currentSettings.uploadArgs ?? [],
     }),
-    getThemes: () => themeMenu.getAvailableOptions().map((o) => ({ id: o.id, label: o.label })),
+    getThemes: () =>
+      themeMenu
+        .getAvailableOptions()
+        .map((o) => ({ id: o.id, label: o.label })),
     refresh: async () => {
       await themeMenu.refreshThemes();
       await refreshUploadSettings();
@@ -889,23 +972,36 @@ export function createKalamosApp(
     },
   });
 
-  async function applyPreferencesChange(patch: PreferencesPatch): Promise<void> {
-    if (patch.theme !== undefined) await themeMenu.selectTheme(patch.theme, true);
-    if (patch.autoPairBrackets !== undefined) editor.setAutoPairBrackets(patch.autoPairBrackets, true);
-    if (patch.autoPairMarkdown !== undefined) editor.setAutoPairMarkdown(patch.autoPairMarkdown, true);
-    if (patch.codeLineNumbers !== undefined) editor.setCodeLineNumbers(patch.codeLineNumbers, true);
-    if (patch.mathAutoNumber !== undefined) editor.setMathAutoNumber(patch.mathAutoNumber, true);
+  async function applyPreferencesChange(
+    patch: PreferencesPatch,
+  ): Promise<void> {
+    if (patch.theme !== undefined)
+      await themeMenu.selectTheme(patch.theme, true);
+    if (patch.autoPairBrackets !== undefined)
+      editor.setAutoPairBrackets(patch.autoPairBrackets, true);
+    if (patch.autoPairMarkdown !== undefined)
+      editor.setAutoPairMarkdown(patch.autoPairMarkdown, true);
+    if (patch.codeLineNumbers !== undefined)
+      editor.setCodeLineNumbers(patch.codeLineNumbers, true);
+    if (patch.mathAutoNumber !== undefined)
+      editor.setMathAutoNumber(patch.mathAutoNumber, true);
     const plain: Partial<Settings> = {};
-    if (patch.startupBehavior !== undefined) plain.startupBehavior = patch.startupBehavior;
+    if (patch.startupBehavior !== undefined)
+      plain.startupBehavior = patch.startupBehavior;
     if (patch.autoSave !== undefined) plain.autoSave = patch.autoSave;
-    if (patch.fontSize !== undefined) plain.fontSize = clampFontSize(patch.fontSize);
-    if (patch.contentWidth !== undefined) plain.contentWidth = clampContentWidth(patch.contentWidth);
-    if (patch.uploadOnInsert !== undefined) plain.uploadOnInsert = patch.uploadOnInsert;
+    if (patch.fontSize !== undefined)
+      plain.fontSize = clampFontSize(patch.fontSize);
+    if (patch.contentWidth !== undefined)
+      plain.contentWidth = clampContentWidth(patch.contentWidth);
+    if (patch.uploadOnInsert !== undefined)
+      plain.uploadOnInsert = patch.uploadOnInsert;
     if (Object.keys(plain).length > 0) {
       currentSettings = { ...currentSettings, ...plain };
-      if (plain.fontSize !== undefined || plain.contentWidth !== undefined) applyLayoutSettings();
+      if (plain.fontSize !== undefined || plain.contentWidth !== undefined)
+        applyLayoutSettings();
       for (const tab of tabs) {
-        if (plain.autoSave === true && editor.isSessionDirty(tab.doc)) scheduleNamedAutosave(tab);
+        if (plain.autoSave === true && editor.isSessionDirty(tab.doc))
+          scheduleNamedAutosave(tab);
         if (plain.autoSave === false) clearAutosaveTimer(tab);
       }
       await persistEditorSettingPatch(plain);
@@ -925,7 +1021,9 @@ export function createKalamosApp(
         "view.mathAutoNumber": editor.isMathAutoNumber(),
       },
       theme: themeMenu.getCurrentTheme(),
-      themes: themeMenu.getAvailableOptions().map((o) => ({ id: o.id, label: o.label })),
+      themes: themeMenu
+        .getAvailableOptions()
+        .map((o) => ({ id: o.id, label: o.label })),
     };
   }
 
@@ -1014,7 +1112,8 @@ export function createKalamosApp(
     "view.codeLineNumbers": () => windowHandlers.onToggleCodeLineNumbers(),
     "view.mathAutoNumber": () => windowHandlers.onToggleMathAutoNumber(),
     "view.cycleTheme": () => themeMenu.cycleTheme(),
-    "view.setTheme": (themeId) => (themeId ? themeMenu.selectTheme(themeId, true) : false),
+    "view.setTheme": (themeId) =>
+      themeId ? themeMenu.selectTheme(themeId, true) : false,
     "view.actualSize": () => setZoom(1),
     "view.zoomIn": () => setZoom(nextZoomLevel(zoom, 1)),
     "view.zoomOut": () => setZoom(nextZoomLevel(zoom, -1)),
@@ -1024,14 +1123,16 @@ export function createKalamosApp(
     commands: menuCommands,
     target: window,
     // While the preferences modal is open, editing commands would act on the hidden document.
-    canRun: (action) => !(preferences.isOpen() && /^(edit|para|fmt)\./.test(action)),
+    canRun: (action) =>
+      !(preferences.isOpen() && /^(edit|para|fmt)\./.test(action)),
     afterRun: () => scheduleMenuSync(true),
   });
 
   // Cmd+, opens the preferences (also offered by the native menu; see menu-dispatch.ts).
   const onPreferencesKeydown = (event: KeyboardEvent) => {
     if (event.defaultPrevented) return;
-    if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return;
+    if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey)
+      return;
     if (event.code !== "Comma" && event.key !== ",") return;
     event.preventDefault();
     void preferences.open();
@@ -1088,9 +1189,14 @@ export function createKalamosApp(
       void quit();
       return;
     }
-    const mod = (event.metaKey || event.ctrlKey) && !(event.metaKey && event.ctrlKey);
+    const mod =
+      (event.metaKey || event.ctrlKey) && !(event.metaKey && event.ctrlKey);
     if (!mod) return;
-    if (!event.altKey && !event.shiftKey && (event.code === "KeyQ" || event.key.toLowerCase() === "q")) {
+    if (
+      !event.altKey &&
+      !event.shiftKey &&
+      (event.code === "KeyQ" || event.key.toLowerCase() === "q")
+    ) {
       event.preventDefault();
       void quit();
       return;
@@ -1131,7 +1237,12 @@ export function createKalamosApp(
 
   const onSidebarKeydown = (event: KeyboardEvent) => {
     if (event.defaultPrevented) return;
-    if (!(event.metaKey || event.ctrlKey) || (event.metaKey && event.ctrlKey) || !event.shiftKey || event.altKey) {
+    if (
+      !(event.metaKey || event.ctrlKey) ||
+      (event.metaKey && event.ctrlKey) ||
+      !event.shiftKey ||
+      event.altKey
+    ) {
       return;
     }
     const key = event.key.toLowerCase();
@@ -1159,7 +1270,9 @@ export function createKalamosApp(
     const normalized = path && path.trim() ? path.trim() : null;
     editor.setImageRootDir(normalized);
     setStatus(
-      normalized ? `${IMAGE_ROOT_STATUS_PREFIX}${toNativePath(normalized)}` : IMAGE_ROOT_CLEARED_MESSAGE,
+      normalized
+        ? `${IMAGE_ROOT_STATUS_PREFIX}${toNativePath(normalized)}`
+        : IMAGE_ROOT_CLEARED_MESSAGE,
       false,
     );
     await persistEditorSettingPatch({ imageRootDir: normalized });
@@ -1169,7 +1282,10 @@ export function createKalamosApp(
     } catch (err) {
       // Kept as the setting (images show their fallback), but say why.
       if (isAssetDirTooBroadError(err)) {
-        setStatus(`${IMAGE_ROOT_TOO_BROAD_PREFIX}${toNativePath(normalized)}`, true);
+        setStatus(
+          `${IMAGE_ROOT_TOO_BROAD_PREFIX}${toNativePath(normalized)}`,
+          true,
+        );
       }
     }
   }
@@ -1235,7 +1351,11 @@ export function createKalamosApp(
       try {
         outPath =
           explicitPath ??
-          (await pickSaveExportPath(defaultExportPath(docPath, chosen), info.label, info.ext));
+          (await pickSaveExportPath(
+            defaultExportPath(docPath, chosen),
+            info.label,
+            info.ext,
+          ));
       } catch (err) {
         setStatus(formatErrorMessage("匯出失敗", err), true);
         return false;
@@ -1277,7 +1397,8 @@ export function createKalamosApp(
       if (!(await isPandocAvailable())) return false;
       let source: string | null;
       try {
-        source = explicitPath ?? (await pickImportPath(PANDOC_IMPORT_EXTENSIONS));
+        source =
+          explicitPath ?? (await pickImportPath(PANDOC_IMPORT_EXTENSIONS));
       } catch (err) {
         setStatus(formatErrorMessage("匯入失敗", err), true);
         return false;
@@ -1296,7 +1417,9 @@ export function createKalamosApp(
         return false;
       }
       // #81 B: a new untitled tab (or the blank one).
-      placeNewTab(makeTab(editor.createSession(markdown, { dirty: true }), null));
+      placeNewTab(
+        makeTab(editor.createSession(markdown, { dirty: true }), null),
+      );
       setStatus(importedMessage(source), false);
       return true;
     } finally {
@@ -1308,7 +1431,8 @@ export function createKalamosApp(
   // event.code is used because Option changes event.key on macOS.
   const onPandocKeydown = (event: KeyboardEvent) => {
     if (event.defaultPrevented) return;
-    if (!(event.metaKey || event.ctrlKey) || !event.altKey || event.shiftKey) return;
+    if (!(event.metaKey || event.ctrlKey) || !event.altKey || event.shiftKey)
+      return;
     if (event.code === "KeyE") {
       event.preventDefault();
       void exportDocumentAs();
@@ -1372,9 +1496,16 @@ export function createKalamosApp(
       setStatus("", false);
     }
     const settings = await refreshUploadSettings();
-    if (settings.uploadOnInsert && lastError === null && active === targetTab && active.path === docPath) {
+    if (
+      settings.uploadOnInsert &&
+      lastError === null &&
+      active === targetTab &&
+      active.path === docPath
+    ) {
       const insertedTo = anchor + (view.state.doc.length - lengthBefore);
-      await runImageUpload(collectUploadTargetsInRange(view.state, anchor, insertedTo));
+      await runImageUpload(
+        collectUploadTargetsInRange(view.state, anchor, insertedTo),
+      );
     }
     return true;
   }
@@ -1395,7 +1526,9 @@ export function createKalamosApp(
 
   let uploadingImages = false;
 
-  async function runImageUpload(targets?: Parameters<typeof uploadImagesInEditor>[0]["targets"]): Promise<boolean> {
+  async function runImageUpload(
+    targets?: Parameters<typeof uploadImagesInEditor>[0]["targets"],
+  ): Promise<boolean> {
     if (uploadingImages) return false;
     uploadingImages = true;
     try {
@@ -1443,7 +1576,10 @@ export function createKalamosApp(
     );
   }
 
-  async function insertPastedImages(files: File[], pos: number): Promise<boolean> {
+  async function insertPastedImages(
+    files: File[],
+    pos: number,
+  ): Promise<boolean> {
     return insertImportedImages(
       pos,
       files.map((file) => async (docPath: string) => {
@@ -1559,7 +1695,11 @@ export function createKalamosApp(
       return false;
     }
     if (!selectedPath) return false;
-    return persistFileToPath(selectedPath, tab, editor.getSessionContent(tab.doc));
+    return persistFileToPath(
+      selectedPath,
+      tab,
+      editor.getSessionContent(tab.doc),
+    );
   }
 
   /** #81: Cmd+N opens a new tab instead of replacing the current document. */
@@ -1576,7 +1716,8 @@ export function createKalamosApp(
       const docPath = active.path;
       let outPath: string | null = null;
       try {
-        outPath = explicitPath ?? (await pickSavePdfPath(defaultPdfPath(docPath)));
+        outPath =
+          explicitPath ?? (await pickSavePdfPath(defaultPdfPath(docPath)));
       } catch (err) {
         setStatus(formatErrorMessage("匯出 PDF 失敗", err), true);
         return false;
@@ -1608,7 +1749,11 @@ export function createKalamosApp(
     const entry = pendingRecovery;
     pendingRecovery = null;
     setRecoveryBannerVisible(false);
-    const restored = makeTab(editor.createSession(entry.content, { dirty: true }), entry.path, entry.docId);
+    const restored = makeTab(
+      editor.createSession(entry.content, { dirty: true }),
+      entry.path,
+      entry.docId,
+    );
     // A blank untitled tab is reused; otherwise the restored text gets its own tab.
     placeNewTab(restored);
     await clearRecovery(entry.docId).catch(() => null);
@@ -1656,7 +1801,11 @@ export function createKalamosApp(
         for (const tab of [...tabs]) {
           if (tab.path === null || !editor.isSessionDirty(tab.doc)) continue;
           clearAutosaveTimer(tab);
-          await persistFileToPath(tab.path, tab, editor.getSessionContent(tab.doc));
+          await persistFileToPath(
+            tab.path,
+            tab,
+            editor.getSessionContent(tab.doc),
+          );
         }
       }
       const unsaved = tabs.filter((tab) => editor.isSessionDirty(tab.doc));
@@ -1679,7 +1828,11 @@ export function createKalamosApp(
         clearAutosaveTimer(tab);
         let saved: boolean;
         if (tab.path !== null) {
-          saved = await persistFileToPath(tab.path, tab, editor.getSessionContent(tab.doc));
+          saved = await persistFileToPath(
+            tab.path,
+            tab,
+            editor.getSessionContent(tab.doc),
+          );
         } else {
           // Show the untitled tab its save dialog is for.
           showTab(tab);
@@ -1757,7 +1910,9 @@ export function createKalamosApp(
     applyLayoutSettings();
     renderTabs();
     await themeMenu.init();
-    await sidebar.init({ restoreFolder: settings?.startupBehavior !== "blank" });
+    await sidebar.init({
+      restoreFolder: settings?.startupBehavior !== "blank",
+    });
     const unlistenMenuAction = await onMenuAction(({ action, arg }) => {
       menu.dispatch(action, arg ?? null);
     }).catch(() => null);
@@ -1886,7 +2041,10 @@ export function createKalamosApp(
 
 let activeApp: KalamosApp | null = null;
 
-if (typeof document !== "undefined" && document.querySelector("#editor-container")) {
+if (
+  typeof document !== "undefined" &&
+  document.querySelector("#editor-container")
+) {
   activeApp = createKalamosApp(document);
   void activeApp.init();
 }

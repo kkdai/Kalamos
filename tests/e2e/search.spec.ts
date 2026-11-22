@@ -1,5 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
-import { MOD, boot, getDoc, getSelection, nextFrames, setDoc } from "./helpers";
+import { expect, type Page, test } from "@playwright/test";
+import { boot, getDoc, getSelection, MOD, nextFrames, setDoc } from "./helpers";
 
 /** #73 A: find & replace in the current document. */
 
@@ -7,7 +7,9 @@ test.beforeEach(async ({ page }) => {
   await boot(page);
 });
 
-const filler = Array.from({ length: 60 }, (_, i) => `段落 ${i + 1}。`).join("\n\n");
+const filler = Array.from({ length: 60 }, (_, i) => `段落 ${i + 1}。`).join(
+  "\n\n",
+);
 
 const DOC = [
   "第一段 apple 與 Apple。",
@@ -50,7 +52,9 @@ async function inViewport(page: Page, selector: string): Promise<boolean> {
   }, selector);
 }
 
-test("#73 Cmd+F → type → Enter / Shift+Enter / Cmd+G walk the hits; Esc returns to the editor", async ({ page }) => {
+test("#73 Cmd+F → type → Enter / Shift+Enter / Cmd+G walk the hits; Esc returns to the editor", async ({
+  page,
+}) => {
   await setDoc(page, DOC, 0);
   await page.keyboard.press(`${MOD}+KeyF`);
   await expect(page.getByTestId("search-panel")).toBeVisible();
@@ -72,7 +76,9 @@ test("#73 Cmd+F → type → Enter / Shift+Enter / Cmd+G walk the hits; Esc retu
   await page.keyboard.press(`${MOD}+Shift+KeyG`);
   await expect(count(page)).toHaveText("6 / 6");
   // The code block hit (far below the fold) was scrolled into view.
-  await expect.poll(() => inViewport(page, ".cm-searchMatch-selected")).toBe(true);
+  await expect
+    .poll(() => inViewport(page, ".cm-searchMatch-selected"))
+    .toBe(true);
 
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("search-panel")).toHaveCount(0);
@@ -84,15 +90,23 @@ test("#73 Cmd+F → type → Enter / Shift+Enter / Cmd+G walk the hits; Esc retu
   expect(await selectedText(page)).toBe("apple");
 });
 
-test("#73 a hit in a hidden link URL is revealed; a table hit is marked inside the widget", async ({ page }) => {
+test("#73 a hit in a hidden link URL is revealed; a table hit is marked inside the widget", async ({
+  page,
+}) => {
   await setDoc(page, DOC, 0);
   // The URL is hidden by live preview until the cursor goes there.
-  await expect(page.locator(".k-mark-hidden", { hasText: "example.com" })).not.toHaveCount(0);
+  await expect(
+    page.locator(".k-mark-hidden", { hasText: "example.com" }),
+  ).not.toHaveCount(0);
   await page.keyboard.press(`${MOD}+KeyF`);
   await page.keyboard.type("example.com/apple");
   await expect(count(page)).toHaveText("1 / 1");
-  await expect(page.locator(".k-mark-hidden", { hasText: "example.com" })).toHaveCount(0);
-  await expect(page.locator(".cm-searchMatch-selected")).toHaveText("example.com/apple");
+  await expect(
+    page.locator(".k-mark-hidden", { hasText: "example.com" }),
+  ).toHaveCount(0);
+  await expect(page.locator(".cm-searchMatch-selected")).toHaveText(
+    "example.com/apple",
+  );
   await expect(page.locator(".cm-searchMatch-selected")).toBeVisible();
 
   await findInput(page).fill("apple");
@@ -102,11 +116,16 @@ test("#73 a hit in a hidden link URL is revealed; a table hit is marked inside t
     await page.keyboard.press("Enter");
   }
   await expect(count(page)).toHaveText("5 / 6");
-  const td = page.getByTestId("table-widget").locator('[data-row="1"][data-col="0"]');
+  const td = page
+    .getByTestId("table-widget")
+    .locator('[data-row="1"][data-col="0"]');
   await expect(td).toHaveClass(/k-search-cell-current/);
-  await expect.poll(() => inViewport(page, ".k-search-cell-current")).toBe(true);
+  await expect
+    .poll(() => inViewport(page, ".k-search-cell-current"))
+    .toBe(true);
   const highlighted = await page.evaluate(() => {
-    const reg = (CSS as unknown as { highlights?: Map<string, Set<Range>> }).highlights;
+    const reg = (CSS as unknown as { highlights?: Map<string, Set<Range>> })
+      .highlights;
     const cur = reg?.get("k-search-current");
     return cur ? [...cur].map((r) => r.toString()) : null;
   });
@@ -125,7 +144,9 @@ test("#73 a hit in a hidden link URL is revealed; a table hit is marked inside t
   expect(active).toEqual({ cell: true, selected: "apple" });
 });
 
-test("#73 Cmd+Opt+F: replace one, replace all, one Cmd+Z undoes replace all", async ({ page }) => {
+test("#73 Cmd+Opt+F: replace one, replace all, one Cmd+Z undoes replace all", async ({
+  page,
+}) => {
   await setDoc(page, DOC, 0);
   await page.keyboard.press(`${MOD}+Alt+KeyF`);
   await expect(page.getByTestId("replace-input")).toBeVisible();
@@ -149,7 +170,9 @@ test("#73 Cmd+Opt+F: replace one, replace all, one Cmd+Z undoes replace all", as
   expect(await getDoc(page)).toBe(afterOne);
 });
 
-test("#73 regex with $1 groups; an invalid regex shows a hint instead of throwing", async ({ page }) => {
+test("#73 regex with $1 groups; an invalid regex shows a hint instead of throwing", async ({
+  page,
+}) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await setDoc(page, "foo-1 foo-22 bar-3", 0);
@@ -158,7 +181,9 @@ test("#73 regex with $1 groups; an invalid regex shows a hint instead of throwin
   await findInput(page).click();
   await page.keyboard.type("foo-(\\d+");
   await expect(count(page)).toHaveText("正規表示式無效");
-  await expect(page.locator('.k-search-field[data-invalid="true"]')).toHaveCount(1);
+  await expect(
+    page.locator('.k-search-field[data-invalid="true"]'),
+  ).toHaveCount(1);
   await page.keyboard.type(")");
   await expect(count(page)).toHaveText(/\/ 2$/);
   await page.getByTestId("replace-input").fill("n$1");
@@ -167,11 +192,15 @@ test("#73 regex with $1 groups; an invalid regex shows a hint instead of throwin
   expect(errors).toEqual([]);
 });
 
-test("#73 selection seeds the query; whole word and case options", async ({ page }) => {
+test("#73 selection seeds the query; whole word and case options", async ({
+  page,
+}) => {
   await setDoc(page, "cat Cat concat cat", 0);
   await page.evaluate(async () => {
     const main = await import("/src/main.ts" as string);
-    main.getActiveApp().editor.view.dispatch({ selection: { anchor: 4, head: 7 } });
+    main
+      .getActiveApp()
+      .editor.view.dispatch({ selection: { anchor: 4, head: 7 } });
   });
   await page.keyboard.press(`${MOD}+KeyF`);
   await expect(findInput(page)).toHaveValue("Cat");
@@ -183,11 +212,17 @@ test("#73 selection seeds the query; whole word and case options", async ({ page
   await expect(count(page)).toHaveText(/\/ 3$/);
 });
 
-test("#73 IME: no search while composing, search after compositionend", async ({ page }) => {
+test("#73 IME: no search while composing, search after compositionend", async ({
+  page,
+}) => {
   await setDoc(page, "中文搜尋與搜尋結果", 0);
   await page.keyboard.press(`${MOD}+KeyF`);
   const cdp = await page.context().newCDPSession(page);
-  await cdp.send("Input.imeSetComposition", { text: "搜", selectionStart: 1, selectionEnd: 1 });
+  await cdp.send("Input.imeSetComposition", {
+    text: "搜",
+    selectionStart: 1,
+    selectionEnd: 1,
+  });
   await nextFrames(page);
   // The counter stays empty: no query has been set while composing.
   await expect(count(page)).toHaveText("");
@@ -207,7 +242,9 @@ test("#73 works in source mode", async ({ page }) => {
   await expect(count(page)).toHaveText("2 / 6");
 });
 
-test("#73 typewriter mode: the hit is scrolled into view (centred)", async ({ page }) => {
+test("#73 typewriter mode: the hit is scrolled into view (centred)", async ({
+  page,
+}) => {
   await setDoc(page, DOC, 0);
   await page.evaluate(async () => {
     const main = await import("/src/main.ts" as string);
@@ -217,5 +254,7 @@ test("#73 typewriter mode: the hit is scrolled into view (centred)", async ({ pa
   await page.keyboard.press(`${MOD}+KeyF`);
   await page.keyboard.type("const apple");
   await expect(count(page)).toHaveText("1 / 1");
-  await expect.poll(() => inViewport(page, ".cm-searchMatch-selected")).toBe(true);
+  await expect
+    .poll(() => inViewport(page, ".cm-searchMatch-selected"))
+    .toBe(true);
 });

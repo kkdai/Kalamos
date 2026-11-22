@@ -18,7 +18,13 @@ import {
   type CompletionResult,
 } from "@codemirror/autocomplete";
 import { syntaxTree } from "@codemirror/language";
-import { EditorState, type Extension, Prec, StateEffect, StateField } from "@codemirror/state";
+import {
+  EditorState,
+  type Extension,
+  Prec,
+  StateEffect,
+  StateField,
+} from "@codemirror/state";
 import { EditorView, ViewPlugin } from "@codemirror/view";
 import type { SyntaxNode } from "@lezer/common";
 import { mapPosClamped } from "./positions";
@@ -43,7 +49,11 @@ let indexPromise: Promise<EmojiIndex> | null = null;
 let loadedIndex: EmojiIndex | null = null;
 
 export function buildEmojiIndex(
-  data: ReadonlyArray<{ emoji: string; names: readonly string[]; description: string }>,
+  data: ReadonlyArray<{
+    emoji: string;
+    names: readonly string[];
+    description: string;
+  }>,
 ): EmojiIndex {
   const entries: EmojiEntry[] = [];
   const byName = new Map<string, string>();
@@ -95,7 +105,8 @@ export function searchEmoji(
     else if (at > 0) substring.push(entry);
   }
   const byLength = (a: EmojiEntry, b: EmojiEntry): number =>
-    a.name.length - b.name.length || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
+    a.name.length - b.name.length ||
+    (a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
   prefix.sort(byLength);
   substring.sort(byLength);
   return [...prefix, ...substring].slice(0, limit);
@@ -123,15 +134,19 @@ const EXCLUDED_NODES = new Set([
 ]);
 
 /** True when a shortcode starting at `colonPos` must not be completed / converted. */
-export function isExcludedEmojiContext(state: EditorState, colonPos: number): boolean {
+export function isExcludedEmojiContext(
+  state: EditorState,
+  colonPos: number,
+): boolean {
   // `12:30`, `http:`, `a:b` — the colon must not follow a letter / digit.
   const before = state.sliceDoc(Math.max(0, colonPos - 2), colonPos);
-  const prevChar = before ? Array.from(before).pop() ?? "" : "";
+  const prevChar = before ? (Array.from(before).pop() ?? "") : "";
   if (prevChar && /[\p{L}\p{N}_]/u.test(prevChar)) return true;
   // An inline code span still being typed (`` `code :sm ``) is not a node
   // yet: an odd number of backticks before the colon on this line means code.
   const line = state.doc.lineAt(colonPos);
-  const ticks = state.sliceDoc(line.from, colonPos).replace(/\\`/g, "").match(/`+/g) ?? [];
+  const ticks =
+    state.sliceDoc(line.from, colonPos).replace(/\\`/g, "").match(/`+/g) ?? [];
   if (ticks.length % 2 === 1) return true;
   // Same for a `$$` display-math block still being typed: an odd number of
   // `$$`-only lines above (looking back a bounded number of lines).
@@ -142,7 +157,11 @@ export function isExcludedEmojiContext(state: EditorState, colonPos: number): bo
   if (fences % 2 === 1) return true;
   // Front matter (also while it is still being typed): line 1 is `---` and no
   // closing `---` / `...` line comes before this one.
-  if (line.number > 1 && line.number <= 200 && state.doc.line(1).text.trim() === "---") {
+  if (
+    line.number > 1 &&
+    line.number <= 200 &&
+    state.doc.line(1).text.trim() === "---"
+  ) {
     let closed = false;
     for (let n = 2; n < line.number; n++) {
       const t = state.doc.line(n).text.trim();
@@ -155,7 +174,11 @@ export function isExcludedEmojiContext(state: EditorState, colonPos: number): bo
   }
   const tree = syntaxTree(state);
   for (const side of [1, -1] as const) {
-    for (let node: SyntaxNode | null = tree.resolveInner(colonPos, side); node; node = node.parent) {
+    for (
+      let node: SyntaxNode | null = tree.resolveInner(colonPos, side);
+      node;
+      node = node.parent
+    ) {
       if (EXCLUDED_NODES.has(node.name)) return true;
     }
   }
@@ -221,12 +244,17 @@ export function shortcodeBefore(
 const addPendingShortcode = StateEffect.define<{ from: number; to: number }>();
 const clearPendingShortcodes = StateEffect.define<null>();
 
-const pendingShortcodes = StateField.define<ReadonlyArray<{ from: number; to: number }>>({
+const pendingShortcodes = StateField.define<
+  ReadonlyArray<{ from: number; to: number }>
+>({
   create: () => [],
   update(value, tr) {
     let next = value;
     if (tr.docChanged && next.length > 0) {
-      next = next.map((r) => ({ from: mapPosClamped(tr.changes, r.from, 1), to: mapPosClamped(tr.changes, r.to, -1) }));
+      next = next.map((r) => ({
+        from: mapPosClamped(tr.changes, r.from, 1),
+        to: mapPosClamped(tr.changes, r.to, -1),
+      }));
     }
     for (const e of tr.effects) {
       if (e.is(addPendingShortcode)) next = [...next, e.value];
@@ -241,7 +269,8 @@ const pendingShortcodePlugin = ViewPlugin.fromClass(
     private waiting = false;
     constructor(readonly view: EditorView) {}
     update(): void {
-      if (this.waiting || this.view.state.field(pendingShortcodes).length === 0) return;
+      if (this.waiting || this.view.state.field(pendingShortcodes).length === 0)
+        return;
       this.waiting = true;
       void loadEmojiIndex()
         .then((index) => this.flush(index))
@@ -276,38 +305,59 @@ const pendingShortcodePlugin = ViewPlugin.fromClass(
   },
 );
 
-const shortcodeInputHandler = EditorView.inputHandler.of((view, from, to, text) => {
-  if (text !== ":" || view.composing || view.compositionStarted || view.state.readOnly) return false;
-  const sel = view.state.selection;
-  if (sel.ranges.length !== 1 || from !== sel.main.from || to !== sel.main.to || from !== to) {
-    return false;
-  }
-  const index = getLoadedEmojiIndex();
-  if (!index) {
-    // First use: insert the colon now, convert when the data has loaded.
-    const m = /:([A-Za-z0-9_+-]+)$/.exec(view.state.sliceDoc(Math.max(0, from - 80), from));
-    if (!m || isExcludedEmojiContext(view.state, from - m[0].length)) return false;
+const shortcodeInputHandler = EditorView.inputHandler.of(
+  (view, from, to, text) => {
+    if (
+      text !== ":" ||
+      view.composing ||
+      view.compositionStarted ||
+      view.state.readOnly
+    )
+      return false;
+    const sel = view.state.selection;
+    if (
+      sel.ranges.length !== 1 ||
+      from !== sel.main.from ||
+      to !== sel.main.to ||
+      from !== to
+    ) {
+      return false;
+    }
+    const index = getLoadedEmojiIndex();
+    if (!index) {
+      // First use: insert the colon now, convert when the data has loaded.
+      const m = /:([A-Za-z0-9_+-]+)$/.exec(
+        view.state.sliceDoc(Math.max(0, from - 80), from),
+      );
+      if (!m || isExcludedEmojiContext(view.state, from - m[0].length))
+        return false;
+      view.dispatch({
+        changes: { from, insert: ":" },
+        selection: { anchor: from + 1 },
+        effects: addPendingShortcode.of({
+          from: from - m[0].length,
+          to: from + 1,
+        }),
+        userEvent: "input.type",
+        scrollIntoView: true,
+      });
+      return true;
+    }
+    const hit = shortcodeBefore(view.state, from, index);
+    if (!hit) return false;
     view.dispatch({
-      changes: { from, insert: ":" },
-      selection: { anchor: from + 1 },
-      effects: addPendingShortcode.of({ from: from - m[0].length, to: from + 1 }),
+      changes: { from: hit.from, to: from, insert: hit.emoji },
+      selection: { anchor: hit.from + hit.emoji.length },
       userEvent: "input.type",
       scrollIntoView: true,
     });
     return true;
-  }
-  const hit = shortcodeBefore(view.state, from, index);
-  if (!hit) return false;
-  view.dispatch({
-    changes: { from: hit.from, to: from, insert: hit.emoji },
-    selection: { anchor: hit.from + hit.emoji.length },
-    userEvent: "input.type",
-    scrollIntoView: true,
-  });
-  return true;
-});
+  },
+);
 
-const emojiLanguageData = EditorState.languageData.of(() => [{ autocomplete: emojiCompletionSource }]);
+const emojiLanguageData = EditorState.languageData.of(() => [
+  { autocomplete: emojiCompletionSource },
+]);
 
 /** Popup themed with the Kalamos palette (--k-* variables). */
 const completionTheme = EditorView.theme({
@@ -333,14 +383,20 @@ const completionTheme = EditorView.theme({
     backgroundColor: "color-mix(in srgb, var(--k-accent) 22%, transparent)",
     color: "var(--k-text)",
   },
-  ".cm-completionLabel": { fontFamily: "var(--k-font-mono)", fontSize: "0.92em" },
+  ".cm-completionLabel": {
+    fontFamily: "var(--k-font-mono)",
+    fontSize: "0.92em",
+  },
   ".cm-completionDetail": {
     color: "var(--k-text-muted)",
     fontStyle: "normal",
     marginLeft: "0.8em",
     fontSize: "0.85em",
   },
-  ".cm-completionMatchedText": { textDecoration: "none", color: "var(--k-link)" },
+  ".cm-completionMatchedText": {
+    textDecoration: "none",
+    color: "var(--k-link)",
+  },
   ".k-emoji-option": {
     display: "inline-block",
     width: "1.6em",
