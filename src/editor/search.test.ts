@@ -1,5 +1,9 @@
-import { SearchQuery, getSearchQuery, searchPanelOpen } from "@codemirror/search";
 import { undo } from "@codemirror/commands";
+import {
+  getSearchQuery,
+  SearchQuery,
+  searchPanelOpen,
+} from "@codemirror/search";
 import { EditorState } from "@codemirror/state";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { resetMockState } from "../ipc";
@@ -29,26 +33,49 @@ const st = (doc: string) => EditorState.create({ doc });
 describe("#73 query helpers", () => {
   it("collectMatches: plain, case-sensitive, whole word, regex", () => {
     const s = st("Foo foo food FOO");
-    expect(collectMatches(s, new SearchQuery({ search: "foo" })).ranges).toHaveLength(4);
-    expect(collectMatches(s, new SearchQuery({ search: "foo", caseSensitive: true })).ranges).toEqual([
+    expect(
+      collectMatches(s, new SearchQuery({ search: "foo" })).ranges,
+    ).toHaveLength(4);
+    expect(
+      collectMatches(s, new SearchQuery({ search: "foo", caseSensitive: true }))
+        .ranges,
+    ).toEqual([
       { from: 4, to: 7 },
       { from: 8, to: 11 },
     ]);
-    expect(collectMatches(s, new SearchQuery({ search: "foo", wholeWord: true })).ranges).toHaveLength(3);
-    expect(collectMatches(s, new SearchQuery({ search: "fo+d", regexp: true })).ranges).toEqual([{ from: 8, to: 12 }]);
+    expect(
+      collectMatches(s, new SearchQuery({ search: "foo", wholeWord: true }))
+        .ranges,
+    ).toHaveLength(3);
+    expect(
+      collectMatches(s, new SearchQuery({ search: "fo+d", regexp: true }))
+        .ranges,
+    ).toEqual([{ from: 8, to: 12 }]);
   });
 
   it("collectMatches skips empty regex matches, caps, and never throws on an invalid regex", () => {
     const s = st("aaa");
-    expect(collectMatches(s, new SearchQuery({ search: "x*", regexp: true })).ranges).toEqual([]);
+    expect(
+      collectMatches(s, new SearchQuery({ search: "x*", regexp: true })).ranges,
+    ).toEqual([]);
     const capped = collectMatches(s, new SearchQuery({ search: "a" }), 2);
-    expect(capped).toEqual({ ranges: [{ from: 0, to: 1 }, { from: 1, to: 2 }], capped: true });
-    expect(collectMatches(s, new SearchQuery({ search: "(", regexp: true }))).toEqual({ ranges: [], capped: false });
+    expect(capped).toEqual({
+      ranges: [
+        { from: 0, to: 1 },
+        { from: 1, to: 2 },
+      ],
+      capped: true,
+    });
+    expect(
+      collectMatches(s, new SearchQuery({ search: "(", regexp: true })),
+    ).toEqual({ ranges: [], capped: false });
   });
 
   it("finds CJK text", () => {
     const s = st("中文搜尋：搜尋結果");
-    expect(collectMatches(s, new SearchQuery({ search: "搜尋" })).ranges).toEqual([
+    expect(
+      collectMatches(s, new SearchQuery({ search: "搜尋" })).ranges,
+    ).toEqual([
       { from: 2, to: 4 },
       { from: 5, to: 7 },
     ]);
@@ -75,14 +102,31 @@ describe("#73 query helpers", () => {
 
   it("matchLabel: n / total, 無結果, invalid regex", () => {
     const q = new SearchQuery({ search: "a" });
-    expect(matchLabel({ query: q, total: 12, capped: false, current: 2 })).toBe("3 / 12");
-    expect(matchLabel({ query: q, total: 12, capped: false, current: -1 })).toBe("? / 12");
-    expect(matchLabel({ query: q, total: 9999, capped: true, current: 0 })).toBe("1 / 9999+");
-    expect(matchLabel({ query: q, total: 0, capped: false, current: -1 })).toBe("無結果");
-    expect(matchLabel({ query: new SearchQuery({ search: "" }), total: 0, capped: false, current: -1 })).toBe("");
+    expect(matchLabel({ query: q, total: 12, capped: false, current: 2 })).toBe(
+      "3 / 12",
+    );
+    expect(
+      matchLabel({ query: q, total: 12, capped: false, current: -1 }),
+    ).toBe("? / 12");
+    expect(
+      matchLabel({ query: q, total: 9999, capped: true, current: 0 }),
+    ).toBe("1 / 9999+");
+    expect(matchLabel({ query: q, total: 0, capped: false, current: -1 })).toBe(
+      "無結果",
+    );
+    expect(
+      matchLabel({
+        query: new SearchQuery({ search: "" }),
+        total: 0,
+        capped: false,
+        current: -1,
+      }),
+    ).toBe("");
     const bad = new SearchQuery({ search: "[", regexp: true });
     expect(bad.valid).toBe(false);
-    expect(matchLabel({ query: bad, total: 0, capped: false, current: -1 })).toBe("正規表示式無效");
+    expect(
+      matchLabel({ query: bad, total: 0, capped: false, current: -1 }),
+    ).toBe("正規表示式無效");
     expect(regexError("[")).toBeTruthy();
     expect(regexError("a+")).toBeNull();
   });
@@ -91,8 +135,13 @@ describe("#73 query helpers", () => {
     const text = "a.b*(c)\\d\nx";
     const s = st(`zz ${text} zz`);
     for (const regexp of [false, true]) {
-      const q = new SearchQuery({ search: selectionToQueryText(text, regexp), regexp });
-      expect(collectMatches(s, q).ranges).toEqual([{ from: 3, to: 3 + text.length }]);
+      const q = new SearchQuery({
+        search: selectionToQueryText(text, regexp),
+        regexp,
+      });
+      expect(collectMatches(s, q).ranges).toEqual([
+        { from: 3, to: 3 + text.length },
+      ]);
     }
   });
 
@@ -143,21 +192,37 @@ describe("#73 find & replace in the real editor", () => {
   });
 
   const view = () => app!.editor.view;
-  const panel = () => document.querySelector<HTMLElement>('[data-testid="search-panel"]');
-  const input = (id: string) => document.querySelector<HTMLInputElement>(`[data-testid="${id}"]`)!;
-  const count = () => document.querySelector('[data-testid="search-count"]')!.textContent;
+  const panel = () =>
+    document.querySelector<HTMLElement>('[data-testid="search-panel"]');
+  const input = (id: string) =>
+    document.querySelector<HTMLInputElement>(`[data-testid="${id}"]`)!;
+  const count = () =>
+    document.querySelector('[data-testid="search-count"]')!.textContent;
   const selected = () => {
     const sel = view().state.selection.main;
-    return { from: sel.from, to: sel.to, text: view().state.sliceDoc(sel.from, sel.to) };
+    return {
+      from: sel.from,
+      to: sel.to,
+      text: view().state.sliceDoc(sel.from, sel.to),
+    };
   };
   const flush = () => new Promise<void>((r) => setTimeout(r, 0));
 
   function typeQuery(el: HTMLInputElement, value: string, composing = false) {
     el.value = value;
-    el.dispatchEvent(new InputEvent("input", { bubbles: true, isComposing: composing }));
+    el.dispatchEvent(
+      new InputEvent("input", { bubbles: true, isComposing: composing }),
+    );
   }
   function key(el: Element, k: string, init: KeyboardEventInit = {}) {
-    el.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true, ...init }));
+    el.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: k,
+        bubbles: true,
+        cancelable: true,
+        ...init,
+      }),
+    );
   }
 
   it("Cmd+F opens the bar and focuses the field; typing selects the first hit and counts", () => {
@@ -236,7 +301,9 @@ describe("#73 find & replace in the real editor", () => {
     input("search-regex").click();
     typeQuery(field, "app(le");
     expect(count()).toBe("正規表示式無效");
-    expect(panel()!.querySelector(".k-search-field")!.getAttribute("data-invalid")).toBe("true");
+    expect(
+      panel()!.querySelector(".k-search-field")!.getAttribute("data-invalid"),
+    ).toBe("true");
     typeQuery(field, "a(p+)le");
     expect(count()).toMatch(/^\d \/ 7$/);
   });
@@ -244,11 +311,15 @@ describe("#73 find & replace in the real editor", () => {
   it("IME: no search while composing; searches on compositionend", () => {
     openFind(view());
     const field = input("search-input");
-    field.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true }));
+    field.dispatchEvent(
+      new CompositionEvent("compositionstart", { bubbles: true }),
+    );
     typeQuery(field, "粗", true);
     expect(getSearchQuery(view().state).search).toBe("");
     field.value = "粗體";
-    field.dispatchEvent(new CompositionEvent("compositionend", { bubbles: true, data: "粗體" }));
+    field.dispatchEvent(
+      new CompositionEvent("compositionend", { bubbles: true, data: "粗體" }),
+    );
     expect(getSearchQuery(view().state).search).toBe("粗體");
     expect(count()).toBe("1 / 1");
   });
@@ -259,7 +330,9 @@ describe("#73 find & replace in the real editor", () => {
     typeQuery(input("search-input"), "apple");
     typeQuery(input("replace-input"), "pear");
     replaceCurrent(view());
-    expect(view().state.doc.toString().startsWith("第一段 pear 與 Apple。")).toBe(true);
+    expect(
+      view().state.doc.toString().startsWith("第一段 pear 與 Apple。"),
+    ).toBe(true);
     const afterOne = view().state.doc.toString();
 
     replaceAllMatches(view());
@@ -302,7 +375,9 @@ describe("#73 find & replace in the real editor", () => {
       '[data-testid="table-widget"] [data-row="1"][data-col="0"]',
     );
     expect(cell).not.toBeNull();
-    expect(document.activeElement).toBe(cell!.querySelector(".k-table-cell-content"));
+    expect(document.activeElement).toBe(
+      cell!.querySelector(".k-table-cell-content"),
+    );
     expect(document.getSelection()!.toString()).toBe("apple");
     expect(cell!.classList.contains("k-search-cell-current")).toBe(true);
   });

@@ -9,7 +9,11 @@ test.beforeEach(async ({ page }) => {
 
 const DOC_PATH = "/tmp/kalamos-test/notes/post.md";
 
-async function openWith(page: import("@playwright/test").Page, content: string, configure: boolean) {
+async function openWith(
+  page: import("@playwright/test").Page,
+  content: string,
+  configure: boolean,
+) {
   await page.evaluate(
     async ({ path, content, configure }) => {
       const ipc = await import("/src/ipc.ts" as string);
@@ -26,8 +30,11 @@ async function openWith(page: import("@playwright/test").Page, content: string, 
   );
 }
 
-test("#19 AC: Cmd+Opt+U replaces the image under the cursor with the remote URL; undo restores", async ({ page }) => {
-  const src = '# Post\n\n![shot](assets/shot.png "Screen")\n\n<img src="assets/b.png" width="100">\n';
+test("#19 AC: Cmd+Opt+U replaces the image under the cursor with the remote URL; undo restores", async ({
+  page,
+}) => {
+  const src =
+    '# Post\n\n![shot](assets/shot.png "Screen")\n\n<img src="assets/b.png" width="100">\n';
   await openWith(page, src, true);
   await page.evaluate(async (pos) => {
     const app = (await import("/src/main.ts" as string)).getActiveApp();
@@ -37,7 +44,9 @@ test("#19 AC: Cmd+Opt+U replaces the image under the cursor with the remote URL;
   await expect(page.getByTestId("status")).toHaveText("已上傳 1 張圖片");
   await expect
     .poll(() => getDoc(page))
-    .toBe('# Post\n\n![shot](https://mock-images.kalamos.test/shot.png "Screen")\n\n<img src="assets/b.png" width="100">\n');
+    .toBe(
+      '# Post\n\n![shot](https://mock-images.kalamos.test/shot.png "Screen")\n\n<img src="assets/b.png" width="100">\n',
+    );
 
   await page.keyboard.press("ControlOrMeta+z");
   await expect.poll(() => getDoc(page)).toBe(src);
@@ -49,14 +58,24 @@ test("#19 AC: Cmd+Opt+U replaces the image under the cursor with the remote URL;
   });
   await page.keyboard.press("ControlOrMeta+Alt+KeyU");
   await expect(page.getByTestId("status")).toHaveText("已上傳 2 張圖片");
-  await expect.poll(() => getDoc(page)).toContain('<img src="https://mock-images.kalamos.test/b.png" width="100">');
-  await expect.poll(() => getDoc(page)).toContain("![shot](https://mock-images.kalamos.test/shot.png");
+  await expect
+    .poll(() => getDoc(page))
+    .toContain(
+      '<img src="https://mock-images.kalamos.test/b.png" width="100">',
+    );
+  await expect
+    .poll(() => getDoc(page))
+    .toContain("![shot](https://mock-images.kalamos.test/shot.png");
 });
 
-test("#19 without an uploader the status explains how to set one up", async ({ page }) => {
+test("#19 without an uploader the status explains how to set one up", async ({
+  page,
+}) => {
   const src = "![a](assets/a.png)\n";
   await openWith(page, src, false);
   await page.keyboard.press("ControlOrMeta+Alt+KeyU");
-  await expect(page.getByTestId("status")).toHaveText("尚未設定圖床上傳指令（見 docs/image-upload.md）");
+  await expect(page.getByTestId("status")).toHaveText(
+    "尚未設定圖床上傳指令（見 docs/image-upload.md）",
+  );
   expect(await getDoc(page)).toBe(src);
 });

@@ -7,7 +7,12 @@
     "items": [
       { "type": "predefined", "item": "about", "label": "關於 Kalamos" },
       { "type": "predefined", "item": "separator" },
-      { "type": "action", "id": "app.preferences", "label": "偏好設定…", "accel": "CmdOrCtrl+," },
+      {
+        "type": "action",
+        "id": "app.preferences",
+        "label": "偏好設定…",
+        "accel": "CmdOrCtrl+,"
+      },
       { "type": "predefined", "item": "separator" },
       { "type": "predefined", "item": "services", "label": "服務" },
       { "type": "predefined", "item": "separator" },
@@ -15,36 +20,111 @@
       { "type": "predefined", "item": "hideOthers", "label": "隱藏其他" },
       { "type": "predefined", "item": "showAll", "label": "全部顯示" },
       { "type": "predefined", "item": "separator" },
-      { "type": "action", "id": "app.quit", "label": "結束 Kalamos", "accel": "CmdOrCtrl+Q" }
+      {
+        "type": "action",
+        "id": "app.quit",
+        "label": "結束 Kalamos",
+        "accel": "CmdOrCtrl+Q"
+      }
     ]
   },
   {
     "type": "submenu",
     "label": "檔案",
     "items": [
-      { "type": "action", "id": "file.new", "label": "新增", "accel": "CmdOrCtrl+N" },
-      { "type": "action", "id": "file.newTab", "label": "新增分頁", "accel": "CmdOrCtrl+T" },
-      { "type": "action", "id": "file.open", "label": "開啟…", "accel": "CmdOrCtrl+O" },
-      { "type": "action", "id": "file.openFolder", "label": "開啟資料夾…", "accel": "CmdOrCtrl+Shift+O" },
+      {
+        "type": "action",
+        "id": "file.new",
+        "label": "新增",
+        "accel": "CmdOrCtrl+N"
+      },
+      {
+        "type": "action",
+        "id": "file.newTab",
+        "label": "新增分頁",
+        "accel": "CmdOrCtrl+T"
+      },
+      {
+        "type": "action",
+        "id": "file.open",
+        "label": "開啟…",
+        "accel": "CmdOrCtrl+O"
+      },
+      {
+        "type": "action",
+        "id": "file.openFolder",
+        "label": "開啟資料夾…",
+        "accel": "CmdOrCtrl+Shift+O"
+      },
       { "type": "predefined", "item": "separator" },
-      { "type": "action", "id": "file.save", "label": "儲存", "accel": "CmdOrCtrl+S" },
-      { "type": "action", "id": "file.saveAs", "label": "另存新檔…", "accel": "CmdOrCtrl+Shift+S" },
+      {
+        "type": "action",
+        "id": "file.save",
+        "label": "儲存",
+        "accel": "CmdOrCtrl+S"
+      },
+      {
+        "type": "action",
+        "id": "file.saveAs",
+        "label": "另存新檔…",
+        "accel": "CmdOrCtrl+Shift+S"
+      },
       { "type": "predefined", "item": "separator" },
       {
         "type": "submenu",
         "label": "匯出",
         "items": [
-          { "type": "action", "id": "file.exportPdf", "label": "PDF…", "accel": "CmdOrCtrl+Shift+E" },
-          { "type": "action", "id": "file.exportPandoc", "label": "Pandoc 格式（Word / EPUB / LaTeX…）…", "accel": "CmdOrCtrl+Alt+E" }
+          {
+            "type": "action",
+            "id": "file.exportPdf",
+            "label": "PDF…",
+            "accel": "CmdOrCtrl+Shift+E"
+          },
+          {
+            "type": "action",
+            "id": "file.exportPandoc",
+            "label": "Pandoc 格式（Word / EPUB / LaTeX…）…",
+            "accel": "CmdOrCtrl+Alt+E"
+          }
         ]
       },
-      { "type": "action", "id": "file.import", "label": "匯入…", "accel": "CmdOrCtrl+Alt+I" },
+      {
+        "type": "action",
+        "id": "file.import",
+        "label": "匯入…",
+        "accel": "CmdOrCtrl+Alt+I"
+      },
       { "type": "predefined", "item": "separator" },
-      { "type": "action", "id": "file.closeTab", "label": "關閉分頁", "accel": "CmdOrCtrl+W" },
-      { "type": "predefined", "item": "separator", "platforms": ["windows", "linux"] },
-      { "type": "action", "id": "app.preferences", "label": "偏好設定…", "accel": "CmdOrCtrl+,", "platforms": ["windows", "linux"] },
-      { "type": "predefined", "item": "separator", "platforms": ["windows", "linux"] },
-      { "type": "action", "id": "app.quit", "label": "結束 Kalamos", "accel": "CmdOrCtrl+Q", "platforms": ["windows", "linux"] }
+      {
+        "type": "action",
+        "id": "file.closeTab",
+        "label": "關閉分頁",
+        "accel": "CmdOrCtrl+W"
+      },
+      {
+        "type": "predefined",
+        "item": "separator",
+        "platforms": ["windows", "linux"]
+      },
+      {
+        "type": "action",
+        "id": "app.preferences",
+        "label": "偏好設定…",
+        "accel": "CmdOrCtrl+,",
+        "platforms": ["windows", "linux"]
+      },
+      {
+        "type": "predefined",
+        "item": "separator",
+        "platforms": ["windows", "linux"]
+      },
+      {
+        "type": "action",
+        "id": "app.quit",
+        "label": "結束 Kalamos",
+        "accel": "CmdOrCtrl+Q",
+        "platforms": ["windows", "linux"]
+      }
     ]
   },
   {
@@ -63,12 +143,37 @@
         "type": "submenu",
         "label": "尋找",
         "items": [
-          { "type": "action", "id": "edit.find", "label": "尋找…", "accel": "CmdOrCtrl+F" },
-          { "type": "action", "id": "edit.replace", "label": "尋找並取代…", "accel": "CmdOrCtrl+Alt+F" },
-          { "type": "action", "id": "edit.findNext", "label": "找下一個", "accel": "CmdOrCtrl+G" },
-          { "type": "action", "id": "edit.findPrevious", "label": "找上一個", "accel": "CmdOrCtrl+Shift+G" },
+          {
+            "type": "action",
+            "id": "edit.find",
+            "label": "尋找…",
+            "accel": "CmdOrCtrl+F"
+          },
+          {
+            "type": "action",
+            "id": "edit.replace",
+            "label": "尋找並取代…",
+            "accel": "CmdOrCtrl+Alt+F"
+          },
+          {
+            "type": "action",
+            "id": "edit.findNext",
+            "label": "找下一個",
+            "accel": "CmdOrCtrl+G"
+          },
+          {
+            "type": "action",
+            "id": "edit.findPrevious",
+            "label": "找上一個",
+            "accel": "CmdOrCtrl+Shift+G"
+          },
           { "type": "predefined", "item": "separator" },
-          { "type": "action", "id": "edit.findInFolder", "label": "在資料夾中尋找…", "accel": "CmdOrCtrl+Shift+F" }
+          {
+            "type": "action",
+            "id": "edit.findInFolder",
+            "label": "在資料夾中尋找…",
+            "accel": "CmdOrCtrl+Shift+F"
+          }
         ]
       }
     ]
@@ -77,62 +182,224 @@
     "type": "submenu",
     "label": "段落",
     "items": [
-      { "type": "action", "id": "para.heading1", "label": "標題 1", "accel": "CmdOrCtrl+1" },
-      { "type": "action", "id": "para.heading2", "label": "標題 2", "accel": "CmdOrCtrl+2" },
-      { "type": "action", "id": "para.heading3", "label": "標題 3", "accel": "CmdOrCtrl+3" },
-      { "type": "action", "id": "para.heading4", "label": "標題 4", "accel": "CmdOrCtrl+4" },
-      { "type": "action", "id": "para.heading5", "label": "標題 5", "accel": "CmdOrCtrl+5" },
-      { "type": "action", "id": "para.heading6", "label": "標題 6", "accel": "CmdOrCtrl+6" },
-      { "type": "action", "id": "para.paragraph", "label": "內文段落", "accel": "CmdOrCtrl+0" },
+      {
+        "type": "action",
+        "id": "para.heading1",
+        "label": "標題 1",
+        "accel": "CmdOrCtrl+1"
+      },
+      {
+        "type": "action",
+        "id": "para.heading2",
+        "label": "標題 2",
+        "accel": "CmdOrCtrl+2"
+      },
+      {
+        "type": "action",
+        "id": "para.heading3",
+        "label": "標題 3",
+        "accel": "CmdOrCtrl+3"
+      },
+      {
+        "type": "action",
+        "id": "para.heading4",
+        "label": "標題 4",
+        "accel": "CmdOrCtrl+4"
+      },
+      {
+        "type": "action",
+        "id": "para.heading5",
+        "label": "標題 5",
+        "accel": "CmdOrCtrl+5"
+      },
+      {
+        "type": "action",
+        "id": "para.heading6",
+        "label": "標題 6",
+        "accel": "CmdOrCtrl+6"
+      },
+      {
+        "type": "action",
+        "id": "para.paragraph",
+        "label": "內文段落",
+        "accel": "CmdOrCtrl+0"
+      },
       { "type": "predefined", "item": "separator" },
-      { "type": "action", "id": "para.orderedList", "label": "有序清單", "accel": "CmdOrCtrl+Shift+[" },
-      { "type": "action", "id": "para.bulletList", "label": "無序清單", "accel": "CmdOrCtrl+Shift+]" },
-      { "type": "action", "id": "para.taskList", "label": "任務清單", "accel": "CmdOrCtrl+Shift+X" },
+      {
+        "type": "action",
+        "id": "para.orderedList",
+        "label": "有序清單",
+        "accel": "CmdOrCtrl+Shift+["
+      },
+      {
+        "type": "action",
+        "id": "para.bulletList",
+        "label": "無序清單",
+        "accel": "CmdOrCtrl+Shift+]"
+      },
+      {
+        "type": "action",
+        "id": "para.taskList",
+        "label": "任務清單",
+        "accel": "CmdOrCtrl+Shift+X"
+      },
       { "type": "predefined", "item": "separator" },
-      { "type": "action", "id": "para.table", "label": "插入表格…", "accel": "CmdOrCtrl+Alt+T" },
-      { "type": "action", "id": "para.codeBlock", "label": "程式碼區塊", "accel": "CmdOrCtrl+Alt+C" },
-      { "type": "action", "id": "para.mathBlock", "label": "數學區塊", "accel": "CmdOrCtrl+Alt+B" },
-      { "type": "action", "id": "para.quote", "label": "引用", "accel": "CmdOrCtrl+Alt+Q" }
+      {
+        "type": "action",
+        "id": "para.table",
+        "label": "插入表格…",
+        "accel": "CmdOrCtrl+Alt+T"
+      },
+      {
+        "type": "action",
+        "id": "para.codeBlock",
+        "label": "程式碼區塊",
+        "accel": "CmdOrCtrl+Alt+C"
+      },
+      {
+        "type": "action",
+        "id": "para.mathBlock",
+        "label": "數學區塊",
+        "accel": "CmdOrCtrl+Alt+B"
+      },
+      {
+        "type": "action",
+        "id": "para.quote",
+        "label": "引用",
+        "accel": "CmdOrCtrl+Alt+Q"
+      }
     ]
   },
   {
     "type": "submenu",
     "label": "格式",
     "items": [
-      { "type": "action", "id": "fmt.bold", "label": "粗體", "accel": "CmdOrCtrl+B" },
-      { "type": "action", "id": "fmt.italic", "label": "斜體", "accel": "CmdOrCtrl+I" },
-      { "type": "action", "id": "fmt.code", "label": "程式碼", "accel": "CmdOrCtrl+Shift+`" },
-      { "type": "action", "id": "fmt.strike", "label": "刪除線", "accel": "CmdOrCtrl+Shift+D" },
+      {
+        "type": "action",
+        "id": "fmt.bold",
+        "label": "粗體",
+        "accel": "CmdOrCtrl+B"
+      },
+      {
+        "type": "action",
+        "id": "fmt.italic",
+        "label": "斜體",
+        "accel": "CmdOrCtrl+I"
+      },
+      {
+        "type": "action",
+        "id": "fmt.code",
+        "label": "程式碼",
+        "accel": "CmdOrCtrl+Shift+`"
+      },
+      {
+        "type": "action",
+        "id": "fmt.strike",
+        "label": "刪除線",
+        "accel": "CmdOrCtrl+Shift+D"
+      },
       { "type": "predefined", "item": "separator" },
-      { "type": "action", "id": "fmt.link", "label": "連結", "accel": "CmdOrCtrl+K" }
+      {
+        "type": "action",
+        "id": "fmt.link",
+        "label": "連結",
+        "accel": "CmdOrCtrl+K"
+      }
     ]
   },
   {
     "type": "submenu",
     "label": "檢視",
     "items": [
-      { "type": "action", "id": "view.sourceMode", "label": "原始碼模式", "accel": "CmdOrCtrl+/", "check": true },
-      { "type": "action", "id": "view.sidebar", "label": "側欄", "accel": "CmdOrCtrl+Shift+L", "check": true },
-      { "type": "action", "id": "view.outline", "label": "大綱", "accel": "CmdOrCtrl+Shift+1", "check": true },
+      {
+        "type": "action",
+        "id": "view.sourceMode",
+        "label": "原始碼模式",
+        "accel": "CmdOrCtrl+/",
+        "check": true
+      },
+      {
+        "type": "action",
+        "id": "view.sidebar",
+        "label": "側欄",
+        "accel": "CmdOrCtrl+Shift+L",
+        "check": true
+      },
+      {
+        "type": "action",
+        "id": "view.outline",
+        "label": "大綱",
+        "accel": "CmdOrCtrl+Shift+1",
+        "check": true
+      },
       { "type": "predefined", "item": "separator" },
-      { "type": "action", "id": "view.focusMode", "label": "專注模式", "accel": "F8", "check": true },
-      { "type": "action", "id": "view.typewriterMode", "label": "打字機模式", "accel": "F9", "check": true },
-      { "type": "action", "id": "view.codeLineNumbers", "label": "程式碼行號", "accel": "CmdOrCtrl+Alt+L", "check": true },
-      { "type": "action", "id": "view.mathAutoNumber", "label": "公式自動編號", "accel": "CmdOrCtrl+Alt+N", "check": true },
+      {
+        "type": "action",
+        "id": "view.focusMode",
+        "label": "專注模式",
+        "accel": "F8",
+        "check": true
+      },
+      {
+        "type": "action",
+        "id": "view.typewriterMode",
+        "label": "打字機模式",
+        "accel": "F9",
+        "check": true
+      },
+      {
+        "type": "action",
+        "id": "view.codeLineNumbers",
+        "label": "程式碼行號",
+        "accel": "CmdOrCtrl+Alt+L",
+        "check": true
+      },
+      {
+        "type": "action",
+        "id": "view.mathAutoNumber",
+        "label": "公式自動編號",
+        "accel": "CmdOrCtrl+Alt+N",
+        "check": true
+      },
       { "type": "predefined", "item": "separator" },
       {
         "type": "themes",
         "label": "主題",
         "items": [
-          { "type": "action", "id": "view.cycleTheme", "label": "切換到下一個主題", "accel": "CmdOrCtrl+Shift+T" }
+          {
+            "type": "action",
+            "id": "view.cycleTheme",
+            "label": "切換到下一個主題",
+            "accel": "CmdOrCtrl+Shift+T"
+          }
         ]
       },
       { "type": "predefined", "item": "separator" },
-      { "type": "action", "id": "view.actualSize", "label": "實際大小", "accel": "CmdOrCtrl+Shift+0" },
-      { "type": "action", "id": "view.zoomIn", "label": "放大", "accel": "CmdOrCtrl+Shift+=" },
-      { "type": "action", "id": "view.zoomOut", "label": "縮小", "accel": "CmdOrCtrl+Shift+-" },
+      {
+        "type": "action",
+        "id": "view.actualSize",
+        "label": "實際大小",
+        "accel": "CmdOrCtrl+Shift+0"
+      },
+      {
+        "type": "action",
+        "id": "view.zoomIn",
+        "label": "放大",
+        "accel": "CmdOrCtrl+Shift+="
+      },
+      {
+        "type": "action",
+        "id": "view.zoomOut",
+        "label": "縮小",
+        "accel": "CmdOrCtrl+Shift+-"
+      },
       { "type": "predefined", "item": "separator", "platforms": ["macos"] },
-      { "type": "predefined", "item": "fullscreen", "label": "進入全螢幕", "platforms": ["macos"] }
+      {
+        "type": "predefined",
+        "item": "fullscreen",
+        "label": "進入全螢幕",
+        "platforms": ["macos"]
+      }
     ]
   },
   {
@@ -141,13 +408,38 @@
     "role": "window",
     "items": [
       { "type": "predefined", "item": "minimize", "label": "縮到最小" },
-      { "type": "predefined", "item": "maximize", "label": "縮放", "platforms": ["macos"] },
-      { "type": "predefined", "item": "maximize", "label": "最大化", "platforms": ["windows", "linux"] },
+      {
+        "type": "predefined",
+        "item": "maximize",
+        "label": "縮放",
+        "platforms": ["macos"]
+      },
+      {
+        "type": "predefined",
+        "item": "maximize",
+        "label": "最大化",
+        "platforms": ["windows", "linux"]
+      },
       { "type": "predefined", "item": "separator" },
-      { "type": "action", "id": "window.nextTab", "label": "顯示下一個分頁", "accel": "Ctrl+Tab" },
-      { "type": "action", "id": "window.previousTab", "label": "顯示上一個分頁", "accel": "Ctrl+Shift+Tab" },
+      {
+        "type": "action",
+        "id": "window.nextTab",
+        "label": "顯示下一個分頁",
+        "accel": "Ctrl+Tab"
+      },
+      {
+        "type": "action",
+        "id": "window.previousTab",
+        "label": "顯示上一個分頁",
+        "accel": "Ctrl+Shift+Tab"
+      },
       { "type": "predefined", "item": "separator", "platforms": ["macos"] },
-      { "type": "predefined", "item": "bringAllToFront", "label": "將全部移至最前", "platforms": ["macos"] }
+      {
+        "type": "predefined",
+        "item": "bringAllToFront",
+        "label": "將全部移至最前",
+        "platforms": ["macos"]
+      }
     ]
   },
   {
@@ -155,11 +447,35 @@
     "label": "說明",
     "role": "help",
     "items": [
-      { "type": "link", "id": "help.repo", "label": "Kalamos 產品頁（GitHub）", "url": "https://github.com/kkdai/Kalamos" },
-      { "type": "link", "id": "help.releases", "label": "下載最新版本", "url": "https://github.com/kkdai/Kalamos/releases" },
-      { "type": "link", "id": "help.issues", "label": "回報問題", "url": "https://github.com/kkdai/Kalamos/issues" },
-      { "type": "predefined", "item": "separator", "platforms": ["windows", "linux"] },
-      { "type": "predefined", "item": "about", "label": "關於 Kalamos", "platforms": ["windows", "linux"] }
+      {
+        "type": "link",
+        "id": "help.repo",
+        "label": "Kalamos 產品頁（GitHub）",
+        "url": "https://github.com/kkdai/Kalamos"
+      },
+      {
+        "type": "link",
+        "id": "help.releases",
+        "label": "下載最新版本",
+        "url": "https://github.com/kkdai/Kalamos/releases"
+      },
+      {
+        "type": "link",
+        "id": "help.issues",
+        "label": "回報問題",
+        "url": "https://github.com/kkdai/Kalamos/issues"
+      },
+      {
+        "type": "predefined",
+        "item": "separator",
+        "platforms": ["windows", "linux"]
+      },
+      {
+        "type": "predefined",
+        "item": "about",
+        "label": "關於 Kalamos",
+        "platforms": ["windows", "linux"]
+      }
     ]
   }
 ]

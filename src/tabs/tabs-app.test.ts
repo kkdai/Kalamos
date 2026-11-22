@@ -1,5 +1,7 @@
 import { undo } from "@codemirror/commands";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { codeLineNumbersFacet } from "../editor/code-blocks";
+import { imageDocPathField, imageRootSettingField } from "../editor/images";
 import {
   emitMockMenuAction,
   getMockQuitCount,
@@ -16,12 +18,10 @@ import {
 } from "../ipc";
 import {
   createKalamosApp,
+  type KalamosApp,
   NAMED_AUTOSAVE_DELAY_MS,
   UNTITLED_RECOVERY_INTERVAL_MS,
-  type KalamosApp,
 } from "../main";
-import { codeLineNumbersFacet } from "../editor/code-blocks";
-import { imageDocPathField, imageRootSettingField } from "../editor/images";
 import { MENU_THEN_KEY_WINDOW_MS } from "../menu/menu-dispatch";
 
 function setupDom(): void {
@@ -36,16 +36,24 @@ function setupDom(): void {
 
 function type(app: KalamosApp, text: string): void {
   const { view } = app.editor;
-  view.dispatch({ changes: { from: view.state.doc.length, insert: text }, userEvent: "input.type" });
+  view.dispatch({
+    changes: { from: view.state.doc.length, insert: text },
+    userEvent: "input.type",
+  });
 }
 
 function key(init: KeyboardEventInit): KeyboardEvent {
-  const event = new KeyboardEvent("keydown", { bubbles: true, cancelable: true, ...init });
+  const event = new KeyboardEvent("keydown", {
+    bubbles: true,
+    cancelable: true,
+    ...init,
+  });
   window.dispatchEvent(event);
   return event;
 }
 
-const tabEls = () => Array.from(document.querySelectorAll<HTMLElement>('[data-testid="tab"]'));
+const tabEls = () =>
+  Array.from(document.querySelectorAll<HTMLElement>('[data-testid="tab"]'));
 
 describe("#81 A document tabs", () => {
   let app: KalamosApp;
@@ -80,8 +88,15 @@ describe("#81 A document tabs", () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(app.getTabs()).toHaveLength(3);
 
-    document.querySelector<HTMLButtonElement>('[data-testid="tab-new"]')!.click();
-    expect(app.getTabs().map((t) => t.label)).toEqual(["未命名", "未命名 2", "未命名 3", "未命名 4"]);
+    document
+      .querySelector<HTMLButtonElement>('[data-testid="tab-new"]')!
+      .click();
+    expect(app.getTabs().map((t) => t.label)).toEqual([
+      "未命名",
+      "未命名 2",
+      "未命名 3",
+      "未命名 4",
+    ]);
     expect(app.getTabs()[3].active).toBe(true);
     expect(getMockWindowTitle()).toBe("未命名 4");
   });
@@ -158,12 +173,19 @@ describe("#81 A document tabs", () => {
     await app.openDocument("/p/docs/README.md");
     app.newTab();
     await app.openDocument("/p/README.md");
-    expect(app.getTabs().map((t) => t.label)).toEqual(["README.md — docs", "README.md — p"]);
+    expect(app.getTabs().map((t) => t.label)).toEqual([
+      "README.md — docs",
+      "README.md — p",
+    ]);
     expect(app.wordCounter.getDocumentStats().words).toBe(1);
-    expect(app.sidebar.outline.getHeadings().map((h) => h.text)).toEqual(["Root"]);
+    expect(app.sidebar.outline.getHeadings().map((h) => h.text)).toEqual([
+      "Root",
+    ]);
     app.cycleTab(1);
     expect(app.wordCounter.getDocumentStats().words).toBe(4);
-    expect(app.sidebar.outline.getHeadings().map((h) => h.text)).toEqual(["Docs"]);
+    expect(app.sidebar.outline.getHeadings().map((h) => h.text)).toEqual([
+      "Docs",
+    ]);
     expect(getMockWindowTitle()).toBe("README.md — docs");
   });
 
@@ -185,10 +207,18 @@ describe("#81 A document tabs", () => {
     app.newTab();
     tabEls()[0].click();
     expect(app.getTabs()[0].active).toBe(true);
-    tabEls()[1].dispatchEvent(new MouseEvent("auxclick", { button: 1, bubbles: true, cancelable: true }));
+    tabEls()[1].dispatchEvent(
+      new MouseEvent("auxclick", {
+        button: 1,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
     await vi.advanceTimersByTimeAsync(0);
     expect(app.getTabs()).toHaveLength(2);
-    tabEls()[1].querySelector<HTMLButtonElement>('[data-testid="tab-close"]')!.click();
+    tabEls()[1]
+      .querySelector<HTMLButtonElement>('[data-testid="tab-close"]')!
+      .click();
     await vi.advanceTimersByTimeAsync(0);
     expect(app.getTabs()).toHaveLength(1);
     expect(app.tabBar.isVisible()).toBe(false);
@@ -211,7 +241,9 @@ describe("#81 A document tabs", () => {
     app.activateTab(app.getTabs()[0].id);
     setMockDialogHandlers({ saveChanges: () => "discard" });
     await app.closeTab();
-    expect(getMockSaveChangesPrompts()).toEqual(["「未命名」有未儲存的變更，要在關閉前儲存嗎？"]);
+    expect(getMockSaveChangesPrompts()).toEqual([
+      "「未命名」有未儲存的變更，要在關閉前儲存嗎？",
+    ]);
     await app.closeTab();
     expect(app.getTabs()).toHaveLength(1);
     expect(app.getTabs()[0].label).toBe("未命名");
@@ -228,7 +260,10 @@ describe("#81 A document tabs", () => {
     // The prompt shows the tab it asks about.
     expect(app.getActiveTabId()).toBe(first);
 
-    setMockDialogHandlers({ saveChanges: () => "save", save: () => "/n/draft.md" });
+    setMockDialogHandlers({
+      saveChanges: () => "save",
+      save: () => "/n/draft.md",
+    });
     expect(await app.closeTab(first)).toBe(true);
     expect(readMockFile("/n/draft.md")).toBe("draft");
     expect(app.getTabs()).toHaveLength(1);
@@ -242,7 +277,6 @@ describe("#81 A document tabs", () => {
     await app.closeTab(app.getTabs()[0].id);
     expect(readMockFile("/n/a.md")).toBe("a1");
     expect(getMockSaveChangesPrompts()).toHaveLength(0);
-
   });
 
   it("with autosave off, closing a named dirty tab asks first", async () => {
@@ -257,7 +291,9 @@ describe("#81 A document tabs", () => {
     type(app, "2");
     setMockDialogHandlers({ saveChanges: () => "save" });
     expect(await app.closeTab()).toBe(true);
-    expect(getMockSaveChangesPrompts()).toEqual(["「b.md」有未儲存的變更，要在關閉前儲存嗎？"]);
+    expect(getMockSaveChangesPrompts()).toEqual([
+      "「b.md」有未儲存的變更，要在關閉前儲存嗎？",
+    ]);
     expect(readMockFile("/n/b.md")).toBe("b2");
   });
 
@@ -280,7 +316,10 @@ describe("#81 A document tabs", () => {
     await vi.advanceTimersByTimeAsync(UNTITLED_RECOVERY_INTERVAL_MS);
     const entries = await listRecovery();
     expect(entries.map((e) => e.content).sort()).toEqual(["one", "two"]);
-    const docIds = app.getTabs().slice(0, 2).map((t) => t.docId);
+    const docIds = app
+      .getTabs()
+      .slice(0, 2)
+      .map((t) => t.docId);
     expect(entries.map((e) => e.docId).sort()).toEqual([...docIds].sort());
   });
 
@@ -308,13 +347,19 @@ describe("#81 A document tabs", () => {
     app.newTab();
     type(app, "two");
     const paths = ["/n/one.md", null];
-    setMockDialogHandlers({ saveChanges: () => "save", save: () => paths.shift() ?? null });
+    setMockDialogHandlers({
+      saveChanges: () => "save",
+      save: () => paths.shift() ?? null,
+    });
     expect(await triggerMockCloseRequested()).toBe(false);
     expect(readMockFile("/n/one.md")).toBe("one");
     expect(app.getTabs()[0].dirty).toBe(false);
     expect(app.getTabs()[1].dirty).toBe(true);
 
-    setMockDialogHandlers({ saveChanges: () => "save", save: () => "/n/two.md" });
+    setMockDialogHandlers({
+      saveChanges: () => "save",
+      save: () => "/n/two.md",
+    });
     expect(await triggerMockCloseRequested()).toBe(true);
     expect(readMockFile("/n/two.md")).toBe("two");
   });
@@ -355,8 +400,13 @@ describe("#81 A document tabs", () => {
   it("#81 B dropped Markdown files open in tabs", async () => {
     seedMockFile("/n/d1.md", "d1");
     seedMockFile("/n/d2.markdown", "d2");
-    await triggerMockFileDrop({ paths: ["/n/d1.md", "/n/d2.markdown", "/n/x.txt"] });
-    expect(app.getTabs().map((t) => t.path)).toEqual(["/n/d1.md", "/n/d2.markdown"]);
+    await triggerMockFileDrop({
+      paths: ["/n/d1.md", "/n/d2.markdown", "/n/x.txt"],
+    });
+    expect(app.getTabs().map((t) => t.path)).toEqual([
+      "/n/d1.md",
+      "/n/d2.markdown",
+    ]);
   });
 
   it("#81 B Cmd+click in the file list opens a new tab", async () => {
@@ -365,16 +415,18 @@ describe("#81 A document tabs", () => {
     await app.openFolder("/n");
     await app.sidebar.setTab("list");
     const item = (name: string) =>
-      Array.from(document.querySelectorAll<HTMLElement>('[data-testid="file-item"]')).find((el) =>
-        el.textContent?.includes(name),
-      )!;
+      Array.from(
+        document.querySelectorAll<HTMLElement>('[data-testid="file-item"]'),
+      ).find((el) => el.textContent?.includes(name))!;
     item("s1.md").click();
     await vi.advanceTimersByTimeAsync(0);
     expect(app.getTabs().map((t) => t.path)).toEqual(["/n/s1.md"]);
     item("s2.md").click();
     await vi.advanceTimersByTimeAsync(0);
     expect(app.getTabs().map((t) => t.path)).toEqual(["/n/s2.md"]);
-    item("s1.md").dispatchEvent(new MouseEvent("click", { bubbles: true, metaKey: true }));
+    item("s1.md").dispatchEvent(
+      new MouseEvent("click", { bubbles: true, metaKey: true }),
+    );
     await vi.advanceTimersByTimeAsync(0);
     expect(app.getTabs().map((t) => t.path)).toEqual(["/n/s2.md", "/n/s1.md"]);
   });
@@ -404,6 +456,10 @@ describe("#81 A document tabs", () => {
     const ids = app.getTabs().map((t) => t.id);
     app.moveTab(ids[2], 0);
     expect(app.getTabs().map((t) => t.id)).toEqual([ids[2], ids[0], ids[1]]);
-    expect(tabEls().map((el) => el.dataset.tabId)).toEqual([ids[2], ids[0], ids[1]]);
+    expect(tabEls().map((el) => el.dataset.tabId)).toEqual([
+      ids[2],
+      ids[0],
+      ids[1],
+    ]);
   });
 });

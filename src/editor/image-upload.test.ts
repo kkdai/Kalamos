@@ -6,13 +6,13 @@ import { EditorView } from "@codemirror/view";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   getMockUploadCalls,
+  getSettings,
   resetMockState,
-  seedMockUploadSettings,
   seedMockFile,
+  seedMockUploadSettings,
   setMockDialogHandlers,
   setMockUploadHandler,
   setSettings,
-  getSettings,
   UPLOADER_NOT_CONFIGURED_MESSAGE,
 } from "../ipc";
 import { createKalamosApp, type KalamosApp } from "../main";
@@ -36,16 +36,27 @@ import { mathMarkdownExtension } from "./math";
 
 const DOC_PATH = "/tmp/kalamos-test/notes/post.md";
 
-function stateOf(doc: string, selection: EditorSelection | number = 0): EditorState {
+function stateOf(
+  doc: string,
+  selection: EditorSelection | number = 0,
+): EditorState {
   let state = EditorState.create({
     doc,
-    selection: typeof selection === "number" ? EditorSelection.cursor(selection) : selection,
+    selection:
+      typeof selection === "number"
+        ? EditorSelection.cursor(selection)
+        : selection,
     extensions: [
       EditorState.allowMultipleSelections.of(true),
       markdown({
         base: markdownLanguage,
         addKeymap: false,
-        extensions: [mathMarkdownExtension, cjkEmphasisExtension, frontMatterExtension, footnoteExtension],
+        extensions: [
+          mathMarkdownExtension,
+          cjkEmphasisExtension,
+          frontMatterExtension,
+          footnoteExtension,
+        ],
       }),
       imageDocPathField,
       history(),
@@ -57,7 +68,7 @@ function stateOf(doc: string, selection: EditorSelection | number = 0): EditorSt
 }
 
 const DOC = [
-  "Intro ![cat](assets/cat.png \"Cat title\") text",
+  'Intro ![cat](assets/cat.png "Cat title") text',
   "",
   '<img src="assets/dog%20pic.png" alt="狗" width="120" title="Dog">',
   "",
@@ -86,11 +97,16 @@ describe("IM-05 collecting upload targets", () => {
 
   it("only the images under the cursor or selection when there are some", () => {
     const onDog = stateOf(DOC, DOC.indexOf("dog%20"));
-    expect(collectUploadTargets(onDog)).toMatchObject({ scope: "selection", targets: [{ html: true }] });
+    expect(collectUploadTargets(onDog)).toMatchObject({
+      scope: "selection",
+      targets: [{ html: true }],
+    });
 
     const from = DOC.indexOf("![cat]");
     const to = DOC.indexOf("<img");
-    const selected = collectUploadTargets(stateOf(DOC, EditorSelection.single(from, to + 3)));
+    const selected = collectUploadTargets(
+      stateOf(DOC, EditorSelection.single(from, to + 3)),
+    );
     expect(selected.targets).toHaveLength(2);
 
     // Cursor on a remote image only: falls back to the whole document.
@@ -102,7 +118,9 @@ describe("IM-05 collecting upload targets", () => {
   it("untitled documents only upload absolute paths", () => {
     let state = stateOf(DOC);
     state = state.update({ effects: setImageDocPathEffect.of(null) }).state;
-    expect(collectUploadTargetsInRange(state).map((t) => t.path)).toEqual(["/tmp/kalamos-test/pics/abs.jpg"]);
+    expect(collectUploadTargetsInRange(state).map((t) => t.path)).toEqual([
+      "/tmp/kalamos-test/pics/abs.jpg",
+    ]);
   });
 
   it("finds the src value of an img tag (first src wins, any quoting)", () => {
@@ -116,7 +134,9 @@ describe("IM-05 collecting upload targets", () => {
   });
 
   it("formats URLs for Markdown destinations", () => {
-    expect(markdownDestinationFor("https://x.test/a b(1).png")).toBe("https://x.test/a%20b%281%29.png");
+    expect(markdownDestinationFor("https://x.test/a b(1).png")).toBe(
+      "https://x.test/a%20b%281%29.png",
+    );
   });
 });
 
@@ -136,7 +156,10 @@ describe("IM-05 replacing references", () => {
 
   const URLS = new Map([
     ["/tmp/kalamos-test/notes/assets/cat.png", "https://img.test/cat.png"],
-    ["/tmp/kalamos-test/notes/assets/dog pic.png", 'https://img.test/dog?a=1&b="2"'],
+    [
+      "/tmp/kalamos-test/notes/assets/dog pic.png",
+      'https://img.test/dog?a=1&b="2"',
+    ],
     ["/tmp/kalamos-test/pics/abs.jpg", "https://img.test/abs.jpg"],
   ]);
 
@@ -164,7 +187,8 @@ describe("IM-05 replacing references", () => {
     // While uploading: text inserted before everything, right after the cat image,
     // and the dog tag's alt edited.
     v.dispatch({ changes: { from: 0, insert: "新的開頭\n" } });
-    const catEnd = v.state.doc.toString().indexOf("\"Cat title\")") + '"Cat title")'.length;
+    const catEnd =
+      v.state.doc.toString().indexOf('"Cat title")') + '"Cat title")'.length;
     v.dispatch({ changes: { from: catEnd, insert: "!!" } });
     const alt = v.state.doc.toString().indexOf('alt="狗"');
     v.dispatch({ changes: { from: alt + 5, to: alt + 6, insert: "貓" } });
@@ -174,7 +198,11 @@ describe("IM-05 replacing references", () => {
     const outcome = replaceUploadedImages(v, targets, URLS, changes);
     expect(outcome).toEqual({ replaced: 2, skipped: 1 });
     const doc = v.state.doc.toString();
-    expect(doc.startsWith("新的開頭\nIntro ![cat](https://img.test/cat.png \"Cat title\")!! text")).toBe(true);
+    expect(
+      doc.startsWith(
+        '新的開頭\nIntro ![cat](https://img.test/cat.png "Cat title")!! text',
+      ),
+    ).toBe(true);
     expect(doc).toContain('<img src="assets/dog%20pic.png" alt="貓"');
     expect(doc).toContain("![abs](https://img.test/abs.jpg)");
   });
@@ -183,8 +211,20 @@ describe("IM-05 replacing references", () => {
     const state = stateOf("abc");
     const tr = state.update({ changes: { from: 3, insert: "x" } });
     expect(changedInside(tr.changes, 0, 3)).toBe(false);
-    expect(changedInside(state.update({ changes: { from: 1, insert: "y" } }).changes, 0, 3)).toBe(true);
-    expect(changedInside(state.update({ changes: { from: 0, to: 3 } }).changes, 0, 3)).toBe(true);
+    expect(
+      changedInside(
+        state.update({ changes: { from: 1, insert: "y" } }).changes,
+        0,
+        3,
+      ),
+    ).toBe(true);
+    expect(
+      changedInside(
+        state.update({ changes: { from: 0, to: 3 } }).changes,
+        0,
+        3,
+      ),
+    ).toBe(true);
   });
 });
 
@@ -217,8 +257,12 @@ describe("IM-05 upload flow", () => {
       notConfiguredMessage: UPLOADER_NOT_CONFIGURED_MESSAGE,
     });
     expect(calls).toBe(0);
-    expect(result.error).toBe("尚未設定圖床上傳指令（見 docs/image-upload.md）");
-    expect(statuses).toEqual([["尚未設定圖床上傳指令（見 docs/image-upload.md）", true]]);
+    expect(result.error).toBe(
+      "尚未設定圖床上傳指令（見 docs/image-upload.md）",
+    );
+    expect(statuses).toEqual([
+      ["尚未設定圖床上傳指令（見 docs/image-upload.md）", true],
+    ]);
   });
 
   it("shows progress, uploads each file once and replaces; nothing replaced on failure", async () => {
@@ -231,7 +275,12 @@ describe("IM-05 upload flow", () => {
       uploader: "/tmp/kalamos-test/bin/picgo",
       upload: async (paths) => {
         uploaded.push(paths);
-        return { urls: paths.map((p) => `https://img.test/${encodeURIComponent(p.split("/").pop()!)}`) };
+        return {
+          urls: paths.map(
+            (p) =>
+              `https://img.test/${encodeURIComponent(p.split("/").pop()!)}`,
+          ),
+        };
       },
       setStatus: (m) => statuses.push(m),
       notConfiguredMessage: "x",
@@ -241,14 +290,17 @@ describe("IM-05 upload flow", () => {
     expect(statuses[0]).toBe("將上傳 3 張圖片…（picgo）");
     expect(statuses[1]).toBe("上傳中… (1/3)：cat.png（picgo）");
     expect(statuses.at(-1)).toBe("已上傳 3 張圖片");
-    expect(v.state.doc.toString().match(/https:\/\/img\.test\/cat\.png/g)).toHaveLength(2);
+    expect(
+      v.state.doc.toString().match(/https:\/\/img\.test\/cat\.png/g),
+    ).toHaveLength(2);
 
     const v2 = mount(DOC);
     const fail = await uploadImagesInEditor({
       view: v2,
       uploader: "picgo",
       upload: async (paths) => {
-        if (paths[0].endsWith("abs.jpg")) throw { kind: "Io", message: "上傳指令失敗（結束碼 1）" };
+        if (paths[0].endsWith("abs.jpg"))
+          throw { kind: "Io", message: "上傳指令失敗（結束碼 1）" };
         return { urls: ["https://img.test/ok.png"] };
       },
       setStatus: (m) => statuses.push(m),
@@ -288,7 +340,14 @@ describe("IM-05 app wiring (mock ipc)", () => {
     await app.init();
     seedMockFile(DOC_PATH, "![a](a.png)");
     await app.openDocument(DOC_PATH);
-    window.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyU", key: "†", metaKey: true, altKey: true }));
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        code: "KeyU",
+        key: "†",
+        metaKey: true,
+        altKey: true,
+      }),
+    );
     await new Promise((r) => setTimeout(r, 0));
     await new Promise((r) => setTimeout(r, 0));
     expect(app.getStatusText()).toBe(UPLOADER_NOT_CONFIGURED_MESSAGE);
@@ -302,8 +361,12 @@ describe("IM-05 app wiring (mock ipc)", () => {
     seedMockFile(DOC_PATH, "# Post\n\n![shot](assets/shot.png)\n");
     await app.openDocument(DOC_PATH);
     expect(await app.uploadDocumentImages()).toBe(true);
-    expect(app.editor.getContent()).toBe("# Post\n\n![shot](https://mock-images.kalamos.test/shot.png)\n");
-    expect(getMockUploadCalls()).toEqual([["/tmp/kalamos-test/notes/assets/shot.png"]]);
+    expect(app.editor.getContent()).toBe(
+      "# Post\n\n![shot](https://mock-images.kalamos.test/shot.png)\n",
+    );
+    expect(getMockUploadCalls()).toEqual([
+      ["/tmp/kalamos-test/notes/assets/shot.png"],
+    ]);
     expect(app.getStatusText()).toBe("已上傳 1 張圖片");
   });
 
@@ -315,9 +378,15 @@ describe("IM-05 app wiring (mock ipc)", () => {
     seedMockFile(DOC_PATH, "text\n");
     await app.openDocument(DOC_PATH);
     setMockDialogHandlers({});
-    setMockUploadHandler(async (paths) => ({ urls: paths.map(() => "https://img.test/pasted.png") }));
-    const file = new File([new Uint8Array([137, 80, 78, 71])], "clip.png", { type: "image/png" });
+    setMockUploadHandler(async (paths) => ({
+      urls: paths.map(() => "https://img.test/pasted.png"),
+    }));
+    const file = new File([new Uint8Array([137, 80, 78, 71])], "clip.png", {
+      type: "image/png",
+    });
     expect(await app.insertPastedImages([file], 5)).toBe(true);
-    expect(app.editor.getContent()).toBe("text\n![](https://img.test/pasted.png)");
+    expect(app.editor.getContent()).toBe(
+      "text\n![](https://img.test/pasted.png)",
+    );
   });
 });

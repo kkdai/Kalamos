@@ -7,8 +7,17 @@ import { cjkEmphasisExtension } from "./cjk-emphasis";
 import { footnoteExtension } from "./footnotes";
 import { frontMatterExtension } from "./front-matter";
 import { mathMarkdownExtension } from "./math";
-import { countDocument, countLines, countSelection, countText } from "./word-count";
-import { counterLabel, createWordCounter, DOC_COUNT_DEBOUNCE_MS } from "./word-count-view";
+import {
+  countDocument,
+  countLines,
+  countSelection,
+  countText,
+} from "./word-count";
+import {
+  counterLabel,
+  createWordCounter,
+  DOC_COUNT_DEBOUNCE_MS,
+} from "./word-count-view";
 
 function stateOf(doc: string, selection?: EditorSelection): EditorState {
   const state = EditorState.create({
@@ -19,7 +28,12 @@ function stateOf(doc: string, selection?: EditorSelection): EditorState {
       markdown({
         base: markdownLanguage,
         addKeymap: false,
-        extensions: [mathMarkdownExtension, cjkEmphasisExtension, frontMatterExtension, footnoteExtension],
+        extensions: [
+          mathMarkdownExtension,
+          cjkEmphasisExtension,
+          frontMatterExtension,
+          footnoteExtension,
+        ],
       }),
     ],
   });
@@ -71,7 +85,7 @@ describe("NV-03 countText", () => {
       "- item one",
       "- [x] done",
       "",
-      "[link text](https://example.com/very/long/url \"title\") ![alt](img/a.png)",
+      '[link text](https://example.com/very/long/url "title") ![alt](img/a.png)',
       "",
       "| a | b |",
       "|---|---|",
@@ -91,12 +105,20 @@ describe("NV-03 countText", () => {
   });
 
   it("excludes front matter and math source", () => {
-    expect(countText("---\ntitle: Hello World\ntags: [a, b]\n---\n\n正文").words).toBe(2);
+    expect(
+      countText("---\ntitle: Hello World\ntags: [a, b]\n---\n\n正文").words,
+    ).toBe(2);
     expect(countText("Area $\\pi r^2$ done").words).toBe(2);
   });
 
   it("returns zeros for an empty document; a trailing newline adds no line", () => {
-    expect(countText("")).toEqual({ words: 0, chars: 0, charsNoSpaces: 0, lines: 0, readingMinutes: 0 });
+    expect(countText("")).toEqual({
+      words: 0,
+      chars: 0,
+      charsNoSpaces: 0,
+      lines: 0,
+      readingMinutes: 0,
+    });
     expect(countText("a\nb\n").lines).toBe(2);
     expect(countText("a\nb").lines).toBe(2);
     expect(countLines("\n")).toBe(1);
@@ -107,7 +129,10 @@ describe("NV-03 countText", () => {
     expect(countText("字".repeat(400)).readingMinutes).toBe(1);
     expect(countText("字".repeat(401)).readingMinutes).toBe(2);
     expect(countText(Array(201).fill("word").join(" ")).readingMinutes).toBe(2);
-    expect(countText("字".repeat(200) + " " + Array(100).fill("w").join(" ")).readingMinutes).toBe(1);
+    expect(
+      countText("字".repeat(200) + " " + Array(100).fill("w").join(" "))
+        .readingMinutes,
+    ).toBe(1);
   });
 });
 
@@ -119,18 +144,32 @@ describe("NV-03 selection counting", () => {
     expect(countSelection(stateOf(doc))).toBeNull();
 
     const from = doc.indexOf("**");
-    const sel = countSelection(stateOf(doc, EditorSelection.single(from, from + 6)));
+    const sel = countSelection(
+      stateOf(doc, EditorSelection.single(from, from + 6)),
+    );
     expect(sel).toMatchObject({ words: 2, chars: 2, lines: 1 });
 
     const multi = countSelection(
-      stateOf(doc, EditorSelection.create([EditorSelection.range(0, 9), EditorSelection.range(doc.length - 5, doc.length)])),
+      stateOf(
+        doc,
+        EditorSelection.create([
+          EditorSelection.range(0, 9),
+          EditorSelection.range(doc.length - 5, doc.length),
+        ]),
+      ),
     );
     expect(multi?.words).toBe(4); // 標 題 Title + words
     expect(multi?.lines).toBe(2);
   });
 
   it("labels the counter", () => {
-    const s = (words: number) => ({ words, chars: 0, charsNoSpaces: 0, lines: 0, readingMinutes: 0 });
+    const s = (words: number) => ({
+      words,
+      chars: 0,
+      charsNoSpaces: 0,
+      lines: 0,
+      readingMinutes: 0,
+    });
     expect(counterLabel(s(1234), null)).toBe("1,234 字");
     expect(counterLabel(s(1234), s(56))).toBe("選取 56 / 1,234 字");
   });
@@ -161,10 +200,14 @@ describe("NV-03 status bar counter", () => {
   it("shows the document count, debounces document edits and counts selections at once", () => {
     vi.useFakeTimers();
     const bar = setup("Hello world 你好");
-    const button = bar.querySelector<HTMLElement>('[data-testid="word-count"]')!;
+    const button = bar.querySelector<HTMLElement>(
+      '[data-testid="word-count"]',
+    )!;
     expect(button.textContent).toBe("4 字");
 
-    view!.dispatch({ changes: { from: view!.state.doc.length, insert: " more" } });
+    view!.dispatch({
+      changes: { from: view!.state.doc.length, insert: " more" },
+    });
     expect(button.textContent).toBe("4 字");
     vi.advanceTimersByTime(DOC_COUNT_DEBOUNCE_MS);
     expect(button.textContent).toBe("5 字");
@@ -178,9 +221,14 @@ describe("NV-03 status bar counter", () => {
   it("does not count during IME composition, catches up afterwards", () => {
     vi.useFakeTimers();
     const bar = setup("abc");
-    const button = bar.querySelector<HTMLElement>('[data-testid="word-count"]')!;
+    const button = bar.querySelector<HTMLElement>(
+      '[data-testid="word-count"]',
+    )!;
     view!.contentDOM.dispatchEvent(new CompositionEvent("compositionstart"));
-    view!.dispatch({ changes: { from: 3, insert: " 中文" }, userEvent: "input.type.compose" });
+    view!.dispatch({
+      changes: { from: 3, insert: " 中文" },
+      userEvent: "input.type.compose",
+    });
     vi.advanceTimersByTime(DOC_COUNT_DEBOUNCE_MS * 2);
     expect(button.textContent).toBe("1 字");
     view!.contentDOM.dispatchEvent(new CompositionEvent("compositionend"));
@@ -190,13 +238,25 @@ describe("NV-03 status bar counter", () => {
 
   it("popover lists the five statistics, for the selection when there is one", () => {
     const bar = setup("Hello world\n\n第二行");
-    const button = bar.querySelector<HTMLElement>('[data-testid="word-count"]')!;
+    const button = bar.querySelector<HTMLElement>(
+      '[data-testid="word-count"]',
+    )!;
     button.click();
-    const popover = bar.querySelector<HTMLElement>('[data-testid="word-count-popover"]')!;
+    const popover = bar.querySelector<HTMLElement>(
+      '[data-testid="word-count-popover"]',
+    )!;
     expect(popover.hidden).toBe(false);
     const rows = () =>
-      Array.from(popover.querySelectorAll("dt")).map((dt) => `${dt.textContent}=${dt.nextElementSibling?.textContent}`);
-    expect(rows()).toEqual(["字數=5", "字元=14", "字元（不含空白）=13", "行數=3", "閱讀時間=約 1 分鐘"]);
+      Array.from(popover.querySelectorAll("dt")).map(
+        (dt) => `${dt.textContent}=${dt.nextElementSibling?.textContent}`,
+      );
+    expect(rows()).toEqual([
+      "字數=5",
+      "字元=14",
+      "字元（不含空白）=13",
+      "行數=3",
+      "閱讀時間=約 1 分鐘",
+    ]);
     expect(popover.textContent).toContain("全文");
 
     view!.dispatch({ selection: { anchor: 0, head: 5 } });

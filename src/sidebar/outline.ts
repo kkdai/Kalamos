@@ -58,8 +58,7 @@ export function extractOutlineHeadings(state: EditorState): OutlineHeading[] {
 
       if (name.startsWith("ATXHeading")) {
         const textFrom = marks.length > 0 ? marks[0].to : from;
-        const textTo =
-          marks.length > 1 ? marks[marks.length - 1].from : to;
+        const textTo = marks.length > 1 ? marks[marks.length - 1].from : to;
         text = state.sliceDoc(textFrom, Math.max(textFrom, textTo)).trim();
       } else {
         // SetextHeading1 / SetextHeading2: text precedes the underline HeaderMark

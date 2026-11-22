@@ -45,11 +45,19 @@
 }
 
 .k-table-toolbar-btn:hover:not(:disabled) {
-  background-color: color-mix(in srgb, var(--k-accent, #5e7a4a) 14%, transparent);
+  background-color: color-mix(
+    in srgb,
+    var(--k-accent, #5e7a4a) 14%,
+    transparent
+  );
 }
 
 .k-table-toolbar-btn[aria-pressed="true"] {
-  background-color: color-mix(in srgb, var(--k-accent, #5e7a4a) 24%, transparent);
+  background-color: color-mix(
+    in srgb,
+    var(--k-accent, #5e7a4a) 24%,
+    transparent
+  );
   color: var(--k-accent, #5e7a4a);
 }
 
@@ -102,7 +110,11 @@
 
 .k-table-menu-item:hover:not(:disabled),
 .k-table-menu-item:focus-visible {
-  background-color: color-mix(in srgb, var(--k-accent, #5e7a4a) 16%, transparent);
+  background-color: color-mix(
+    in srgb,
+    var(--k-accent, #5e7a4a) 16%,
+    transparent
+  );
   outline: none;
 }
 
@@ -191,7 +203,11 @@
 
 .k-table-picker-cell.is-selected {
   border-color: var(--k-accent, #5e7a4a);
-  background-color: color-mix(in srgb, var(--k-accent, #5e7a4a) 22%, transparent);
+  background-color: color-mix(
+    in srgb,
+    var(--k-accent, #5e7a4a) 22%,
+    transparent
+  );
 }
 
 .k-table-picker-label {

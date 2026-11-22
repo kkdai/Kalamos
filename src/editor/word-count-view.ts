@@ -10,7 +10,12 @@ import "./word-count.css";
 
 import { StateEffect } from "@codemirror/state";
 import { EditorView, type ViewUpdate } from "@codemirror/view";
-import { countDocument, countSelection, selectionSize, type TextStats } from "./word-count";
+import {
+  countDocument,
+  countSelection,
+  selectionSize,
+  type TextStats,
+} from "./word-count";
 
 export const DOC_COUNT_DEBOUNCE_MS = 250;
 /** Selections up to this many characters are counted synchronously. */
@@ -35,7 +40,10 @@ export interface WordCounter {
 
 const fmt = (n: number): string => n.toLocaleString("en-US");
 
-export function counterLabel(doc: TextStats, selection: TextStats | null): string {
+export function counterLabel(
+  doc: TextStats,
+  selection: TextStats | null,
+): string {
   return selection
     ? `選取 ${fmt(selection.words)} / ${fmt(doc.words)} 字`
     : `${fmt(doc.words)} 字`;
@@ -47,7 +55,10 @@ export function statsRows(stats: TextStats): Array<[string, string]> {
     ["字元", fmt(stats.chars)],
     ["字元（不含空白）", fmt(stats.charsNoSpaces)],
     ["行數", fmt(stats.lines)],
-    ["閱讀時間", stats.readingMinutes > 0 ? `約 ${fmt(stats.readingMinutes)} 分鐘` : "—"],
+    [
+      "閱讀時間",
+      stats.readingMinutes > 0 ? `約 ${fmt(stats.readingMinutes)} 分鐘` : "—",
+    ],
   ];
 }
 
@@ -134,7 +145,8 @@ export function createWordCounter(options: WordCounterOptions): WordCounter {
   function onUpdate(update: ViewUpdate): void {
     if (destroyed) return;
     if (composing || update.view.composing) {
-      if (update.docChanged || update.selectionSet) pendingAfterComposition = true;
+      if (update.docChanged || update.selectionSet)
+        pendingAfterComposition = true;
       return;
     }
     if (update.docChanged) scheduleDoc();
@@ -156,7 +168,9 @@ export function createWordCounter(options: WordCounterOptions): WordCounter {
   view.contentDOM.addEventListener("compositionend", onCompositionEnd);
 
   view.dispatch({
-    effects: StateEffect.appendConfig.of(EditorView.updateListener.of(onUpdate)),
+    effects: StateEffect.appendConfig.of(
+      EditorView.updateListener.of(onUpdate),
+    ),
   });
 
   function togglePopover(open?: boolean): void {
@@ -205,7 +219,10 @@ export function createWordCounter(options: WordCounterOptions): WordCounter {
       destroyed = true;
       if (docTimer !== null) clearTimeout(docTimer);
       if (selTimer !== null) clearTimeout(selTimer);
-      view.contentDOM.removeEventListener("compositionstart", onCompositionStart);
+      view.contentDOM.removeEventListener(
+        "compositionstart",
+        onCompositionStart,
+      );
       view.contentDOM.removeEventListener("compositionend", onCompositionEnd);
       button.removeEventListener("click", onButtonClick);
       button.removeEventListener("mousedown", onButtonMouseDown);

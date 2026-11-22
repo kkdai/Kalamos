@@ -23,8 +23,8 @@ import type { EditorView } from "@codemirror/view";
 import {
   collectImageSpecs,
   effectiveImageRoot,
-  imageDocPathField,
   type ImageSpec,
+  imageDocPathField,
   resolveImageSrc,
 } from "./images";
 import { mapPosClamped } from "./positions";
@@ -46,7 +46,10 @@ export interface UploadTarget {
 }
 
 /** Destination range of a Markdown image: its URL node. */
-function markdownDestination(state: EditorState, spec: ImageSpec): { from: number; to: number } | null {
+function markdownDestination(
+  state: EditorState,
+  spec: ImageSpec,
+): { from: number; to: number } | null {
   let node = syntaxTree(state).resolveInner(spec.from + 1, 1);
   while (node.name !== "Image" && node.parent) node = node.parent;
   if (node.name !== "Image") return null;
@@ -55,7 +58,9 @@ function markdownDestination(state: EditorState, spec: ImageSpec): { from: numbe
 }
 
 /** Value range of the first `src` attribute of an `<img>` tag (first wins, as in HTML). */
-export function imgSrcValueRange(tag: string): { from: number; to: number } | null {
+export function imgSrcValueRange(
+  tag: string,
+): { from: number; to: number } | null {
   const re = /\ssrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/i;
   const m = re.exec(tag);
   if (!m) return null;
@@ -125,12 +130,18 @@ export function collectUploadTargets(state: EditorState): {
 
 /** A URL as a Markdown destination (no spaces / parentheses / angle brackets). */
 export function markdownDestinationFor(url: string): string {
-  return url.replace(/[ ()<>]/g, (ch) => `%${ch.charCodeAt(0).toString(16).toUpperCase().padStart(2, "0")}`);
+  return url.replace(
+    /[ ()<>]/g,
+    (ch) => `%${ch.charCodeAt(0).toString(16).toUpperCase().padStart(2, "0")}`,
+  );
 }
 
 /** A URL as an `<img src>` value (inside its existing quotes). */
 export function htmlAttributeFor(url: string): string {
-  return url.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  return url
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 // ---------------------------------------------------------------------------
@@ -140,13 +151,16 @@ export function htmlAttributeFor(url: string): string {
 const startTracking = StateEffect.define<number>();
 const stopTracking = StateEffect.define<number>();
 
-export const uploadTrackerField = StateField.define<ReadonlyMap<number, ChangeSet>>({
+export const uploadTrackerField = StateField.define<
+  ReadonlyMap<number, ChangeSet>
+>({
   create: () => new Map(),
   update(value, tr) {
     let next: Map<number, ChangeSet> | null = null;
     if (tr.docChanged && value.size > 0) {
       next = new Map();
-      for (const [id, changes] of value) next.set(id, changes.compose(tr.changes));
+      for (const [id, changes] of value)
+        next.set(id, changes.compose(tr.changes));
     }
     for (const e of tr.effects) {
       if (e.is(startTracking)) {
@@ -180,7 +194,8 @@ export function beginTracking(view: EditorView): number {
 /** Stop recording and return the changes made since `beginTracking`. */
 export function endTracking(view: EditorView, id: number): ChangeSet {
   const changes =
-    view.state.field(uploadTrackerField, false)?.get(id) ?? ChangeSet.empty(view.state.doc.length);
+    view.state.field(uploadTrackerField, false)?.get(id) ??
+    ChangeSet.empty(view.state.doc.length);
   view.dispatch({ effects: stopTracking.of(id) });
   return changes;
 }
@@ -190,11 +205,16 @@ export function endTracking(view: EditorView, id: number): ChangeSet {
 // ---------------------------------------------------------------------------
 
 /** Did `changes` modify anything strictly inside `[from, to]`? (Edits next to it are fine.) */
-export function changedInside(changes: ChangeSet, from: number, to: number): boolean {
+export function changedInside(
+  changes: ChangeSet,
+  from: number,
+  to: number,
+): boolean {
   let hit = false;
   changes.iterChangedRanges((fromA, toA) => {
     if (hit) return;
-    if (fromA === toA ? fromA > from && fromA < to : fromA < to && toA > from) hit = true;
+    if (fromA === toA ? fromA > from && fromA < to : fromA < to && toA > from)
+      hit = true;
   });
   return hit;
 }
@@ -284,9 +304,16 @@ function errorText(err: unknown): string {
   return String(err);
 }
 
-export async function uploadImagesInEditor(options: UploadFlowOptions): Promise<UploadFlowResult> {
+export async function uploadImagesInEditor(
+  options: UploadFlowOptions,
+): Promise<UploadFlowResult> {
   const { view, setStatus } = options;
-  const none: UploadFlowResult = { uploaded: 0, replaced: 0, skipped: 0, error: null };
+  const none: UploadFlowResult = {
+    uploaded: 0,
+    replaced: 0,
+    skipped: 0,
+    error: null,
+  };
   const uploader = options.uploader?.trim();
   if (!uploader) {
     setStatus(options.notConfiguredMessage, true);
@@ -306,7 +333,10 @@ export async function uploadImagesInEditor(options: UploadFlowOptions): Promise<
   const urls = new Map<string, string>();
   try {
     for (const [i, path] of paths.entries()) {
-      setStatus(`上傳中… (${i + 1}/${paths.length})：${basename(path)}（${tool}）`, false);
+      setStatus(
+        `上傳中… (${i + 1}/${paths.length})：${basename(path)}（${tool}）`,
+        false,
+      );
       const result = await options.upload([path]);
       const url = result.urls[0];
       if (result.urls.length !== 1 || !url) {
@@ -321,7 +351,12 @@ export async function uploadImagesInEditor(options: UploadFlowOptions): Promise<
     return { ...none, error: message };
   }
   const changes = endTracking(view, trackingId);
-  const { replaced, skipped } = replaceUploadedImages(view, targets, urls, changes);
+  const { replaced, skipped } = replaceUploadedImages(
+    view,
+    targets,
+    urls,
+    changes,
+  );
   setStatus(
     skipped > 0
       ? `已上傳 ${paths.length} 張圖片；${skipped} 處引用在上傳期間被修改，未替換`

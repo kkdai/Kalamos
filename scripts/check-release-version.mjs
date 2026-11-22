@@ -36,7 +36,9 @@ export function extractCargoVersion(tomlContent) {
  */
 export function normalizeTag(rawTag) {
   if (rawTag == null) return "";
-  return String(rawTag).trim().replace(/^refs\/tags\//, "");
+  return String(rawTag)
+    .trim()
+    .replace(/^refs\/tags\//, "");
 }
 
 /**

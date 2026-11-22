@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+  type FileMeta,
   getMockAllowedAssetDirs,
   getMockPandocExports,
   MOCK_PANDOC_IMPORT_MARKDOWN,
@@ -10,17 +11,16 @@ import {
   setMockPandocExportHandler,
   setMockPandocImportHandler,
   setMockPandocVersion,
-  type FileMeta,
 } from "../ipc";
 import { createKalamosApp, type KalamosApp } from "../main";
 import { pickExportFormat } from "./format-picker";
 import {
   defaultExportPath,
-  ensureExportExtension,
   EXPORTING_MESSAGE,
+  ensureExportExtension,
   exportedMessage,
-  importedMessage,
   IMPORTING_MESSAGE,
+  importedMessage,
   isImportablePath,
   PANDOC_FORMATS,
   PANDOC_MISSING_MESSAGE,
@@ -44,11 +44,18 @@ async function until(check: () => boolean): Promise<void> {
 }
 
 function picker(): HTMLElement | null {
-  return document.querySelector<HTMLElement>("[data-testid=export-format-picker]");
+  return document.querySelector<HTMLElement>(
+    "[data-testid=export-format-picker]",
+  );
 }
 
-function press(code: string, key = code.replace("Key", "").toLowerCase()): void {
-  window.dispatchEvent(new KeyboardEvent("keydown", { key, code, metaKey: true, altKey: true }));
+function press(
+  code: string,
+  key = code.replace("Key", "").toLowerCase(),
+): void {
+  window.dispatchEvent(
+    new KeyboardEvent("keydown", { key, code, metaKey: true, altKey: true }),
+  );
 }
 
 describe("EX-02 helpers", () => {
@@ -56,13 +63,25 @@ describe("EX-02 helpers", () => {
     expect(defaultExportPath("/tmp/kalamos-test/notes/報告.md", "docx")).toBe(
       "/tmp/kalamos-test/notes/報告.docx",
     );
-    expect(defaultExportPath("/tmp/kalamos-test/a.markdown", "latex")).toBe("/tmp/kalamos-test/a.tex");
-    expect(defaultExportPath("/tmp/kalamos-test/a.md", "mediawiki")).toBe("/tmp/kalamos-test/a.wiki");
+    expect(defaultExportPath("/tmp/kalamos-test/a.markdown", "latex")).toBe(
+      "/tmp/kalamos-test/a.tex",
+    );
+    expect(defaultExportPath("/tmp/kalamos-test/a.md", "mediawiki")).toBe(
+      "/tmp/kalamos-test/a.wiki",
+    );
     expect(defaultExportPath(null, "epub")).toBe("未命名.epub");
-    expect(ensureExportExtension("/tmp/kalamos-test/out", "odt")).toBe("/tmp/kalamos-test/out.odt");
-    expect(ensureExportExtension("/tmp/kalamos-test/out.ODT", "odt")).toBe("/tmp/kalamos-test/out.ODT");
-    expect(exportedMessage("docx", "/tmp/kalamos-test/a.docx")).toBe("已匯出 DOCX：/tmp/kalamos-test/a.docx");
-    expect(importedMessage("/tmp/kalamos-test/報告.docx")).toBe("已匯入：報告.docx");
+    expect(ensureExportExtension("/tmp/kalamos-test/out", "odt")).toBe(
+      "/tmp/kalamos-test/out.odt",
+    );
+    expect(ensureExportExtension("/tmp/kalamos-test/out.ODT", "odt")).toBe(
+      "/tmp/kalamos-test/out.ODT",
+    );
+    expect(exportedMessage("docx", "/tmp/kalamos-test/a.docx")).toBe(
+      "已匯出 DOCX：/tmp/kalamos-test/a.docx",
+    );
+    expect(importedMessage("/tmp/kalamos-test/報告.docx")).toBe(
+      "已匯入：報告.docx",
+    );
     expect(isImportablePath("/tmp/kalamos-test/a.DOCX")).toBe(true);
     expect(isImportablePath("/tmp/kalamos-test/a.pdf")).toBe(false);
     expect(isImportablePath("/tmp/kalamos.test/noext")).toBe(false);
@@ -89,15 +108,23 @@ describe("EX-02 helpers", () => {
       "",
       "- 清單",
     ].join("\n");
-    const out = prepareMarkdownForPandoc(md, "/tmp/kalamos-test/notes/doc.md", "/tmp/kalamos-test/blog");
+    const out = prepareMarkdownForPandoc(
+      md,
+      "/tmp/kalamos-test/notes/doc.md",
+      "/tmp/kalamos-test/blog",
+    );
     expect(out.toc).toBe(true);
     expect(out.imageRoot).toBe("/tmp/kalamos-test/blog");
     // The [TOC] paragraph is removed; the one inside the code block stays.
     expect(out.markdown.split("[TOC]").length - 1).toBe(1);
-    expect(out.markdown).toContain("![貓](</tmp/kalamos-test/notes/assets/my cat.png>)");
+    expect(out.markdown).toContain(
+      "![貓](</tmp/kalamos-test/notes/assets/my cat.png>)",
+    );
     expect(out.markdown).toContain("![根](/tmp/kalamos-test/blog/img/a.png)");
     expect(out.markdown).toContain("![遠端](https://example.com/x.png)");
-    expect(out.markdown).toContain("![B\\[1\\]](/tmp/kalamos-test/notes/pics/b.png){width=120px}");
+    expect(out.markdown).toContain(
+      "![B\\[1\\]](/tmp/kalamos-test/notes/pics/b.png){width=120px}",
+    );
     expect(out.markdown).not.toContain("onerror");
     // Code blocks are untouched; front matter and other content kept.
     expect(out.markdown).toContain("```md\n[TOC]\n![](/img/in-code.png)\n```");
@@ -107,7 +134,11 @@ describe("EX-02 helpers", () => {
 
   it("without a document path relative images stay as written; no [TOC] → toc false", () => {
     const out = prepareMarkdownForPandoc("![a](a.png)\n", null, null);
-    expect(out).toEqual({ markdown: "![a](a.png)\n", toc: false, imageRoot: null });
+    expect(out).toEqual({
+      markdown: "![a](a.png)\n",
+      toc: false,
+      imageRoot: null,
+    });
   });
 });
 
@@ -116,8 +147,12 @@ describe("EX-02 format picker", () => {
 
   it("lists the five formats and resolves with the clicked one", async () => {
     const choice = pickExportFormat();
-    const buttons = Array.from(picker()!.querySelectorAll<HTMLButtonElement>(".k-format-option"));
-    expect(buttons.map((b) => b.dataset.format)).toEqual(PANDOC_FORMATS.map((f) => f.id));
+    const buttons = Array.from(
+      picker()!.querySelectorAll<HTMLButtonElement>(".k-format-option"),
+    );
+    expect(buttons.map((b) => b.dataset.format)).toEqual(
+      PANDOC_FORMATS.map((f) => f.id),
+    );
     expect(buttons.map((b) => b.firstElementChild?.textContent)).toEqual([
       "DOCX",
       "ODT",
@@ -137,7 +172,9 @@ describe("EX-02 format picker", () => {
     expect(await choice).toBeNull();
 
     choice = pickExportFormat();
-    document.querySelector<HTMLButtonElement>("[data-testid=export-format-cancel]")!.click();
+    document
+      .querySelector<HTMLButtonElement>("[data-testid=export-format-cancel]")!
+      .click();
     expect(await choice).toBeNull();
 
     choice = pickExportFormat();
@@ -164,7 +201,10 @@ describe("EX-02 / EX-03 in the app", () => {
   });
 
   it("Cmd+Opt+E: format picker → save dialog named after the doc → 匯出中… → 已匯出", async () => {
-    seedMockFile("/tmp/kalamos-test/notes/Report.md", "# Title\n\n- a\n\n![x](img/x.png)\n");
+    seedMockFile(
+      "/tmp/kalamos-test/notes/Report.md",
+      "# Title\n\n- a\n\n![x](img/x.png)\n",
+    );
     app = createKalamosApp(document);
     await app.init();
     await app.openDocument("/tmp/kalamos-test/notes/Report.md");
@@ -183,7 +223,9 @@ describe("EX-02 / EX-03 in the app", () => {
           expect(req.format).toBe("odt");
           expect(req.outPath).toBe("/tmp/kalamos-test/notes/out.odt");
           expect(req.docPath).toBe("/tmp/kalamos-test/notes/Report.md");
-          expect(req.markdown).toContain("![x](/tmp/kalamos-test/notes/img/x.png)");
+          expect(req.markdown).toContain(
+            "![x](/tmp/kalamos-test/notes/img/x.png)",
+          );
           release = resolve;
         }),
     );
@@ -196,7 +238,9 @@ describe("EX-02 / EX-03 in the app", () => {
     expect(app.isExportingPandoc()).toBe(true);
     release({ path: "/tmp/kalamos-test/notes/out.odt", mtimeMs: 1, size: 10 });
     await until(() => !app!.isExportingPandoc());
-    expect(app.getStatusText()).toBe("已匯出 ODT：/tmp/kalamos-test/notes/out.odt");
+    expect(app.getStatusText()).toBe(
+      "已匯出 ODT：/tmp/kalamos-test/notes/out.odt",
+    );
     // The document text is untouched.
     expect(app.editor.getContent()).toBe("# Title\n\n- a\n\n![x](img/x.png)\n");
   });
@@ -240,10 +284,17 @@ describe("EX-02 / EX-03 in the app", () => {
     expect(await pending).toBe(false);
 
     setMockPandocExportHandler(() => {
-      throw { kind: "Io", message: "Pandoc 執行失敗（exit 83）：Could not find image" };
+      throw {
+        kind: "Io",
+        message: "Pandoc 執行失敗（exit 83）：Could not find image",
+      };
     });
-    expect(await app.exportDocumentAs("latex", "/tmp/kalamos-test/a.tex")).toBe(false);
-    expect(app.getStatusText()).toBe("匯出失敗：Pandoc 執行失敗（exit 83）：Could not find image");
+    expect(await app.exportDocumentAs("latex", "/tmp/kalamos-test/a.tex")).toBe(
+      false,
+    );
+    expect(app.getStatusText()).toBe(
+      "匯出失敗：Pandoc 執行失敗（exit 83）：Could not find image",
+    );
   });
 
   it("Cmd+Opt+I imports into a new untitled, dirty document", async () => {
@@ -272,7 +323,10 @@ describe("EX-02 / EX-03 in the app", () => {
         new Promise((resolve) => {
           expect(path).toBe("/tmp/kalamos-test/a.odt");
           release = () =>
-            resolve({ markdown: "![](/tmp/kalamos-test/media/image1.png)\n", mediaDir: "/tmp/kalamos-test/media" });
+            resolve({
+              markdown: "![](/tmp/kalamos-test/media/image1.png)\n",
+              mediaDir: "/tmp/kalamos-test/media",
+            });
         }),
     );
     const done = app.importDocument("/tmp/kalamos-test/a.odt");
@@ -300,9 +354,13 @@ describe("EX-02 / EX-03 in the app", () => {
     app.editor.setContent("目前文件");
     setMockPandocVersion("2.14.2");
     expect(await app.importDocument("/tmp/kalamos-test/a.docx")).toBe(false);
-    expect(app.getStatusText()).toBe("匯入失敗：Pandoc 版本過舊，匯入需要 2.15 以上");
+    expect(app.getStatusText()).toBe(
+      "匯入失敗：Pandoc 版本過舊，匯入需要 2.15 以上",
+    );
     expect(app.editor.getContent()).toBe("目前文件");
-    expect(await app.exportDocumentAs("docx", "/tmp/kalamos-test/a.docx")).toBe(true);
+    expect(await app.exportDocumentAs("docx", "/tmp/kalamos-test/a.docx")).toBe(
+      true,
+    );
     setMockPandocVersion("2.15");
     expect(await app.importDocument("/tmp/kalamos-test/a.docx")).toBe(true);
   });

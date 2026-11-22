@@ -109,7 +109,11 @@ export function createPreferences(
     return node;
   }
 
-  function row(label: string, control: HTMLElement, hint?: string): HTMLElement {
+  function row(
+    label: string,
+    control: HTMLElement,
+    hint?: string,
+  ): HTMLElement {
     const wrap = el("div", "k-pref-row");
     const labelEl = el("label", "k-pref-label", label);
     if (control.id) labelEl.htmlFor = control.id;
@@ -121,7 +125,13 @@ export function createPreferences(
   }
 
   function checkbox(
-    key: "autoSave" | "autoPairBrackets" | "autoPairMarkdown" | "codeLineNumbers" | "mathAutoNumber" | "uploadOnInsert",
+    key:
+      | "autoSave"
+      | "autoPairBrackets"
+      | "autoPairMarkdown"
+      | "codeLineNumbers"
+      | "mathAutoNumber"
+      | "uploadOnInsert",
     text: string,
     testId: string,
   ): HTMLElement {
@@ -187,7 +197,9 @@ export function createPreferences(
       select.append(opt);
     }
     select.addEventListener("change", () => {
-      void host.applyChange({ startupBehavior: select.value as StartupBehavior });
+      void host.applyChange({
+        startupBehavior: select.value as StartupBehavior,
+      });
     });
     syncers.push((v) => {
       select.value = v.startupBehavior;
@@ -196,12 +208,20 @@ export function createPreferences(
       row(
         "啟動時",
         select,
-        IS_WINDOWS ? "從檔案總管開啟的檔案不受影響。" : "從 Finder 開啟的檔案不受影響。",
+        IS_WINDOWS
+          ? "從檔案總管開啟的檔案不受影響。"
+          : "從 Finder 開啟的檔案不受影響。",
       ),
       row(
         "自動儲存",
-        checkbox("autoSave", "停止輸入 1 秒後自動儲存已命名的文件", "pref-auto-save"),
-        shortcutLabel("關閉後只有 Cmd+S 會寫入檔案；切換或關閉文件時仍會儲存，未命名文件仍會寫入救回檔。"),
+        checkbox(
+          "autoSave",
+          "停止輸入 1 秒後自動儲存已命名的文件",
+          "pref-auto-save",
+        ),
+        shortcutLabel(
+          "關閉後只有 Cmd+S 會寫入檔案；切換或關閉文件時仍會儲存，未命名文件仍會寫入救回檔。",
+        ),
       ),
     );
     return panel;
@@ -210,7 +230,17 @@ export function createPreferences(
   function buildEditor(): HTMLElement {
     const panel = el("div", "k-pref-panel");
     panel.append(
-      row("字體大小", slider("fontSize", FONT_SIZE_MIN, FONT_SIZE_MAX, 1, clampFontSize, "pref-font-size")),
+      row(
+        "字體大小",
+        slider(
+          "fontSize",
+          FONT_SIZE_MIN,
+          FONT_SIZE_MAX,
+          1,
+          clampFontSize,
+          "pref-font-size",
+        ),
+      ),
       row(
         "內容寬度",
         slider(
@@ -225,13 +255,29 @@ export function createPreferences(
     );
     const pairs = el("div", "k-pref-stack");
     pairs.append(
-      checkbox("autoPairBrackets", shortcutLabel("自動配對括號與引號（Cmd+Opt+P）"), "pref-auto-pair-brackets"),
-      checkbox("autoPairMarkdown", shortcutLabel("自動配對 Markdown 符號 * _ ` ~（Cmd+Opt+Shift+P）"), "pref-auto-pair-markdown"),
+      checkbox(
+        "autoPairBrackets",
+        shortcutLabel("自動配對括號與引號（Cmd+Opt+P）"),
+        "pref-auto-pair-brackets",
+      ),
+      checkbox(
+        "autoPairMarkdown",
+        shortcutLabel("自動配對 Markdown 符號 * _ ` ~（Cmd+Opt+Shift+P）"),
+        "pref-auto-pair-markdown",
+      ),
     );
     const blocks = el("div", "k-pref-stack");
     blocks.append(
-      checkbox("codeLineNumbers", shortcutLabel("程式碼區塊顯示行號（Cmd+Opt+L）"), "pref-code-line-numbers"),
-      checkbox("mathAutoNumber", shortcutLabel("公式自動編號（Cmd+Opt+N）"), "pref-math-auto-number"),
+      checkbox(
+        "codeLineNumbers",
+        shortcutLabel("程式碼區塊顯示行號（Cmd+Opt+L）"),
+        "pref-code-line-numbers",
+      ),
+      checkbox(
+        "mathAutoNumber",
+        shortcutLabel("公式自動編號（Cmd+Opt+N）"),
+        "pref-math-auto-number",
+      ),
     );
     panel.append(row("自動配對", pairs), row("區塊", blocks));
     return panel;
@@ -262,7 +308,11 @@ export function createPreferences(
     });
     panel.append(
       row("主題", select, shortcutLabel("也可以用 Cmd+Shift+T 循環切換。")),
-      row("自訂主題", openBtn, "把 .css 檔放進這個資料夾，重新開啟偏好設定或主題選單即可選用。"),
+      row(
+        "自訂主題",
+        openBtn,
+        "把 .css 檔放進這個資料夾，重新開啟偏好設定或主題選單即可選用。",
+      ),
     );
     return panel;
   }
@@ -285,7 +335,9 @@ export function createPreferences(
       void host.clearImageRootDir().then(sync);
     });
     syncers.push((v) => {
-      rootPath.textContent = v.imageRootDir ? toNativePath(v.imageRootDir) : "未設定";
+      rootPath.textContent = v.imageRootDir
+        ? toNativePath(v.imageRootDir)
+        : "未設定";
       rootPath.dataset.empty = v.imageRootDir ? "false" : "true";
       clear.disabled = !v.imageRootDir;
     });
@@ -300,13 +352,24 @@ export function createPreferences(
     });
 
     panel.append(
-      row("圖片根目錄", rootWrap, shortcutLabel("以 / 開頭的圖片路徑會相對於這個資料夾（Cmd+Opt+R）。")),
+      row(
+        "圖片根目錄",
+        rootWrap,
+        shortcutLabel("以 / 開頭的圖片路徑會相對於這個資料夾（Cmd+Opt+R）。"),
+      ),
       row(
         "上傳程式",
         uploader,
         "上傳程式只能在 settings.json 的 uploadCommand / uploadArgs 設定，避免網頁內容執行本機程式。",
       ),
-      row("上傳時機", checkbox("uploadOnInsert", "貼上或拖入圖片後立即上傳", "pref-upload-on-insert")),
+      row(
+        "上傳時機",
+        checkbox(
+          "uploadOnInsert",
+          "貼上或拖入圖片後立即上傳",
+          "pref-upload-on-insert",
+        ),
+      ),
     );
     return panel;
   }
@@ -389,11 +452,18 @@ export function createPreferences(
       return;
     }
     const target = event.target as HTMLElement | null;
-    if (target?.getAttribute("role") === "tab" && (event.key === "ArrowLeft" || event.key === "ArrowRight")) {
+    if (
+      target?.getAttribute("role") === "tab" &&
+      (event.key === "ArrowLeft" || event.key === "ArrowRight")
+    ) {
       event.preventDefault();
       const ids = PREFERENCES_TABS.map((t) => t.id);
       const idx = ids.indexOf(currentTab);
-      const next = ids[(idx + (event.key === "ArrowRight" ? 1 : -1) + ids.length) % ids.length];
+      const next =
+        ids[
+          (idx + (event.key === "ArrowRight" ? 1 : -1) + ids.length) %
+            ids.length
+        ];
       selectTab(next);
       tabButtons.get(next)?.focus();
     }

@@ -9,22 +9,34 @@
   color-scheme: light;
 
   /* PRD §12.3 Palette */
-  --k-bg: #F5EFE0;
-  --k-surface: #EDE4CF;
-  --k-text: #2B2622;
-  --k-text-muted: #6E6355;
-  --k-accent: #5E7A4A;
-  --k-link: #A4552F;
-  --k-divider: #D9CDB3;
+  --k-bg: #f5efe0;
+  --k-surface: #ede4cf;
+  --k-text: #2b2622;
+  --k-text-muted: #6e6355;
+  --k-accent: #5e7a4a;
+  --k-link: #a4552f;
+  --k-divider: #d9cdb3;
 
   /* Derived semi-transparent selection from --k-link (#A4552F) */
   --k-selection-bg: rgba(164, 85, 47, 0.22);
 
   /* #81 tab bar */
   --k-tab-track-bg: var(--k-surface);
-  --k-tab-track-border: color-mix(in srgb, var(--k-divider) 60%, var(--k-surface));
+  --k-tab-track-border: color-mix(
+    in srgb,
+    var(--k-divider) 60%,
+    var(--k-surface)
+  );
   --k-tab-active-bg: color-mix(in srgb, var(--k-bg) 45%, #fff);
   --k-tab-active-shadow: 0 1px 2px rgba(43, 38, 34, 0.12);
-  --k-tab-inactive-text: color-mix(in srgb, var(--k-text-muted) 80%, var(--k-surface));
-  --k-tab-close-hover-bg: color-mix(in srgb, var(--k-text-muted) 16%, transparent);
+  --k-tab-inactive-text: color-mix(
+    in srgb,
+    var(--k-text-muted) 80%,
+    var(--k-surface)
+  );
+  --k-tab-close-hover-bg: color-mix(
+    in srgb,
+    var(--k-text-muted) 16%,
+    transparent
+  );
 }

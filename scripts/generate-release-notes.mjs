@@ -82,8 +82,7 @@ export function formatReleaseNotes({
     files.find((f) => /-setup\.exe$/i.test(f)) ||
     `Kalamos_${version}_x64-setup.exe`;
   const msi =
-    files.find((f) => /\.msi$/i.test(f)) ||
-    `Kalamos_${version}_x64_en-US.msi`;
+    files.find((f) => /\.msi$/i.test(f)) || `Kalamos_${version}_x64_en-US.msi`;
 
   const changelogSection = extractChangelogSection(changelogText, version);
   const summarySection = changelogSection || DEFAULT_SUMMARY_PLACEHOLDER;

@@ -379,16 +379,22 @@ mod tests {
 
     #[test]
     fn too_broad_folders_are_rejected() {
-        let home = Path::new("/Users/me");
+        let home = Path::new("/tmp/kalamos-test/home");
         assert!(is_too_broad(Path::new("/"), Some(home)));
-        assert!(is_too_broad(Path::new("/Users"), Some(home)));
-        assert!(is_too_broad(Path::new("/Users/me"), Some(home)));
-        assert!(!is_too_broad(Path::new("/Users/me/blog"), Some(home)));
+        assert!(is_too_broad(Path::new("/tmp/kalamos-test"), Some(home)));
+        assert!(is_too_broad(Path::new("/tmp/kalamos-test/home"), Some(home)));
+        assert!(!is_too_broad(
+            Path::new("/tmp/kalamos-test/home/blog"),
+            Some(home)
+        ));
         assert!(!is_too_broad(Path::new("/tmp/x"), Some(home)));
-        assert!(!is_too_broad(Path::new("/Users/other"), Some(home)));
+        assert!(!is_too_broad(
+            Path::new("/tmp/kalamos-test/other"),
+            Some(home)
+        ));
         // Without a known home only the filesystem root is refused.
         assert!(is_too_broad(Path::new("/"), None));
-        assert!(!is_too_broad(Path::new("/Users"), None));
+        assert!(!is_too_broad(Path::new("/tmp/kalamos-test"), None));
     }
 
     #[test]

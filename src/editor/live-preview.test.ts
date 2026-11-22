@@ -243,7 +243,9 @@ describe("Live Preview (ED-01), Source Mode (ED-02), Shortcuts (ED-03) & IME", (
       { from: 4, to: 8, className: "k-strong" },
       { from: 8, to: 10, className: "k-mark-hidden" },
     ]);
-    expect(app.editor.view.contentDOM.querySelector(".k-strong")?.textContent).toBe("「粗體」");
+    expect(
+      app.editor.view.contentDOM.querySelector(".k-strong")?.textContent,
+    ).toBe("「粗體」");
     // Parse/render only: the text is untouched.
     expect(app.editor.getContent()).toBe(doc);
   });
@@ -260,7 +262,9 @@ describe("Live Preview (ED-01), Source Mode (ED-02), Shortcuts (ED-03) & IME", (
       { from: 4, to: 7, className: "k-strong" },
       { from: 7, to: 9, className: "k-mark-hidden" },
     ]);
-    expect(app.editor.view.contentDOM.querySelector(".k-strong")?.textContent).toBe("粗體。");
+    expect(
+      app.editor.view.contentDOM.querySelector(".k-strong")?.textContent,
+    ).toBe("粗體。");
     expect(app.editor.getContent()).toBe(doc);
   });
 
@@ -357,7 +361,11 @@ describe("Live Preview (ED-01), Source Mode (ED-02), Shortcuts (ED-03) & IME", (
     // 1. Normal click (without metaKey/ctrlKey) on HTTPS link -> does not open
     app.editor.setCursor(doc.indexOf("HTTPS") + 1);
     view.contentDOM.dispatchEvent(
-      new MouseEvent("click", { bubbles: true, metaKey: false, ctrlKey: false }),
+      new MouseEvent("click", {
+        bubbles: true,
+        metaKey: false,
+        ctrlKey: false,
+      }),
     );
     expect(openSpy).not.toHaveBeenCalled();
 
@@ -403,7 +411,9 @@ describe("Live Preview (ED-01), Source Mode (ED-02), Shortcuts (ED-03) & IME", (
     app.editor.setCursor(view.state.doc.length);
 
     // Start IME composition
-    view.contentDOM.dispatchEvent(new Event("compositionstart", { bubbles: true }));
+    view.contentDOM.dispatchEvent(
+      new Event("compositionstart", { bubbles: true }),
+    );
 
     // Insert markdown syntax and move cursor away while composing
     view.dispatch({
@@ -415,10 +425,14 @@ describe("Live Preview (ED-01), Source Mode (ED-02), Shortcuts (ED-03) & IME", (
     expect(view.contentDOM.querySelector(".k-strong")).toBeNull();
 
     // End IME composition
-    view.contentDOM.dispatchEvent(new Event("compositionend", { bubbles: true }));
+    view.contentDOM.dispatchEvent(
+      new Event("compositionend", { bubbles: true }),
+    );
     await Promise.resolve();
 
-    expect(view.contentDOM.querySelector(".k-strong")?.textContent).toBe("組字中");
+    expect(view.contentDOM.querySelector(".k-strong")?.textContent).toBe(
+      "組字中",
+    );
   });
 
   it("toggles Source Mode via Cmd+/ preserving content & cursor and saving settings.sourceMode", async () => {
@@ -445,7 +459,9 @@ describe("Live Preview (ED-01), Source Mode (ED-02), Shortcuts (ED-03) & IME", (
     expect(app.editor.getContent()).toBe(doc);
     expect(app.editor.view.state.selection.main.head).toBe(cursorPos);
     expect(app.editor.view.contentDOM.querySelector(".k-strong")).toBeNull();
-    expect(app.editor.view.contentDOM.querySelector(".k-mark-hidden")).toBeNull();
+    expect(
+      app.editor.view.contentDOM.querySelector(".k-mark-hidden"),
+    ).toBeNull();
     expect((await getSettings()).sourceMode).toBe(true);
 
     // Press Cmd+/ again to return to live preview

@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 import { boot, getDoc, line, nextFrames, setDoc } from "./helpers";
 
 /**
@@ -22,12 +22,15 @@ async function hiddenMarkWidths(page: Page, lineNo: number): Promise<number[]> {
 async function visibleText(page: Page, lineNo: number): Promise<string> {
   return line(page, lineNo).evaluate((el) => {
     const clone = el.cloneNode(true) as HTMLElement;
-    for (const hidden of Array.from(clone.querySelectorAll(".k-mark-hidden"))) hidden.remove();
+    for (const hidden of Array.from(clone.querySelectorAll(".k-mark-hidden")))
+      hidden.remove();
     return clone.textContent ?? "";
   });
 }
 
-test("#49 AC: `- ` becomes a bullet at once and stays one while typing", async ({ page }) => {
+test("#49 AC: `- ` becomes a bullet at once and stays one while typing", async ({
+  page,
+}) => {
   await page.keyboard.type("- ");
   await expect(line(page, 1).locator(".k-bullet-marker")).toHaveCount(1);
   await page.keyboard.type("item");
@@ -40,7 +43,9 @@ test("#49 AC: `- ` becomes a bullet at once and stays one while typing", async (
   expect(await visibleText(page, 1)).toBe("- item");
 });
 
-test("#49 AC: ordered, task, heading and quote render while typing", async ({ page }) => {
+test("#49 AC: ordered, task, heading and quote render while typing", async ({
+  page,
+}) => {
   await page.keyboard.type("1. first");
   await expect(line(page, 1).locator(".k-list-marker")).toHaveText("1.");
   await expect(line(page, 1).locator(".k-mark")).toHaveCount(0);
@@ -48,7 +53,9 @@ test("#49 AC: ordered, task, heading and quote render while typing", async ({ pa
   await page.keyboard.press("Enter");
   await page.keyboard.press("Enter");
   await page.keyboard.type("- [ ] task");
-  await expect(page.locator(".cm-content input.k-task-checkbox")).toHaveCount(1);
+  await expect(page.locator(".cm-content input.k-task-checkbox")).toHaveCount(
+    1,
+  );
   // Checkbox (an <input>, no text) + the separating space + text; no `- [ ]`.
   expect(await visibleText(page, 3)).toBe(" task");
 
@@ -64,10 +71,14 @@ test("#49 AC: ordered, task, heading and quote render while typing", async ({ pa
   await expect(line(page, 6)).toHaveClass(/k-quote-line/);
   expect(await visibleText(page, 6)).toBe("quote");
 
-  expect(await getDoc(page)).toBe("1. first\n\n- [ ] task\n\n## heading\n> quote");
+  expect(await getDoc(page)).toBe(
+    "1. first\n\n- [ ] task\n\n## heading\n> quote",
+  );
 });
 
-test("#49 AC: Enter on an empty item ends the list with a blank line", async ({ page }) => {
+test("#49 AC: Enter on an empty item ends the list with a blank line", async ({
+  page,
+}) => {
   await page.keyboard.type("- item one");
   await page.keyboard.press("Enter");
   await page.keyboard.type("item two");
@@ -79,7 +90,9 @@ test("#49 AC: Enter on an empty item ends the list with a blank line", async ({ 
   await expect(line(page, 4).locator(".k-bullet-marker")).toHaveCount(0);
 });
 
-test("#49 AC: Enter on an empty quote line leaves the quote", async ({ page }) => {
+test("#49 AC: Enter on an empty quote line leaves the quote", async ({
+  page,
+}) => {
   await page.keyboard.type("> quote");
   await page.keyboard.press("Enter");
   await page.keyboard.press("Enter");
@@ -88,7 +101,9 @@ test("#49 AC: Enter on an empty quote line leaves the quote", async ({ page }) =
   await expect(line(page, 3)).not.toHaveClass(/k-quote-line/);
 });
 
-test("#49 AC: ordered / task / nested lists exit level by level", async ({ page }) => {
+test("#49 AC: ordered / task / nested lists exit level by level", async ({
+  page,
+}) => {
   await page.keyboard.type("1. one");
   await page.keyboard.press("Enter");
   await page.keyboard.type("two");
@@ -110,7 +125,9 @@ test("#49 AC: ordered / task / nested lists exit level by level", async ({ page 
   expect(await getDoc(page)).toBe("- a\n  - b\n\nafter");
 });
 
-test("#49 AC: Backspace right after the marker makes a paragraph", async ({ page }) => {
+test("#49 AC: Backspace right after the marker makes a paragraph", async ({
+  page,
+}) => {
   await page.keyboard.type("- item");
   for (let i = 0; i < 4; i++) await page.keyboard.press("ArrowLeft");
   await page.keyboard.press("Backspace");
@@ -118,12 +135,18 @@ test("#49 AC: Backspace right after the marker makes a paragraph", async ({ page
   await expect(line(page, 1).locator(".k-bullet-marker")).toHaveCount(0);
 });
 
-test("#49 AC: the bullet does not flicker during IME composition", async ({ page }) => {
+test("#49 AC: the bullet does not flicker during IME composition", async ({
+  page,
+}) => {
   await page.keyboard.type("- ");
   await expect(line(page, 1).locator(".k-bullet-marker")).toHaveCount(1);
   const cdp = await page.context().newCDPSession(page);
   for (const step of ["z", "zh", "zho", "中"]) {
-    await cdp.send("Input.imeSetComposition", { text: step, selectionStart: step.length, selectionEnd: step.length });
+    await cdp.send("Input.imeSetComposition", {
+      text: step,
+      selectionStart: step.length,
+      selectionEnd: step.length,
+    });
     await nextFrames(page);
     await expect(line(page, 1).locator(".k-bullet-marker")).toHaveCount(1);
   }

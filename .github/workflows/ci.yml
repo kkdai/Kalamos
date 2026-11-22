@@ -41,6 +41,9 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Biome format and lint check
+        run: npx biome ci
+
       - name: Check release manifest versions
         run: node scripts/check-release-version.mjs
 

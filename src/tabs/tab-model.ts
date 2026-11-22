@@ -2,7 +2,11 @@
  * #81 A: pure helpers for the document tabs (naming, collision labels,
  * keyboard cycling, which tab becomes active after a close, reordering).
  */
-import { IS_WINDOWS, isMarkdownFilePath, MARKDOWN_EXTENSIONS } from "../platform";
+import {
+  IS_WINDOWS,
+  isMarkdownFilePath,
+  MARKDOWN_EXTENSIONS,
+} from "../platform";
 
 export { MARKDOWN_EXTENSIONS };
 
@@ -71,9 +75,12 @@ export function tabLabels(
       for (const tab of group) labels.set(tab.id, name);
       continue;
     }
-    const parents = new Map(group.map((t) => [t.id, splitPath(t.path!).slice(0, -1)]));
+    const parents = new Map(
+      group.map((t) => [t.id, splitPath(t.path!).slice(0, -1)]),
+    );
     const maxDepth = Math.max(...[...parents.values()].map((p) => p.length));
-    const suffix = (dirs: string[], depth: number) => dirs.slice(Math.max(0, dirs.length - depth)).join(sep);
+    const suffix = (dirs: string[], depth: number) =>
+      dirs.slice(Math.max(0, dirs.length - depth)).join(sep);
     for (const tab of group) {
       const dirs = parents.get(tab.id)!;
       let depth = 1;
@@ -82,7 +89,8 @@ export function tabLabels(
         depth < maxDepth &&
         group.some(
           (other) =>
-            other.path !== tab.path && suffix(parents.get(other.id)!, depth) === suffix(dirs, depth),
+            other.path !== tab.path &&
+            suffix(parents.get(other.id)!, depth) === suffix(dirs, depth),
         )
       ) {
         depth++;
@@ -95,7 +103,11 @@ export function tabLabels(
 }
 
 /** Next / previous index with wrap-around (Ctrl+Tab / Ctrl+Shift+Tab). */
-export function cycleIndex(index: number, count: number, delta: 1 | -1): number {
+export function cycleIndex(
+  index: number,
+  count: number,
+  delta: 1 | -1,
+): number {
   if (count <= 0) return -1;
   return (((index + delta) % count) + count) % count;
 }
@@ -106,7 +118,11 @@ export function cycleIndex(index: number, count: number, delta: 1 | -1): number 
  * neighbour (or the left one when it was last); closing another tab keeps the
  * active one.
  */
-export function activeIndexAfterClose(closedIndex: number, activeIndex: number, count: number): number {
+export function activeIndexAfterClose(
+  closedIndex: number,
+  activeIndex: number,
+  count: number,
+): number {
   const remaining = count - 1;
   if (remaining <= 0) return -1;
   if (closedIndex === activeIndex) return Math.min(closedIndex, remaining - 1);
@@ -114,7 +130,11 @@ export function activeIndexAfterClose(closedIndex: number, activeIndex: number, 
 }
 
 /** A copy of `items` with the item at `from` moved to `to` (indices in the original list). */
-export function moveItem<T>(items: readonly T[], from: number, to: number): T[] {
+export function moveItem<T>(
+  items: readonly T[],
+  from: number,
+  to: number,
+): T[] {
   const out = items.slice();
   if (from < 0 || from >= out.length) return out;
   const [item] = out.splice(from, 1);

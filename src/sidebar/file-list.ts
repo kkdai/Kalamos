@@ -8,7 +8,10 @@ export interface FileListContextTarget {
 export interface FileListOptions {
   container: HTMLElement;
   /** #81 B: `newTab` = Cmd+click (always open in a new tab). */
-  onSelectFile: (path: string, options?: { newTab: boolean }) => void | Promise<void>;
+  onSelectFile: (
+    path: string,
+    options?: { newTab: boolean },
+  ) => void | Promise<void>;
   onContextMenu?: (event: MouseEvent, target: FileListContextTarget) => void;
 }
 

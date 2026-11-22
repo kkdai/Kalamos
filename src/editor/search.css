@@ -71,12 +71,14 @@
 
 .k-search-field:focus-within {
   border-color: var(--k-accent, #5e7a4a);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--k-accent, #5e7a4a) 22%, transparent);
+  box-shadow: 0 0 0 2px
+    color-mix(in srgb, var(--k-accent, #5e7a4a) 22%, transparent);
 }
 
 .k-search-field[data-invalid="true"] {
   border-color: var(--k-link, #a4552f);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--k-link, #a4552f) 22%, transparent);
+  box-shadow: 0 0 0 2px
+    color-mix(in srgb, var(--k-link, #a4552f) 22%, transparent);
 }
 
 .k-search-input {
@@ -159,7 +161,11 @@
 }
 
 .k-search-opt[aria-pressed="true"] {
-  background-color: color-mix(in srgb, var(--k-accent, #5e7a4a) 20%, transparent);
+  background-color: color-mix(
+    in srgb,
+    var(--k-accent, #5e7a4a) 20%,
+    transparent
+  );
   color: var(--k-accent, #5e7a4a);
 }
 
@@ -197,25 +203,43 @@
 
 /* Match marks in the text (CodeMirror decorations from @codemirror/search). */
 .cm-editor .cm-scroller .cm-content .cm-searchMatch {
-  background-color: var(--k-search-match-bg, color-mix(in srgb, var(--k-accent, #5e7a4a) 24%, transparent));
+  background-color: var(
+    --k-search-match-bg,
+    color-mix(in srgb, var(--k-accent, #5e7a4a) 24%, transparent)
+  );
   border-radius: 2px;
   outline: none;
 }
 
 .cm-editor .cm-scroller .cm-content .cm-searchMatch.cm-searchMatch-selected {
-  background-color: var(--k-search-current-bg, color-mix(in srgb, var(--k-link, #a4552f) 42%, transparent));
+  background-color: var(
+    --k-search-current-bg,
+    color-mix(in srgb, var(--k-link, #a4552f) 42%, transparent)
+  );
   box-shadow: 0 0 0 1px var(--k-search-current-ring, var(--k-link, #a4552f));
 }
 
 .cm-editor {
-  --k-search-match-bg: color-mix(in srgb, var(--k-accent, #5e7a4a) 24%, transparent);
-  --k-search-current-bg: color-mix(in srgb, var(--k-link, #a4552f) 42%, transparent);
+  --k-search-match-bg: color-mix(
+    in srgb,
+    var(--k-accent, #5e7a4a) 24%,
+    transparent
+  );
+  --k-search-current-bg: color-mix(
+    in srgb,
+    var(--k-link, #a4552f) 42%,
+    transparent
+  );
   --k-search-current-ring: var(--k-link, #a4552f);
 }
 
 /* Hits inside table widgets (CSS Custom Highlight API). */
 ::highlight(k-search-match) {
-  background-color: color-mix(in srgb, var(--k-accent, #5e7a4a) 24%, transparent);
+  background-color: color-mix(
+    in srgb,
+    var(--k-accent, #5e7a4a) 24%,
+    transparent
+  );
 }
 
 ::highlight(k-search-current) {

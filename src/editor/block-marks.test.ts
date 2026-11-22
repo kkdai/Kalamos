@@ -3,12 +3,16 @@ import { ensureSyntaxTree } from "@codemirror/language";
 import { EditorSelection, EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { afterEach, describe, expect, it } from "vitest";
-import { collectBlockSpecs, footnoteIndexField, blocksExtension } from "./blocks";
+import {
+  blocksExtension,
+  collectBlockSpecs,
+  footnoteIndexField,
+} from "./blocks";
 import { cjkEmphasisExtension } from "./cjk-emphasis";
 import { footnoteExtension } from "./footnotes";
 import { frontMatterExtension } from "./front-matter";
-import { collectLivePreviewSpecs } from "./live-preview";
 import { handleListBackspace, handleListEnter } from "./lists";
+import { collectLivePreviewSpecs } from "./live-preview";
 import { mathMarkdownExtension } from "./math";
 
 /** #49: block markers render like Typora; Enter / Backspace leave lists and quotes. */
@@ -21,7 +25,12 @@ function stateOf(doc: string, cursor: number): EditorState {
       markdown({
         base: markdownLanguage,
         addKeymap: false,
-        extensions: [mathMarkdownExtension, cjkEmphasisExtension, frontMatterExtension, footnoteExtension],
+        extensions: [
+          mathMarkdownExtension,
+          cjkEmphasisExtension,
+          frontMatterExtension,
+          footnoteExtension,
+        ],
       }),
       blocksExtension,
     ],
@@ -31,53 +40,97 @@ function stateOf(doc: string, cursor: number): EditorState {
 }
 
 function markerSpec(doc: string, cursor: number, from: number) {
-  return collectLivePreviewSpecs(stateOf(doc, cursor)).filter((s) => s.from === from);
+  return collectLivePreviewSpecs(stateOf(doc, cursor)).filter(
+    (s) => s.from === from,
+  );
 }
 
 describe("#49 block marker decorations", () => {
   it("a bullet shows as soon as `- ` is typed and while typing; `-` only with the cursor on it", () => {
     // Just typed `- `: cursor after the space.
-    expect(markerSpec("- ", 2, 0)).toEqual([{ from: 0, to: 1, className: "k-list-marker", widgetType: "bullet" }]);
+    expect(markerSpec("- ", 2, 0)).toEqual([
+      { from: 0, to: 1, className: "k-list-marker", widgetType: "bullet" },
+    ]);
     // Typing the item text.
     expect(markerSpec("- item", 6, 0)[0].widgetType).toBe("bullet");
     // Cursor on the marker (before or right after `-`) reveals it.
-    expect(markerSpec("- item", 0, 0)).toEqual([{ from: 0, to: 1, className: "k-mark k-list-marker" }]);
-    expect(markerSpec("- item", 1, 0)[0].className).toBe("k-mark k-list-marker");
+    expect(markerSpec("- item", 0, 0)).toEqual([
+      { from: 0, to: 1, className: "k-mark k-list-marker" },
+    ]);
+    expect(markerSpec("- item", 1, 0)[0].className).toBe(
+      "k-mark k-list-marker",
+    );
   });
 
   it("ordered lists keep a styled number; task items show a checkbox until the cursor is on the marker", () => {
-    expect(markerSpec("1. item", 7, 0)).toEqual([{ from: 0, to: 2, className: "k-list-marker" }]);
-    expect(markerSpec("1. item", 1, 0)[0].className).toBe("k-mark k-list-marker");
+    expect(markerSpec("1. item", 7, 0)).toEqual([
+      { from: 0, to: 2, className: "k-list-marker" },
+    ]);
+    expect(markerSpec("1. item", 1, 0)[0].className).toBe(
+      "k-mark k-list-marker",
+    );
 
     const task = collectLivePreviewSpecs(stateOf("- [ ] task", 10));
     expect(task).toContainEqual({ from: 0, to: 2, className: "k-mark-hidden" });
-    expect(task).toContainEqual({ from: 2, to: 5, className: "k-task-checkbox", widgetType: "task", checked: false });
+    expect(task).toContainEqual({
+      from: 2,
+      to: 5,
+      className: "k-task-checkbox",
+      widgetType: "task",
+      checked: false,
+    });
     const onBox = collectLivePreviewSpecs(stateOf("- [ ] task", 4));
-    expect(onBox).toContainEqual({ from: 0, to: 1, className: "k-mark k-list-marker" });
+    expect(onBox).toContainEqual({
+      from: 0,
+      to: 1,
+      className: "k-mark k-list-marker",
+    });
     expect(onBox).toContainEqual({ from: 2, to: 5, className: "k-mark" });
   });
 
   it("`##` is hidden while editing the heading text, shown with the cursor in the marks", () => {
     const doc = "## heading";
     const inText = collectLivePreviewSpecs(stateOf(doc, 7));
-    expect(inText).toContainEqual({ from: 0, to: 3, className: "k-mark-hidden" });
+    expect(inText).toContainEqual({
+      from: 0,
+      to: 3,
+      className: "k-mark-hidden",
+    });
     expect(inText).toContainEqual({ from: 3, to: 10, className: "k-h2" });
     // Right after typing `## ` the marks are already hidden.
-    expect(collectLivePreviewSpecs(stateOf("## ", 3))).toContainEqual({ from: 0, to: 3, className: "k-mark-hidden" });
-    expect(collectLivePreviewSpecs(stateOf(doc, 1))).toContainEqual({ from: 0, to: 3, className: "k-mark" });
+    expect(collectLivePreviewSpecs(stateOf("## ", 3))).toContainEqual({
+      from: 0,
+      to: 3,
+      className: "k-mark-hidden",
+    });
+    expect(collectLivePreviewSpecs(stateOf(doc, 1))).toContainEqual({
+      from: 0,
+      to: 3,
+      className: "k-mark",
+    });
     // Closing marks reveal when the cursor is on them.
     const closed = "## title ##";
-    expect(collectLivePreviewSpecs(stateOf(closed, 4))).toContainEqual({ from: 8, to: 11, className: "k-mark-hidden" });
-    expect(collectLivePreviewSpecs(stateOf(closed, 10))).toContainEqual({ from: 8, to: 11, className: "k-mark" });
+    expect(collectLivePreviewSpecs(stateOf(closed, 4))).toContainEqual({
+      from: 8,
+      to: 11,
+      className: "k-mark-hidden",
+    });
+    expect(collectLivePreviewSpecs(stateOf(closed, 10))).toContainEqual({
+      from: 8,
+      to: 11,
+      className: "k-mark",
+    });
   });
 
   it("`>` is hidden while typing the quote, shown with the cursor on it", () => {
     const doc = "> quote";
     const spec = (cursor: number) => {
       const s = stateOf(doc, cursor);
-      return collectBlockSpecs(s, [{ from: 0, to: doc.length }], s.field(footnoteIndexField).index).find(
-        (x) => x.kind === "mark" && x.from === 0,
-      );
+      return collectBlockSpecs(
+        s,
+        [{ from: 0, to: doc.length }],
+        s.field(footnoteIndexField).index,
+      ).find((x) => x.kind === "mark" && x.from === 0);
     };
     expect(spec(7)?.className).toBe("k-mark-hidden");
     expect(spec(2)?.className).toBe("k-mark-hidden"); // just typed `> `

@@ -53,7 +53,9 @@ function mount(doc: string, docPath: string | null = DOC): EditorView {
 }
 
 const imgs = (view: EditorView) =>
-  Array.from(view.contentDOM.querySelectorAll<HTMLImageElement>("img.k-image-img"));
+  Array.from(
+    view.contentDOM.querySelectorAll<HTMLImageElement>("img.k-image-img"),
+  );
 
 beforeEach(() => {
   ipc.resetMockState();
@@ -68,10 +70,16 @@ afterEach(() => {
 describe("#69 needsAssetFileAllow", () => {
   it("only paths outside the document folder and image root need a file allow", () => {
     expect(needsAssetFileAllow(PIC, DOC, null)).toBe(true);
-    expect(needsAssetFileAllow("/tmp/kalamos-test/blog/_posts/a.png", DOC, null)).toBe(false);
-    expect(needsAssetFileAllow("/tmp/kalamos-test/blog/_posts/sub/a.png", DOC, null)).toBe(false);
+    expect(
+      needsAssetFileAllow("/tmp/kalamos-test/blog/_posts/a.png", DOC, null),
+    ).toBe(false);
+    expect(
+      needsAssetFileAllow("/tmp/kalamos-test/blog/_posts/sub/a.png", DOC, null),
+    ).toBe(false);
     // A sibling folder sharing a name prefix is still outside.
-    expect(needsAssetFileAllow("/tmp/kalamos-test/blog/_posts2/a.png", DOC, null)).toBe(true);
+    expect(
+      needsAssetFileAllow("/tmp/kalamos-test/blog/_posts2/a.png", DOC, null),
+    ).toBe(true);
     expect(needsAssetFileAllow(PIC, DOC, "/tmp/kalamos-test/blog")).toBe(false);
     expect(needsAssetFileAllow(PIC, null, null)).toBe(true);
   });
@@ -80,7 +88,9 @@ describe("#69 needsAssetFileAllow", () => {
 describe("#69 allow a single parent-folder image", () => {
   it("a ../ image asks for that one file, then loads it", async () => {
     const view = mount("![pic](../images/pic.png)\n\nend");
-    const widget = view.contentDOM.querySelector<HTMLElement>("[data-testid=image-widget]")!;
+    const widget = view.contentDOM.querySelector<HTMLElement>(
+      "[data-testid=image-widget]",
+    )!;
     expect(widget.dataset.path).toBe(PIC);
     // Not loaded before the scope allows it (no permanent broken image).
     expect(imgs(view)).toHaveLength(0);
@@ -88,7 +98,9 @@ describe("#69 allow a single parent-folder image", () => {
     expect(allowAssetFile).toHaveBeenCalledTimes(1);
     expect(allowAssetFile).toHaveBeenCalledWith(PIC);
     expect(ipc.getMockAllowedAssetFiles()).toEqual([PIC]);
-    expect(ipc.getMockAllowedAssetDirs()).not.toContain("/tmp/kalamos-test/blog/images");
+    expect(ipc.getMockAllowedAssetDirs()).not.toContain(
+      "/tmp/kalamos-test/blog/images",
+    );
     const [img] = imgs(view);
     expect(decodeURIComponent(img.src)).toContain(PIC);
     expect(widget.dataset.assetScope).toBe("file");
@@ -105,7 +117,9 @@ describe("#69 allow a single parent-folder image", () => {
   });
 
   it("caches allowed files: re-rendering and concurrent requests call the backend once", async () => {
-    const view = mount("![a](../images/pic.png)\n\n![b](../images/pic.png)\n\nend");
+    const view = mount(
+      "![a](../images/pic.png)\n\n![b](../images/pic.png)\n\nend",
+    );
     await flush();
     expect(allowAssetFile).toHaveBeenCalledTimes(1);
     expect(imgs(view)).toHaveLength(2);
@@ -130,19 +144,26 @@ describe("#69 allow a single parent-folder image", () => {
   it("a refused file (not an image) falls back to the broken-image box", async () => {
     const view = mount("![x](../secret.txt)\n\nend");
     await flush();
-    expect(allowAssetFile).toHaveBeenCalledWith("/tmp/kalamos-test/blog/secret.txt");
+    expect(allowAssetFile).toHaveBeenCalledWith(
+      "/tmp/kalamos-test/blog/secret.txt",
+    );
     expect(ipc.getMockAllowedAssetFiles()).toEqual([]);
     const [img] = imgs(view);
     img.dispatchEvent(new Event("error"));
     await flush();
-    expect(view.contentDOM.querySelector("[data-testid=image-fallback]")).not.toBeNull();
+    expect(
+      view.contentDOM.querySelector("[data-testid=image-fallback]"),
+    ).not.toBeNull();
     view.destroy();
   });
 
   it("a load error on a not-yet-allowed file allows it and re-renders the image once", async () => {
     // A path in the document folder is assumed to be in scope; if it still
     // fails to load, the file is allowed individually and loaded again.
-    const view = mount("![a](pic.png)\n\nend", "/tmp/kalamos-test/blog/images/doc.md");
+    const view = mount(
+      "![a](pic.png)\n\nend",
+      "/tmp/kalamos-test/blog/images/doc.md",
+    );
     await flush();
     expect(allowAssetFile).not.toHaveBeenCalled();
     const [first] = imgs(view);
@@ -156,7 +177,9 @@ describe("#69 allow a single parent-folder image", () => {
     second.dispatchEvent(new Event("error"));
     await flush();
     expect(allowAssetFile).toHaveBeenCalledTimes(1);
-    expect(view.contentDOM.querySelector("[data-testid=image-fallback]")).not.toBeNull();
+    expect(
+      view.contentDOM.querySelector("[data-testid=image-fallback]"),
+    ).not.toBeNull();
     view.destroy();
   });
 });

@@ -13,7 +13,11 @@
   --k-syntax-number: color-mix(in srgb, var(--k-link) 75%, var(--k-text));
   --k-syntax-function: color-mix(in srgb, var(--k-accent) 70%, var(--k-text));
   --k-syntax-type: color-mix(in srgb, var(--k-link) 55%, var(--k-accent));
-  --k-syntax-operator: color-mix(in srgb, var(--k-text-muted) 85%, var(--k-text));
+  --k-syntax-operator: color-mix(
+    in srgb,
+    var(--k-text-muted) 85%,
+    var(--k-text)
+  );
   --k-syntax-property: color-mix(in srgb, var(--k-text) 80%, var(--k-link));
 }
 
@@ -25,7 +29,11 @@
   --k-syntax-number: color-mix(in srgb, var(--k-link) 80%, var(--k-text));
   --k-syntax-function: color-mix(in srgb, var(--k-accent) 75%, var(--k-text));
   --k-syntax-type: color-mix(in srgb, var(--k-accent) 60%, var(--k-link));
-  --k-syntax-operator: color-mix(in srgb, var(--k-text-muted) 85%, var(--k-text));
+  --k-syntax-operator: color-mix(
+    in srgb,
+    var(--k-text-muted) 85%,
+    var(--k-text)
+  );
   --k-syntax-property: color-mix(in srgb, var(--k-text) 82%, var(--k-link));
 }
 
@@ -37,7 +45,11 @@
     --k-syntax-number: color-mix(in srgb, var(--k-link) 80%, var(--k-text));
     --k-syntax-function: color-mix(in srgb, var(--k-accent) 75%, var(--k-text));
     --k-syntax-type: color-mix(in srgb, var(--k-accent) 60%, var(--k-link));
-    --k-syntax-operator: color-mix(in srgb, var(--k-text-muted) 85%, var(--k-text));
+    --k-syntax-operator: color-mix(
+      in srgb,
+      var(--k-text-muted) 85%,
+      var(--k-text)
+    );
     --k-syntax-property: color-mix(in srgb, var(--k-text) 82%, var(--k-link));
   }
 }

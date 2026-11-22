@@ -36,8 +36,8 @@ import {
   footnoteIdOf,
   footnoteIndexOfState,
 } from "./footnotes";
-import { isSelectionTouchingRange } from "./live-preview";
 import { collectDocumentHeadings, jumpToHeadingSlug } from "./lists";
+import { isSelectionTouchingRange } from "./live-preview";
 import { mapPosClamped } from "./positions";
 
 /** Re-run block decorations after an IME composition ended. */
@@ -53,7 +53,10 @@ function changeTouches(tr: Transaction, re: RegExp): boolean {
   let hit = false;
   tr.changes.iterChangedRanges((fromA, toA, fromB, toB) => {
     if (hit) return;
-    if (re.test(lineSpanText(tr.startState, fromA, toA)) || re.test(lineSpanText(tr.state, fromB, toB))) {
+    if (
+      re.test(lineSpanText(tr.startState, fromA, toA)) ||
+      re.test(lineSpanText(tr.state, fromB, toB))
+    ) {
       hit = true;
     }
   });
@@ -76,10 +79,17 @@ interface FootnoteFieldValue {
 
 function computeFootnotes(state: EditorState): FootnoteFieldValue {
   const tree = syntaxTree(state);
-  return { index: footnoteIndexOfState(state, tree), parsedTo: tree.length, dirty: false };
+  return {
+    index: footnoteIndexOfState(state, tree),
+    parsedTo: tree.length,
+    dirty: false,
+  };
 }
 
-function mapFootnoteIndex(index: FootnoteIndex, tr: Transaction): FootnoteIndex {
+function mapFootnoteIndex(
+  index: FootnoteIndex,
+  tr: Transaction,
+): FootnoteIndex {
   const definitions = new Map(index.definitions);
   for (const [id, d] of definitions) {
     definitions.set(id, {
@@ -106,7 +116,9 @@ export const footnoteIndexField = StateField.define<FootnoteFieldValue>({
         dirty: value.dirty || changeTouches(tr, FOOTNOTE_TEXT_RE),
       };
     }
-    const grown = syntaxTree(tr.state).length > mapPosClamped(tr.changes, value.parsedTo, 1);
+    const grown =
+      syntaxTree(tr.state).length >
+      mapPosClamped(tr.changes, value.parsedTo, 1);
     if (
       value.dirty ||
       grown ||
@@ -207,7 +219,8 @@ export function nestTocEntries(entries: readonly TocEntry[]): TocNode[] {
   const stack: TocNode[] = [];
   for (const entry of entries) {
     const node: TocNode = { ...entry, children: [] };
-    while (stack.length > 0 && stack[stack.length - 1].level >= entry.level) stack.pop();
+    while (stack.length > 0 && stack[stack.length - 1].level >= entry.level)
+      stack.pop();
     if (stack.length === 0) roots.push(node);
     else stack[stack.length - 1].children.push(node);
     stack.push(node);
@@ -220,7 +233,9 @@ export class TocWidget extends WidgetType {
 
   constructor(readonly entries: readonly TocEntry[]) {
     super();
-    this.key = entries.map((e) => `${e.level}\u0000${e.slug}\u0000${e.text}`).join("\u0001");
+    this.key = entries
+      .map((e) => `${e.level}\u0000${e.slug}\u0000${e.text}`)
+      .join("\u0001");
   }
 
   eq(other: TocWidget): boolean {
@@ -328,23 +343,40 @@ export function collectBlockSpecs(
             for (let n = first; n <= last; n++) {
               const line = state.doc.line(n);
               if (line.to < range.from || line.from > range.to) continue;
-              quoteLines.set(line.from, Math.max(quoteLines.get(line.from) ?? 0, depth));
+              quoteLines.set(
+                line.from,
+                Math.max(quoteLines.get(line.from) ?? 0, depth),
+              );
             }
             return undefined;
           }
           case "QuoteMark": {
             seen.add(key);
             // #49: `>` shows only while the cursor is on the marker itself.
-            const touched = isSelectionTouchingRange(selection, ref.from, ref.to);
+            const touched = isSelectionTouchingRange(
+              selection,
+              ref.from,
+              ref.to,
+            );
             let to = ref.to;
             if (!touched && state.sliceDoc(to, to + 1) === " ") to++;
-            specs.push({ kind: "mark", from: ref.from, to, className: touched ? "k-mark" : "k-mark-hidden" });
+            specs.push({
+              kind: "mark",
+              from: ref.from,
+              to,
+              className: touched ? "k-mark" : "k-mark-hidden",
+            });
             return false;
           }
           case "HorizontalRule": {
             seen.add(key);
             if (lineTouched(ref.from)) {
-              specs.push({ kind: "mark", from: ref.from, to: ref.to, className: "k-mark" });
+              specs.push({
+                kind: "mark",
+                from: ref.from,
+                to: ref.to,
+                className: "k-mark",
+              });
             } else {
               specs.push({ kind: "hr", from: ref.from, to: ref.to });
             }
@@ -360,10 +392,20 @@ export function collectBlockSpecs(
               let cls = "k-frontmatter-line";
               if (n === first) cls += " k-frontmatter-first";
               if (n === last) cls += " k-frontmatter-last";
-              specs.push({ kind: "line", from: line.from, to: line.from, className: cls });
+              specs.push({
+                kind: "line",
+                from: line.from,
+                to: line.from,
+                className: cls,
+              });
             }
             for (const mark of ref.node.getChildren("FrontMatterMark")) {
-              specs.push({ kind: "mark", from: mark.from, to: mark.to, className: "k-frontmatter-fence" });
+              specs.push({
+                kind: "mark",
+                from: mark.from,
+                to: mark.to,
+                className: "k-frontmatter-fence",
+              });
             }
             return false;
           }
@@ -375,7 +417,12 @@ export function collectBlockSpecs(
             for (let n = first; n <= last; n++) {
               const line = state.doc.line(n);
               if (line.to < range.from || line.from > range.to) continue;
-              specs.push({ kind: "line", from: line.from, to: line.from, className: "k-footnote-def-line" });
+              specs.push({
+                kind: "line",
+                from: line.from,
+                to: line.from,
+                className: "k-footnote-def-line",
+              });
             }
             if (mark) {
               const id = footnoteIdOf(state.sliceDoc(mark.from, mark.to));
@@ -384,7 +431,9 @@ export function collectBlockSpecs(
                 kind: "mark",
                 from: mark.from,
                 to: mark.to,
-                className: number ? "k-footnote-def-mark" : "k-footnote-def-mark k-footnote-unused",
+                className: number
+                  ? "k-footnote-def-mark"
+                  : "k-footnote-def-mark k-footnote-unused",
               });
             }
             return undefined;
@@ -395,7 +444,12 @@ export function collectBlockSpecs(
             const number = footnotes?.numbers.get(id);
             if (!number) return false; // undefined footnote: stays literal
             if (isSelectionTouchingRange(selection, ref.from, ref.to)) {
-              specs.push({ kind: "mark", from: ref.from, to: ref.to, className: "k-footnote-ref-src" });
+              specs.push({
+                kind: "mark",
+                from: ref.from,
+                to: ref.to,
+                className: "k-footnote-ref-src",
+              });
             } else {
               specs.push({
                 kind: "footnote",
@@ -428,20 +482,36 @@ export function collectBlockSpecs(
 const hrWidget = new HorizontalRuleWidget();
 
 export function buildBlockDecorations(view: EditorView): DecorationSet {
-  const ranges = view.visibleRanges.length > 0 ? view.visibleRanges : [view.viewport];
-  const specs = collectBlockSpecs(view.state, ranges, footnoteIndex(view.state));
+  const ranges =
+    view.visibleRanges.length > 0 ? view.visibleRanges : [view.viewport];
+  const specs = collectBlockSpecs(
+    view.state,
+    ranges,
+    footnoteIndex(view.state),
+  );
   const out: Array<Range<Decoration>> = specs.map((spec) => {
     switch (spec.kind) {
       case "line":
-        return Decoration.line({ class: spec.className ?? "" }).range(spec.from);
+        return Decoration.line({ class: spec.className ?? "" }).range(
+          spec.from,
+        );
       case "hr":
-        return Decoration.replace({ widget: hrWidget }).range(spec.from, spec.to);
+        return Decoration.replace({ widget: hrWidget }).range(
+          spec.from,
+          spec.to,
+        );
       case "footnote":
         return Decoration.replace({
-          widget: new FootnoteRefWidget(spec.footnoteId ?? "", spec.footnoteNumber ?? 0),
+          widget: new FootnoteRefWidget(
+            spec.footnoteId ?? "",
+            spec.footnoteNumber ?? 0,
+          ),
         }).range(spec.from, spec.to);
       default:
-        return Decoration.mark({ class: spec.className ?? "" }).range(spec.from, spec.to);
+        return Decoration.mark({ class: spec.className ?? "" }).range(
+          spec.from,
+          spec.to,
+        );
     }
   });
   return Decoration.set(out, true);
@@ -458,7 +528,8 @@ export const blockPreviewPlugin = ViewPlugin.fromClass(
 
     update(update: ViewUpdate): void {
       if (this.isComposing || update.view.composing) {
-        if (update.docChanged) this.decorations = this.decorations.map(update.changes);
+        if (update.docChanged)
+          this.decorations = this.decorations.map(update.changes);
         return;
       }
       if (
@@ -507,18 +578,25 @@ export function isTocText(text: string): boolean {
 }
 
 /** Top-level paragraphs consisting only of `[TOC]` (case-insensitive). */
-export function findTocParagraphs(state: EditorState): Array<{ from: number; to: number }> {
+export function findTocParagraphs(
+  state: EditorState,
+): Array<{ from: number; to: number }> {
   const out: Array<{ from: number; to: number }> = [];
   const top = syntaxTree(state).topNode;
   for (let node = top.firstChild; node; node = node.nextSibling) {
     if (node.name !== "Paragraph" || node.to - node.from > 16) continue;
-    if (TOC_RE.test(state.sliceDoc(node.from, node.to))) out.push({ from: node.from, to: node.to });
+    if (TOC_RE.test(state.sliceDoc(node.from, node.to)))
+      out.push({ from: node.from, to: node.to });
   }
   return out;
 }
 
 export function tocEntriesOf(state: EditorState): TocEntry[] {
-  return collectDocumentHeadings(state).map((h) => ({ level: h.level, text: h.text, slug: h.slug }));
+  return collectDocumentHeadings(state).map((h) => ({
+    level: h.level,
+    text: h.text,
+    slug: h.slug,
+  }));
 }
 
 interface TocFieldValue {
@@ -537,25 +615,41 @@ function tocDecorations(
   for (const toc of tocs) {
     const widget = new TocWidget(entries);
     if (isSelectionTouchingRange(state.selection, toc.from, toc.to)) {
-      out.push(Decoration.widget({ widget, block: true, side: 1 }).range(toc.to));
+      out.push(
+        Decoration.widget({ widget, block: true, side: 1 }).range(toc.to),
+      );
     } else {
-      out.push(Decoration.replace({ widget, block: true }).range(toc.from, toc.to));
+      out.push(
+        Decoration.replace({ widget, block: true }).range(toc.from, toc.to),
+      );
     }
   }
   return Decoration.set(out, true);
 }
 
-function computeToc(state: EditorState, previous?: TocFieldValue): TocFieldValue {
+function computeToc(
+  state: EditorState,
+  previous?: TocFieldValue,
+): TocFieldValue {
   const tocs = findTocParagraphs(state);
   let entries = tocs.length > 0 ? tocEntriesOf(state) : [];
-  if (previous && sameEntries(previous.entries, entries)) entries = previous.entries;
-  return { tocs, entries, decorations: tocDecorations(state, tocs, entries), dirty: false };
+  if (previous && sameEntries(previous.entries, entries))
+    entries = previous.entries;
+  return {
+    tocs,
+    entries,
+    decorations: tocDecorations(state, tocs, entries),
+    dirty: false,
+  };
 }
 
 function sameEntries(a: readonly TocEntry[], b: readonly TocEntry[]): boolean {
   return (
     a.length === b.length &&
-    a.every((e, i) => e.level === b[i].level && e.slug === b[i].slug && e.text === b[i].text)
+    a.every(
+      (e, i) =>
+        e.level === b[i].level && e.slug === b[i].slug && e.text === b[i].text,
+    )
   );
 }
 
@@ -575,11 +669,20 @@ export const tocField = StateField.define<TocFieldValue>({
     }
     const refresh = tr.effects.some((e) => e.is(blocksRefreshEffect));
     const treeChanged = syntaxTree(tr.startState) !== syntaxTree(tr.state);
-    if (tr.docChanged || treeChanged || tr.reconfigured || value.dirty || refresh) {
+    if (
+      tr.docChanged ||
+      treeChanged ||
+      tr.reconfigured ||
+      value.dirty ||
+      refresh
+    ) {
       return computeToc(tr.state, value);
     }
     if (tr.selection && value.tocs.length > 0) {
-      return { ...value, decorations: tocDecorations(tr.state, value.tocs, value.entries) };
+      return {
+        ...value,
+        decorations: tocDecorations(tr.state, value.tocs, value.entries),
+      };
     }
     return value;
   },
@@ -598,7 +701,11 @@ export function footnoteAt(
   if (!index) return null;
   const tree = syntaxTree(state);
   for (const side of [1, -1] as const) {
-    for (let n: SyntaxNode | null = tree.resolveInner(pos, side); n; n = n.parent) {
+    for (
+      let n: SyntaxNode | null = tree.resolveInner(pos, side);
+      n;
+      n = n.parent
+    ) {
       if (n.name !== "FootnoteReference") continue;
       const id = footnoteIdOf(state.sliceDoc(n.from, n.to));
       const def = index.definitions.get(id);

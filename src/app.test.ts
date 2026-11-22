@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  type FileMeta,
   listRecovery,
   openFile,
   readMockFile,
@@ -9,13 +10,12 @@ import {
   setMockSaveInterceptor,
   triggerMockCloseRequested,
   writeRecovery,
-  type FileMeta,
 } from "./ipc";
 import {
   createKalamosApp,
+  type KalamosApp,
   NAMED_AUTOSAVE_DELAY_MS,
   UNTITLED_RECOVERY_INTERVAL_MS,
-  type KalamosApp,
 } from "./main";
 
 function setupDom(): HTMLElement {
@@ -83,9 +83,9 @@ describe("Kalamos app — shortcuts, byte-exact save, autosave & crash recovery"
 
     const saved = await openFile("/tmp/crlf-cjk.md");
     expect(saved).toBe(original);
-    expect(
-      Array.from(new TextEncoder().encode(saved)),
-    ).toEqual(Array.from(new TextEncoder().encode(original)));
+    expect(Array.from(new TextEncoder().encode(saved))).toEqual(
+      Array.from(new TextEncoder().encode(original)),
+    );
   });
 
   it("Cmd+Shift+S saves as new file and Cmd+N starts a new untitled document", async () => {
@@ -190,7 +190,9 @@ describe("Kalamos app — shortcuts, byte-exact save, autosave & crash recovery"
     // Test openFile failure displays status without throwing unhandled rejection
     const openedMissing = await app.openDocument("/tmp/non-existent.md");
     expect(openedMissing).toBe(false);
-    const statusEl = document.querySelector<HTMLElement>('[data-testid="status"]')!;
+    const statusEl = document.querySelector<HTMLElement>(
+      '[data-testid="status"]',
+    )!;
     expect(statusEl.textContent).toContain("開檔失敗");
 
     // Open valid file, then make saveFile fail during autosave
@@ -257,7 +259,11 @@ describe("Kalamos app — shortcuts, byte-exact save, autosave & crash recovery"
 
   it("restoring a named recovery entry marks it dirty and triggers autosave after 1s", async () => {
     seedMockFile("/tmp/named-recover.md", "old content");
-    await writeRecovery("doc-named", "recovered newer content", "/tmp/named-recover.md");
+    await writeRecovery(
+      "doc-named",
+      "recovered newer content",
+      "/tmp/named-recover.md",
+    );
 
     app = createKalamosApp(document);
     await app.init();
@@ -267,7 +273,9 @@ describe("Kalamos app — shortcuts, byte-exact save, autosave & crash recovery"
     expect(app.editor.isDirty()).toBe(true);
 
     await vi.advanceTimersByTimeAsync(NAMED_AUTOSAVE_DELAY_MS);
-    expect(readMockFile("/tmp/named-recover.md")).toBe("recovered newer content");
+    expect(readMockFile("/tmp/named-recover.md")).toBe(
+      "recovered newer content",
+    );
     expect(app.editor.isDirty()).toBe(false);
   });
 
@@ -301,7 +309,11 @@ describe("Kalamos app — shortcuts, byte-exact save, autosave & crash recovery"
     userTypeText(app, "!");
     seedMockFile("/tmp/fourth.md", "fourth");
     await app.openPath("/tmp/fourth.md", "current");
-    expect(app.getTabs().map((t) => t.path)).toEqual([null, "/tmp/third.md", "/tmp/fourth.md"]);
+    expect(app.getTabs().map((t) => t.path)).toEqual([
+      null,
+      "/tmp/third.md",
+      "/tmp/fourth.md",
+    ]);
     // Cmd+click ("newTab"): always a new tab.
     seedMockFile("/tmp/fifth.md", "fifth");
     await app.openPath("/tmp/fifth.md", "newTab");

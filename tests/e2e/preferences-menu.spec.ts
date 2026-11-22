@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 import { boot, getDoc, MOD, nextFrames, selectRange, setDoc } from "./helpers";
 
 /**
@@ -7,7 +7,11 @@ import { boot, getDoc, MOD, nextFrames, selectRange, setDoc } from "./helpers";
  * event — the same path the Rust side emits on.
  */
 
-async function menuAction(page: Page, action: string, arg: string | null = null): Promise<void> {
+async function menuAction(
+  page: Page,
+  action: string,
+  arg: string | null = null,
+): Promise<void> {
   await page.evaluate(
     async ({ action, arg }) => {
       const ipc = await import("/src/ipc.ts" as string);
@@ -37,7 +41,9 @@ test.describe("#74 preferences window", () => {
     await boot(page);
   });
 
-  test("Cmd+, opens the modal with four tabs; Escape closes it", async ({ page }) => {
+  test("Cmd+, opens the modal with four tabs; Escape closes it", async ({
+    page,
+  }) => {
     await setDoc(page, "hello");
     await page.keyboard.press(`${MOD}+Comma`);
     const dialog = page.getByTestId("preferences");
@@ -64,7 +70,9 @@ test.describe("#74 preferences window", () => {
     await expect(dialog).toHaveCount(0);
   });
 
-  test("editor preferences apply at once and survive a reload of the settings", async ({ page }) => {
+  test("editor preferences apply at once and survive a reload of the settings", async ({
+    page,
+  }) => {
     await menuAction(page, "app.preferences");
     await page.getByTestId("pref-tab-editor").click();
 
@@ -73,10 +81,15 @@ test.describe("#74 preferences window", () => {
     await page.getByTestId("pref-content-width").fill("960");
     const vars = await page.evaluate(() => {
       const cs = getComputedStyle(document.documentElement);
-      return [cs.getPropertyValue("--k-font-size").trim(), cs.getPropertyValue("--k-max-width").trim()];
+      return [
+        cs.getPropertyValue("--k-font-size").trim(),
+        cs.getPropertyValue("--k-max-width").trim(),
+      ];
     });
     expect(vars).toEqual(["21px", "960px"]);
-    const lineFont = await page.locator(".cm-content").evaluate((el) => getComputedStyle(el).fontSize);
+    const lineFont = await page
+      .locator(".cm-content")
+      .evaluate((el) => getComputedStyle(el).fontSize);
     expect(lineFont).toBe("21px");
 
     await page.getByTestId("pref-code-line-numbers").check();
@@ -84,8 +97,15 @@ test.describe("#74 preferences window", () => {
 
     await expect
       .poll(() => savedSettings(page))
-      .toMatchObject({ fontSize: 21, contentWidth: 960, codeLineNumbers: true, autoPairBrackets: false });
-    await expect.poll(() => menuChecks(page)).toMatchObject({ "view.codeLineNumbers": true });
+      .toMatchObject({
+        fontSize: 21,
+        contentWidth: 960,
+        codeLineNumbers: true,
+        autoPairBrackets: false,
+      });
+    await expect
+      .poll(() => menuChecks(page))
+      .toMatchObject({ "view.codeLineNumbers": true });
 
     // A fresh app reads them back (same mock settings file).
     await page.getByTestId("pref-close").click();
@@ -99,9 +119,16 @@ test.describe("#74 preferences window", () => {
       (window as unknown as { __freshApp: unknown }).__freshApp = fresh;
     });
     const restored = await page.evaluate(() => {
-      const fresh = (window as unknown as {
-        __freshApp: { editor: { isCodeLineNumbers(): boolean; isAutoPairBrackets(): boolean } };
-      }).__freshApp;
+      const fresh = (
+        window as unknown as {
+          __freshApp: {
+            editor: {
+              isCodeLineNumbers(): boolean;
+              isAutoPairBrackets(): boolean;
+            };
+          };
+        }
+      ).__freshApp;
       return {
         font: document.documentElement.style.getPropertyValue("--k-font-size"),
         width: document.documentElement.style.getPropertyValue("--k-max-width"),
@@ -109,10 +136,17 @@ test.describe("#74 preferences window", () => {
         pairs: fresh.editor.isAutoPairBrackets(),
       };
     });
-    expect(restored).toEqual({ font: "21px", width: "960px", lines: true, pairs: false });
+    expect(restored).toEqual({
+      font: "21px",
+      width: "960px",
+      lines: true,
+      pairs: false,
+    });
   });
 
-  test("appearance: theme select switches the theme and the menu marks it", async ({ page }) => {
+  test("appearance: theme select switches the theme and the menu marks it", async ({
+    page,
+  }) => {
     await menuAction(page, "app.preferences");
     await page.getByTestId("pref-tab-appearance").click();
     await page.getByTestId("pref-theme").selectOption("melan");
@@ -125,14 +159,18 @@ test.describe("#74 preferences window", () => {
         }),
       )
       .toBe("melan");
-    await expect.poll(() => savedSettings(page)).toMatchObject({ theme: "melan" });
+    await expect
+      .poll(() => savedSettings(page))
+      .toMatchObject({ theme: "melan" });
   });
 
   test("general: autosave off is saved", async ({ page }) => {
     await page.keyboard.press(`${MOD}+Comma`);
     await page.getByTestId("pref-auto-save").uncheck();
     await page.getByTestId("pref-startup").selectOption("blank");
-    await expect.poll(() => savedSettings(page)).toMatchObject({ autoSave: false, startupBehavior: "blank" });
+    await expect
+      .poll(() => savedSettings(page))
+      .toMatchObject({ autoSave: false, startupBehavior: "blank" });
   });
 });
 
@@ -141,23 +179,35 @@ test.describe("#74 menu actions", () => {
     await boot(page);
   });
 
-  test("view toggles run once and keep the check marks in sync with shortcuts", async ({ page }) => {
+  test("view toggles run once and keep the check marks in sync with shortcuts", async ({
+    page,
+  }) => {
     await setDoc(page, "text");
     await menuAction(page, "view.focusMode");
-    await expect.poll(() => menuChecks(page)).toMatchObject({ "view.focusMode": true });
+    await expect
+      .poll(() => menuChecks(page))
+      .toMatchObject({ "view.focusMode": true });
     await page.waitForTimeout(250);
     await page.keyboard.press("F8");
-    await expect.poll(() => menuChecks(page)).toMatchObject({ "view.focusMode": false });
+    await expect
+      .poll(() => menuChecks(page))
+      .toMatchObject({ "view.focusMode": false });
 
     await page.keyboard.press(`${MOD}+Slash`);
-    await expect.poll(() => menuChecks(page)).toMatchObject({ "view.sourceMode": true });
+    await expect
+      .poll(() => menuChecks(page))
+      .toMatchObject({ "view.sourceMode": true });
     // A menu click well after the key press (inside 500 ms it counts as the same press).
     await page.waitForTimeout(600);
     await menuAction(page, "view.sourceMode");
-    await expect.poll(() => menuChecks(page)).toMatchObject({ "view.sourceMode": false });
+    await expect
+      .poll(() => menuChecks(page))
+      .toMatchObject({ "view.sourceMode": false });
   });
 
-  test("a shortcut handled by the page is not repeated by the menu event", async ({ page }) => {
+  test("a shortcut handled by the page is not repeated by the menu event", async ({
+    page,
+  }) => {
     await setDoc(page, "word");
     await selectRange(page, 0, 4);
     await page.keyboard.press(`${MOD}+b`);
@@ -177,16 +227,25 @@ test.describe("#74 menu actions", () => {
     expect(await getDoc(page)).toBe("### ~~Title~~");
   });
 
-  test("編輯 > 尋找 opens the find panel and 在資料夾中尋找 the sidebar search", async ({ page }) => {
+  test("編輯 > 尋找 opens the find panel and 在資料夾中尋找 the sidebar search", async ({
+    page,
+  }) => {
     await setDoc(page, "alpha beta");
     await menuAction(page, "edit.find");
     await expect(page.locator(".k-search").first()).toBeVisible();
     await menuAction(page, "edit.findInFolder");
-    await expect(page.getByTestId("sidebar")).toHaveAttribute("data-visible", "true");
-    await expect.poll(() => menuChecks(page)).toMatchObject({ "view.sidebar": true });
+    await expect(page.getByTestId("sidebar")).toHaveAttribute(
+      "data-visible",
+      "true",
+    );
+    await expect
+      .poll(() => menuChecks(page))
+      .toMatchObject({ "view.sidebar": true });
   });
 
-  test("表格儲存格 keeps undo working (edit items stay predefined)", async ({ page }) => {
+  test("表格儲存格 keeps undo working (edit items stay predefined)", async ({
+    page,
+  }) => {
     await setDoc(page, "intro\n\n| a | b |\n| - | - |\n| c | d |\n\nend", 0);
     const cell = page
       .getByTestId("table-widget")

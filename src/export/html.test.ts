@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { buildExportHtml, collectExportHeadings, escapeHtml, fileUrlFromPath } from "./html";
+import {
+  buildExportHtml,
+  collectExportHeadings,
+  escapeHtml,
+  fileUrlFromPath,
+} from "./html";
 import { defaultPdfPath, documentTitle, ensurePdfExtension } from "./pdf";
 
 async function render(md: string, docPath: string | null = "/notes/doc.md") {
@@ -12,7 +17,8 @@ function bodyOf(html: string): string {
 
 describe("EX-01 export HTML", () => {
   it("gives headings GitHub-style slug ids (same as #5), with duplicates suffixed", async () => {
-    const md = "# Hello World\n\n## 中文 標題\n\n## Hello World\n\nSetext\n---\n\n### **Bold** `code`\n";
+    const md =
+      "# Hello World\n\n## 中文 標題\n\n## Hello World\n\nSetext\n---\n\n### **Bold** `code`\n";
     const { html, headings } = await render(md);
     expect(headings).toEqual([
       { level: 1, text: "Hello World", id: "hello-world" },
@@ -25,12 +31,16 @@ describe("EX-01 export HTML", () => {
     expect(html).toContain('<h2 id="中文-標題">中文 標題</h2>');
     expect(html).toContain('<h2 id="hello-world-1">Hello World</h2>');
     expect(html).toContain('<h2 id="setext">Setext</h2>');
-    expect(html).toContain('<h3 id="bold-code"><strong>Bold</strong> <code>code</code></h3>');
+    expect(html).toContain(
+      '<h3 id="bold-code"><strong>Bold</strong> <code>code</code></h3>',
+    );
     expect(collectExportHeadings(md)).toEqual(headings);
   });
 
   it("renders GFM tables with alignment and empty cells", async () => {
-    const { html } = await render("| a | b | c |\n|:-|:-:|-:|\n| 1 | | **3** |\n");
+    const { html } = await render(
+      "| a | b | c |\n|:-|:-:|-:|\n| 1 | | **3** |\n",
+    );
     const body = bodyOf(html);
     expect(body).toContain('<table class="k-table">');
     expect(body).toContain(
@@ -42,7 +52,9 @@ describe("EX-01 export HTML", () => {
   });
 
   it("renders bullet, ordered and task lists", async () => {
-    const { html } = await render("- a\n- b\n\n3. x\n4. y\n\n- [x] done\n- [ ] todo\n");
+    const { html } = await render(
+      "- a\n- b\n\n3. x\n4. y\n\n- [x] done\n- [ ] todo\n",
+    );
     const body = bodyOf(html);
     expect(body).toMatch(/<ul>\n<li><p>a<\/p>\n<\/li>/);
     expect(body).toContain('<ol start="3">');
@@ -55,21 +67,33 @@ describe("EX-01 export HTML", () => {
   });
 
   it("highlights fenced code with token spans and escapes code text", async () => {
-    const { html } = await render("```js\nconst a = \"<b>\"; // hi\n```\n\n```\nplain <i>\n```\n");
+    const { html } = await render(
+      '```js\nconst a = "<b>"; // hi\n```\n\n```\nplain <i>\n```\n',
+    );
     const body = bodyOf(html);
     expect(body).toContain('<pre class="k-code" data-lang="js"><code>');
     expect(body).toContain('<span class="k-tok-keyword">const</span>');
-    expect(body).toContain('<span class="k-tok-string">&quot;&lt;b&gt;&quot;</span>');
+    expect(body).toContain(
+      '<span class="k-tok-string">&quot;&lt;b&gt;&quot;</span>',
+    );
     expect(body).toContain('<span class="k-tok-comment">// hi</span>');
-    expect(body).toContain('<pre class="k-code"><code>plain &lt;i&gt;</code></pre>');
+    expect(body).toContain(
+      '<pre class="k-code"><code>plain &lt;i&gt;</code></pre>',
+    );
     expect(body).not.toContain("<b>");
   });
 
   it("renders inline and block math as MathJax SVG", async () => {
-    const { html } = await render("Euler $e^{i\\pi}+1=0$.\n\n$$\n\\int_0^1 x\\,dx\n$$\n");
+    const { html } = await render(
+      "Euler $e^{i\\pi}+1=0$.\n\n$$\n\\int_0^1 x\\,dx\n$$\n",
+    );
     const body = bodyOf(html);
-    expect(body).toMatch(/<span class="k-math-inline"><mjx-container[^>]*><svg/);
-    expect(body).toMatch(/<div class="k-math-block"><mjx-container[^>]*display="true"[^>]*><svg/);
+    expect(body).toMatch(
+      /<span class="k-math-inline"><mjx-container[^>]*><svg/,
+    );
+    expect(body).toMatch(
+      /<div class="k-math-block"><mjx-container[^>]*display="true"[^>]*><svg/,
+    );
   }, 30_000);
 
   it("never lets document content inject markup or scripts", async () => {
@@ -80,7 +104,7 @@ describe("EX-01 export HTML", () => {
       "",
       'Inline <img src=x onerror="alert(3)"> and <br> ok.',
       "",
-      "[js](javascript:alert(4)) [ok](https://example.com \"t\\\"x\")",
+      '[js](javascript:alert(4)) [ok](https://example.com "t\\"x")',
       "",
       '![a"b](javascript:alert(5))',
       "",
@@ -94,13 +118,18 @@ describe("EX-01 export HTML", () => {
     expect(body).not.toContain("javascript:");
     expect(body).toContain("&lt;script&gt;alert(2)&lt;/script&gt;");
     // IM-03: <img> is rebuilt from allow-listed attributes only (onerror dropped).
-    expect(body).toContain('Inline <img src="file:///notes/x" alt=""> and <br> ok.');
+    expect(body).toContain(
+      'Inline <img src="file:///notes/x" alt=""> and <br> ok.',
+    );
     expect(body).not.toMatch(/onerror/i);
     expect(body).toContain('<span class="k-link">js</span>');
     expect(body).toContain('<a href="https://example.com"');
     expect(body).toContain('<span class="k-image-missing">[a&quot;b]</span>');
     // Title must be escaped too.
-    const { html: titled } = await buildExportHtml("x", { title: "</title><script>", docPath: null });
+    const { html: titled } = await buildExportHtml("x", {
+      title: "</title><script>",
+      docPath: null,
+    });
     expect(titled).toContain("<title>&lt;/title&gt;&lt;script&gt;</title>");
   });
 
@@ -109,11 +138,15 @@ describe("EX-01 export HTML", () => {
       "![cat](assets/my%20cat.png) ![r](https://x.test/a.png) ![d](data:image/png;base64,AAAA)",
       "/notes/doc.md",
     );
-    expect(html).toContain('<img src="file:///notes/assets/my%20cat.png" alt="cat">');
+    expect(html).toContain(
+      '<img src="file:///notes/assets/my%20cat.png" alt="cat">',
+    );
     expect(html).toContain('<img src="https://x.test/a.png" alt="r">');
     expect(html).toContain('<img src="data:image/png;base64,AAAA" alt="d">');
     const untitled = await render("![cat](assets/cat.png)", null);
-    expect(untitled.html).toContain('<span class="k-image-missing">[cat]</span>');
+    expect(untitled.html).toContain(
+      '<span class="k-image-missing">[cat]</span>',
+    );
   });
 
   it("produces a standalone page with print CSS and a restrictive CSP", async () => {

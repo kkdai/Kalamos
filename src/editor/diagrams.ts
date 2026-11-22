@@ -86,7 +86,8 @@ export function collectDiagramBlocks(
       const hasClosingFence =
         marks.length >= 2 &&
         endLine.number > startLine.number &&
-        state.doc.lineAt(marks[marks.length - 1].from).number === endLine.number;
+        state.doc.lineAt(marks[marks.length - 1].from).number ===
+          endLine.number;
       // Unclosed fences run to the end of the document while typing; leave
       // them as plain code until they are closed.
       if (!hasClosingFence) return false;
@@ -102,7 +103,11 @@ export function collectDiagramBlocks(
         from: startLine.from,
         to: endLine.to,
         source,
-        active: isSelectionTouchingRange(state.selection, startLine.from, endLine.to),
+        active: isSelectionTouchingRange(
+          state.selection,
+          startLine.from,
+          endLine.to,
+        ),
       });
       return false;
     },
@@ -206,7 +211,9 @@ export function flowToMermaid(source: string): string {
       }
       if (i > 0) {
         const prev = /^([^\s()]+)(?:\(([^)]*)\))?$/.exec(edge.names[i - 1])!;
-        const opts = (prev[2] ?? "").split(",").map((s) => s.trim().toLowerCase());
+        const opts = (prev[2] ?? "")
+          .split(",")
+          .map((s) => s.trim().toLowerCase());
         const label = opts.find((o) => o === "yes" || o === "no");
         line += label ? ` -->|${label}| ` : " --> ";
       }
@@ -253,16 +260,22 @@ export function sequenceToMermaid(source: string): string {
       );
       return;
     }
-    const note = /^note\s+(left of|right of|over)\s+([^:]+?)\s*:\s*(.*)$/i.exec(text);
+    const note = /^note\s+(left of|right of|over)\s+([^:]+?)\s*:\s*(.*)$/i.exec(
+      text,
+    );
     if (note) {
       const actors = note[2].split(",").map(seqActor).join(",");
       out.push(`Note ${note[1].toLowerCase()} ${actors}: ${note[3] || " "}`);
       return;
     }
-    const signal = /^([^:]+?)\s*(-->>|->>|-->|->)\s*([^:]+?)\s*:\s*(.*)$/.exec(text);
+    const signal = /^([^:]+?)\s*(-->>|->>|-->|->)\s*([^:]+?)\s*:\s*(.*)$/.exec(
+      text,
+    );
     if (signal) {
       const [, a, arrow, b, msg] = signal;
-      out.push(`${seqActor(a)}${SEQUENCE_ARROWS[arrow]}${seqActor(b)}: ${msg || " "}`);
+      out.push(
+        `${seqActor(a)}${SEQUENCE_ARROWS[arrow]}${seqActor(b)}: ${msg || " "}`,
+      );
       return;
     }
     throw new DiagramSyntaxError("無法解析的序列圖語法", lineNo);
@@ -305,9 +318,16 @@ function parseColor(value: string): [number, number, number] | null {
   if (hex) {
     const h =
       hex[1].length === 3
-        ? hex[1].split("").map((c) => c + c).join("")
+        ? hex[1]
+            .split("")
+            .map((c) => c + c)
+            .join("")
         : hex[1];
-    return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16)) as [number, number, number];
+    return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16)) as [
+      number,
+      number,
+      number,
+    ];
   }
   const rgb = /^rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)/i.exec(v);
   if (rgb) return [Number(rgb[1]), Number(rgb[2]), Number(rgb[3])];
@@ -325,7 +345,10 @@ function isDarkColor(value: string): boolean {
 export function readDiagramTheme(): DiagramTheme {
   const colors = { ...PAPYROS_FALLBACK };
   let fontFamily = "";
-  if (typeof document !== "undefined" && typeof getComputedStyle === "function") {
+  if (
+    typeof document !== "undefined" &&
+    typeof getComputedStyle === "function"
+  ) {
     const root = getComputedStyle(document.documentElement);
     const read = (name: string, fallback: string): string =>
       root.getPropertyValue(name).trim() || fallback;
@@ -450,7 +473,10 @@ export interface DiagramRenderResult {
 
 interface MermaidLike {
   initialize: (config: Record<string, unknown>) => void;
-  parse: (text: string, options?: { suppressErrors?: boolean }) => Promise<unknown>;
+  parse: (
+    text: string,
+    options?: { suppressErrors?: boolean },
+  ) => Promise<unknown>;
   render: (id: string, text: string) => Promise<{ svg: string }>;
 }
 
@@ -472,7 +498,11 @@ let initializedThemeKey: string | null = null;
 let renderQueue: Promise<unknown> = Promise.resolve();
 let renderSeq = 0;
 
-function cacheKey(kind: DiagramKind, source: string, theme: DiagramTheme): string {
+function cacheKey(
+  kind: DiagramKind,
+  source: string,
+  theme: DiagramTheme,
+): string {
   return `${theme.key}\u0000${kind}\u0000${source}`;
 }
 
@@ -544,8 +574,9 @@ function errorMessage(err: unknown): string {
 /** 1-based error line from a Mermaid (jison / langium) error, if any. */
 export function extractErrorLine(err: unknown): number | null {
   if (err instanceof DiagramSyntaxError) return err.line;
-  const hash = (err as { hash?: { loc?: { first_line?: unknown }; line?: unknown } } | null)
-    ?.hash;
+  const hash = (
+    err as { hash?: { loc?: { first_line?: unknown }; line?: unknown } } | null
+  )?.hash;
   if (hash) {
     if (typeof hash.loc?.first_line === "number") return hash.loc.first_line;
     if (typeof hash.line === "number") return hash.line + 1;
@@ -587,7 +618,11 @@ async function doRender(
   try {
     engine = await loadEngine();
   } catch (err) {
-    return { svg: "", error: `無法載入圖表引擎：${errorMessage(err)}`, line: null };
+    return {
+      svg: "",
+      error: `無法載入圖表引擎：${errorMessage(err)}`,
+      line: null,
+    };
   }
   const { mermaid, purify } = engine;
   if (initializedThemeKey !== theme.key) {
@@ -669,7 +704,9 @@ function showResult(dom: HTMLElement, result: DiagramRenderResult): void {
     const title = document.createElement("div");
     title.className = "k-diagram-error-title";
     title.textContent =
-      result.line !== null ? `圖表語法錯誤（第 ${result.line} 行）` : "圖表語法錯誤";
+      result.line !== null
+        ? `圖表語法錯誤（第 ${result.line} 行）`
+        : "圖表語法錯誤";
     const detail = document.createElement("pre");
     detail.className = "k-diagram-error-detail";
     detail.textContent = result.error.slice(0, 600);
@@ -721,11 +758,13 @@ function scheduleRender(
   const state = st;
   const run = (): void => {
     state.timer = null;
-    void renderDiagram(widget.kind, widget.source, widget.theme).then((result) => {
-      if (state.key !== key) return; // superseded by a newer source
-      showResult(dom, result);
-      if (dom.isConnected) view.requestMeasure();
-    });
+    void renderDiagram(widget.kind, widget.source, widget.theme).then(
+      (result) => {
+        if (state.key !== key) return; // superseded by a newer source
+        showResult(dom, result);
+        if (dom.isConnected) view.requestMeasure();
+      },
+    );
   };
   if (delay > 0) {
     state.timer = setTimeout(run, delay);
@@ -755,7 +794,9 @@ export class DiagramWidget extends WidgetType {
 
   toDOM(view: EditorView): HTMLElement {
     const dom = document.createElement("div");
-    dom.className = this.isPreview ? "k-diagram k-diagram-preview" : "k-diagram";
+    dom.className = this.isPreview
+      ? "k-diagram k-diagram-preview"
+      : "k-diagram";
     dom.dataset.testid = this.isPreview ? "diagram-preview" : "diagram";
     dom.dataset.kind = this.kind;
     dom.dataset.preview = String(this.isPreview);
@@ -906,7 +947,8 @@ function rebuildRegions(
   regions: PosRange[],
 ): DecorationSet {
   let result = decorations;
-  const clamp = (n: number): number => Math.max(0, Math.min(n, state.doc.length));
+  const clamp = (n: number): number =>
+    Math.max(0, Math.min(n, state.doc.length));
   for (const r of regions) {
     let from = state.doc.lineAt(clamp(r.from)).from;
     let to = state.doc.lineAt(clamp(r.to)).to;
@@ -956,7 +998,10 @@ export const diagramStateField = StateField.define<DiagramFieldValue>({
         decorations: value.decorations.map(tr.changes),
         theme,
         dirty,
-        dirtyAll: value.dirtyAll || themeChanged || (tr.docChanged && isStructuralChange(tr)),
+        dirtyAll:
+          value.dirtyAll ||
+          themeChanged ||
+          (tr.docChanged && isStructuralChange(tr)),
         // Mapped, not copied: a copied position can fall outside the next
         // (shorter) document and make mapPos throw (#56).
         parsedTo: mapPosClamped(tr.changes, value.parsedTo, 1),
@@ -1036,13 +1081,25 @@ export const diagramThemePlugin = ViewPlugin.fromClass(
         this.observer = new MutationObserver(this.onChange);
         this.observer.observe(document.documentElement, {
           attributes: true,
-          attributeFilter: ["data-theme", "data-custom-theme", "class", "style"],
+          attributeFilter: [
+            "data-theme",
+            "data-custom-theme",
+            "class",
+            "style",
+          ],
         });
         if (document.head) {
-          this.observer.observe(document.head, { childList: true, subtree: true, characterData: true });
+          this.observer.observe(document.head, {
+            childList: true,
+            subtree: true,
+            characterData: true,
+          });
         }
       }
-      if (typeof window !== "undefined" && typeof window.matchMedia === "function") {
+      if (
+        typeof window !== "undefined" &&
+        typeof window.matchMedia === "function"
+      ) {
         this.media = window.matchMedia("(prefers-color-scheme: dark)");
         this.media.addEventListener?.("change", this.onChange);
       }
@@ -1092,4 +1149,7 @@ export const diagramThemePlugin = ViewPlugin.fromClass(
   },
 );
 
-export const diagramsExtension: Extension = [diagramStateField, diagramThemePlugin];
+export const diagramsExtension: Extension = [
+  diagramStateField,
+  diagramThemePlugin,
+];

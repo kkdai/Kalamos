@@ -1,8 +1,23 @@
 import "./table-toolbar.css";
 
-import { type EditorState, type Extension, StateField } from "@codemirror/state";
-import type { DecorationSet, KeyBinding, PluginValue, ViewUpdate } from "@codemirror/view";
-import { Decoration, EditorView, ViewPlugin, WidgetType } from "@codemirror/view";
+import {
+  type EditorState,
+  type Extension,
+  StateField,
+} from "@codemirror/state";
+import type {
+  DecorationSet,
+  KeyBinding,
+  PluginValue,
+  ViewUpdate,
+} from "@codemirror/view";
+import {
+  Decoration,
+  EditorView,
+  ViewPlugin,
+  WidgetType,
+} from "@codemirror/view";
+import { shortcutLabel } from "../platform";
 import {
   type ActiveTableCell,
   columnAlign,
@@ -11,7 +26,6 @@ import {
   type TableAction,
 } from "./table-ops";
 import { findTableAtPos } from "./tables";
-import { shortcutLabel } from "../platform";
 
 /**
  * #59 B: floating table toolbar + context menu + shortcuts.
@@ -68,27 +82,46 @@ function activeTableRange(state: EditorState): ActiveTableRange | null {
     // the table widget's DOM (losing the focused cell).
     decorations: Decoration.set([
       from > 0
-        ? Decoration.widget({ widget: new ToolbarSpacerWidget(), block: true, side: 1 }).range(from - 1)
-        : Decoration.widget({ widget: new ToolbarSpacerWidget(), block: true, side: -1 }).range(from),
+        ? Decoration.widget({
+            widget: new ToolbarSpacerWidget(),
+            block: true,
+            side: 1,
+          }).range(from - 1)
+        : Decoration.widget({
+            widget: new ToolbarSpacerWidget(),
+            block: true,
+            side: -1,
+          }).range(from),
     ]),
   };
 }
 
 /** The active table's range plus the spacer before it (block decorations need a StateField). */
-export const tableToolbarSpaceField = StateField.define<ActiveTableRange | null>({
-  create: activeTableRange,
-  update(value, tr) {
-    if (!tr.docChanged && !tr.selection) return value;
-    const next = activeTableRange(tr.state);
-    if (next && value && !tr.docChanged && next.from === value.from && next.to === value.to) return value;
-    return next;
-  },
-  provide: (f) => EditorView.decorations.from(f, (v) => v?.decorations ?? Decoration.none),
-});
+export const tableToolbarSpaceField =
+  StateField.define<ActiveTableRange | null>({
+    create: activeTableRange,
+    update(value, tr) {
+      if (!tr.docChanged && !tr.selection) return value;
+      const next = activeTableRange(tr.state);
+      if (
+        next &&
+        value &&
+        !tr.docChanged &&
+        next.from === value.from &&
+        next.to === value.to
+      )
+        return value;
+      return next;
+    },
+    provide: (f) =>
+      EditorView.decorations.from(f, (v) => v?.decorations ?? Decoration.none),
+  });
 
 /** The `.k-table-wrapper` of the table starting at `pos` (current DOM). */
 function tableWrapperAt(view: EditorView, pos: number): HTMLElement | null {
-  for (const el of view.contentDOM.querySelectorAll<HTMLElement>(".k-table-wrapper")) {
+  for (const el of view.contentDOM.querySelectorAll<HTMLElement>(
+    ".k-table-wrapper",
+  )) {
     try {
       if (view.posAtDOM(el) === pos) return el;
     } catch {
@@ -112,16 +145,70 @@ interface ShortcutSpec {
  * Cmd+Enter is reserved for leaving the table (#59 A).
  */
 export const TABLE_SHORTCUTS: readonly ShortcutSpec[] = [
-  { key: "Mod-Alt-ArrowUp", action: "rowAbove", code: "ArrowUp", alt: true, shift: false },
-  { key: "Mod-Alt-ArrowDown", action: "rowBelow", code: "ArrowDown", alt: true, shift: false },
-  { key: "Mod-Alt-ArrowLeft", action: "colLeft", code: "ArrowLeft", alt: true, shift: false },
-  { key: "Mod-Alt-ArrowRight", action: "colRight", code: "ArrowRight", alt: true, shift: false },
-  { key: "Mod-Shift-Backspace", action: "deleteRow", code: "Backspace", alt: false, shift: true },
-  { key: "Mod-Alt-Backspace", action: "deleteCol", code: "Backspace", alt: true, shift: false },
+  {
+    key: "Mod-Alt-ArrowUp",
+    action: "rowAbove",
+    code: "ArrowUp",
+    alt: true,
+    shift: false,
+  },
+  {
+    key: "Mod-Alt-ArrowDown",
+    action: "rowBelow",
+    code: "ArrowDown",
+    alt: true,
+    shift: false,
+  },
+  {
+    key: "Mod-Alt-ArrowLeft",
+    action: "colLeft",
+    code: "ArrowLeft",
+    alt: true,
+    shift: false,
+  },
+  {
+    key: "Mod-Alt-ArrowRight",
+    action: "colRight",
+    code: "ArrowRight",
+    alt: true,
+    shift: false,
+  },
+  {
+    key: "Mod-Shift-Backspace",
+    action: "deleteRow",
+    code: "Backspace",
+    alt: false,
+    shift: true,
+  },
+  {
+    key: "Mod-Alt-Backspace",
+    action: "deleteCol",
+    code: "Backspace",
+    alt: true,
+    shift: false,
+  },
   // Not L / C / R: Cmd+Opt+(Shift+)R is the image root folder (IM-04).
-  { key: "Mod-Alt-Shift-ArrowLeft", action: "alignLeft", code: "ArrowLeft", alt: true, shift: true },
-  { key: "Mod-Alt-Shift-ArrowUp", action: "alignCenter", code: "ArrowUp", alt: true, shift: true },
-  { key: "Mod-Alt-Shift-ArrowRight", action: "alignRight", code: "ArrowRight", alt: true, shift: true },
+  {
+    key: "Mod-Alt-Shift-ArrowLeft",
+    action: "alignLeft",
+    code: "ArrowLeft",
+    alt: true,
+    shift: true,
+  },
+  {
+    key: "Mod-Alt-Shift-ArrowUp",
+    action: "alignCenter",
+    code: "ArrowUp",
+    alt: true,
+    shift: true,
+  },
+  {
+    key: "Mod-Alt-Shift-ArrowRight",
+    action: "alignRight",
+    code: "ArrowRight",
+    alt: true,
+    shift: true,
+  },
 ];
 
 /**
@@ -138,16 +225,24 @@ export const tableKeymap: KeyBinding[] = TABLE_SHORTCUTS.map((s) => ({
   },
 }));
 
-export function shortcutActionForEvent(event: KeyboardEvent): TableAction | null {
+export function shortcutActionForEvent(
+  event: KeyboardEvent,
+): TableAction | null {
   if (!(event.metaKey || event.ctrlKey)) return null;
   const spec = TABLE_SHORTCUTS.find(
-    (s) => s.code === event.code && s.alt === event.altKey && s.shift === event.shiftKey,
+    (s) =>
+      s.code === event.code &&
+      s.alt === event.altKey &&
+      s.shift === event.shiftKey,
   );
   return spec?.action ?? null;
 }
 
 /** The cell a DOM node of a table widget belongs to (`th/td[data-row][data-col]`). */
-export function tableCellFromDom(view: EditorView, node: Node | null): ActiveTableCell | null {
+export function tableCellFromDom(
+  view: EditorView,
+  node: Node | null,
+): ActiveTableCell | null {
   const el = node instanceof Element ? node : node?.parentElement;
   const cellEl = el?.closest<HTMLElement>("[data-row][data-col]");
   const wrapper = cellEl?.closest<HTMLElement>(".k-table-wrapper");
@@ -162,14 +257,26 @@ export function tableCellFromDom(view: EditorView, node: Node | null): ActiveTab
   if (!table) return null;
   const row = Number(cellEl.dataset.row);
   const col = Number(cellEl.dataset.col);
-  if (!(row >= 0 && row <= table.bodyRows.length && col >= 0 && col < table.colCount)) return null;
+  if (
+    !(
+      row >= 0 &&
+      row <= table.bodyRows.length &&
+      col >= 0 &&
+      col < table.colCount
+    )
+  )
+    return null;
   return { table, row, col };
 }
 
 /** The table cell being edited: a focused widget cell, else the cursor's cell. */
 export function currentTableCell(view: EditorView): ActiveTableCell | null {
   const active = view.dom.ownerDocument.activeElement;
-  if (active && active !== view.contentDOM && view.contentDOM.contains(active)) {
+  if (
+    active &&
+    active !== view.contentDOM &&
+    view.contentDOM.contains(active)
+  ) {
     const fromDom = tableCellFromDom(view, active);
     if (fromDom) return fromDom;
   }
@@ -182,7 +289,10 @@ export function currentTableCell(view: EditorView): ActiveTableCell | null {
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 
-function alignIcon(doc: Document, kind: "left" | "center" | "right"): SVGSVGElement {
+function alignIcon(
+  doc: Document,
+  kind: "left" | "center" | "right",
+): SVGSVGElement {
   const svg = doc.createElementNS(SVG_NS, "svg");
   svg.setAttribute("width", "14");
   svg.setAttribute("height", "14");
@@ -190,10 +300,25 @@ function alignIcon(doc: Document, kind: "left" | "center" | "right"): SVGSVGElem
   svg.setAttribute("aria-hidden", "true");
   const lines: Array<[number, number]> =
     kind === "left"
-      ? [[2, 12], [2, 8], [2, 12], [2, 8]]
+      ? [
+          [2, 12],
+          [2, 8],
+          [2, 12],
+          [2, 8],
+        ]
       : kind === "right"
-        ? [[2, 12], [6, 12], [2, 12], [6, 12]]
-        : [[2, 12], [4, 10], [2, 12], [4, 10]];
+        ? [
+            [2, 12],
+            [6, 12],
+            [2, 12],
+            [6, 12],
+          ]
+        : [
+            [2, 12],
+            [4, 10],
+            [2, 12],
+            [4, 10],
+          ];
   lines.forEach(([x1, x2], i) => {
     const path = doc.createElementNS(SVG_NS, "path");
     path.setAttribute("d", `M${x1} ${2.5 + i * 3}H${x2}`);
@@ -211,9 +336,24 @@ interface ButtonSpec {
 
 const TOOLBAR_GROUPS: ButtonSpec[][] = [
   [
-    { action: "alignLeft", label: "靠左", title: "欄靠左（⌥⇧⌘←）", icon: "left" },
-    { action: "alignCenter", label: "置中", title: "欄置中（⌥⇧⌘↑）", icon: "center" },
-    { action: "alignRight", label: "靠右", title: "欄靠右（⌥⇧⌘→）", icon: "right" },
+    {
+      action: "alignLeft",
+      label: "靠左",
+      title: "欄靠左（⌥⇧⌘←）",
+      icon: "left",
+    },
+    {
+      action: "alignCenter",
+      label: "置中",
+      title: "欄置中（⌥⇧⌘↑）",
+      icon: "center",
+    },
+    {
+      action: "alignRight",
+      label: "靠右",
+      title: "欄靠右（⌥⇧⌘→）",
+      icon: "right",
+    },
   ],
   [
     { action: "rowBelow", label: "+列", title: "下方插入列（⌥⌘↓）" },
@@ -260,7 +400,10 @@ function isActionDisabled(action: TableAction, cell: ActiveTableCell): boolean {
   return false;
 }
 
-function isAlignPressed(action: TableAction, cell: ActiveTableCell): boolean | null {
+function isAlignPressed(
+  action: TableAction,
+  cell: ActiveTableCell,
+): boolean | null {
   const align = columnAlign(cell.table, cell.col);
   if (action === "alignLeft") return align === "left";
   if (action === "alignCenter") return align === "center";
@@ -287,9 +430,11 @@ export function openTableContextMenu(
   closeTableContextMenu();
   const doc = view.dom.ownerDocument;
   // Escape gives focus back to where it was (a cell, or the editor).
-  const previousFocus = doc.activeElement instanceof HTMLElement ? doc.activeElement : null;
+  const previousFocus =
+    doc.activeElement instanceof HTMLElement ? doc.activeElement : null;
   const restoreFocus = () => {
-    if (previousFocus?.isConnected && previousFocus !== doc.body) previousFocus.focus({ preventScroll: true });
+    if (previousFocus?.isConnected && previousFocus !== doc.body)
+      previousFocus.focus({ preventScroll: true });
     else view.focus();
   };
   const menu = doc.createElement("div");
@@ -377,7 +522,10 @@ export function openTableContextMenu(
 }
 
 /** The table cell under a context-menu event (widget cell, or table source). */
-function tableCellForEvent(view: EditorView, event: MouseEvent): ActiveTableCell | null {
+function tableCellForEvent(
+  view: EditorView,
+  event: MouseEvent,
+): ActiveTableCell | null {
   const fromDom = tableCellFromDom(view, event.target as Node | null);
   if (fromDom) return fromDom;
   const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
@@ -435,7 +583,9 @@ class TableToolbarView implements PluginValue {
     // Keep the editor / focused cell focused while clicking the toolbar.
     this.dom.addEventListener("mousedown", (e) => e.preventDefault());
     this.dom.addEventListener("click", (e) => {
-      const btn = (e.target as HTMLElement).closest<HTMLButtonElement>("button[data-action]");
+      const btn = (e.target as HTMLElement).closest<HTMLButtonElement>(
+        "button[data-action]",
+      );
       if (!btn || btn.disabled) return;
       const target = currentTableCell(this.view) ?? this.target;
       if (!target) return;
@@ -459,7 +609,8 @@ class TableToolbarView implements PluginValue {
       }
       const el = e.target instanceof Element ? e.target : null;
       this.rightPressCell = tableCellFromDom(this.view, el);
-      if (el?.closest(".k-table-wrapper [data-row][data-col]")) e.preventDefault();
+      if (el?.closest(".k-table-wrapper [data-row][data-col]"))
+        e.preventDefault();
     };
     // Shortcuts typed in a focused widget cell (CodeMirror ignores those events).
     this.onKeyDown = (e) => {
@@ -504,8 +655,14 @@ class TableToolbarView implements PluginValue {
   update(update: ViewUpdate): void {
     const prev = update.startState.field(tableToolbarSpaceField, false) ?? null;
     const next = update.state.field(tableToolbarSpaceField, false) ?? null;
-    const mappedPrev = prev && update.docChanged ? update.changes.mapPos(prev.from, -1) : prev?.from;
-    if ((prev?.from ?? null) !== (next?.from ?? null) && mappedPrev !== next?.from) {
+    const mappedPrev =
+      prev && update.docChanged
+        ? update.changes.mapPos(prev.from, -1)
+        : prev?.from;
+    if (
+      (prev?.from ?? null) !== (next?.from ?? null) &&
+      mappedPrev !== next?.from
+    ) {
       // Plugins update before the DOM does: remember where the anchor is now.
       // Entering a table keeps that table still; leaving one keeps the text
       // below it still when the cursor went there.
@@ -513,7 +670,9 @@ class TableToolbarView implements PluginValue {
       let el: HTMLElement | null = null;
       let pos = 0;
       if (next) {
-        const oldPos = update.docChanged ? update.changes.invertedDesc.mapPos(next.from, 1) : next.from;
+        const oldPos = update.docChanged
+          ? update.changes.invertedDesc.mapPos(next.from, 1)
+          : next.from;
         el = tableWrapperAt(update.view, oldPos);
         pos = next.from;
       } else if (prev && update.state.selection.main.head > mappedPrev!) {
@@ -537,7 +696,9 @@ class TableToolbarView implements PluginValue {
     this.view.requestMeasure({
       key: this,
       read: (view) => {
-        const spacer = view.contentDOM.querySelector<HTMLElement>(".k-table-toolbar-spacer");
+        const spacer = view.contentDOM.querySelector<HTMLElement>(
+          ".k-table-toolbar-spacer",
+        );
         const target = spacer ? currentTableCell(view) : null;
         if (!spacer || !target) return { place: null };
         const scroller = view.scrollDOM;
@@ -548,7 +709,11 @@ class TableToolbarView implements PluginValue {
           place: {
             target,
             // Scroller content coordinates (independent of the scroll position).
-            top: rect.top - scrollRect.top + scroller.scrollTop + Math.max(0, (rect.height - height) / 2),
+            top:
+              rect.top -
+              scrollRect.top +
+              scroller.scrollTop +
+              Math.max(0, (rect.height - height) / 2),
             left: rect.left - scrollRect.left + scroller.scrollLeft,
           },
         };
@@ -577,7 +742,11 @@ class TableToolbarView implements PluginValue {
 
   destroy(): void {
     this.view.contentDOM.removeEventListener("contextmenu", this.onContextMenu);
-    this.view.contentDOM.removeEventListener("mousedown", this.onMouseDown, true);
+    this.view.contentDOM.removeEventListener(
+      "mousedown",
+      this.onMouseDown,
+      true,
+    );
     this.view.contentDOM.removeEventListener("keydown", this.onKeyDown);
     this.view.contentDOM.removeEventListener("focusin", this.onFocusChange);
     this.view.contentDOM.removeEventListener("focusout", this.onFocusChange);

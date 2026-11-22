@@ -66,7 +66,8 @@
 .k-pref-tab:focus-visible,
 .k-pref-dialog select:focus-visible,
 .k-pref-dialog input:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--k-accent, #5e7a4a) 60%, transparent);
+  outline: 2px solid
+    color-mix(in srgb, var(--k-accent, #5e7a4a) 60%, transparent);
   outline-offset: 1px;
 }
 
@@ -114,7 +115,8 @@
   grid-template-columns: 110px 1fr;
   gap: 12px;
   padding: 12px 0;
-  border-bottom: 1px solid color-mix(in srgb, var(--k-divider, #d9cdb3) 60%, transparent);
+  border-bottom: 1px solid
+    color-mix(in srgb, var(--k-divider, #d9cdb3) 60%, transparent);
 }
 
 .k-pref-row:last-child {

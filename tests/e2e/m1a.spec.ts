@@ -1,11 +1,11 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 import {
-  MOD,
   boot,
   getDoc,
   getSelection,
   isCollapsed,
   line,
+  MOD,
   nextFrames,
   selectRange,
   setCursor,
@@ -35,10 +35,25 @@ interface InlineCase {
 }
 
 const INLINE_CASES: InlineCase[] = [
-  { name: "bold", src: "**粗體**", contentClass: "k-strong", contentText: "粗體" },
+  {
+    name: "bold",
+    src: "**粗體**",
+    contentClass: "k-strong",
+    contentText: "粗體",
+  },
   { name: "italic", src: "*斜體*", contentClass: "k-em", contentText: "斜體" },
-  { name: "inline code", src: "`code`", contentClass: "k-code", contentText: "code" },
-  { name: "strike", src: "~~刪除~~", contentClass: "k-strike", contentText: "刪除" },
+  {
+    name: "inline code",
+    src: "`code`",
+    contentClass: "k-code",
+    contentText: "code",
+  },
+  {
+    name: "strike",
+    src: "~~刪除~~",
+    contentClass: "k-strike",
+    contentText: "刪除",
+  },
   {
     name: "link",
     src: "[文字](https://example.com)",
@@ -53,7 +68,9 @@ const INLINE_CASES: InlineCase[] = [
   })),
 ];
 
-async function hiddenMarksCollapsed(page: Page): Promise<{ count: number; allCollapsed: boolean }> {
+async function hiddenMarksCollapsed(
+  page: Page,
+): Promise<{ count: number; allCollapsed: boolean }> {
   return page.evaluate(() => {
     const first = document.querySelector(".cm-content .cm-line");
     const marks = Array.from(first?.querySelectorAll(".k-mark-hidden") ?? []);
@@ -65,7 +82,9 @@ async function hiddenMarksCollapsed(page: Page): Promise<{ count: number; allCol
 }
 
 for (const c of INLINE_CASES) {
-  test(`AC5 ${c.name}: markers hidden when cursor leaves, shown when it returns`, async ({ page }) => {
+  test(`AC5 ${c.name}: markers hidden when cursor leaves, shown when it returns`, async ({
+    page,
+  }) => {
     await setDoc(page, "");
     // Type it for real, then move the cursor to another line.
     await page.keyboard.type(c.src);
@@ -75,7 +94,9 @@ for (const c of INLINE_CASES) {
     await nextFrames(page);
 
     const first = line(page, 1);
-    await expect(first.locator(`.${c.contentClass}`).first()).toContainText(c.contentText);
+    await expect(first.locator(`.${c.contentClass}`).first()).toContainText(
+      c.contentText,
+    );
     const hidden = await hiddenMarksCollapsed(page);
     expect(hidden.count).toBeGreaterThan(0);
     expect(hidden.allCollapsed).toBe(true);
@@ -89,9 +110,9 @@ for (const c of INLINE_CASES) {
     await setCursor(page, 1);
     await expect(first.locator(".k-mark-hidden")).toHaveCount(0);
     const visibleMarks = await page.evaluate(() =>
-      Array.from(document.querySelectorAll(".cm-content .cm-line:first-child .k-mark")).map(
-        (m) => m.getBoundingClientRect().width,
-      ),
+      Array.from(
+        document.querySelectorAll(".cm-content .cm-line:first-child .k-mark"),
+      ).map((m) => m.getBoundingClientRect().width),
     );
     expect(visibleMarks.length).toBeGreaterThan(0);
     expect(visibleMarks.every((w) => w > 0.5)).toBe(true);
@@ -146,7 +167,9 @@ test("AC6 live preview never mutates the document string", async ({ page }) => {
 // AC7 — Cmd+/ source mode: content and cursor preserved, rich widgets unloaded
 // ---------------------------------------------------------------------------
 
-test("AC7 Cmd+/ toggles source mode, keeps content and cursor, unloads widgets", async ({ page }) => {
+test("AC7 Cmd+/ toggles source mode, keeps content and cursor, unloads widgets", async ({
+  page,
+}) => {
   const src = [
     "**粗體** 段落",
     "",
@@ -168,7 +191,9 @@ test("AC7 Cmd+/ toggles source mode, keeps content and cursor, unloads widgets",
 
   await page.keyboard.press(`${MOD}+/`);
   await nextFrames(page);
-  expect(await page.evaluate(() => window.__kalamos!.isSourceMode())).toBe(true);
+  expect(await page.evaluate(() => window.__kalamos!.isSourceMode())).toBe(
+    true,
+  );
   expect(await getDoc(page)).toBe(src);
   expect(await getSelection(page)).toEqual(before);
   await expect(page.locator(".cm-content .k-mark-hidden")).toHaveCount(0);
@@ -178,7 +203,9 @@ test("AC7 Cmd+/ toggles source mode, keeps content and cursor, unloads widgets",
 
   await page.keyboard.press(`${MOD}+/`);
   await nextFrames(page);
-  expect(await page.evaluate(() => window.__kalamos!.isSourceMode())).toBe(false);
+  expect(await page.evaluate(() => window.__kalamos!.isSourceMode())).toBe(
+    false,
+  );
   expect(await getDoc(page)).toBe(src);
   expect(await getSelection(page)).toEqual(before);
   await expect(page.getByTestId("table-widget")).toHaveCount(1);
@@ -221,7 +248,9 @@ for (const t of TOGGLES) {
 
 // BUG-1 / #22: CJK-friendly flanking (src/editor/cjk-emphasis.ts) lets `**`
 // sit between full-width punctuation and CJK letters.
-test("AC8 bold around CJK punctuation renders (「你好」 followed by CJK) [BUG-1 #22]", async ({ page }) => {
+test("AC8 bold around CJK punctuation renders (「你好」 followed by CJK) [BUG-1 #22]", async ({
+  page,
+}) => {
   const src = "他說「你好」再見\n\nend";
   await setDoc(page, src);
   await selectRange(page, 2, 6);
@@ -231,7 +260,9 @@ test("AC8 bold around CJK punctuation renders (「你好」 followed by CJK) [BU
   await expect(line(page, 1).locator(".k-strong")).toContainText("「你好」");
 });
 
-test("#22 typing `中文**「粗體」**中文` / `中文**粗體。**中文` renders strong; text unchanged", async ({ page }) => {
+test("#22 typing `中文**「粗體」**中文` / `中文**粗體。**中文` renders strong; text unchanged", async ({
+  page,
+}) => {
   await setDoc(page, "\n\nend", 0);
   await page.keyboard.type("中文**「粗體」**中文");
   await setCursor(page, (await getDoc(page)).length);
@@ -245,7 +276,9 @@ test("#22 typing `中文**「粗體」**中文` / `中文**粗體。**中文` re
   await page.keyboard.type("中文**粗體。**中文");
   await setCursor(page, (await getDoc(page)).length);
   await expect(line(page, 2).locator(".k-strong")).toHaveText("粗體。");
-  expect(await getDoc(page)).toBe("中文**「粗體」**中文\n中文**粗體。**中文\n\nend");
+  expect(await getDoc(page)).toBe(
+    "中文**「粗體」**中文\n中文**粗體。**中文\n\nend",
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -259,7 +292,9 @@ async function isComposing(page: Page): Promise<boolean> {
   });
 }
 
-test("AC9 decorations are frozen during IME composition (CDP imeSetComposition)", async ({ page }) => {
+test("AC9 decorations are frozen during IME composition (CDP imeSetComposition)", async ({
+  page,
+}) => {
   const src = "**粗體** 與 *斜體*\n\n";
   await setDoc(page, src, src.length);
   const cdp = await page.context().newCDPSession(page);
@@ -272,10 +307,17 @@ test("AC9 decorations are frozen during IME composition (CDP imeSetComposition)"
     w.__obs = new MutationObserver((list) => {
       w.__mut += list.length;
     });
-    w.__obs.observe(target, { attributes: true, childList: true, subtree: true, characterData: true });
+    w.__obs.observe(target, {
+      attributes: true,
+      childList: true,
+      subtree: true,
+      characterData: true,
+    });
   });
   const snapshot = () =>
-    page.evaluate(() => document.querySelector(".cm-content .cm-line")!.innerHTML);
+    page.evaluate(
+      () => document.querySelector(".cm-content .cm-line")!.innerHTML,
+    );
   const before = await snapshot();
 
   for (const step of ["n", "ni", "nih", "niha", "nihao", "你好"]) {
@@ -288,17 +330,23 @@ test("AC9 decorations are frozen during IME composition (CDP imeSetComposition)"
     expect(await isComposing(page)).toBe(true);
     expect(await snapshot()).toBe(before);
   }
-  const mutations = await page.evaluate(() => (window as unknown as { __mut: number }).__mut);
+  const mutations = await page.evaluate(
+    () => (window as unknown as { __mut: number }).__mut,
+  );
   expect(mutations).toBe(0);
 
   await cdp.send("Input.insertText", { text: "你好" });
   await nextFrames(page, 4);
   expect(await getDoc(page)).toBe(`${src}你好`);
   // After commit decorations are live again (markers still hidden on line 1).
-  expect(await isCollapsed(page, ".cm-content .cm-line:first-child .k-mark-hidden")).toBe(true);
+  expect(
+    await isCollapsed(page, ".cm-content .cm-line:first-child .k-mark-hidden"),
+  ).toBe(true);
 });
 
-test("AC9 composing on a decorated line keeps its markers stable", async ({ page }) => {
+test("AC9 composing on a decorated line keeps its markers stable", async ({
+  page,
+}) => {
   // Cursor at the end of a heading line. Since #49 the `##` is hidden there
   // (shown only with the cursor on it); either way its marker decorations
   // must not change while composing.
@@ -307,12 +355,19 @@ test("AC9 composing on a decorated line keeps its markers stable", async ({ page
   const cdp = await page.context().newCDPSession(page);
   const markCount = () =>
     page.evaluate(
-      () => document.querySelectorAll(".cm-content .cm-line:first-child .k-mark, .cm-content .cm-line:first-child .k-mark-hidden").length,
+      () =>
+        document.querySelectorAll(
+          ".cm-content .cm-line:first-child .k-mark, .cm-content .cm-line:first-child .k-mark-hidden",
+        ).length,
     );
   const before = await markCount();
   expect(before).toBeGreaterThan(0);
   for (const step of ["z", "zh", "zho", "中"]) {
-    await cdp.send("Input.imeSetComposition", { text: step, selectionStart: step.length, selectionEnd: step.length });
+    await cdp.send("Input.imeSetComposition", {
+      text: step,
+      selectionStart: step.length,
+      selectionEnd: step.length,
+    });
     await nextFrames(page);
     expect(await isComposing(page)).toBe(true);
     expect(await markCount()).toBe(before);
@@ -322,7 +377,9 @@ test("AC9 composing on a decorated line keeps its markers stable", async ({ page
   expect(await getDoc(page)).toBe("## 標題中");
 });
 
-test("AC9 math live preview does not re-render during IME composition", async ({ page }) => {
+test("AC9 math live preview does not re-render during IME composition", async ({
+  page,
+}) => {
   // Cursor inside a $$ block shows source + live preview below (#8). Each
   // pinyin step must not re-typeset the preview while composing.
   const src = "$$\nx+\n$$\n\nend";
@@ -332,7 +389,11 @@ test("AC9 math live preview does not re-render during IME composition", async ({
   const texBefore = await preview.getAttribute("data-tex");
   const cdp = await page.context().newCDPSession(page);
   for (const step of ["y", "yi", "一"]) {
-    await cdp.send("Input.imeSetComposition", { text: step, selectionStart: step.length, selectionEnd: step.length });
+    await cdp.send("Input.imeSetComposition", {
+      text: step,
+      selectionStart: step.length,
+      selectionEnd: step.length,
+    });
     await nextFrames(page);
     expect(await isComposing(page)).toBe(true);
     expect(await preview.getAttribute("data-tex")).toBe(texBefore);
@@ -346,7 +407,9 @@ test("AC9 math live preview does not re-render during IME composition", async ({
 // AC10 — sidebar: hidden by default, Cmd+Shift+L, three tabs, Cmd+Shift+O
 // ---------------------------------------------------------------------------
 
-test("AC10 sidebar hidden by default; Cmd+Shift+L toggles; three tabs", async ({ page }) => {
+test("AC10 sidebar hidden by default; Cmd+Shift+L toggles; three tabs", async ({
+  page,
+}) => {
   const sidebar = page.locator("#sidebar");
   await expect(sidebar).toHaveAttribute("data-visible", "false");
   await page.getByTestId("editor").click();
@@ -360,45 +423,84 @@ test("AC10 sidebar hidden by default; Cmd+Shift+L toggles; three tabs", async ({
 });
 
 // BUG-2 (#32): opening a folder must reveal a hidden sidebar on the file tree.
-test("AC10 Cmd+Shift+O with hidden sidebar reveals the opened folder [BUG-2]", async ({ page }) => {
-  await withIpc(page, "ipc.setMockDialogHandlers({ openFolder: () => '/demo' });");
+test("AC10 Cmd+Shift+O with hidden sidebar reveals the opened folder [BUG-2]", async ({
+  page,
+}) => {
+  await withIpc(
+    page,
+    "ipc.setMockDialogHandlers({ openFolder: () => '/demo' });",
+  );
   // Start from the outline tab to check we switch back to the file tree.
   await page.evaluate(async () => {
     const app = (await import("/src/main.ts" as string)).getActiveApp();
     await app.sidebar.setTab("outline");
   });
-  await expect(page.locator("#sidebar")).toHaveAttribute("data-visible", "false");
+  await expect(page.locator("#sidebar")).toHaveAttribute(
+    "data-visible",
+    "false",
+  );
   await page.getByTestId("editor").click();
   await page.keyboard.press(`${MOD}+Shift+o`);
   await expect(page.getByTestId("sidebar-folder-title")).toContainText("demo");
-  await expect(page.locator("#sidebar")).toHaveAttribute("data-visible", "true");
-  await expect(page.getByTestId("sidebar-tab-tree")).toHaveAttribute("aria-selected", "true");
-  await expect(page.getByTestId("file-item").filter({ hasText: "welcome.md" })).toBeVisible();
+  await expect(page.locator("#sidebar")).toHaveAttribute(
+    "data-visible",
+    "true",
+  );
+  await expect(page.getByTestId("sidebar-tab-tree")).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await expect(
+    page.getByTestId("file-item").filter({ hasText: "welcome.md" }),
+  ).toBeVisible();
   await expect
-    .poll(() => withIpc<boolean>(page, "return (await ipc.getSettings()).sidebarVisible;"))
+    .poll(() =>
+      withIpc<boolean>(
+        page,
+        "return (await ipc.getSettings()).sidebarVisible;",
+      ),
+    )
     .toBe(true);
 });
 
-test("AC10 cancelling the Cmd+Shift+O dialog leaves a hidden sidebar hidden", async ({ page }) => {
+test("AC10 cancelling the Cmd+Shift+O dialog leaves a hidden sidebar hidden", async ({
+  page,
+}) => {
   await withIpc(page, "ipc.setMockDialogHandlers({ openFolder: () => null });");
   await page.getByTestId("editor").click();
   await page.keyboard.press(`${MOD}+Shift+o`);
   await page.waitForTimeout(200);
-  await expect(page.locator("#sidebar")).toHaveAttribute("data-visible", "false");
+  await expect(page.locator("#sidebar")).toHaveAttribute(
+    "data-visible",
+    "false",
+  );
 });
 
-test("AC10 Cmd+Shift+O opens a folder; clicking a file opens it", async ({ page }) => {
-  await withIpc(page, "ipc.setMockDialogHandlers({ openFolder: () => '/demo' });");
+test("AC10 Cmd+Shift+O opens a folder; clicking a file opens it", async ({
+  page,
+}) => {
+  await withIpc(
+    page,
+    "ipc.setMockDialogHandlers({ openFolder: () => '/demo' });",
+  );
   await page.getByTestId("editor").click();
   await page.keyboard.press(`${MOD}+Shift+o`);
   await expect(page.getByTestId("sidebar-folder-title")).toContainText("demo");
-  await expect(page.locator("#sidebar")).toHaveAttribute("data-visible", "true");
+  await expect(page.locator("#sidebar")).toHaveAttribute(
+    "data-visible",
+    "true",
+  );
 
   // File tree tab
-  const welcome = page.getByTestId("file-item").filter({ hasText: "welcome.md" });
+  const welcome = page
+    .getByTestId("file-item")
+    .filter({ hasText: "welcome.md" });
   await expect(welcome).toHaveCount(1);
   await welcome.click();
-  const expected = await withIpc<string>(page, "return ipc.readMockFile('/demo/welcome.md');");
+  const expected = await withIpc<string>(
+    page,
+    "return ipc.readMockFile('/demo/welcome.md');",
+  );
   await expect.poll(() => getDoc(page)).toBe(expected);
 
   // File list tab
@@ -406,7 +508,10 @@ test("AC10 Cmd+Shift+O opens a folder; clicking a file opens it", async ({ page 
   const notes = page.getByTestId("file-item").filter({ hasText: "notes.md" });
   await expect(notes).toHaveCount(1);
   await notes.click();
-  const notesContent = await withIpc<string>(page, "return ipc.readMockFile('/demo/notes.md');");
+  const notesContent = await withIpc<string>(
+    page,
+    "return ipc.readMockFile('/demo/notes.md');",
+  );
   await expect.poll(() => getDoc(page)).toBe(notesContent);
 });
 
@@ -422,7 +527,10 @@ function longDoc(): { src: string; headingPos: number[] } {
   levels.forEach((lvl, i) => {
     const h = `${"#".repeat(lvl)} Section ${i + 1}`;
     headingPos.push(offset);
-    const body = Array.from({ length: 40 }, (_, j) => `段落 ${i + 1}.${j + 1} 內文`).join("\n\n");
+    const body = Array.from(
+      { length: 40 },
+      (_, j) => `段落 ${i + 1}.${j + 1} 內文`,
+    ).join("\n\n");
     const block = `${h}\n\n${body}\n\n`;
     parts.push(block);
     offset += block.length;
@@ -430,7 +538,9 @@ function longDoc(): { src: string; headingPos: number[] } {
   return { src: parts.join(""), headingPos };
 }
 
-test("AC12 outline lists heading levels, click scrolls, active section highlighted", async ({ page }) => {
+test("AC12 outline lists heading levels, click scrolls, active section highlighted", async ({
+  page,
+}) => {
   const { src, headingPos } = longDoc();
   await setDoc(page, src, 0);
   await page.evaluate(async () => {
@@ -441,9 +551,11 @@ test("AC12 outline lists heading levels, click scrolls, active section highlight
   await page.getByTestId("sidebar-tab-outline").click();
   const items = page.getByTestId("outline-item");
   await expect(items).toHaveCount(6);
-  expect(await items.evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.level))).toEqual([
-    "1", "2", "3", "2", "3", "1",
-  ]);
+  expect(
+    await items.evaluateAll((els) =>
+      els.map((e) => (e as HTMLElement).dataset.level),
+    ),
+  ).toEqual(["1", "2", "3", "2", "3", "1"]);
 
   // Click the 5th heading → selection at heading, heading line visible.
   await items.nth(4).click();
@@ -464,22 +576,34 @@ test("AC12 outline lists heading levels, click scrolls, active section highlight
 // AC13 — theme menu: built-ins + custom themes, applies immediately, persists
 // ---------------------------------------------------------------------------
 
-test("AC13 theme menu lists Papyros, Melan and custom themes; selection applies and persists", async ({ page }) => {
+test("AC13 theme menu lists Papyros, Melan and custom themes; selection applies and persists", async ({
+  page,
+}) => {
   await page.getByTestId("theme-menu-button").click();
   const menu = page.getByTestId("theme-menu");
   await expect(menu).toHaveAttribute("data-visible", "true");
   const ids = await page
     .getByTestId("theme-option")
     .evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.themeId));
-  expect(ids).toEqual(expect.arrayContaining(["papyros", "melan", "custom:night"]));
+  expect(ids).toEqual(
+    expect.arrayContaining(["papyros", "melan", "custom:night"]),
+  );
 
-  await page.locator('[data-testid="theme-option"][data-theme-id="melan"]').click();
+  await page
+    .locator('[data-testid="theme-option"][data-theme-id="melan"]')
+    .click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "melan");
   // body has a 180 ms background transition (PRD §12.5) → poll.
   await expect
-    .poll(() => page.evaluate(() => getComputedStyle(document.body).backgroundColor))
+    .poll(() =>
+      page.evaluate(() => getComputedStyle(document.body).backgroundColor),
+    )
     .toBe("rgb(28, 26, 23)");
-  await expect.poll(() => withIpc<string>(page, "return (await ipc.getSettings()).theme;")).toBe("melan");
+  await expect
+    .poll(() =>
+      withIpc<string>(page, "return (await ipc.getSettings()).theme;"),
+    )
+    .toBe("melan");
 
   // A CSS file dropped into themes/ appears the next time the menu opens.
   await withIpc(
@@ -487,14 +611,27 @@ test("AC13 theme menu lists Papyros, Melan and custom themes; selection applies 
     "ipc.seedMockCustomTheme('forest', ':root[data-custom-theme] { --k-bg: #102010; --k-text: #e0f0e0; }');",
   );
   await page.getByTestId("theme-menu-button").click();
-  const forest = page.locator('[data-testid="theme-option"][data-theme-id="custom:forest"]');
+  const forest = page.locator(
+    '[data-testid="theme-option"][data-theme-id="custom:forest"]',
+  );
   await expect(forest).toHaveCount(1);
   await forest.click();
   await expect(page.locator("html")).toHaveAttribute("data-custom-theme", /.*/);
   await expect
-    .poll(() => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--k-bg").trim().toLowerCase()))
+    .poll(() =>
+      page.evaluate(() =>
+        getComputedStyle(document.documentElement)
+          .getPropertyValue("--k-bg")
+          .trim()
+          .toLowerCase(),
+      ),
+    )
     .toBe("#102010");
-  await expect.poll(() => withIpc<string>(page, "return (await ipc.getSettings()).theme;")).toBe("custom:forest");
+  await expect
+    .poll(() =>
+      withIpc<string>(page, "return (await ipc.getSettings()).theme;"),
+    )
+    .toBe("custom:forest");
 });
 
 // ---------------------------------------------------------------------------
@@ -526,7 +663,9 @@ const PRD_PALETTE: Record<string, Record<string, string>> = {
 function luminance(hex: string): number {
   const n = hex.replace("#", "");
   const ch = [0, 2, 4].map((i) => parseInt(n.slice(i, i + 2), 16) / 255);
-  const lin = ch.map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+  const lin = ch.map((c) =>
+    c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4,
+  );
   return 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2];
 }
 
@@ -538,29 +677,48 @@ function contrast(a: string, b: string): number {
 async function readTokens(page: Page): Promise<Record<string, string>> {
   return page.evaluate((keys) => {
     const cs = getComputedStyle(document.documentElement);
-    return Object.fromEntries(keys.map((k) => [k, cs.getPropertyValue(k).trim().toLowerCase()]));
+    return Object.fromEntries(
+      keys.map((k) => [k, cs.getPropertyValue(k).trim().toLowerCase()]),
+    );
   }, Object.keys(PRD_PALETTE.papyros));
 }
 
 for (const theme of ["papyros", "melan"]) {
-  test(`AC14 ${theme} palette equals PRD §12.3 and text contrast ≥ 4.5:1`, async ({ page }) => {
-    await page.evaluate((t) => document.documentElement.setAttribute("data-theme", t), theme);
+  test(`AC14 ${theme} palette equals PRD §12.3 and text contrast ≥ 4.5:1`, async ({
+    page,
+  }) => {
+    await page.evaluate(
+      (t) => document.documentElement.setAttribute("data-theme", t),
+      theme,
+    );
     const tokens = await readTokens(page);
     expect(tokens).toEqual(PRD_PALETTE[theme]);
-    expect(contrast(tokens["--k-text"], tokens["--k-bg"])).toBeGreaterThanOrEqual(4.5);
-    expect(contrast(tokens["--k-text-muted"], tokens["--k-bg"])).toBeGreaterThanOrEqual(4.5);
+    expect(
+      contrast(tokens["--k-text"], tokens["--k-bg"]),
+    ).toBeGreaterThanOrEqual(4.5);
+    expect(
+      contrast(tokens["--k-text-muted"], tokens["--k-bg"]),
+    ).toBeGreaterThanOrEqual(4.5);
   });
 }
 
-test("AC1 document title follows the active tab (#81; Tauri window title: manual)", async ({ page }) => {
+test("AC1 document title follows the active tab (#81; Tauri window title: manual)", async ({
+  page,
+}) => {
   await expect(page).toHaveTitle("未命名");
 });
 
 for (const scheme of ["light", "dark"] as const) {
-  test(`AC1/AC14 default theme follows system ${scheme} scheme`, async ({ page }) => {
+  test(`AC1/AC14 default theme follows system ${scheme} scheme`, async ({
+    page,
+  }) => {
     await page.emulateMedia({ colorScheme: scheme });
-    await page.evaluate(() => document.documentElement.removeAttribute("data-theme"));
+    await page.evaluate(() =>
+      document.documentElement.removeAttribute("data-theme"),
+    );
     const tokens = await readTokens(page);
-    expect(tokens).toEqual(PRD_PALETTE[scheme === "light" ? "papyros" : "melan"]);
+    expect(tokens).toEqual(
+      PRD_PALETTE[scheme === "light" ? "papyros" : "melan"],
+    );
   });
 }
