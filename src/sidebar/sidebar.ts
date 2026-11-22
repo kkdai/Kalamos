@@ -24,6 +24,7 @@ import { createFileList, type FileListView } from "./file-list";
 import { createFileTree, type FileTreeView } from "./file-tree";
 import { createFolderSearch, type FolderSearchView } from "./folder-search";
 import { createOutline, type OutlineView } from "./outline";
+import { pathRoot, shortcutLabel } from "../platform";
 
 export interface SidebarTabDescriptor {
   id: SidebarTab;
@@ -70,9 +71,11 @@ export interface SidebarController {
 }
 
 function dirnameOf(fullPath: string): string {
+  const root = pathRoot(fullPath);
   const idx = fullPath.lastIndexOf("/");
   if (idx <= 0) return "/";
-  return fullPath.slice(0, idx);
+  const slice = fullPath.slice(0, idx);
+  return root && `${slice}/` === root ? root.replace(/\/+$/, "") : slice;
 }
 
 function basenameOf(fullPath: string): string {
@@ -152,7 +155,7 @@ export function createSidebar(options: CreateSidebarOptions): SidebarController 
   openFolderBtn.type = "button";
   openFolderBtn.className = "k-sidebar-icon-btn";
   openFolderBtn.dataset.testid = "sidebar-open-folder-btn";
-  openFolderBtn.title = "開啟資料夾 (Cmd+Shift+O)";
+  openFolderBtn.title = shortcutLabel("開啟資料夾 (Cmd+Shift+O)");
   openFolderBtn.textContent = "開啟";
 
   headerEl.append(folderTitleEl, openFolderBtn);

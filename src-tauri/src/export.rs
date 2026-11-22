@@ -296,7 +296,7 @@ pub fn inspect_pdf(path: &Path) -> Result<PdfSummary, AppError> {
     imp::inspect(path)
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 mod imp {
     use super::*;
 
@@ -308,8 +308,178 @@ mod imp {
     ) -> Result<FileMeta, AppError> {
         Err(AppError::new(
             ErrorKind::Io,
-            "PDF export is only supported on macOS",
+            "PDF export is only supported on macOS and Windows",
         ))
+    }
+
+    pub fn inspect(_path: &Path) -> Result<PdfSummary, AppError> {
+        Err(AppError::new(
+            ErrorKind::Io,
+            "PDF inspection is only supported on macOS",
+        ))
+    }
+}
+
+/// Windows: print the page with headless Microsoft Edge (always installed on
+/// Windows 10 / 11; Google Chrome is used as a fallback). Chromium paginates
+/// with the page's `@page { size: A4; margin: … }` rules, drops the default
+/// header / footer, and `--generate-pdf-document-outline` turns the h1–h6
+/// headings into nested PDF bookmarks, so no post-processing is needed.
+#[cfg(target_os = "windows")]
+mod imp {
+    use super::*;
+
+    use std::ffi::OsString;
+    use std::process::{Command, Stdio};
+    use std::time::Instant;
+
+    pub const BROWSER_MISSING_MESSAGE: &str =
+        "找不到 Microsoft Edge 或 Google Chrome，無法匯出 PDF";
+
+    /// Environment variable that overrides the browser used for PDF export.
+    pub const BROWSER_ENV: &str = "KALAMOS_PDF_BROWSER";
+
+    fn browser_candidates() -> Vec<PathBuf> {
+        let mut out = Vec::new();
+        let mut push = |var: &str, rel: &str| {
+            if let Some(base) = std::env::var_os(var) {
+                out.push(PathBuf::from(base).join(rel));
+            }
+        };
+        for var in ["ProgramFiles(x86)", "ProgramFiles", "LOCALAPPDATA"] {
+            push(var, r"Microsoft\Edge\Application\msedge.exe");
+        }
+        for var in ["ProgramFiles", "ProgramFiles(x86)", "LOCALAPPDATA"] {
+            push(var, r"Google\Chrome\Application\chrome.exe");
+        }
+        out
+    }
+
+    pub fn find_browser() -> Option<PathBuf> {
+        if let Some(p) = std::env::var_os(BROWSER_ENV).map(PathBuf::from) {
+            if p.is_file() {
+                return Some(p);
+            }
+        }
+        browser_candidates().into_iter().find(|p| p.is_file())
+    }
+
+    fn work_dir() -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos();
+        let seq = TEMP_COUNTER.fetch_add(1, Ordering::Relaxed);
+        std::env::temp_dir().join(format!(
+            "kalamos-pdf-{}-{nanos}-{seq}",
+            std::process::id()
+        ))
+    }
+
+    fn is_pdf(path: &Path) -> bool {
+        use std::io::Read;
+        let mut head = [0u8; 5];
+        fs::File::open(path)
+            .and_then(|mut f| f.read_exact(&mut head))
+            .map(|_| &head == b"%PDF-")
+            .unwrap_or(false)
+    }
+
+    fn print_to_pdf(
+        browser: &Path,
+        page: &Path,
+        profile: &Path,
+        out: &Path,
+        timeout: Duration,
+    ) -> Result<(), AppError> {
+        let mut print_arg = OsString::from("--print-to-pdf=");
+        print_arg.push(out.as_os_str());
+        let mut profile_arg = OsString::from("--user-data-dir=");
+        profile_arg.push(profile.as_os_str());
+
+        let mut cmd = Command::new(browser);
+        crate::platform::no_console(&mut cmd)
+            .arg("--headless")
+            .arg("--disable-gpu")
+            .arg("--no-first-run")
+            .arg("--no-default-browser-check")
+            .arg("--disable-extensions")
+            .arg("--disable-sync")
+            .arg("--disable-background-networking")
+            .arg("--disable-component-update")
+            .arg("--allow-file-access-from-files")
+            .arg("--no-pdf-header-footer")
+            .arg("--print-to-pdf-no-header")
+            .arg("--generate-pdf-document-outline")
+            .arg(profile_arg)
+            .arg(print_arg)
+            .arg(page.as_os_str())
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null());
+        let mut child = cmd
+            .spawn()
+            .map_err(|e| AppError::new(ErrorKind::Io, format!("無法啟動 {}：{e}", browser.display())))?;
+
+        let deadline = Instant::now() + timeout;
+        let status = loop {
+            match child.try_wait() {
+                Ok(Some(status)) => break status,
+                Ok(None) => {
+                    if Instant::now() >= deadline {
+                        let _ = child.kill();
+                        let _ = child.wait();
+                        return Err(AppError::new(
+                            ErrorKind::Io,
+                            format!("PDF 匯出逾時（超過 {} 秒）", timeout.as_secs()),
+                        ));
+                    }
+                    std::thread::sleep(Duration::from_millis(50));
+                }
+                Err(e) => return Err(AppError::new(ErrorKind::Io, e.to_string())),
+            }
+        };
+        if !status.success() && !is_pdf(out) {
+            return Err(AppError::new(
+                ErrorKind::Io,
+                format!("PDF 匯出失敗（瀏覽器結束碼 {}）", status.code().unwrap_or(-1)),
+            ));
+        }
+        if !is_pdf(out) {
+            return Err(AppError::new(ErrorKind::Io, "PDF 匯出失敗：瀏覽器沒有產生 PDF"));
+        }
+        Ok(())
+    }
+
+    pub fn export(
+        html: &str,
+        target: &Path,
+        _headings: &[ExportHeading],
+        timeout: Duration,
+    ) -> Result<FileMeta, AppError> {
+        let browser =
+            find_browser().ok_or_else(|| AppError::not_found(BROWSER_MISSING_MESSAGE))?;
+        let work = work_dir();
+        fs::create_dir_all(&work)?;
+        let tmp_pdf = temp_sibling(target, "print");
+        let result = (|| {
+            let page = work.join("page.html");
+            fs::write(&page, html)?;
+            print_to_pdf(&browser, &page, &work.join("profile"), &tmp_pdf, timeout)?;
+            fs::rename(&tmp_pdf, target)?;
+            file_meta(target)
+        })();
+        if result.is_err() {
+            let _ = fs::remove_file(&tmp_pdf);
+        }
+        // The browser profile may still be locked for a moment after exit.
+        for _ in 0..10 {
+            if fs::remove_dir_all(&work).is_ok() || !work.exists() {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(100));
+        }
+        result
     }
 
     pub fn inspect(_path: &Path) -> Result<PdfSummary, AppError> {
@@ -1011,5 +1181,27 @@ mod tests {
         let v: Vec<ExportHeading> =
             serde_json::from_str(r#"[{"level":2,"text":"標題","id":"標題"}]"#).unwrap();
         assert_eq!(v, vec![h(2, "標題")].into_iter().map(|mut x| { x.id = "標題".into(); x }).collect::<Vec<_>>());
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn windows_headless_edge_exports_real_pdf() {
+        if super::imp::find_browser().is_none() {
+            return;
+        }
+        let dir = tempfile::tempdir().unwrap();
+        let out = dir.path().join("exported.pdf");
+        let headings = vec![h(1, "第一章 蘆葦筆"), h(2, "小節 1.1")];
+        let html = "<!doctype html><html><head><meta charset=\"utf-8\"><style>@page{size:A4;margin:18mm 20mm}</style></head><body><h1>第一章 蘆葦筆</h1><p>內文段落</p><h2>小節 1.1</h2><p>更多內容</p></body></html>";
+        let meta = export_pdf_blocking(
+            html,
+            &out.to_string_lossy(),
+            &headings,
+            EXPORT_TIMEOUT,
+        )
+        .expect("export pdf with headless Edge");
+        assert!(meta.size > 1000);
+        let bytes = std::fs::read(&out).unwrap();
+        assert!(bytes.starts_with(b"%PDF-"));
     }
 }

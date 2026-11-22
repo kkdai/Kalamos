@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>Write, and it appears.</strong><br />
-  A Typora-style WYSIWYM live-preview Markdown desktop editor for macOS, built with Tauri 2 and CodeMirror 6.<br />
+  A Typora-style WYSIWYM live-preview Markdown desktop editor for macOS & Windows, built with Tauri 2 and CodeMirror 6.<br />
   Free, offline, no account, no telemetry.
 </p>
 
@@ -122,7 +122,16 @@
 | | Export via Pandoc (DOCX/ODT/LaTeX/Wiki/EPUB) | `Cmd+Opt+E` |
 | | Import via Pandoc | `Cmd+Opt+I` |
 
+> **Windows shortcuts**: every `Cmd` above maps to `Ctrl` and `Opt` maps to `Alt` (e.g. `Cmd+Opt+T` is `Ctrl+Alt+T`).
+
 ---
+
+## Installation (Windows)
+
+1. Download the latest Windows installer (`.msi` or `-setup.exe`) from Releases, or build from source below.
+2. Windows 10 / 11 already includes **WebView2** and **Microsoft Edge** (used for headless A4 PDF export with document outline bookmarks).
+3. The installer registers `.md`, `.markdown`, `.mdown`, `.mkd`, `.mkdn`, `.mdwn`, and `.mdtxt` file associations; double-clicking or choosing **Open with Kalamos** in File Explorer opens the file in the running window.
+4. Settings and custom CSS themes live in `%APPDATA%\io.kalamos.app\` (`settings.json` and `themes\*.css`).
 
 ## Installation (macOS)
 
@@ -189,8 +198,8 @@ npm run bench
 
 ## Known Limitations
 
-- **macOS only**: Native PDF export relies on macOS `WKWebView`, `NSPrintOperation`, and `PDFKit`; Windows and Linux packaging are not supported yet.
-- **No GUI Preferences window yet**: Most toggles work via shortcuts and persist automatically in `~/Library/Application Support/io.kalamos.app/settings.json`; image uploader settings (`uploadCommand`, `uploadArgs`, `uploadOnInsert`) are edited directly in that file.
+- **macOS & Windows**: macOS uses `WKWebView`, `NSPrintOperation`, and `PDFKit` for bookmarked PDF export; Windows uses headless Microsoft Edge (or Google Chrome) to paginate onto A4 and build PDF outline bookmarks from `<h1>`–`<h6>`.
+- **No GUI Preferences window yet**: Most toggles work via shortcuts and persist automatically in `~/Library/Application Support/io.kalamos.app/settings.json` (`%APPDATA%\io.kalamos.app\settings.json` on Windows); image uploader settings (`uploadCommand`, `uploadArgs`, `uploadOnInsert`) are edited directly in that file.
 - **Pandoc is external**: Multi-format export (`EX-02`) and import (`EX-03`) require installing Pandoc separately (2.15+ for sandboxed import).
 - **Unsigned macOS builds**: Prebuilt `.dmg` releases require manual Gatekeeper approval on first launch.
 - **iPic preset**: macOS iPic is not built in as a preset; any CLI image uploader matching the stdout URL contract can be configured as `uploadCommand`.

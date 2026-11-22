@@ -39,11 +39,7 @@ pub fn is_ignored_name(name: &str) -> bool {
 }
 
 pub fn is_markdown_name(name: &str) -> bool {
-    Path::new(name)
-        .extension()
-        .and_then(|ext| ext.to_str())
-        .map(|ext| ext.eq_ignore_ascii_case("md") || ext.eq_ignore_ascii_case("markdown"))
-        .unwrap_or(false)
+    crate::open_with::has_markdown_extension(Path::new(name))
 }
 
 pub fn extract_excerpt(content: &str) -> String {

@@ -5,6 +5,7 @@ pub mod fsops;
 pub mod images;
 pub mod open_with;
 pub mod pandoc;
+pub mod platform;
 pub mod recovery;
 pub mod search;
 pub mod settings;
@@ -15,11 +16,31 @@ pub mod watch;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .manage(watch::WatcherManager::new())
-        .manage(open_with::PendingOpenFiles::new())
+        .manage(open_with::PendingOpenFiles::new());
+
+    // Windows / Linux: a second instance launched by Explorer ("Open with")
+    // forwards its argv to the running instance and exits.
+    #[cfg(any(target_os = "windows", target_os = "linux"))]
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
+        open_with::handle_cli_args(app, &argv, Some(std::path::Path::new(&cwd)));
+    }));
+
+    builder
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .setup(|_app| {
+            #[cfg(any(target_os = "windows", target_os = "linux"))]
+            {
+                let args: Vec<String> = std::env::args().collect();
+                if args.len() > 1 {
+                    let cwd = std::env::current_dir().ok();
+                    open_with::handle_cli_args(_app.handle(), &args, cwd.as_deref());
+                }
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             files::open_file,
             files::save_file,

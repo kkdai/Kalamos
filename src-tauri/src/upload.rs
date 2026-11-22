@@ -28,9 +28,8 @@ use crate::settings::{get_settings_in, Settings};
 pub const UPLOAD_TIMEOUT: Duration = Duration::from_secs(60);
 pub const UPLOADER_NOT_CONFIGURED_MESSAGE: &str =
     "尚未設定圖床上傳指令（見 docs/image-upload.md）";
-/// Folders searched after PATH for a bare command name (GUI apps on macOS do
-/// not inherit the shell PATH).
-pub const EXTRA_SEARCH_DIRS: &[&str] = &["/opt/homebrew/bin", "/usr/local/bin"];
+// Folders searched after PATH for a bare command name: see
+// `platform::extra_search_dirs` (GUI apps on macOS do not inherit the shell PATH).
 const STDERR_TAIL_CHARS: usize = 400;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -119,32 +118,17 @@ fn stderr_tail(stderr: &[u8]) -> String {
     }
 }
 
-fn is_executable(path: &Path) -> bool {
-    let Ok(meta) = fs::metadata(path) else {
-        return false;
-    };
-    if !meta.is_file() {
-        return false;
-    }
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        meta.permissions().mode() & 0o111 != 0
-    }
-    #[cfg(not(unix))]
-    {
-        true
-    }
-}
+use crate::platform::is_executable;
 
-/// A command with a `/` is used as given; a bare name is looked up in PATH
-/// and then the Homebrew folders.
+/// A command that names a path (contains `/`, or `\` on Windows, or is
+/// absolute) is used as given; a bare name is looked up in PATH and then the
+/// platform's extra folders (with `PATHEXT` extensions on Windows).
 pub fn resolve_command(
     command: &str,
     path_env: Option<OsString>,
     extra_dirs: &[PathBuf],
 ) -> Result<PathBuf, AppError> {
-    if command.contains('/') {
+    if crate::platform::is_path_like(command) {
         let p = PathBuf::from(command);
         return if is_executable(&p) {
             Ok(p)
@@ -152,14 +136,7 @@ pub fn resolve_command(
             Err(AppError::not_found(format!("找不到可執行的上傳指令：{command}")))
         };
     }
-    let mut dirs: Vec<PathBuf> = path_env
-        .map(|p| std::env::split_paths(&p).collect())
-        .unwrap_or_default();
-    dirs.extend(extra_dirs.iter().cloned());
-    dirs.into_iter()
-        .filter(|d| !d.as_os_str().is_empty())
-        .map(|d| d.join(command))
-        .find(|c| is_executable(c))
+    crate::platform::find_executable(command, path_env, extra_dirs)
         .ok_or_else(|| AppError::not_found(format!("找不到上傳指令：{command}")))
 }
 
@@ -181,7 +158,8 @@ pub fn run_uploader(
     if paths.is_empty() {
         return Ok(Vec::new());
     }
-    let mut child = Command::new(program)
+    let mut cmd = Command::new(program);
+    let mut child = crate::platform::no_console(&mut cmd)
         .args(args)
         .args(paths)
         .stdin(Stdio::null())
@@ -243,7 +221,7 @@ pub fn upload_with(
         .iter()
         .map(|p| validate_image_path(p))
         .collect::<Result<Vec<_>, _>>()?;
-    let extra: Vec<PathBuf> = EXTRA_SEARCH_DIRS.iter().map(PathBuf::from).collect();
+    let extra = crate::platform::extra_search_dirs();
     let program = resolve_command(&uploader.command, std::env::var_os("PATH"), &extra)?;
     let urls = run_uploader(&program, &uploader.args, &files, timeout)?;
     Ok(UploadResult { urls })

@@ -40,7 +40,7 @@ test("#16 EX-02: without Pandoc the install hint is shown and no picker opens", 
   await setDoc(page, "# a");
   await withIpc(page, "ipc.setMockPandocAvailable(false);");
   await page.keyboard.press(`${MOD}+Alt+KeyE`);
-  await expect(page.getByTestId("status")).toHaveText("找不到 Pandoc：請先安裝（brew install pandoc）");
+  await expect(page.getByTestId("status")).toContainText("找不到 Pandoc：請先安裝");
   await expect(page.getByTestId("export-format-picker")).toHaveCount(0);
 });
 

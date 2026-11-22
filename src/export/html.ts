@@ -97,7 +97,16 @@ export function escapeHtml(text: string): string {
 
 /** Local file path → file:// URL (the export WebView may read local files). */
 export function fileUrlFromPath(path: string): string {
-  return `file://${path
+  const norm = path.replace(/\\/g, "/");
+  const drive = /^([A-Za-z]):(?:\/(.*))?$/.exec(norm);
+  if (drive) {
+    const rest = (drive[2] ?? "")
+      .split("/")
+      .map((segment) => encodeURIComponent(segment))
+      .join("/");
+    return `file:///${drive[1]}:/${rest}`;
+  }
+  return `file://${norm
     .split("/")
     .map((segment) => encodeURIComponent(segment))
     .join("/")}`;

@@ -25,8 +25,8 @@ use crate::files::FileMeta;
 pub const PANDOC_TIMEOUT: Duration = Duration::from_secs(120);
 /// `pandoc --version` must answer within this time.
 const VERSION_TIMEOUT: Duration = Duration::from_secs(10);
-/// Extra folders searched after PATH (Homebrew on Apple silicon / Intel).
-pub const EXTRA_SEARCH_DIRS: &[&str] = &["/opt/homebrew/bin", "/usr/local/bin"];
+// Extra folders searched after PATH: see `platform::extra_search_dirs`
+// (Homebrew on macOS; Pandoc / winget / Scoop / Chocolatey folders on Windows).
 /// Markdown dialect Kalamos documents are written in.
 pub const MARKDOWN_READER: &str =
     "markdown+tex_math_dollars+footnotes+yaml_metadata_block+pipe_tables+task_lists";
@@ -34,7 +34,11 @@ pub const MARKDOWN_READER: &str =
 /// default (math as $`…`$ / ```math), which Kalamos does not read; turn it off
 /// so math comes out as `$…$` / `$$…$$` (#48).
 pub const MARKDOWN_WRITER: &str = "gfm-tex_math_gfm+tex_math_dollars+footnotes";
+#[cfg(not(target_os = "windows"))]
 pub const PANDOC_MISSING_MESSAGE: &str = "找不到 Pandoc：請先安裝（brew install pandoc）";
+#[cfg(target_os = "windows")]
+pub const PANDOC_MISSING_MESSAGE: &str =
+    "找不到 Pandoc：請先安裝（winget install JohnMacFarlane.Pandoc，或至 pandoc.org 下載安裝程式）";
 pub const PANDOC_TOO_OLD_FOR_IMPORT_MESSAGE: &str = "Pandoc 版本過舊，匯入需要 2.15 以上";
 /// First pandoc release with `--sandbox` (imports run sandboxed).
 pub const MIN_SANDBOX_VERSION: (u32, u32, u32) = (2, 15, 0);
@@ -127,34 +131,10 @@ pub fn reader_for_path(path: &Path) -> Result<&'static str, AppError> {
 // Detection
 // ---------------------------------------------------------------------------
 
-fn is_executable(path: &Path) -> bool {
-    let Ok(meta) = fs::metadata(path) else {
-        return false;
-    };
-    if !meta.is_file() {
-        return false;
-    }
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        meta.permissions().mode() & 0o111 != 0
-    }
-    #[cfg(not(unix))]
-    {
-        true
-    }
-}
-
-/// First executable `pandoc` in `path_env` (PATH-style list), then `extra_dirs`.
+/// First executable `pandoc` (`pandoc.exe` on Windows) in `path_env`
+/// (PATH-style list), then `extra_dirs`.
 pub fn find_pandoc(path_env: Option<OsString>, extra_dirs: &[PathBuf]) -> Option<PathBuf> {
-    let mut dirs: Vec<PathBuf> = path_env
-        .map(|p| std::env::split_paths(&p).collect())
-        .unwrap_or_default();
-    dirs.extend(extra_dirs.iter().cloned());
-    dirs.into_iter()
-        .filter(|d| !d.as_os_str().is_empty())
-        .map(|d| d.join("pandoc"))
-        .find(|candidate| is_executable(candidate))
+    crate::platform::find_executable("pandoc", path_env, extra_dirs)
 }
 
 /// Detects pandoc at `path` and reads its version (first line of `--version`).
@@ -205,7 +185,7 @@ pub fn supports_sandbox(version: Option<&str>) -> bool {
 }
 
 fn detect() -> PandocStatus {
-    let extra: Vec<PathBuf> = EXTRA_SEARCH_DIRS.iter().map(PathBuf::from).collect();
+    let extra = crate::platform::extra_search_dirs();
     status_for(find_pandoc(std::env::var_os("PATH"), &extra))
 }
 
@@ -261,7 +241,8 @@ pub fn run_pandoc(
     timeout: Duration,
 ) -> Result<RunOutput, AppError> {
     let spawn = || {
-        Command::new(pandoc)
+        let mut cmd = Command::new(pandoc);
+        crate::platform::no_console(&mut cmd)
             .args(args)
             .stdin(if stdin.is_some() {
                 Stdio::piped()
@@ -695,10 +676,45 @@ pub fn import_with(
     if !has_media {
         let _ = fs::remove_dir(&work_dir);
     }
+    #[cfg(target_os = "windows")]
+    let markdown = if has_media {
+        slash_media_paths(&markdown, &work_dir)
+    } else {
+        markdown
+    };
     Ok(ImportResult {
         markdown,
         media_dir: has_media.then(|| work_dir.to_string_lossy().into_owned()),
     })
+}
+
+/// Windows: pandoc writes the extracted media paths with backslashes
+/// (`C:\Users\me\AppData\Local\Temp\kalamos-import-…\media\image1.png`).
+/// Rewrite them with forward slashes so they are plain Markdown destinations
+/// (a backslash may escape the next character) that the editor resolves.
+#[cfg(any(target_os = "windows", test))]
+pub fn slash_media_paths(markdown: &str, work_dir: &Path) -> String {
+    let native = work_dir.to_string_lossy().into_owned();
+    if !native.contains('\\') {
+        return markdown.to_string();
+    }
+    let slashed = native.replace('\\', "/");
+    let mut out = String::with_capacity(markdown.len());
+    let mut rest = markdown;
+    while let Some(idx) = rest.find(&native) {
+        out.push_str(&rest[..idx]);
+        out.push_str(&slashed);
+        let after = &rest[idx + native.len()..];
+        let end = after
+            .find(|c: char| {
+                c.is_whitespace() || matches!(c, ')' | '"' | '\'' | '>' | '<' | ']' | '}')
+            })
+            .unwrap_or(after.len());
+        out.push_str(&after[..end].replace('\\', "/"));
+        rest = &after[end..];
+    }
+    out.push_str(rest);
+    out
 }
 
 #[tauri::command]
@@ -1283,5 +1299,23 @@ printf '# 第一章\n\n## 第一節\n\n### 小節\n\n![](%s/media/image1.png)\n\
             }
             drop(dir);
         }
+    }
+}
+
+#[cfg(test)]
+mod media_path_tests {
+    use super::slash_media_paths;
+    use std::path::Path;
+
+    #[test]
+    fn rewrites_backslashed_media_paths_only() {
+        let work = Path::new(r"C:\Temp\kalamos-import-a");
+        let md = "![x](C:\\Temp\\kalamos-import-a\\media\\image1.png) and C:\\other\\keep.png\n";
+        assert_eq!(
+            slash_media_paths(md, work),
+            "![x](C:/Temp/kalamos-import-a/media/image1.png) and C:\\other\\keep.png\n"
+        );
+        // Nothing to do for forward-slash work dirs.
+        assert_eq!(slash_media_paths("a\\b", Path::new("/tmp/w")), "a\\b");
     }
 }

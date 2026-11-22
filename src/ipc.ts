@@ -7,6 +7,15 @@ import {
   open as openDialog,
   save as saveDialog,
 } from "@tauri-apps/plugin-dialog";
+import { isAbsolutePath, toNativePath, toSlashPath } from "./platform";
+
+function normalizeTreeNode(node: TreeNode): TreeNode {
+  return {
+    ...node,
+    path: toSlashPath(node.path),
+    children: node.children?.map(normalizeTreeNode),
+  };
+}
 
 export type ErrorKind =
   | "NotFound"
@@ -199,8 +208,10 @@ export function isIgnoredName(name: string): boolean {
 }
 
 export function isMarkdownName(name: string): boolean {
-  const lower = name.toLowerCase();
-  return lower.endsWith(".md") || lower.endsWith(".markdown");
+  const dot = name.lastIndexOf(".");
+  if (dot <= 0) return false;
+  const ext = name.slice(dot + 1).toLowerCase();
+  return (MARKDOWN_EXT_LIST as readonly string[]).includes(ext);
 }
 
 export function extractExcerpt(content: string): string {
@@ -409,7 +420,8 @@ export async function saveFile(
   content: string,
 ): Promise<FileMeta> {
   if (isTauri()) {
-    return invoke<FileMeta>("save_file", { path, content });
+    const meta = await invoke<FileMeta>("save_file", { path, content });
+    return { ...meta, path: toSlashPath(meta.path) };
   }
   const defaultSave = async (): Promise<FileMeta> => {
     if (!path || !path.trim()) {
@@ -530,7 +542,7 @@ function buildMockTree(dirPath: string): TreeNode {
 
 export async function readTree(path: string): Promise<TreeNode> {
   if (isTauri()) {
-    return invoke<TreeNode>("read_tree", { path });
+    return normalizeTreeNode(await invoke<TreeNode>("read_tree", { path }));
   }
   const norm = assertValidMockDir(path);
   return buildMockTree(norm);
@@ -538,7 +550,8 @@ export async function readTree(path: string): Promise<TreeNode> {
 
 export async function listFiles(path: string): Promise<FileEntry[]> {
   if (isTauri()) {
-    return invoke<FileEntry[]>("list_files", { path });
+    const entries = await invoke<FileEntry[]>("list_files", { path });
+    return entries.map((e) => ({ ...e, path: toSlashPath(e.path) }));
   }
   const norm = assertValidMockDir(path);
   const prefix = norm === "/" ? "/" : `${norm}/`;
@@ -730,13 +743,17 @@ export async function searchInFolder(
   opts: FolderSearchOptions,
 ): Promise<FolderSearchResults> {
   if (isTauri()) {
-    return invoke<FolderSearchResults>("search_in_folder", {
+    const res = await invoke<FolderSearchResults>("search_in_folder", {
       root,
       query,
       caseSensitive: opts.caseSensitive,
       wholeWord: opts.wholeWord,
       regex: opts.regex,
     });
+    return {
+      ...res,
+      hits: res.hits.map((h) => ({ ...h, path: toSlashPath(h.path) })),
+    };
   }
   return mockSearchInFolder(root, query, opts);
 }
@@ -752,7 +769,8 @@ export async function watchFolder(path: string): Promise<null> {
 
 export async function createFile(path: string): Promise<FileMeta> {
   if (isTauri()) {
-    return invoke<FileMeta>("create_file", { path });
+    const meta = await invoke<FileMeta>("create_file", { path });
+    return { ...meta, path: toSlashPath(meta.path) };
   }
   if (!path || !path.trim()) {
     throw createAppError("InvalidPath", "Path must not be empty");
@@ -863,7 +881,10 @@ export async function onFsChanged(
 ): Promise<() => void> {
   if (isTauri()) {
     return listen<FsChangedPayload>("fs-changed", (event) => {
-      void listener(event.payload);
+      void listener({
+        root: toSlashPath(event.payload.root),
+        paths: event.payload.paths.map((p) => toSlashPath(p)),
+      });
     });
   }
   mockFsChangedListeners.add(listener);
@@ -909,7 +930,8 @@ export async function writeRecovery(
 
 export async function listRecovery(): Promise<RecoveryEntry[]> {
   if (isTauri()) {
-    return invoke<RecoveryEntry[]>("list_recovery");
+    const list = await invoke<RecoveryEntry[]>("list_recovery");
+    return list.map((e) => ({ ...e, path: toSlashPath(e.path) }));
   }
   return Array.from(mockRecovery.values())
     .map((entry) => ({ ...entry }))
@@ -927,7 +949,12 @@ export async function clearRecovery(docId: string): Promise<null> {
 
 export async function getSettings(): Promise<Settings> {
   if (isTauri()) {
-    return invoke<Settings>("get_settings");
+    const s = await invoke<Settings>("get_settings");
+    return {
+      ...s,
+      lastFolder: toSlashPath(s.lastFolder),
+      imageRootDir: toSlashPath(s.imageRootDir),
+    };
   }
   return { ...mockSettings };
 }
@@ -1009,14 +1036,18 @@ export async function readThemeCss(id: string): Promise<string> {
   return css;
 }
 
+import {
+  MARKDOWN_EXTENSIONS as MARKDOWN_EXT_LIST,
+} from "./platform";
+
 export async function pickOpenFilePath(): Promise<string | null> {
   if (isTauri()) {
     const selected = await openDialog({
       multiple: false,
       directory: false,
-      filters: [{ name: "Markdown", extensions: ["md", "markdown"] }],
+      filters: [{ name: "Markdown", extensions: [...MARKDOWN_EXT_LIST] }],
     });
-    return typeof selected === "string" ? selected : null;
+    return typeof selected === "string" ? toSlashPath(selected) : null;
   }
   if (mockOpenDialogHandler) {
     return await mockOpenDialogHandler();
@@ -1030,7 +1061,7 @@ export async function pickOpenFolderPath(): Promise<string | null> {
       multiple: false,
       directory: true,
     });
-    return typeof selected === "string" ? selected : null;
+    return typeof selected === "string" ? toSlashPath(selected) : null;
   }
   if (mockOpenFolderDialogHandler) {
     return await mockOpenFolderDialogHandler();
@@ -1046,10 +1077,10 @@ export async function pickSaveFilePath(
 ): Promise<string | null> {
   if (isTauri()) {
     const selected = await saveDialog({
-      defaultPath: defaultPath ?? undefined,
+      defaultPath: toNativePath(defaultPath) ?? undefined,
       filters: [{ name: "Markdown", extensions: ["md", "markdown"] }],
     });
-    return selected ?? null;
+    return toSlashPath(selected ?? null);
   }
   if (mockSaveDialogHandler) {
     return await mockSaveDialogHandler(defaultPath);
@@ -1259,9 +1290,9 @@ export const DISPLAY_IMAGE_EXTS = [
  */
 export async function allowAssetFile(path: string): Promise<null> {
   if (isTauri()) {
-    return invoke<null>("allow_asset_file", { path });
+    return invoke<null>("allow_asset_file", { path: toNativePath(path) });
   }
-  if (!path || !path.trim() || !path.startsWith("/")) {
+  if (!path || !path.trim() || !isAbsolutePath(path)) {
     throw createAppError("InvalidPath", `Image path must be absolute: ${path}`);
   }
   const norm = normalizePath(path);
@@ -1293,7 +1324,7 @@ export function getMockAssetFiles(): string[] {
 /** URL that loads a local file in the WebView (asset protocol under Tauri). */
 export function localFileUrl(path: string): string {
   if (isTauri()) {
-    return convertFileSrc(path);
+    return convertFileSrc(toNativePath(path));
   }
   return `asset://localhost/${encodeURIComponent(path)}`;
 }
@@ -1308,7 +1339,7 @@ export async function onFileDrop(listener: FileDropListener): Promise<() => void
           ? window.devicePixelRatio
           : 1;
       void listener({
-        paths: event.payload.paths,
+        paths: event.payload.paths.map((p) => toSlashPath(p)),
         position: {
           x: event.payload.position.x / ratio,
           y: event.payload.position.y / ratio,
@@ -1352,7 +1383,10 @@ export async function onOpenFilesRequested(
 ): Promise<() => void> {
   if (isTauri()) {
     return listen<OpenFilesRequest>(OPEN_FILES_EVENT, (event) => {
-      void listener(event.payload);
+      void listener({
+        paths: event.payload.paths.map((p) => toSlashPath(p)),
+        rejected: event.payload.rejected,
+      });
     });
   }
   mockOpenFilesListeners.add(listener);
@@ -1364,7 +1398,11 @@ export async function onOpenFilesRequested(
 /** Mark the frontend ready and take what the OS queued before it was (cold launch). */
 export async function takePendingOpenFiles(): Promise<OpenFilesRequest> {
   if (isTauri()) {
-    return invoke<OpenFilesRequest>("take_pending_open_files");
+    const req = await invoke<OpenFilesRequest>("take_pending_open_files");
+    return {
+      paths: req.paths.map((p) => toSlashPath(p)),
+      rejected: req.rejected,
+    };
   }
   mockOpenFilesReady = true;
   const taken = mockPendingOpenFiles;
@@ -1416,10 +1454,10 @@ let mockExportPdfHandler: MockExportPdfHandler | null = null;
 export async function pickSavePdfPath(defaultPath: string): Promise<string | null> {
   if (isTauri()) {
     const selected = await saveDialog({
-      defaultPath,
+      defaultPath: toNativePath(defaultPath),
       filters: [{ name: "PDF", extensions: ["pdf"] }],
     });
-    return selected ?? null;
+    return toSlashPath(selected ?? null);
   }
   if (mockSaveDialogHandler) {
     return await mockSaveDialogHandler(defaultPath);
@@ -1434,7 +1472,8 @@ export async function exportPdf(
   headings: PdfHeading[],
 ): Promise<FileMeta> {
   if (isTauri()) {
-    return invoke<FileMeta>("export_pdf", { html, outPath, headings });
+    const meta = await invoke<FileMeta>("export_pdf", { html, outPath, headings });
+    return { ...meta, path: toSlashPath(meta.path) };
   }
   if (!outPath || !outPath.trim()) {
     throw createAppError("InvalidPath", "Path must not be empty");
@@ -1525,7 +1564,7 @@ export async function pandocStatus(recheck = false): Promise<PandocStatus> {
 /** Convert `markdown` with pandoc to `format`, written atomically to `outPath`. */
 export async function exportPandoc(req: PandocExportRequest): Promise<FileMeta> {
   if (isTauri()) {
-    return invoke<FileMeta>("export_pandoc", {
+    const meta = await invoke<FileMeta>("export_pandoc", {
       docPath: req.docPath,
       markdown: req.markdown,
       format: req.format,
@@ -1533,6 +1572,7 @@ export async function exportPandoc(req: PandocExportRequest): Promise<FileMeta> 
       imageRoot: req.imageRoot ?? null,
       toc: Boolean(req.toc),
     });
+    return { ...meta, path: toSlashPath(meta.path) };
   }
   if (!mockPandocStatus.available) throw createAppError("NotFound", PANDOC_MISSING);
   if (!req.outPath || !req.outPath.trim()) {
@@ -1554,7 +1594,8 @@ export async function exportPandoc(req: PandocExportRequest): Promise<FileMeta> 
 /** Convert a DOCX / ODT / EPUB / LaTeX / HTML / MediaWiki file to Markdown. */
 export async function importPandoc(path: string): Promise<PandocImportResult> {
   if (isTauri()) {
-    return invoke<PandocImportResult>("import_pandoc", { path });
+    const res = await invoke<PandocImportResult>("import_pandoc", { path });
+    return { ...res, mediaDir: toSlashPath(res.mediaDir) };
   }
   if (!path || !path.trim()) throw createAppError("InvalidPath", "Path must not be empty");
   const ext = path.slice(path.lastIndexOf(".") + 1).toLowerCase();
@@ -1577,10 +1618,10 @@ export async function pickSaveExportPath(
 ): Promise<string | null> {
   if (isTauri()) {
     const selected = await saveDialog({
-      defaultPath,
+      defaultPath: toNativePath(defaultPath),
       filters: [{ name: label, extensions: [ext] }],
     });
-    return selected ?? null;
+    return toSlashPath(selected ?? null);
   }
   if (mockSaveDialogHandler) return await mockSaveDialogHandler(defaultPath);
   return null;
@@ -1594,7 +1635,7 @@ export async function pickImportPath(extensions: string[]): Promise<string | nul
       directory: false,
       filters: [{ name: "可匯入的文件", extensions }],
     });
-    return typeof selected === "string" ? selected : null;
+    return typeof selected === "string" ? toSlashPath(selected) : null;
   }
   if (mockOpenDialogHandler) return await mockOpenDialogHandler();
   return null;

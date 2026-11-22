@@ -6,6 +6,7 @@ import {
   setSettings,
   type ThemeInfo,
 } from "../ipc";
+import { shortcutLabel } from "../platform";
 
 export const CUSTOM_THEME_STYLE_ID = "k-custom-theme";
 
@@ -135,7 +136,7 @@ export function createThemeMenu(
   btnEl.className = "k-theme-btn";
   btnEl.id = "theme-menu-btn";
   btnEl.dataset.testid = "theme-menu-button";
-  btnEl.title = "切換主題 (Cmd+Shift+T)";
+  btnEl.title = shortcutLabel("切換主題 (Cmd+Shift+T)");
   btnEl.setAttribute("aria-label", "主題選單");
   btnEl.setAttribute("aria-haspopup", "menu");
   btnEl.setAttribute("aria-expanded", "false");
@@ -160,7 +161,6 @@ export function createThemeMenu(
       optBtn.type = "button";
       optBtn.className = "k-theme-option";
       optBtn.dataset.testid = "theme-option";
-      optBtn.dataset.theme = item.id;
       optBtn.dataset.themeId = item.id;
       optBtn.dataset.active = isActive ? "true" : "false";
       optBtn.setAttribute("role", "menuitemradio");

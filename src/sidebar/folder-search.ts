@@ -15,6 +15,7 @@ import {
   type FolderSearchOptions,
   type FolderSearchResults,
 } from "../ipc";
+import { shortcutLabel } from "../platform";
 
 export const FOLDER_SEARCH_DEBOUNCE_MS = 250;
 
@@ -257,7 +258,7 @@ export function createFolderSearch(init: FolderSearchOptionsInit): FolderSearchV
     if (!root) {
       lastResults = null;
       resultsEl.innerHTML = "";
-      setStatus("請先開啟資料夾（⇧⌘O）才能搜尋", "no-folder");
+      setStatus(shortcutLabel("請先開啟資料夾（⇧⌘O）才能搜尋"), "no-folder");
       return;
     }
     if (!query) {
@@ -335,7 +336,7 @@ export function createFolderSearch(init: FolderSearchOptionsInit): FolderSearchV
       clearTimer();
       lastResults = null;
       resultsEl.innerHTML = "";
-      setStatus("請先開啟資料夾（⇧⌘O）才能搜尋", "no-folder");
+      setStatus(shortcutLabel("請先開啟資料夾（⇧⌘O）才能搜尋"), "no-folder");
       return;
     }
     if (lastResults && lastResults.root !== root) {
