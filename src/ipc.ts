@@ -173,7 +173,7 @@ const mockSaveChangesPrompts: string[] = [];
 let mockWindowTitle = "Kalamos";
 let mockPromptDialogHandler: DialogPromptHandler | null = null;
 let mockSaveInterceptor: MockSaveInterceptor | null = null;
-const mockCloseListeners = new Set<() => void | Promise<void>>();
+const mockCloseListeners = new Set<() => boolean | void | Promise<boolean | void>>();
 const mockFsChangedListeners = new Set<FsChangedListener>();
 
 export function isTauri(): boolean {
@@ -329,6 +329,7 @@ export function resetMockState(): void {
   mockPromptDialogHandler = null;
   mockSaveInterceptor = null;
   mockCloseListeners.clear();
+  mockQuitCount = 0;
   mockFsChangedListeners.clear();
   mockAssetFiles.clear();
   mockAllowedAssetDirs.clear();
@@ -1106,19 +1107,30 @@ export async function askDiscardChanges(
   return true;
 }
 
-export const SAVE_CHANGES_LABELS = { yes: "儲存", no: "不儲存", cancel: "取消" } as const;
+export interface SaveChangesLabels {
+  yes: string;
+  no: string;
+  cancel: string;
+}
 
-/** #81: 儲存 / 不儲存 / 取消 before closing a tab with unsaved changes. */
-export async function askSaveChanges(message: string): Promise<SaveChangesChoice> {
+export const SAVE_CHANGES_LABELS: SaveChangesLabels = { yes: "儲存", no: "不儲存", cancel: "取消" };
+/** #81 B: closing the window / quitting with several unsaved documents. */
+export const SAVE_ALL_CHANGES_LABELS: SaveChangesLabels = { yes: "全部儲存", no: "不儲存", cancel: "取消" };
+
+/** #81: 儲存 / 不儲存 / 取消 before closing a tab (or the window) with unsaved changes. */
+export async function askSaveChanges(
+  message: string,
+  labels: SaveChangesLabels = SAVE_CHANGES_LABELS,
+): Promise<SaveChangesChoice> {
   if (isTauri()) {
     const result = await messageDialog(message, {
       title: "Kalamos",
       kind: "warning",
-      buttons: { ...SAVE_CHANGES_LABELS },
+      buttons: { ...labels },
     });
     // The plugin answers with the button key ("Yes") or, on some platforms, its label.
-    if (result === "Yes" || result === SAVE_CHANGES_LABELS.yes) return "save";
-    if (result === "No" || result === SAVE_CHANGES_LABELS.no) return "discard";
+    if (result === "Yes" || result === labels.yes) return "save";
+    if (result === "No" || result === labels.no) return "discard";
     return "cancel";
   }
   mockSaveChangesPrompts.push(message);
@@ -1160,12 +1172,13 @@ export async function promptMockInput(
   return null;
 }
 
-export async function onWindowCloseRequested(
-  handler: () => void | Promise<void>,
-): Promise<() => void> {
+/** The handler returns false to keep the window open (#81 B: 取消 at the unsaved prompt). */
+export type WindowCloseHandler = () => boolean | void | Promise<boolean | void>;
+
+export async function onWindowCloseRequested(handler: WindowCloseHandler): Promise<() => void> {
   if (isTauri()) {
-    return getCurrentWindow().onCloseRequested(async () => {
-      await handler();
+    return getCurrentWindow().onCloseRequested(async (event) => {
+      if ((await handler()) === false) event.preventDefault();
     });
   }
   mockCloseListeners.add(handler);
@@ -1174,10 +1187,28 @@ export async function onWindowCloseRequested(
   };
 }
 
-export async function triggerMockCloseRequested(): Promise<void> {
+/** Resolves to whether the window would close (no listener kept it open). */
+export async function triggerMockCloseRequested(): Promise<boolean> {
+  let close = true;
   for (const listener of Array.from(mockCloseListeners)) {
-    await listener();
+    if ((await listener()) === false) close = false;
   }
+  return close;
+}
+
+let mockQuitCount = 0;
+
+/** #81 B: exit the app (⌘Q), once the frontend has settled unsaved changes. */
+export async function quitApp(): Promise<void> {
+  if (isTauri()) {
+    await invoke("quit_app");
+    return;
+  }
+  mockQuitCount++;
+}
+
+export function getMockQuitCount(): number {
+  return mockQuitCount;
 }
 
 // ---------------------------------------------------------------------------

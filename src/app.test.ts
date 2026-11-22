@@ -271,7 +271,7 @@ describe("Kalamos app — shortcuts, byte-exact save, autosave & crash recovery"
     expect(app.editor.isDirty()).toBe(false);
   });
 
-  it("prompts via ask before discarding dirty untitled doc, and flushes save before switching dirty named doc", async () => {
+  it("#81 B opening a file never replaces unsaved changes: it gets a new tab, or the tab it is already in", async () => {
     app = createKalamosApp(document);
     await app.init();
 
@@ -280,48 +280,53 @@ describe("Kalamos app — shortcuts, byte-exact save, autosave & crash recovery"
     expect(await listRecovery()).toHaveLength(1);
     seedMockFile("/tmp/other.md", "other");
 
-    // User cancels discard dialog: opening another file in this tab is refused
-    setMockDialogHandlers({ ask: () => false });
-    const openedWhenCanceled = await app.openDocument("/tmp/other.md");
-    expect(openedWhenCanceled).toBe(false);
-    expect(app.editor.getContent()).toBe("unsaved untitled text");
-    expect(await listRecovery()).toHaveLength(1);
-
-    // #81: Cmd+N opens a new tab; the untitled draft stays (and keeps its recovery file)
-    const created = await app.newDocument();
-    expect(created).toBe(true);
-    expect(app.editor.getContent()).toBe("");
-    expect(app.getTabs()).toHaveLength(2);
-    expect(await listRecovery()).toHaveLength(1);
-
-    // Named dirty document flushes save before another file replaces it
-    seedMockFile("/tmp/named-switch.md", "base");
-    await app.openDocument("/tmp/named-switch.md");
-    userTypeText(app, " + edit");
-    expect(app.editor.isDirty()).toBe(true);
-
-    await app.openDocument("/tmp/other.md");
-    expect(readMockFile("/tmp/named-switch.md")).toBe("base + edit");
+    const ask = vi.fn(() => false);
+    setMockDialogHandlers({ ask });
+    expect(await app.openDocument("/tmp/other.md")).toBe(true);
+    expect(ask).not.toHaveBeenCalled();
     expect(app.getCurrentPath()).toBe("/tmp/other.md");
+    expect(app.getTabs().map((t) => t.path)).toEqual([null, "/tmp/other.md"]);
+    expect(await listRecovery()).toHaveLength(1);
+
+    // Already open: switched to, not opened again.
+    app.cycleTab(1);
+    expect(await app.openDocument("/tmp/other.md")).toBe(true);
+    expect(app.getTabs()).toHaveLength(2);
+    expect(app.getCurrentPath()).toBe("/tmp/other.md");
+
+    // Sidebar click ("current"): replaces a clean tab, opens a new tab next to a dirty one.
+    seedMockFile("/tmp/third.md", "third");
+    await app.openPath("/tmp/third.md", "current");
+    expect(app.getTabs().map((t) => t.path)).toEqual([null, "/tmp/third.md"]);
+    userTypeText(app, "!");
+    seedMockFile("/tmp/fourth.md", "fourth");
+    await app.openPath("/tmp/fourth.md", "current");
+    expect(app.getTabs().map((t) => t.path)).toEqual([null, "/tmp/third.md", "/tmp/fourth.md"]);
+    // Cmd+click ("newTab"): always a new tab.
+    seedMockFile("/tmp/fifth.md", "fifth");
+    await app.openPath("/tmp/fifth.md", "newTab");
+    expect(app.getTabs()).toHaveLength(4);
   });
 
-  it("flushes named file save or untitled recovery on window close requested", async () => {
+  it("#81 B window close: named files are written (autosave on); unsaved untitled text is asked about", async () => {
     app = createKalamosApp(document);
     await app.init();
 
-    // Untitled dirty file writes recovery on close
-    userTypeText(app, "closing untitled draft");
-    await triggerMockCloseRequested();
-    const rec = await listRecovery();
-    expect(rec).toHaveLength(1);
-    expect(rec[0].content).toBe("closing untitled draft");
-
-    // Named dirty file flushes save on close
     seedMockFile("/tmp/closing-named.md", "start");
     await app.openDocument("/tmp/closing-named.md");
     userTypeText(app, " end");
-    await triggerMockCloseRequested();
+    expect(await triggerMockCloseRequested()).toBe(true);
     expect(readMockFile("/tmp/closing-named.md")).toBe("start end");
     expect(app.editor.isDirty()).toBe(false);
+
+    app.newTab();
+    userTypeText(app, "closing untitled draft");
+    await vi.advanceTimersByTimeAsync(UNTITLED_RECOVERY_INTERVAL_MS);
+    setMockDialogHandlers({ saveChanges: () => "cancel" });
+    expect(await triggerMockCloseRequested()).toBe(false);
+    expect(await listRecovery()).toHaveLength(1);
+    setMockDialogHandlers({ saveChanges: () => "discard" });
+    expect(await triggerMockCloseRequested()).toBe(true);
+    expect(await listRecovery()).toHaveLength(0);
   });
 });

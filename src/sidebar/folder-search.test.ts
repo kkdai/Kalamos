@@ -271,19 +271,21 @@ describe("#73 B in the app", () => {
     });
   });
 
-  it("unsaved changes: the usual prompt is shown; cancelling keeps the current document", async () => {
+  it("#81 B unsaved changes: no prompt — the hit opens in a new tab and the edited document stays", async () => {
     await app!.openFolder("/notes");
     seedMockFile("/notes/c.md", "other needle");
     let asked = 0;
     setMockDialogHandlers({ ask: () => (asked++, false), save: () => null });
-    // Open a.md through the search, then edit it.
     await app!.sidebar.openSearch();
     input().value = "other";
     await app!.sidebar.folderSearch.runNow();
     const view = app!.editor.view;
     view.dispatch({ changes: { from: 0, insert: "dirty " } });
     document.querySelector<HTMLElement>('[data-testid="folder-search-hit"]')!.click();
-    await vi.waitFor(() => expect(asked).toBeGreaterThan(0));
+    await vi.waitFor(() => expect(app!.getCurrentPath()).toBe("/notes/c.md"));
+    expect(asked).toBe(0);
+    expect(app!.getTabs()).toHaveLength(2);
+    app!.cycleTab(1);
     expect(app!.editor.getContent().startsWith("dirty ")).toBe(true);
   });
 });

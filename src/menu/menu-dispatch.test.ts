@@ -57,6 +57,13 @@ describe("#74 menu accelerators", () => {
     expect(() => parseAccelerator("Hyper+K")).toThrow();
   });
 
+  it("#81 Ctrl+Tab matches Ctrl only, not Cmd", () => {
+    const m = parseAccelerator("Ctrl+Shift+Tab");
+    expect(m).toMatchObject({ code: "Tab", ctrl: true, shift: true, cmdOrCtrl: false });
+    expect(matchesKey(m, key({ code: "Tab", key: "Tab", ctrlKey: true, shiftKey: true }))).toBe(true);
+    expect(matchesKey(m, key({ code: "Tab", key: "Tab", metaKey: true, shiftKey: true }))).toBe(false);
+  });
+
   it("CmdOrCtrl matches Cmd or Ctrl, but not both or neither", () => {
     const m = parseAccelerator("CmdOrCtrl+S");
     expect(matchesKey(m, key({ code: "KeyS", metaKey: true }))).toBe(true);

@@ -82,7 +82,6 @@ import {
 } from "./preferences/preferences";
 import {
   allowAssetDir,
-  askDiscardChanges,
   askSaveChanges,
   isAssetDirTooBroadError,
   clearRecovery,
@@ -110,6 +109,8 @@ import {
   pickOpenFolderPath,
   pickSaveFilePath,
   pickSavePdfPath,
+  quitApp,
+  SAVE_ALL_CHANGES_LABELS,
   saveFile,
   setSettings,
   setWindowTitle,
@@ -126,9 +127,13 @@ import { createTabBar, type TabBar } from "./tabs/tab-bar";
 import {
   activeIndexAfterClose,
   cycleIndex,
+  isMarkdownPath,
   moveItem,
   nextUntitledNumber,
+  type OpenMode,
+  resolveOpenTarget,
   tabLabels,
+  unsavedChangesMessage,
 } from "./tabs/tab-model";
 import {
   applyThemeWithCustomCss,
@@ -176,27 +181,11 @@ function formatErrorMessage(prefix: string, err: unknown): string {
   return `${prefix}：${String(err)}`;
 }
 
-function baseName(path: string): string {
-  const parts = path.split(/[\\/]/);
-  return parts[parts.length - 1] || path;
-}
-
-/** #67: status line after the OS handed over files Kalamos did not (all) open. */
-export function openWithStatusMessage(
-  openedPath: string | null,
-  extraCount: number,
-  rejected: string[],
-): string {
-  const parts: string[] = [];
-  if (openedPath !== null && extraCount > 0) {
-    parts.push(
-      `已開啟 ${baseName(openedPath)}；另有 ${extraCount} 個檔案未開啟（Kalamos 一次開啟一個檔案）`,
-    );
-  }
-  if (rejected.length > 0) {
-    parts.push(`無法開啟：${rejected.join("、")}（只支援一般的 Markdown 檔案）`);
-  }
-  return parts.join("；");
+/** #67: status line for what the OS handed over that Kalamos refused (#81 B: every accepted file opens in a tab). */
+export function openWithStatusMessage(rejected: string[]): string {
+  return rejected.length > 0
+    ? `無法開啟：${rejected.join("、")}（只支援一般的 Markdown 檔案）`
+    : "";
 }
 
 export const IMAGE_ROOT_STATUS_PREFIX = "圖片根目錄：";
@@ -265,8 +254,15 @@ export interface KalamosApp {
   getCurrentPath: () => string | null;
   getPendingRecovery: () => RecoveryEntry | null;
   getStatusText: () => string;
+  /** Cmd+O: a new tab, or the tab the file is already open in, or the blank one. */
   openDocument: (explicitPath?: string) => Promise<boolean>;
-  /** #67: open what Finder / Dock / `open -a` handed over (first file; the rest are reported). */
+  /** #81 B: open `path` per the tab rules ("tab" / "current" = sidebar click / "newTab" = Cmd+click). */
+  openPath: (path: string, mode: OpenMode) => Promise<boolean>;
+  /** #81 B: red button / ⌘Q — settles every tab's unsaved changes; false = stay open. */
+  requestCloseWindow: () => Promise<boolean>;
+  /** #81 B: ⌘Q. */
+  quit: () => Promise<boolean>;
+  /** #67 / #81 B: open what Finder / Dock / `open -a` handed over, each file in its own tab. */
   openRequestedFiles: (req: OpenFilesRequest) => Promise<boolean>;
   openFolder: (explicitPath?: string) => Promise<boolean>;
   toggleSidebar: () => Promise<boolean>;
@@ -402,22 +398,6 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
     }, NAMED_AUTOSAVE_DELAY_MS);
   }
 
-  async function prepareBeforeSwitchDocument(): Promise<boolean> {
-    const tab = active;
-    if (!editor.isSessionDirty(tab.doc)) {
-      return true;
-    }
-    if (tab.path !== null) {
-      clearAutosaveTimer(tab);
-      return persistFileToPath(tab.path, tab, editor.getSessionContent(tab.doc));
-    }
-    const confirmed = await askDiscardChanges();
-    if (!confirmed) {
-      return false;
-    }
-    await clearRecovery(tab.docId).catch(() => null);
-    return true;
-  }
 
   async function persistEditorSettingPatch(
     patch: Partial<Settings>,
@@ -498,7 +478,8 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
         return;
       }
       const targetPath = resolveRelativeMarkdownPath(active.path, relativePath);
-      const opened = await openDocument(targetPath);
+      // Like a click in the sidebar: this tab, or a new one when it has unsaved changes.
+      const opened = await openPath(targetPath, "current");
       if (opened && slug) {
         jumpToHeadingSlug(view, slug);
       }
@@ -619,7 +600,21 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
     clearAutosaveTimer(active);
     const index = tabs.indexOf(active);
     tabs[index] = next;
+    if (next.path === null) {
+      // The replaced tab's number is free again.
+      next.untitledNumber = nextUntitledNumber(tabs.filter((t) => t !== next && t.path === null).map((t) => t.untitledNumber));
+    }
     showTab(next);
+  }
+
+  /** Shows a newly made tab: in place of a blank untitled active tab, else as a new tab. */
+  function placeNewTab(tab: DocumentTab): void {
+    if (isPristine(active)) {
+      replaceActiveTab(tab);
+    } else {
+      tabs.push(tab);
+      showTab(tab);
+    }
   }
 
   function isPristine(tab: DocumentTab): boolean {
@@ -768,12 +763,13 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
   const sidebar = createSidebar({
     element: sidebarEl,
     editorView: editor.view,
-    onSelectFile: async (path) => {
-      await openDocument(path);
+    onSelectFile: async (path, selectOptions) => {
+      // #81 B: click = this tab (a new one when it has unsaved changes); Cmd+click = a new tab.
+      await openPath(path, selectOptions?.newTab ? "newTab" : "current");
     },
     onOpenSearchHit: async (hit) => {
-      // #73 B: the current document is not reopened (no unsaved prompt).
-      if (active.path !== hit.path && !(await openDocument(hit.path))) return;
+      // #73 B / #81 B: an open document is switched to, never reopened.
+      if (!(await openPath(hit.path, "tab"))) return;
       const range = lineColumnToRange(editor.view.state, hit.line, hit.column, hit.length);
       revealRange(editor.view, range.from, range.to);
     },
@@ -966,6 +962,9 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
     "file.new": () => newDocument(),
     "file.newTab": () => newTab(),
     "file.closeTab": () => closeTab(),
+    "window.nextTab": () => cycleTab(1),
+    "window.previousTab": () => cycleTab(-1),
+    "app.quit": () => quit(),
     "file.open": () => openDocument(),
     "file.openFolder": () => sidebar.openFolder(),
     "file.save": () => saveDocument(),
@@ -1192,12 +1191,8 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
         setStatus(pandocErrorMessage("匯入失敗", err), true);
         return false;
       }
-      // Convert first, then switch: a failed import leaves the current document alone.
-      if (!(await prepareBeforeSwitchDocument())) {
-        setStatus("", false);
-        return false;
-      }
-      replaceActiveTab(makeTab(editor.createSession(markdown, { dirty: true }), null));
+      // #81 B: a new untitled tab (or the blank one).
+      placeNewTab(makeTab(editor.createSession(markdown, { dirty: true }), null));
       setStatus(importedMessage(source), false);
       return true;
     } finally {
@@ -1360,10 +1355,53 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
   let unlistenMenu: (() => void) | null = null;
   let destroyed = false;
 
-  async function openDocument(explicitPath?: string): Promise<boolean> {
-    if (!(await prepareBeforeSwitchDocument())) {
+  function openTabStates() {
+    return tabs.map((t) => ({
+      id: t.id,
+      path: t.path,
+      dirty: editor.isSessionDirty(t.doc),
+      pristine: isPristine(t),
+    }));
+  }
+
+  /**
+   * #81 B: opens `path` per the tab rules (see resolveOpenTarget): an open file
+   * is switched to, a blank untitled tab is reused, otherwise `mode` decides.
+   * Nothing is ever replaced while it has unsaved changes, so there is no prompt.
+   */
+  async function openPath(path: string, mode: OpenMode): Promise<boolean> {
+    const already = resolveOpenTarget(openTabStates(), active.id, path, mode);
+    if (already.kind === "existing") {
+      activateTab(already.id);
+      setStatus("", false);
+      return true;
+    }
+    let content: string;
+    try {
+      content = await openFile(path);
+    } catch (err) {
+      setStatus(formatErrorMessage("開檔失敗", err), true);
       return false;
     }
+    // The tabs may have changed while the file was read.
+    const target = resolveOpenTarget(openTabStates(), active.id, path, mode);
+    if (target.kind === "existing") {
+      activateTab(target.id);
+    } else {
+      const tab = makeTab(editor.createSession(content), path);
+      if (target.kind === "replace") {
+        replaceActiveTab(tab);
+      } else {
+        tabs.push(tab);
+        showTab(tab);
+      }
+    }
+    setStatus("", false);
+    return true;
+  }
+
+  /** Cmd+O (asks for the file when `explicitPath` is omitted): a new tab, or the open / blank one. */
+  async function openDocument(explicitPath?: string): Promise<boolean> {
     let selectedPath: string | null = null;
     try {
       selectedPath = explicitPath ?? (await pickOpenFilePath());
@@ -1372,36 +1410,23 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
       return false;
     }
     if (!selectedPath) return false;
-    try {
-      const content = await openFile(selectedPath);
-      // #81 A: still opens in the current tab (opening in tabs is part B).
-      replaceActiveTab(makeTab(editor.createSession(content), selectedPath));
-      setStatus("", false);
-      return true;
-    } catch (err) {
-      setStatus(formatErrorMessage("開檔失敗", err), true);
-      return false;
-    }
+    return openPath(selectedPath, "tab");
   }
 
-  // Requests are handled one at a time so a second Finder open waits for the
-  // unsaved-changes prompt of the first instead of racing it.
+  // Requests are handled one at a time, in order, so the tabs come out in the order given.
   let openRequestChain: Promise<unknown> = Promise.resolve();
 
   function openRequestedFiles(req: OpenFilesRequest): Promise<boolean> {
     const run = async (): Promise<boolean> => {
       const paths = req.paths ?? [];
       const rejected = req.rejected ?? [];
-      if (paths.length === 0) {
-        if (rejected.length > 0) {
-          setStatus(openWithStatusMessage(null, 0, rejected), true);
-        }
-        return false;
+      // #81 B: every file gets its own tab (Finder can hand over several at once).
+      let opened = false;
+      for (const path of paths) {
+        if (await openPath(path, "tab")) opened = true;
       }
-      const opened = await openDocument(paths[0]);
-      if (opened) {
-        const message = openWithStatusMessage(paths[0], paths.length - 1, rejected);
-        if (message) setStatus(message, rejected.length > 0);
+      if (rejected.length > 0) {
+        setStatus(openWithStatusMessage(rejected), true);
       }
       return opened;
     };
@@ -1481,12 +1506,7 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
     setRecoveryBannerVisible(false);
     const restored = makeTab(editor.createSession(entry.content, { dirty: true }), entry.path, entry.docId);
     // A blank untitled tab is reused; otherwise the restored text gets its own tab.
-    if (isPristine(active)) {
-      replaceActiveTab(restored);
-    } else {
-      tabs.push(restored);
-      showTab(restored);
-    }
+    placeNewTab(restored);
     await clearRecovery(entry.docId).catch(() => null);
     if (restored.path !== null && tabs.includes(restored)) {
       scheduleNamedAutosave(restored);
@@ -1517,6 +1537,67 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
     }
   }
 
+  /**
+   * #81 B: the window is closing (red button) or the app quits (⌘Q). Named
+   * files are written when autosave is on (as when closing a tab); every other
+   * tab with changes — background ones included — is listed in one prompt:
+   * 全部儲存 / 不儲存 / 取消. Resolves to whether closing may go ahead.
+   */
+  let closingWindow = false;
+  async function requestCloseWindow(): Promise<boolean> {
+    if (closingWindow) return false;
+    closingWindow = true;
+    try {
+      if (currentSettings.autoSave !== false) {
+        for (const tab of [...tabs]) {
+          if (tab.path === null || !editor.isSessionDirty(tab.doc)) continue;
+          clearAutosaveTimer(tab);
+          await persistFileToPath(tab.path, tab, editor.getSessionContent(tab.doc));
+        }
+      }
+      const unsaved = tabs.filter((tab) => editor.isSessionDirty(tab.doc));
+      if (unsaved.length === 0) return true;
+      const labels = currentLabels();
+      const choice = await askSaveChanges(
+        unsavedChangesMessage(unsaved.map((tab) => labels.get(tab.id) ?? "")),
+        SAVE_ALL_CHANGES_LABELS,
+      );
+      if (choice === "cancel") return false;
+      if (choice === "discard") {
+        for (const tab of unsaved) {
+          clearAutosaveTimer(tab);
+          await clearRecovery(tab.docId).catch(() => null);
+        }
+        return true;
+      }
+      for (const tab of unsaved) {
+        if (!tabs.includes(tab) || !editor.isSessionDirty(tab.doc)) continue;
+        clearAutosaveTimer(tab);
+        let saved: boolean;
+        if (tab.path !== null) {
+          saved = await persistFileToPath(tab.path, tab, editor.getSessionContent(tab.doc));
+        } else {
+          // Show the untitled tab its save dialog is for.
+          showTab(tab);
+          saved = await saveDocumentAs();
+        }
+        // A cancelled save dialog or a failed write keeps the window open.
+        if (!saved) return false;
+      }
+      return true;
+    } finally {
+      closingWindow = false;
+    }
+  }
+
+  /** ⌘Q / 結束 Kalamos. */
+  async function quit(): Promise<boolean> {
+    if (!(await requestCloseWindow())) return false;
+    for (const tab of tabs) clearAutosaveTimer(tab);
+    await quitApp().catch(() => null);
+    return true;
+  }
+
   const onRestoreClick = () => {
     void restoreRecovery();
   };
@@ -1529,10 +1610,16 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
 
   async function init(): Promise<void> {
     unlistenClose = await onWindowCloseRequested(async () => {
-      await flushBeforeClose();
+      const close = await requestCloseWindow();
+      if (close) for (const tab of tabs) clearAutosaveTimer(tab);
+      return close;
     });
     const unlistenDrop = await onFileDrop(async ({ paths, position }) => {
+      // Images go into the current document first; dropped Markdown files then open in tabs.
       await dropImageFiles(paths, position);
+      for (const path of paths) {
+        if (isMarkdownPath(path)) await openPath(path, "tab");
+      }
     }).catch(() => null);
     if (destroyed) {
       unlistenDrop?.();
@@ -1652,6 +1739,9 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
     getPendingRecovery: () => pendingRecovery,
     getStatusText: () => statusText,
     openDocument,
+    openPath,
+    requestCloseWindow,
+    quit,
     openRequestedFiles,
     openFolder: (explicitPath?: string) => sidebar.openFolder(explicitPath),
     toggleSidebar: () => sidebar.toggleVisible(),

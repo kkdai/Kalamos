@@ -110,3 +110,59 @@ export function moveItem<T>(items: readonly T[], from: number, to: number): T[] 
   out.splice(target, 0, item);
   return out;
 }
+
+/** Extensions Kalamos opens as documents (same list as open_with.rs / bundle.fileAssociations). */
+export const MARKDOWN_EXTENSIONS = ["md", "markdown", "mdown", "mkd", "mkdn", "mdwn", "mdtxt"];
+
+export function isMarkdownPath(path: string): boolean {
+  const name = baseNameOf(path);
+  const dot = name.lastIndexOf(".");
+  return dot > 0 && MARKDOWN_EXTENSIONS.includes(name.slice(dot + 1).toLowerCase());
+}
+
+/**
+ * #81 B: how a file is opened.
+ * - "tab": Cmd+O, Finder, drag & drop, folder search — a new tab.
+ * - "current": a single click in the sidebar — this tab, unless it has unsaved changes.
+ * - "newTab": Cmd+click in the sidebar — always a new tab.
+ */
+export type OpenMode = "tab" | "current" | "newTab";
+
+export interface OpenTabState {
+  id: string;
+  path: string | null;
+  dirty: boolean;
+  /** Untitled, empty and unchanged. */
+  pristine: boolean;
+}
+
+export type OpenTarget =
+  | { kind: "existing"; id: string }
+  /** Load into the active tab, in place. */
+  | { kind: "replace" }
+  | { kind: "new" };
+
+/**
+ * Where `path` opens. A file already open in a tab is switched to (never
+ * opened twice); a blank untitled active tab is reused (except for Cmd+click).
+ */
+export function resolveOpenTarget(
+  tabs: OpenTabState[],
+  activeId: string,
+  path: string,
+  mode: OpenMode,
+): OpenTarget {
+  const existing = tabs.find((t) => t.path === path);
+  if (existing) return { kind: "existing", id: existing.id };
+  if (mode === "newTab") return { kind: "new" };
+  const active = tabs.find((t) => t.id === activeId);
+  if (active?.pristine) return { kind: "replace" };
+  if (mode === "current" && active && !active.dirty) return { kind: "replace" };
+  return { kind: "new" };
+}
+
+/** Message of the close-window prompt listing the documents with unsaved changes. */
+export function unsavedChangesMessage(labels: string[]): string {
+  const list = labels.map((label) => `・${label}`).join("\n");
+  return `以下 ${labels.length} 份文件有未儲存的變更：\n${list}\n\n要在關閉前儲存嗎？`;
+}

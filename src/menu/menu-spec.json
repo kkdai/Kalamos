@@ -14,7 +14,7 @@
       { "type": "predefined", "item": "hideOthers", "label": "隱藏其他" },
       { "type": "predefined", "item": "showAll", "label": "全部顯示" },
       { "type": "predefined", "item": "separator" },
-      { "type": "predefined", "item": "quit", "label": "結束 Kalamos" }
+      { "type": "action", "id": "app.quit", "label": "結束 Kalamos", "accel": "CmdOrCtrl+Q" }
     ]
   },
   {
@@ -137,6 +137,9 @@
     "items": [
       { "type": "predefined", "item": "minimize", "label": "縮到最小" },
       { "type": "predefined", "item": "maximize", "label": "縮放" },
+      { "type": "predefined", "item": "separator" },
+      { "type": "action", "id": "window.nextTab", "label": "顯示下一個分頁", "accel": "Ctrl+Tab" },
+      { "type": "action", "id": "window.previousTab", "label": "顯示上一個分頁", "accel": "Ctrl+Shift+Tab" },
       { "type": "predefined", "item": "separator" },
       { "type": "predefined", "item": "bringAllToFront", "label": "將全部移至最前" }
     ]

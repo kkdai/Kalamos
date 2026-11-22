@@ -330,6 +330,14 @@ fn apply_sync_state<R: Runtime>(
     Ok(())
 }
 
+/// #81: 結束 Kalamos (⌘Q). The predefined Quit item calls `terminate:` directly,
+/// with no event the WebView could cancel, so the menu sends `app.quit` to the
+/// frontend instead; it settles every tab's unsaved changes, then calls this.
+#[tauri::command]
+pub fn quit_app(app: AppHandle) {
+    app.exit(0);
+}
+
 #[tauri::command]
 pub fn sync_menu_state(app: AppHandle, state: MenuSyncState) -> Result<(), AppError> {
     let Some(store) = app.try_state::<MenuStateStore<tauri::Wry>>() else {
@@ -408,7 +416,12 @@ mod tests {
                 _ => None,
             })
             .collect();
-        for item in ["undo", "redo", "cut", "copy", "paste", "selectAll", "quit", "about"] {
+        // #81: 結束 is a custom action so the frontend can ask about unsaved tabs first.
+        assert_eq!(accel_of("app.quit").as_deref(), Some("CmdOrCtrl+Q"));
+        assert_eq!(accel_of("file.closeTab").as_deref(), Some("CmdOrCtrl+W"));
+        assert_eq!(accel_of("window.nextTab").as_deref(), Some("Ctrl+Tab"));
+        assert!(!predefined.contains("quit") && !predefined.contains("closeWindow"));
+        for item in ["undo", "redo", "cut", "copy", "paste", "selectAll", "about"] {
             assert!(predefined.contains(item), "missing predefined {item}");
         }
         // Every predefined item name is one we know how to build.

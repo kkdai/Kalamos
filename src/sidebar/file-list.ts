@@ -7,7 +7,8 @@ export interface FileListContextTarget {
 
 export interface FileListOptions {
   container: HTMLElement;
-  onSelectFile: (path: string) => void | Promise<void>;
+  /** #81 B: `newTab` = Cmd+click (always open in a new tab). */
+  onSelectFile: (path: string, options?: { newTab: boolean }) => void | Promise<void>;
   onContextMenu?: (event: MouseEvent, target: FileListContextTarget) => void;
 }
 
@@ -76,7 +77,7 @@ export function createFileList(options: FileListOptions): FileListView {
 
       itemEl.addEventListener("click", (e) => {
         e.stopPropagation();
-        void onSelectFile(entry.path);
+        void onSelectFile(entry.path, { newTab: e.metaKey || e.ctrlKey });
       });
 
       itemEl.addEventListener("contextmenu", (e) => {
