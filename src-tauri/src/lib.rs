@@ -3,6 +3,7 @@ pub mod export;
 pub mod files;
 pub mod fsops;
 pub mod images;
+pub mod menu;
 pub mod open_with;
 pub mod pandoc;
 pub mod recovery;
@@ -20,6 +21,9 @@ pub fn run() {
         .manage(open_with::PendingOpenFiles::new())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        // #74: native menu bar; items emit `menu-action` to the frontend.
+        .menu(menu::build_app_menu)
+        .on_menu_event(menu::handle_menu_event)
         .invoke_handler(tauri::generate_handler![
             files::open_file,
             files::save_file,
@@ -36,6 +40,7 @@ pub fn run() {
             settings::set_settings,
             themes::list_themes,
             themes::read_theme_css,
+            themes::open_themes_dir,
             images::import_image,
             images::import_image_bytes,
             images::allow_asset_dir,
@@ -47,6 +52,7 @@ pub fn run() {
             upload::upload_images,
             open_with::take_pending_open_files,
             search::search_in_folder,
+            menu::sync_menu_state,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

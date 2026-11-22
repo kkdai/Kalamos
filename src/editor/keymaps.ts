@@ -11,6 +11,12 @@ import {
   toggleOrderedList,
   toggleTaskList,
 } from "./lists";
+import {
+  insertCodeBlock,
+  insertMathBlock,
+  setHeadingLevel,
+  toggleBlockquote,
+} from "./paragraph-commands";
 import { openInsertTableDialog } from "./table-insert-dialog";
 import { convertPipeRowToTable } from "./table-ops";
 import { tableKeymap } from "./table-toolbar";
@@ -32,7 +38,7 @@ export interface FileCommandHandlers {
   onToggleAutoPairMarkdown?: () => void | Promise<void>;
 }
 
-type SymmetricMarker = "**" | "*" | "`";
+type SymmetricMarker = "**" | "*" | "`" | "~~";
 
 function isWrappedInsideSelection(
   text: string,
@@ -132,6 +138,11 @@ export function toggleEmphasis(view: EditorView): boolean {
 
 export function toggleInlineCode(view: EditorView): boolean {
   return toggleSymmetricMarker(view, "`");
+}
+
+/** #74 格式 > 刪除線. */
+export function toggleStrikethrough(view: EditorView): boolean {
+  return toggleSymmetricMarker(view, "~~");
 }
 
 export function toggleLink(view: EditorView): boolean {
@@ -315,6 +326,18 @@ export function createFileKeymap(handlers: FileCommandHandlers): KeyBinding[] {
       preventDefault: true,
       run: (view) => copyHeadingBookmark(view) !== null,
     },
+    // #74 段落 / 格式 menu shortcuts (same accelerators as src/menu/menu-spec.json).
+    ...[0, 1, 2, 3, 4, 5, 6].map(
+      (level): KeyBinding => ({
+        key: `Mod-${level}`,
+        preventDefault: true,
+        run: (view) => setHeadingLevel(view, level),
+      }),
+    ),
+    { key: "Mod-Alt-c", preventDefault: true, run: (view) => insertCodeBlock(view) },
+    { key: "Mod-Alt-b", preventDefault: true, run: (view) => insertMathBlock(view) },
+    { key: "Mod-Alt-q", preventDefault: true, run: (view) => toggleBlockquote(view) },
+    { key: "Mod-Shift-d", preventDefault: true, run: (view) => toggleStrikethrough(view) },
     {
       key: "Mod-Alt-l",
       preventDefault: true,
