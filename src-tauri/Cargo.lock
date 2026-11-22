@@ -2056,6 +2056,7 @@ dependencies = [
  "objc2-foundation",
  "objc2-pdf-kit",
  "objc2-web-kit",
+ "regex",
  "serde",
  "serde_json",
  "tauri",

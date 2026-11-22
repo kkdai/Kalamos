@@ -15,12 +15,14 @@ import {
   trashPath,
   watchFolder,
   type FileEntry,
+  type FolderSearchHit,
   type Settings,
   type SidebarTab,
   type TreeNode,
 } from "../ipc";
 import { createFileList, type FileListView } from "./file-list";
 import { createFileTree, type FileTreeView } from "./file-tree";
+import { createFolderSearch, type FolderSearchView } from "./folder-search";
 import { createOutline, type OutlineView } from "./outline";
 
 export interface SidebarTabDescriptor {
@@ -36,6 +38,8 @@ export interface CreateSidebarOptions {
   onSelectFile: (path: string) => void | Promise<void>;
   onPathRenamed?: (fromPath: string, toPath: string) => void | Promise<void>;
   onPathTrashed?: (trashedPath: string) => void | Promise<void>;
+  /** #73 B: a folder-search hit was clicked. */
+  onOpenSearchHit?: (hit: FolderSearchHit) => void | Promise<void>;
   onError?: (prefix: string, err: unknown) => void;
 }
 
@@ -44,6 +48,9 @@ export interface SidebarController {
   fileTree: FileTreeView;
   fileList: FileListView;
   outline: OutlineView;
+  folderSearch: FolderSearchView;
+  /** #73 B: Cmd+Shift+F — show the sidebar's search tab and focus its field. */
+  openSearch: () => Promise<void>;
   attachEditorView: (view: EditorView) => void;
   isVisible: () => boolean;
   setVisible: (visible: boolean, persist?: boolean) => Promise<void>;
@@ -127,6 +134,7 @@ export function createSidebar(options: CreateSidebarOptions): SidebarController 
     { id: "tree", label: "檔案樹", testId: "sidebar-tab-tree" },
     { id: "list", label: "檔案列表", testId: "sidebar-tab-list" },
     { id: "outline", label: "大綱", testId: "sidebar-tab-outline" },
+    { id: "search", label: "搜尋", testId: "sidebar-tab-search" },
   ];
 
   // Build Sidebar DOM structure
@@ -235,8 +243,15 @@ export function createSidebar(options: CreateSidebarOptions): SidebarController 
     view: options.editorView ?? null,
   });
 
+  const folderSearch = createFolderSearch({
+    getFolder: () => currentFolder,
+    onOpenHit: async (hit) => {
+      await options.onOpenSearchHit?.(hit);
+    },
+  });
+
   bodyEl.addEventListener("contextmenu", (e) => {
-    if (e.defaultPrevented || !currentFolder || currentTab === "outline") return;
+    if (e.defaultPrevented || !currentFolder || currentTab === "outline" || currentTab === "search") return;
     e.preventDefault();
     openContextMenu(e, { path: currentFolder, kind: "dir" });
   });
@@ -267,6 +282,14 @@ export function createSidebar(options: CreateSidebarOptions): SidebarController 
     } else if (currentTab === "list") {
       outline.setActiveMount(false);
       fileList.render(currentFiles, activeFilePath);
+    } else if (currentTab === "search") {
+      outline.setActiveMount(false);
+      // Keep the same DOM (and focus) when the folder data refreshes.
+      if (folderSearch.element.parentElement !== bodyEl || bodyEl.childElementCount !== 1) {
+        bodyEl.innerHTML = "";
+        bodyEl.appendChild(folderSearch.element);
+      }
+      folderSearch.refresh();
     } else if (currentTab === "outline") {
       const customTab = tabs.find((t) => t.id === "outline");
       if (customTab?.render) {
@@ -313,6 +336,12 @@ export function createSidebar(options: CreateSidebarOptions): SidebarController 
     if (persist) {
       await persistSettingsPatch({ sidebarTab: currentTab });
     }
+  }
+
+  async function openSearch(): Promise<void> {
+    if (!visible) await setVisible(true, true);
+    if (currentTab !== "search") await setTab("search", true);
+    folderSearch.focusInput();
   }
 
   async function loadFolderData(folderPath: string): Promise<boolean> {
@@ -632,6 +661,7 @@ export function createSidebar(options: CreateSidebarOptions): SidebarController 
     document.removeEventListener("click", onDocumentClick);
     document.removeEventListener("keydown", onDocumentKeydown);
     outline.destroy();
+    folderSearch.destroy();
     fileTree.destroy();
     fileList.destroy();
     element.innerHTML = "";
@@ -644,6 +674,8 @@ export function createSidebar(options: CreateSidebarOptions): SidebarController 
     fileTree,
     fileList,
     outline,
+    folderSearch,
+    openSearch,
     attachEditorView,
     isVisible: () => visible,
     setVisible,
