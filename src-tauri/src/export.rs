@@ -385,6 +385,31 @@ mod imp {
             .unwrap_or(false)
     }
 
+    pub(super) fn pdf_print_args(page: &Path, profile: &Path, out: &Path) -> Vec<OsString> {
+        let mut print_arg = OsString::from("--print-to-pdf=");
+        print_arg.push(out.as_os_str());
+        let mut profile_arg = OsString::from("--user-data-dir=");
+        profile_arg.push(profile.as_os_str());
+
+        vec![
+            OsString::from("--headless"),
+            OsString::from("--disable-gpu"),
+            OsString::from("--no-first-run"),
+            OsString::from("--no-default-browser-check"),
+            OsString::from("--disable-extensions"),
+            OsString::from("--disable-sync"),
+            OsString::from("--disable-background-networking"),
+            OsString::from("--disable-component-update"),
+            // Match macOS WKWebView's setAllowsContentJavaScript(false): the exported page is static.
+            OsString::from("--blink-settings=scriptEnabled=false"),
+            OsString::from("--no-pdf-header-footer"),
+            OsString::from("--generate-pdf-document-outline"),
+            profile_arg,
+            print_arg,
+            page.as_os_str().to_os_string(),
+        ]
+    }
+
     fn print_to_pdf(
         browser: &Path,
         page: &Path,
@@ -392,28 +417,9 @@ mod imp {
         out: &Path,
         timeout: Duration,
     ) -> Result<(), AppError> {
-        let mut print_arg = OsString::from("--print-to-pdf=");
-        print_arg.push(out.as_os_str());
-        let mut profile_arg = OsString::from("--user-data-dir=");
-        profile_arg.push(profile.as_os_str());
-
         let mut cmd = Command::new(browser);
         crate::platform::no_console(&mut cmd)
-            .arg("--headless")
-            .arg("--disable-gpu")
-            .arg("--no-first-run")
-            .arg("--no-default-browser-check")
-            .arg("--disable-extensions")
-            .arg("--disable-sync")
-            .arg("--disable-background-networking")
-            .arg("--disable-component-update")
-            .arg("--allow-file-access-from-files")
-            .arg("--no-pdf-header-footer")
-            .arg("--print-to-pdf-no-header")
-            .arg("--generate-pdf-document-outline")
-            .arg(profile_arg)
-            .arg(print_arg)
-            .arg(page.as_os_str())
+            .args(pdf_print_args(page, profile, out))
             .stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(Stdio::null());
@@ -1181,6 +1187,23 @@ mod tests {
         let v: Vec<ExportHeading> =
             serde_json::from_str(r#"[{"level":2,"text":"標題","id":"標題"}]"#).unwrap();
         assert_eq!(v, vec![h(2, "標題")].into_iter().map(|mut x| { x.id = "標題".into(); x }).collect::<Vec<_>>());
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn windows_pdf_args_disable_js_and_drop_redundant_flags() {
+        let args: Vec<String> = super::imp::pdf_print_args(
+            Path::new(r"C:\Temp\page.html"),
+            Path::new(r"C:\Temp\profile"),
+            Path::new(r"C:\Temp\out.pdf"),
+        )
+        .into_iter()
+        .map(|s| s.to_string_lossy().into_owned())
+        .collect();
+        assert!(args.iter().any(|a| a == "--blink-settings=scriptEnabled=false"));
+        assert!(args.iter().any(|a| a == "--no-pdf-header-footer"));
+        assert!(!args.iter().any(|a| a == "--allow-file-access-from-files"));
+        assert!(!args.iter().any(|a| a == "--print-to-pdf-no-header"));
     }
 
     #[cfg(target_os = "windows")]

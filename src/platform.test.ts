@@ -2,7 +2,13 @@ import { describe, expect, it } from "vitest";
 import { dirname, joinPath, resolveImageRoot, resolveImageSrc } from "./editor/images";
 import { resolveRelativeMarkdownPath } from "./editor/lists";
 import { fileUrlFromPath } from "./export/html";
-import { resetMockState, seedMockFile, setMockDialogHandlers, triggerMockFileDrop } from "./ipc";
+import {
+  isMarkdownName,
+  resetMockState,
+  seedMockFile,
+  setMockDialogHandlers,
+  triggerMockFileDrop,
+} from "./ipc";
 import { createKalamosApp } from "./main";
 import {
   isAbsolutePath,
@@ -72,7 +78,9 @@ describe("platform (Windows & cross-platform helpers)", () => {
       path: "C:/Docs/kalamos-test/pic.png",
       url: "asset:C:/Docs/kalamos-test/pic.png",
     });
-    expect(resolveImageRoot("C:\\Docs\\kalamos-test\\root", null, null)).toBe("C:/Docs/kalamos-test/root");
+    expect(resolveImageRoot("C:\\Docs\\kalamos-test\\root", null, null, true)).toBe("C:/Docs/kalamos-test/root");
+    // Non-Windows platforms ignore Windows drive paths in front matter and fall back to settingRoot.
+    expect(resolveImageRoot("C:/Docs/kalamos-test/root", null, "/blog", false)).toBe("/blog");
     expect(resolveImageRoot(null, null, "D:/blog/static")).toBe("D:/blog/static");
   });
 
@@ -100,10 +108,14 @@ describe("platform (Windows & cross-platform helpers)", () => {
     expect(toCtrlLabel("⌥⌘↓")).toBe("Ctrl+Alt+↓");
   });
 
-  it("recognizes all Markdown extensions and opens a dropped .md file or top-left buttons", async () => {
+  it("recognizes all Markdown extensions and opens a dropped .md file; quick buttons are Windows-only", async () => {
     expect(isMarkdownFilePath("C:/notes/a.md")).toBe(true);
     expect(isMarkdownFilePath("C:/notes/a.MKDN")).toBe(true);
     expect(isMarkdownFilePath("C:/notes/a.txt")).toBe(false);
+    expect(isMarkdownFilePath("/x/.md")).toBe(false);
+    expect(isMarkdownFilePath("C:\\x\\.md")).toBe(false);
+    expect(isMarkdownName("note.mdown")).toBe(true);
+    expect(isMarkdownName(".md")).toBe(false);
 
     resetMockState();
     document.body.innerHTML = `<div id="app"><aside id="sidebar" data-visible="false"></aside><main id="editor-container"></main><div id="status"></div></div>`;
@@ -111,25 +123,30 @@ describe("platform (Windows & cross-platform helpers)", () => {
     seedMockFile("/tmp/btn-open.md", "# 按鈕開啟\n");
     setMockDialogHandlers({ open: () => "/tmp/btn-open.md" });
 
-    const app = createKalamosApp(document);
-    await app.init();
+    // Non-Windows (default in jsdom): top-left quick buttons are not rendered.
+    const macApp = createKalamosApp(document);
+    await macApp.init();
+    expect(document.querySelector('[data-testid="open-file-button"]')).toBeNull();
+    expect(document.querySelector('[data-testid="sidebar-toggle-button"]')).toBeNull();
 
-    // Drag & drop a Markdown file onto the window opens it.
+    // Drag & drop a Markdown file onto the window opens it in a tab.
     await triggerMockFileDrop({ paths: ["/tmp/drop-open.md"] });
-    expect(app.getCurrentPath()).toBe("/tmp/drop-open.md");
-    expect(app.editor.getContent()).toBe("# 拖放開啟\n");
+    expect(macApp.getCurrentPath()).toBe("/tmp/drop-open.md");
+    expect(macApp.editor.getContent()).toBe("# 拖放開啟\n");
+    macApp.destroy();
 
-    // Top-left open-file button opens the file picker.
+    // Windows: top-left quick buttons are rendered and functional.
+    const winApp = createKalamosApp(document, { showQuickButtons: true });
+    await winApp.init();
     document.querySelector<HTMLButtonElement>('[data-testid="open-file-button"]')!.click();
     await new Promise((r) => setTimeout(r, 0));
-    expect(app.getCurrentPath()).toBe("/tmp/btn-open.md");
+    expect(winApp.getCurrentPath()).toBe("/tmp/btn-open.md");
 
-    // Top-left sidebar-toggle button opens and closes the sidebar.
-    expect(app.sidebar.isVisible()).toBe(false);
+    expect(winApp.sidebar.isVisible()).toBe(false);
     document.querySelector<HTMLButtonElement>('[data-testid="sidebar-toggle-button"]')!.click();
     await new Promise((r) => setTimeout(r, 0));
-    expect(app.sidebar.isVisible()).toBe(true);
+    expect(winApp.sidebar.isVisible()).toBe(true);
 
-    app.destroy();
+    winApp.destroy();
   });
 });

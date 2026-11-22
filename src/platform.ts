@@ -42,9 +42,11 @@ export const MARKDOWN_EXTENSIONS = [
 /** True when `path` ends with one of `MARKDOWN_EXTENSIONS`. */
 export function isMarkdownFilePath(path: string): boolean {
   const clean = path.replace(/[?#].*$/, "");
-  const dot = clean.lastIndexOf(".");
+  const slash = Math.max(clean.lastIndexOf("/"), clean.lastIndexOf("\\"));
+  const name = slash >= 0 ? clean.slice(slash + 1) : clean;
+  const dot = name.lastIndexOf(".");
   if (dot <= 0) return false;
-  const ext = clean.slice(dot + 1).toLowerCase();
+  const ext = name.slice(dot + 1).toLowerCase();
   return (MARKDOWN_EXTENSIONS as readonly string[]).includes(ext);
 }
 

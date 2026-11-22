@@ -22,6 +22,15 @@
   left: calc(var(--k-sidebar-width, 260px) + 12px);
 }
 
+/* Windows quick buttons occupy top-left: leave room in the tab bar when present. */
+:has(> .k-sidebar-toggle-widget) > .k-tabbar {
+  padding-left: calc(16px + 66px + 10px);
+}
+
+:has(> .k-sidebar-toggle-widget) > .k-sidebar[data-visible="true"] ~ .k-tabbar {
+  padding-left: calc(var(--k-sidebar-width, 260px) + 12px + 66px + 10px);
+}
+
 .k-theme-btn {
   display: inline-flex;
   align-items: center;

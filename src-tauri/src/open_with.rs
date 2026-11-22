@@ -206,17 +206,18 @@ pub fn handle_cli_args<R: tauri::Runtime>(
     deliver(app, filter_cli_args(args, cwd));
 }
 
+pub fn focus_main_window<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.unminimize();
+        let _ = window.set_focus();
+    }
+}
+
 fn deliver<R: tauri::Runtime>(app: &tauri::AppHandle<R>, req: OpenFilesRequest) {
     let state = app.state::<PendingOpenFiles>();
     if let Some(ready) = state.offer(req) {
-        if let Some(window) = app.get_webview_window("main") {
-            let _ = window.unminimize();
-            let _ = window.set_focus();
-        }
+        focus_main_window(app);
         let _ = app.emit(OPEN_FILES_EVENT, ready);
-    } else if let Some(window) = app.get_webview_window("main") {
-        let _ = window.unminimize();
-        let _ = window.set_focus();
     }
 }
 

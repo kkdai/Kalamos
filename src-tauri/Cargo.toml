@@ -8,6 +8,7 @@ license = "MIT"
 
 [lib]
 name = "kalamos_lib"
+# Desktop-only build; add "staticlib" and "cdylib" if mobile targets are enabled.
 crate-type = ["rlib"]
 
 [build-dependencies]

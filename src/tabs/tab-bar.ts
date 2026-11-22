@@ -7,6 +7,7 @@
  * focus away from the editor.
  */
 import "./tabs.css";
+import { shortcutLabel } from "../platform";
 
 export interface TabBarItem {
   id: string;
@@ -70,7 +71,7 @@ export function createTabBar(options: TabBarOptions): TabBar {
   newBtn.type = "button";
   newBtn.className = "k-tabbar-new";
   newBtn.dataset.testid = "tab-new";
-  newBtn.title = "新增分頁（⌘T）";
+  newBtn.title = shortcutLabel("新增分頁（⌘T）");
   newBtn.setAttribute("aria-label", "新增分頁");
   newBtn.appendChild(lineIcon("M8 3.5v9M3.5 8h9", 16));
 
@@ -130,7 +131,7 @@ export function createTabBar(options: TabBarOptions): TabBar {
       close.dataset.testid = "tab-close";
       close.tabIndex = -1;
       close.setAttribute("aria-label", `關閉 ${item.label}`);
-      close.title = "關閉分頁（⌘W）";
+      close.title = shortcutLabel("關閉分頁（⌘W）");
       close.appendChild(lineIcon("M4.5 4.5l7 7M11.5 4.5l-7 7", 12));
       const dot = document.createElement("span");
       dot.className = "k-tab-dirty-dot";

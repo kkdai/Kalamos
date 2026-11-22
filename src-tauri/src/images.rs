@@ -286,6 +286,12 @@ fn canonical_home<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Option<PathBu
 /// Checks a requested asset folder (e.g. an image root that may come from a
 /// downloaded document's front matter) before it is allowed recursively.
 pub fn check_asset_dir(path: &Path, home: Option<&Path>) -> Result<PathBuf, AppError> {
+    if path.as_os_str().is_empty() || !path.is_absolute() {
+        return Err(AppError::invalid_path(format!(
+            "Image root folder must be absolute: {}",
+            path.display()
+        )));
+    }
     let canonical = crate::platform::canonicalize(path)
         .map_err(|_| AppError::invalid_path(format!("Not a folder: {}", path.display())))?;
     if is_too_broad(&canonical, home) {
@@ -403,6 +409,11 @@ mod tests {
         let err = check_asset_dir(&home.join("missing"), Some(&home)).unwrap_err();
         assert_eq!(err.kind, ErrorKind::InvalidPath);
         assert!(!err.message.starts_with(TOO_BROAD_MESSAGE));
+        // Relative or empty folders are rejected without consulting cwd.
+        let err = check_asset_dir(Path::new("relative/root"), Some(&home)).unwrap_err();
+        assert_eq!(err.kind, ErrorKind::InvalidPath);
+        let err = check_asset_dir(Path::new(""), Some(&home)).unwrap_err();
+        assert_eq!(err.kind, ErrorKind::InvalidPath);
     }
 
     const PNG: &[u8] = &[0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 13];

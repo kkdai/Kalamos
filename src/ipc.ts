@@ -8,7 +8,13 @@ import {
   open as openDialog,
   save as saveDialog,
 } from "@tauri-apps/plugin-dialog";
-import { isAbsolutePath, toNativePath, toSlashPath } from "./platform";
+import {
+  isAbsolutePath,
+  isMarkdownFilePath,
+  MARKDOWN_EXTENSIONS as MARKDOWN_EXT_LIST,
+  toNativePath,
+  toSlashPath,
+} from "./platform";
 
 function normalizeTreeNode(node: TreeNode): TreeNode {
   return {
@@ -229,10 +235,7 @@ export function isIgnoredName(name: string): boolean {
 }
 
 export function isMarkdownName(name: string): boolean {
-  const dot = name.lastIndexOf(".");
-  if (dot <= 0) return false;
-  const ext = name.slice(dot + 1).toLowerCase();
-  return (MARKDOWN_EXT_LIST as readonly string[]).includes(ext);
+  return isMarkdownFilePath(name);
 }
 
 export function extractExcerpt(content: string): string {
@@ -1074,10 +1077,6 @@ export async function readThemeCss(id: string): Promise<string> {
   return css;
 }
 
-import {
-  MARKDOWN_EXTENSIONS as MARKDOWN_EXT_LIST,
-} from "./platform";
-
 export async function pickOpenFilePath(): Promise<string | null> {
   if (isTauri()) {
     const selected = await openDialog({
@@ -1889,7 +1888,7 @@ export function getMockZoom(): number {
 /** Shows the custom CSS theme folder in Finder; resolves with its path. */
 export async function openThemesDir(): Promise<string> {
   if (isTauri()) {
-    return invoke<string>("open_themes_dir");
+    return toSlashPath(await invoke<string>("open_themes_dir"));
   }
   mockThemesDirOpened += 1;
   return "/mock/app-data/themes";

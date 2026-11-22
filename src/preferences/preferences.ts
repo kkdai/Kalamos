@@ -1,6 +1,7 @@
 import "./preferences.css";
 
 import type { StartupBehavior } from "../ipc";
+import { shortcutLabel } from "../platform";
 
 /**
  * #74 偏好設定 (Cmd+,): an in-app modal. Every control applies its change at
@@ -196,7 +197,7 @@ export function createPreferences(
       row(
         "自動儲存",
         checkbox("autoSave", "停止輸入 1 秒後自動儲存已命名的文件", "pref-auto-save"),
-        "關閉後只有 Cmd+S 會寫入檔案；切換或關閉文件時仍會儲存，未命名文件仍會寫入救回檔。",
+        shortcutLabel("關閉後只有 Cmd+S 會寫入檔案；切換或關閉文件時仍會儲存，未命名文件仍會寫入救回檔。"),
       ),
     );
     return panel;
@@ -220,13 +221,13 @@ export function createPreferences(
     );
     const pairs = el("div", "k-pref-stack");
     pairs.append(
-      checkbox("autoPairBrackets", "自動配對括號與引號（Cmd+Opt+P）", "pref-auto-pair-brackets"),
-      checkbox("autoPairMarkdown", "自動配對 Markdown 符號 * _ ` ~（Cmd+Opt+Shift+P）", "pref-auto-pair-markdown"),
+      checkbox("autoPairBrackets", shortcutLabel("自動配對括號與引號（Cmd+Opt+P）"), "pref-auto-pair-brackets"),
+      checkbox("autoPairMarkdown", shortcutLabel("自動配對 Markdown 符號 * _ ` ~（Cmd+Opt+Shift+P）"), "pref-auto-pair-markdown"),
     );
     const blocks = el("div", "k-pref-stack");
     blocks.append(
-      checkbox("codeLineNumbers", "程式碼區塊顯示行號（Cmd+Opt+L）", "pref-code-line-numbers"),
-      checkbox("mathAutoNumber", "公式自動編號（Cmd+Opt+N）", "pref-math-auto-number"),
+      checkbox("codeLineNumbers", shortcutLabel("程式碼區塊顯示行號（Cmd+Opt+L）"), "pref-code-line-numbers"),
+      checkbox("mathAutoNumber", shortcutLabel("公式自動編號（Cmd+Opt+N）"), "pref-math-auto-number"),
     );
     panel.append(row("自動配對", pairs), row("區塊", blocks));
     return panel;
@@ -256,7 +257,7 @@ export function createPreferences(
       void host.openThemesDir();
     });
     panel.append(
-      row("主題", select, "也可以用 Cmd+Shift+T 循環切換。"),
+      row("主題", select, shortcutLabel("也可以用 Cmd+Shift+T 循環切換。")),
       row("自訂主題", openBtn, "把 .css 檔放進這個資料夾，重新開啟偏好設定或主題選單即可選用。"),
     );
     return panel;
@@ -295,7 +296,7 @@ export function createPreferences(
     });
 
     panel.append(
-      row("圖片根目錄", rootWrap, "以 / 開頭的圖片路徑會相對於這個資料夾（Cmd+Opt+R）。"),
+      row("圖片根目錄", rootWrap, shortcutLabel("以 / 開頭的圖片路徑會相對於這個資料夾（Cmd+Opt+R）。")),
       row(
         "上傳程式",
         uploader,

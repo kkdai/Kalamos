@@ -18,7 +18,7 @@ import {
   WidgetType,
 } from "@codemirror/view";
 import { allowAssetDir, allowAssetFile, isAssetDirTooBroadError, localFileUrl } from "../ipc";
-import { isDrivePath, pathRoot } from "../platform";
+import { IS_WINDOWS, isDrivePath, pathRoot } from "../platform";
 import {
   findTyporaRootUrl,
   hasImageSize,
@@ -84,6 +84,7 @@ export function resolveImageRoot(
   frontMatterRoot: string | null,
   docPath: string | null,
   settingRoot: string | null,
+  windows: boolean = IS_WINDOWS,
 ): string | null {
   let fm = frontMatterRoot?.trim() ?? "";
   if (/^file:\/\//i.test(fm)) {
@@ -92,10 +93,10 @@ export function resolveImageRoot(
     } catch {
       fm = "";
     }
-  } else if (isDrivePath(fm)) {
+  } else if (windows && isDrivePath(fm)) {
     fm = fm.replace(/\\/g, "/");
   }
-  if (fm && (isDrivePath(fm) || !/^[a-z][a-z0-9+.-]*:/i.test(fm))) {
+  if (fm && ((windows && isDrivePath(fm)) || !/^[a-z][a-z0-9+.-]*:/i.test(fm))) {
     const fmRoot = pathRoot(fm);
     if (fmRoot) return joinPath(fmRoot, fm.slice(fmRoot.length));
     if (docPath) return joinPath(dirname(docPath), fm);
