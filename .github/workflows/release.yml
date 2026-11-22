@@ -1,0 +1,213 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check-version:
+    name: Check release version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+      tag: ${{ steps.check.outputs.tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+
+      - name: Validate manifest and tag versions
+        id: check
+        run: node scripts/check-release-version.mjs --github-output
+        env:
+          RELEASE_TAG: ${{ startsWith(github.ref, 'refs/tags/') && github.ref || '' }}
+
+  build:
+    name: Build (${{ matrix.target }})
+    needs: check-version
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            artifact_name: installer-macos-aarch64
+            bundles: app,dmg
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            artifact_name: installer-macos-x64
+            bundles: app,dmg
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact_name: installer-windows-x64
+            bundles: nsis,msi
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: "src-tauri -> target"
+          key: ${{ matrix.target }}
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build Tauri installers
+        shell: bash
+        run: npx tauri build --target "${{ matrix.target }}" --bundles "${{ matrix.bundles }}"
+        env:
+          CI: "true"
+
+      - name: Verify macOS code signature and DMG layout
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          bundle_dir="src-tauri/target/${{ matrix.target }}/release/bundle"
+          app_path="${bundle_dir}/macos/Kalamos.app"
+          dmg_path="$(find "${bundle_dir}/dmg" -maxdepth 1 -name '*.dmg' | head -n 1)"
+
+          test -d "$app_path"
+          test -f "$dmg_path"
+
+          echo "Verifying .app ad-hoc signature..."
+          codesign --verify --deep --strict --verbose=2 "$app_path"
+
+          echo "Verifying .dmg contains Applications symlink and valid signed .app..."
+          mount_dir="$(mktemp -d /tmp/kalamos-dmg.XXXXXX)"
+          cleanup() {
+            hdiutil detach "$mount_dir" -quiet || hdiutil detach "$mount_dir" -force -quiet || true
+            rmdir "$mount_dir" || true
+          }
+          trap cleanup EXIT
+
+          hdiutil attach -nobrowse -readonly -mountpoint "$mount_dir" "$dmg_path"
+          test -L "$mount_dir/Applications"
+          test -d "$mount_dir/Kalamos.app"
+          codesign --verify --deep --strict --verbose=2 "$mount_dir/Kalamos.app"
+
+      - name: Stage macOS installers
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-artifacts
+          cp "src-tauri/target/${{ matrix.target }}/release/bundle/dmg/"*.dmg release-artifacts/
+          ls -lh release-artifacts/
+
+      - name: Stage Windows installers
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-artifacts
+          cp "src-tauri/target/${{ matrix.target }}/release/bundle/nsis/"*-setup.exe release-artifacts/
+          cp "src-tauri/target/${{ matrix.target }}/release/bundle/msi/"*.msi release-artifacts/
+          ls -lh release-artifacts/
+
+      - name: Upload installer artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: release-artifacts/*
+          if-no-files-found: error
+          retention-days: 14
+
+  checksums:
+    name: Generate SHA256SUMS
+    needs: [check-version, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download installer artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: installer-*
+          path: dist-artifacts
+          merge-multiple: true
+
+      - name: Generate SHA256SUMS.txt
+        run: |
+          set -euo pipefail
+          cd dist-artifacts
+          LC_ALL=C sha256sum $(LC_ALL=C ls -1 | LC_ALL=C sort) > ../SHA256SUMS.txt
+          cat ../SHA256SUMS.txt
+
+      - name: Upload SHA256SUMS artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: sha256sums
+          path: SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    name: Create draft GitHub Release
+    needs: [check-version, checksums]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+
+      - name: Download installer artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: installer-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Download SHA256SUMS
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: sha256sums
+          path: release-assets
+
+      - name: Generate release notes
+        run: |
+          node scripts/generate-release-notes.mjs \
+            --version "${{ needs.check-version.outputs.version }}" \
+            --checksums "release-assets/SHA256SUMS.txt" \
+            --output "release-notes.md"
+
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          release_tag="${{ needs.check-version.outputs.tag }}"
+          release_version="${{ needs.check-version.outputs.version }}"
+          gh release create "$release_tag" \
+            --draft \
+            --title "Kalamos v${release_version}" \
+            --notes-file "release-notes.md" \
+            release-assets/*
