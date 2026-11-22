@@ -36,11 +36,18 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Check release manifest versions
+        run: node scripts/check-release-version.mjs
+
       - name: TypeScript typecheck
         run: npx tsc --noEmit
 
       - name: Run frontend unit tests (Vitest)
         run: npm test
+
+      - name: Run Node script unit tests
+        shell: bash
+        run: node --test tests/*.test.mjs
 
       - name: Build frontend dist
         run: npm run build

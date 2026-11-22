@@ -1,13 +1,70 @@
 #!/usr/bin/env node
 
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
+export const DEFAULT_SUMMARY_PLACEHOLDER =
+  "<!-- 發布前請在此補充本版本的新功能、改進與修正摘要 -->";
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 /**
- * Formats GitHub draft release notes using the project template and SHA256SUMS.
+ * Extracts the markdown body of the `## <version>` section from a CHANGELOG.md string.
+ * Returns an empty string when no matching section or body is found.
  */
-export function formatReleaseNotes({ version, checksumsText }) {
+export function extractChangelogSection(changelogText, version) {
+  if (!changelogText || !version) return "";
+
+  const normalizedVersion = String(version).trim().replace(/^v/, "");
+  if (!normalizedVersion) return "";
+
+  const headingRe = new RegExp(
+    `^##\\s+${escapeRegExp(normalizedVersion)}(?:\\s+.*)?$`,
+  );
+  const lines = changelogText.split(/\r?\n/);
+
+  let collecting = false;
+  let inCodeFence = false;
+  const sectionLines = [];
+
+  for (const line of lines) {
+    if (/^\s*```/.test(line)) {
+      if (collecting) {
+        inCodeFence = !inCodeFence;
+        sectionLines.push(line);
+      }
+      continue;
+    }
+
+    if (!collecting) {
+      if (headingRe.test(line.trim())) {
+        collecting = true;
+      }
+      continue;
+    }
+
+    if (!inCodeFence && /^#{1,2}\s+/.test(line)) {
+      break;
+    }
+
+    sectionLines.push(line);
+  }
+
+  return sectionLines.join("\n").trim();
+}
+
+/**
+ * Formats GitHub draft release notes using the project template, optional
+ * CHANGELOG.md content, and SHA256SUMS.
+ */
+export function formatReleaseNotes({
+  version,
+  checksumsText,
+  changelogText = "",
+}) {
   const trimmedChecksums = checksumsText.trim();
   const files = trimmedChecksums
     ? trimmedChecksums
@@ -28,10 +85,13 @@ export function formatReleaseNotes({ version, checksumsText }) {
     files.find((f) => /\.msi$/i.test(f)) ||
     `Kalamos_${version}_x64_en-US.msi`;
 
+  const changelogSection = extractChangelogSection(changelogText, version);
+  const summarySection = changelogSection || DEFAULT_SUMMARY_PLACEHOLDER;
+
   return [
     `## Kalamos v${version}`,
     "",
-    "<!-- 發布前請在此補充本版本的新功能、改進與修正摘要 -->",
+    summarySection,
     "",
     "### 安裝方式",
     "",
@@ -63,7 +123,13 @@ export function formatReleaseNotes({ version, checksumsText }) {
 }
 
 function parseArgs(argv) {
-  const opts = { version: "", checksumsPath: "", outputPath: "" };
+  const opts = {
+    version: "",
+    checksumsPath: "",
+    outputPath: "",
+    changelogPath: "",
+    hasExplicitChangelog: false,
+  };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === "--version") {
@@ -72,6 +138,9 @@ function parseArgs(argv) {
       opts.checksumsPath = argv[++i] ?? "";
     } else if (arg === "--output") {
       opts.outputPath = argv[++i] ?? "";
+    } else if (arg === "--changelog") {
+      opts.changelogPath = argv[++i] ?? "";
+      opts.hasExplicitChangelog = true;
     } else {
       throw new Error(`Unknown argument: ${arg}`);
     }
@@ -88,9 +157,19 @@ if (
   try {
     const opts = parseArgs(process.argv.slice(2));
     const checksumsText = readFileSync(resolve(opts.checksumsPath), "utf8");
+    let changelogText = "";
+    if (opts.hasExplicitChangelog) {
+      changelogText = readFileSync(resolve(opts.changelogPath), "utf8");
+    } else {
+      const defaultChangelogPath = resolve("CHANGELOG.md");
+      if (existsSync(defaultChangelogPath)) {
+        changelogText = readFileSync(defaultChangelogPath, "utf8");
+      }
+    }
     const notes = formatReleaseNotes({
       version: opts.version,
       checksumsText,
+      changelogText,
     });
     if (opts.outputPath) {
       writeFileSync(resolve(opts.outputPath), notes, "utf8");
