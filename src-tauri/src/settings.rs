@@ -14,6 +14,8 @@ pub enum SidebarTab {
     Tree,
     List,
     Outline,
+    /// #73 B: folder search.
+    Search,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

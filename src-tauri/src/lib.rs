@@ -6,6 +6,7 @@ pub mod images;
 pub mod open_with;
 pub mod pandoc;
 pub mod recovery;
+pub mod search;
 pub mod settings;
 pub mod themes;
 pub mod tree;
@@ -45,6 +46,7 @@ pub fn run() {
             pandoc::import_pandoc,
             upload::upload_images,
             open_with::take_pending_open_files,
+            search::search_in_folder,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

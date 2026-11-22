@@ -39,6 +39,7 @@ import {
 } from "./editor/images";
 import { collectUploadTargetsInRange, uploadImagesInEditor } from "./editor/image-upload";
 import { bindWindowShortcuts } from "./editor/keymaps";
+import { lineColumnToRange, revealRange } from "./editor/search";
 import { FOCUS_MODE_MESSAGE, TYPEWRITER_MODE_MESSAGE } from "./editor/writing-modes";
 import { AUTO_PAIR_BRACKETS_MESSAGE, AUTO_PAIR_MARKDOWN_MESSAGE } from "./editor/auto-pair";
 import { createWordCounter, type WordCounter } from "./editor/word-count-view";
@@ -450,6 +451,12 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
     onSelectFile: async (path) => {
       await openDocument(path);
     },
+    onOpenSearchHit: async (hit) => {
+      // #73 B: the current document is not reopened (no unsaved prompt).
+      if (currentPath !== hit.path && !(await openDocument(hit.path))) return;
+      const range = lineColumnToRange(editor.view.state, hit.line, hit.column, hit.length);
+      revealRange(editor.view, range.from, range.to);
+    },
     onPathRenamed: (from, to) => {
       if (currentPath === null) return;
       if (currentPath === from) {
@@ -518,6 +525,10 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
     } else if (key === "e" || event.code === "KeyE") {
       event.preventDefault();
       void exportDocumentPdf();
+    } else if (key === "f" || event.code === "KeyF") {
+      // #73 B: folder search.
+      event.preventDefault();
+      void sidebar.openSearch();
     }
   };
   window.addEventListener("keydown", onSidebarKeydown);

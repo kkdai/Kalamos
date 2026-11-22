@@ -299,6 +299,39 @@ function afterNavigate(view: EditorView, focusEditor: boolean): void {
   revealTableCellLater(view);
 }
 
+/**
+ * #73 B: select `from..to`, scroll it into view (centred in typewriter mode)
+ * and focus the editor — or, for a hit inside a table cell, that cell.
+ */
+export function revealRange(view: EditorView, from: number, to: number): void {
+  const len = view.state.doc.length;
+  const range = { from: Math.max(0, Math.min(from, len)), to: Math.max(0, Math.min(to, len)) };
+  view.dispatch({
+    selection: EditorSelection.single(range.from, range.to),
+    effects: scrollEffect(view, range),
+    userEvent: "select.search",
+  });
+  const hit = tableHitAt(view.state, range.from, range.to);
+  if (hit) {
+    focusTableCell(view, hit.table.from, hit.row, hit.col, range);
+    revealTableCellLater(view);
+  } else {
+    view.focus();
+  }
+}
+
+/** 1-based line / column (UTF-16 units) → document range, clamped to the line. */
+export function lineColumnToRange(
+  state: EditorState,
+  line: number,
+  column: number,
+  length: number,
+): MatchRange {
+  const l = state.doc.line(Math.max(1, Math.min(line, state.doc.lines)));
+  const from = Math.min(l.from + Math.max(0, column - 1), l.to);
+  return { from, to: Math.min(from + Math.max(0, length), l.to) };
+}
+
 /** Cmd+F (find) / Cmd+Opt+F (find + replace). */
 export function openFind(view: EditorView, options: { replace?: boolean } = {}): boolean {
   const seed = selectionSeed(view);

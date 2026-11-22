@@ -66,7 +66,7 @@ export interface RecoveryEntry {
   savedAtMs: number;
 }
 
-export type SidebarTab = "tree" | "list" | "outline";
+export type SidebarTab = "tree" | "list" | "outline" | "search";
 
 export interface Settings {
   theme: string;
@@ -573,6 +573,172 @@ export async function listFiles(path: string): Promise<FileEntry[]> {
   });
 
   return entries;
+}
+
+// ---------------------------------------------------------------------------
+// #73 B: folder search
+// ---------------------------------------------------------------------------
+
+export interface FolderSearchOptions {
+  caseSensitive: boolean;
+  wholeWord: boolean;
+  regex: boolean;
+}
+
+export interface FolderSearchHit {
+  path: string;
+  /** 1-based. */
+  line: number;
+  /** 1-based, in UTF-16 code units. */
+  column: number;
+  /** UTF-16 code units. */
+  length: number;
+  snippet: string;
+  snippetMatchStart: number;
+  snippetMatchEnd: number;
+}
+
+export interface FolderSearchResults {
+  hits: FolderSearchHit[];
+  truncated: boolean;
+  filesSearched: number;
+}
+
+export const FOLDER_SEARCH_MAX_RESULTS = 1000;
+const SNIPPET_MAX_CHARS = 160;
+const SNIPPET_CONTEXT_CHARS = 40;
+
+/** Same snippet rules as src-tauri/src/search.rs (cut on code points). */
+export function makeSearchSnippet(
+  line: string,
+  start: number,
+  end: number,
+): { snippet: string; matchStart: number; matchEnd: number } {
+  const chars = Array.from(line);
+  const total = chars.length;
+  const hitFrom = Array.from(line.slice(0, start)).length;
+  const hitTo = hitFrom + Array.from(line.slice(start, end)).length;
+  let from = total <= SNIPPET_MAX_CHARS ? 0 : Math.max(0, hitFrom - SNIPPET_CONTEXT_CHARS);
+  let to = Math.min(total, from + SNIPPET_MAX_CHARS);
+  if (to - from < SNIPPET_MAX_CHARS) from = Math.max(0, to - SNIPPET_MAX_CHARS);
+  const ws = (c: string) => /\s/u.test(c);
+  while (from < hitFrom && ws(chars[from])) from++;
+  while (to > hitTo && to > from && ws(chars[to - 1])) to--;
+  const hitEnd = Math.min(hitTo, to);
+  const prefix = chars.slice(0, from).some((c) => !ws(c)) ? "…" : "";
+  const suffix = chars.slice(to).some((c) => !ws(c)) ? "…" : "";
+  const before = chars.slice(from, hitFrom).join("");
+  const hit = chars.slice(hitFrom, hitEnd).join("");
+  const after = chars.slice(hitEnd, to).join("");
+  const matchStart = prefix.length + before.length;
+  return {
+    snippet: prefix + before + hit + after + suffix,
+    matchStart,
+    matchEnd: matchStart + hit.length,
+  };
+}
+
+function isWordChar(c: string | undefined): boolean {
+  return c !== undefined && /[\p{L}\p{N}_]/u.test(c);
+}
+
+function lastChar(s: string): string | undefined {
+  const arr = Array.from(s);
+  return arr[arr.length - 1];
+}
+
+function buildMockMatcher(query: string, opts: FolderSearchOptions): RegExp {
+  const source = opts.regex ? query : query.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&");
+  const flags = opts.caseSensitive ? "g" : "gi";
+  try {
+    return new RegExp(source, `${flags}u`);
+  } catch {
+    try {
+      return new RegExp(source, flags);
+    } catch (err) {
+      throw createAppError("Parse", `Invalid regular expression: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+}
+
+function mockSearchInFolder(root: string, query: string, opts: FolderSearchOptions): FolderSearchResults {
+  const norm = assertValidMockDir(root);
+  const result: FolderSearchResults = { hits: [], truncated: false, filesSearched: 0 };
+  if (!query) return result;
+  const matcher = buildMockMatcher(query, opts);
+  const prefix = norm === "/" ? "/" : `${norm}/`;
+  // Files of a folder before its sub-folders, each sorted by name (as Rust).
+  const paths = [...mockFiles.keys()]
+    .filter((p) => {
+      if (!p.startsWith(prefix)) return false;
+      const segs = p.slice(prefix.length).split("/");
+      return !segs.some(isIgnoredName) && isMarkdownName(segs[segs.length - 1]);
+    })
+    .sort((a, b) => {
+      const sa = a.slice(prefix.length).split("/");
+      const sb = b.slice(prefix.length).split("/");
+      for (let i = 0; ; i++) {
+        const aFile = i === sa.length - 1;
+        const bFile = i === sb.length - 1;
+        if (aFile !== bFile) return aFile ? -1 : 1;
+        if (sa[i] !== sb[i]) return sa[i] < sb[i] ? -1 : 1;
+        if (aFile) return 0;
+      }
+    });
+  for (const path of paths) {
+    result.filesSearched++;
+    const lines = mockFiles.get(path)!.content.split("\n");
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].endsWith("\r") ? lines[i].slice(0, -1) : lines[i];
+      matcher.lastIndex = 0;
+      for (let m = matcher.exec(line); m; m = matcher.exec(line)) {
+        if (m[0] === "") {
+          matcher.lastIndex++;
+          continue;
+        }
+        const start = m.index;
+        const end = start + m[0].length;
+        if (opts.wholeWord) {
+          const left = isWordChar(lastChar(line.slice(0, start))) && isWordChar(Array.from(m[0])[0]);
+          const right = isWordChar(lastChar(m[0])) && isWordChar(Array.from(line.slice(end))[0]);
+          if (left || right) continue;
+        }
+        if (result.hits.length >= FOLDER_SEARCH_MAX_RESULTS) {
+          result.truncated = true;
+          return result;
+        }
+        const { snippet, matchStart, matchEnd } = makeSearchSnippet(line, start, end);
+        result.hits.push({
+          path,
+          line: i + 1,
+          column: start + 1,
+          length: m[0].length,
+          snippet,
+          snippetMatchStart: matchStart,
+          snippetMatchEnd: matchEnd,
+        });
+      }
+    }
+  }
+  return result;
+}
+
+/** #73 B: search the Markdown files under `root` (Rust: search_in_folder). */
+export async function searchInFolder(
+  root: string,
+  query: string,
+  opts: FolderSearchOptions,
+): Promise<FolderSearchResults> {
+  if (isTauri()) {
+    return invoke<FolderSearchResults>("search_in_folder", {
+      root,
+      query,
+      caseSensitive: opts.caseSensitive,
+      wholeWord: opts.wholeWord,
+      regex: opts.regex,
+    });
+  }
+  return mockSearchInFolder(root, query, opts);
 }
 
 export async function watchFolder(path: string): Promise<null> {
