@@ -8,7 +8,7 @@ import "./styles/themes/papyros.css";
 import "./styles/themes/melan.css";
 import "./styles/editor.css";
 
-import { createEditor, type KalamosEditor } from "./editor";
+import { createEditor, type DocSession, type KalamosEditor } from "./editor";
 import { pickExportFormat } from "./export/format-picker";
 import { buildExportHtml } from "./export/html";
 import {
@@ -39,6 +39,7 @@ import {
 } from "./editor/images";
 import { collectUploadTargetsInRange, uploadImagesInEditor } from "./editor/image-upload";
 import type { EditorView } from "@codemirror/view";
+import type { StateEffect } from "@codemirror/state";
 import {
   bindWindowShortcuts,
   toggleEmphasis,
@@ -82,6 +83,7 @@ import {
 import {
   allowAssetDir,
   askDiscardChanges,
+  askSaveChanges,
   isAssetDirTooBroadError,
   clearRecovery,
   DEFAULT_SETTINGS,
@@ -110,6 +112,7 @@ import {
   pickSavePdfPath,
   saveFile,
   setSettings,
+  setWindowTitle,
   takePendingOpenFiles,
   UPLOADER_NOT_CONFIGURED_MESSAGE,
   uploadImages,
@@ -119,6 +122,14 @@ import {
   type Settings,
 } from "./ipc";
 import { createSidebar, type SidebarController } from "./sidebar/sidebar";
+import { createTabBar, type TabBar } from "./tabs/tab-bar";
+import {
+  activeIndexAfterClose,
+  cycleIndex,
+  moveItem,
+  nextUntitledNumber,
+  tabLabels,
+} from "./tabs/tab-model";
 import {
   applyThemeWithCustomCss,
   createThemeMenu,
@@ -203,8 +214,45 @@ export function nextZoomLevel(current: number, direction: 1 | -1): number {
   return smaller.length > 0 ? smaller[smaller.length - 1] : ZOOM_LEVELS[0];
 }
 
+/** #81: one open document. The single EditorView shows the active tab's `doc`. */
+export interface DocumentTab {
+  id: string;
+  /** Recovery file id. */
+  docId: string;
+  /** null = untitled. */
+  path: string | null;
+  /** 「未命名 n」 while untitled. */
+  untitledNumber: number;
+  /** EditorState + saved content + dirty flag. */
+  doc: DocSession;
+  scrollTop: number;
+  scrollSnapshot: StateEffect<unknown> | null;
+  autosaveTimer: ReturnType<typeof setTimeout> | null;
+}
+
+export interface TabInfo {
+  id: string;
+  label: string;
+  path: string | null;
+  docId: string;
+  dirty: boolean;
+  active: boolean;
+}
+
 export interface KalamosApp {
   editor: KalamosEditor;
+  tabBar: TabBar;
+  /** #81: open tabs in display order. */
+  getTabs: () => TabInfo[];
+  getActiveTabId: () => string;
+  /** #81: Cmd+T / Cmd+N / ＋ — a new blank untitled tab. */
+  newTab: () => boolean;
+  /** #81: Cmd+W — false when cancelled at the unsaved prompt. */
+  closeTab: (id?: string) => Promise<boolean>;
+  activateTab: (id: string) => boolean;
+  /** #81: Ctrl+Tab / Ctrl+Shift+Tab. */
+  cycleTab: (delta: 1 | -1) => boolean;
+  moveTab: (id: string, toIndex: number) => boolean;
   /** #74: Cmd+, preferences modal. */
   preferences: PreferencesController;
   /** #74: native menu action dispatcher (menu-action events land here). */
@@ -269,10 +317,7 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
   const discardBtn = root.querySelector<HTMLButtonElement>("#recovery-discard-btn");
   const statusEl = root.querySelector<HTMLElement>("#status");
 
-  let docId = generateDocId();
-  let currentPath: string | null = null;
   let pendingRecovery: RecoveryEntry | null = null;
-  let autosaveTimer: ReturnType<typeof setTimeout> | null = null;
   let unlistenClose: (() => void) | null = null;
   let statusText = "";
   let currentSettings: Settings = { ...DEFAULT_SETTINGS };
@@ -285,20 +330,22 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
     }
   }
 
+  // Image paths, asset scope and the front-matter image root follow the active tab.
   let syncedDocPath: string | null = null;
   function syncDocumentPath(): void {
-    if (syncedDocPath === currentPath) return;
-    syncedDocPath = currentPath;
-    editor.setDocumentPath(currentPath);
-    if (currentPath !== null) {
-      void allowAssetDir(currentPath).catch(() => null);
+    const path = active.path;
+    editor.setDocumentPath(path);
+    if (syncedDocPath === path) return;
+    syncedDocPath = path;
+    if (path !== null) {
+      void allowAssetDir(path).catch(() => null);
     }
   }
 
-  function clearAutosaveTimer(): void {
-    if (autosaveTimer !== null) {
-      clearTimeout(autosaveTimer);
-      autosaveTimer = null;
+  function clearAutosaveTimer(tab: DocumentTab = active): void {
+    if (tab.autosaveTimer !== null) {
+      clearTimeout(tab.autosaveTimer);
+      tab.autosaveTimer = null;
     }
   }
 
@@ -310,63 +357,65 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
 
   async function persistFileToPath(
     targetPath: string,
-    targetDocId: string,
+    tab: DocumentTab,
     contentToSave: string,
   ): Promise<boolean> {
     try {
       await saveFile(targetPath, contentToSave);
       setStatus("", false);
-      if (docId === targetDocId) {
-        currentPath = targetPath;
-        syncDocumentPath();
-        editor.markClean(contentToSave);
-        await clearRecovery(targetDocId).catch(() => null);
-        if (editor.isDirty() && currentPath !== null) {
-          scheduleNamedAutosave();
+      if (tabs.includes(tab)) {
+        tab.path = targetPath;
+        editor.markSessionClean(tab.doc, contentToSave);
+        if (tab === active) syncDocumentPath();
+        renderTabs();
+        await clearRecovery(tab.docId).catch(() => null);
+        if (tabs.includes(tab) && editor.isSessionDirty(tab.doc) && tab.path !== null) {
+          scheduleNamedAutosave(tab);
         }
       }
       return true;
     } catch (err) {
-      if (docId === targetDocId) {
-        editor.markDirty();
+      const open = tabs.includes(tab);
+      if (open) {
+        editor.markSessionDirty(tab.doc);
+        renderTabs();
       }
       setStatus(formatErrorMessage("存檔失敗", err), true);
-      const latestContent =
-        docId === targetDocId ? editor.getContent() : contentToSave;
-      await writeRecovery(targetDocId, latestContent, targetPath).catch(() => null);
+      const latestContent = open ? editor.getSessionContent(tab.doc) : contentToSave;
+      await writeRecovery(tab.docId, latestContent, targetPath).catch(() => null);
       return false;
     }
   }
 
-  function scheduleNamedAutosave(): void {
-    clearAutosaveTimer();
-    if (currentPath === null) return;
+  /** #81: every tab keeps its own autosave timer, so a tab switched away from still saves. */
+  function scheduleNamedAutosave(tab: DocumentTab = active): void {
+    clearAutosaveTimer(tab);
+    if (tab.path === null) return;
     // #74 preference: autosave off = only explicit saves (and switching / closing) write the file.
     if (currentSettings.autoSave === false) return;
-    const targetPath = currentPath;
-    const targetDocId = docId;
-    autosaveTimer = setTimeout(() => {
-      autosaveTimer = null;
-      if (currentPath === targetPath && docId === targetDocId && editor.isDirty()) {
-        const contentToSave = editor.getContent();
-        void persistFileToPath(targetPath, targetDocId, contentToSave);
+    const targetPath = tab.path;
+    tab.autosaveTimer = setTimeout(() => {
+      tab.autosaveTimer = null;
+      if (tabs.includes(tab) && tab.path === targetPath && editor.isSessionDirty(tab.doc)) {
+        void persistFileToPath(targetPath, tab, editor.getSessionContent(tab.doc));
       }
     }, NAMED_AUTOSAVE_DELAY_MS);
   }
 
   async function prepareBeforeSwitchDocument(): Promise<boolean> {
-    if (!editor.isDirty()) {
+    const tab = active;
+    if (!editor.isSessionDirty(tab.doc)) {
       return true;
     }
-    if (currentPath !== null) {
-      clearAutosaveTimer();
-      return persistFileToPath(currentPath, docId, editor.getContent());
+    if (tab.path !== null) {
+      clearAutosaveTimer(tab);
+      return persistFileToPath(tab.path, tab, editor.getSessionContent(tab.doc));
     }
     const confirmed = await askDiscardChanges();
     if (!confirmed) {
       return false;
     }
-    await clearRecovery(docId).catch(() => null);
+    await clearRecovery(tab.docId).catch(() => null);
     return true;
   }
 
@@ -413,9 +462,10 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
     initialContent: "",
     handlers,
     onUserChange: () => {
-      if (currentPath !== null) {
-        scheduleNamedAutosave();
+      if (active.path !== null) {
+        scheduleNamedAutosave(active);
       }
+      renderTabs();
     },
     onSourceModeChange: (sourceMode) => {
       void persistEditorSettingPatch({ sourceMode });
@@ -443,11 +493,11 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
       void persistEditorSettingPatch({ autoPairMarkdown });
     },
     onOpenRelativeLink: async (relativePath, slug, view) => {
-      if (currentPath === null) {
+      if (active.path === null) {
         setStatus("請先儲存目前文件，才能開啟相對路徑連結", true);
         return;
       }
-      const targetPath = resolveRelativeMarkdownPath(currentPath, relativePath);
+      const targetPath = resolveRelativeMarkdownPath(active.path, relativePath);
       const opened = await openDocument(targetPath);
       if (opened && slug) {
         jumpToHeadingSlug(view, slug);
@@ -460,6 +510,220 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
       setStatus(`${IMAGE_ROOT_TOO_BROAD_PREFIX}${root}`, true);
     },
   });
+
+  // ---- #81: document tabs ----
+
+  let tabSeq = 0;
+  function makeTab(doc: DocSession, path: string | null, docId = generateDocId()): DocumentTab {
+    return {
+      id: `tab-${++tabSeq}`,
+      docId,
+      path,
+      untitledNumber: path === null ? nextUntitledNumber(untitledNumbersInUse()) : 0,
+      doc,
+      scrollTop: 0,
+      scrollSnapshot: null,
+      autosaveTimer: null,
+    };
+  }
+
+  const tabs: DocumentTab[] = [];
+  function untitledNumbersInUse(): number[] {
+    return tabs.filter((t) => t.path === null).map((t) => t.untitledNumber);
+  }
+
+  let active: DocumentTab = makeTab(editor.getSession(), null);
+  tabs.push(active);
+
+  const tabBar = createTabBar({
+    parent: editorContainer.parentElement ?? document.body,
+    before: editorContainer.parentElement ? editorContainer : null,
+    onSelect: (id) => {
+      activateTab(id);
+    },
+    onClose: (id) => {
+      void closeTab(id);
+    },
+    onNew: () => {
+      newTab();
+    },
+    onReorder: (id, toIndex) => {
+      moveTab(id, toIndex);
+    },
+  });
+
+  let lastWindowTitle = "";
+  function currentLabels(): Map<string, string> {
+    return tabLabels(tabs);
+  }
+
+  function renderTabs(): void {
+    const labels = currentLabels();
+    tabBar.render(
+      tabs.map((tab) => ({
+        id: tab.id,
+        label: labels.get(tab.id) ?? "",
+        title: tab.path ?? labels.get(tab.id) ?? "",
+        dirty: editor.isSessionDirty(tab.doc),
+        active: tab === active,
+      })),
+    );
+    const title = labels.get(active.id) ?? "Kalamos";
+    if (title !== lastWindowTitle) {
+      lastWindowTitle = title;
+      void setWindowTitle(title).catch(() => null);
+    }
+  }
+
+  function findTab(id: string | undefined): DocumentTab | undefined {
+    return id === undefined ? active : tabs.find((t) => t.id === id);
+  }
+
+  /** Shows `target` in the editor; everything that follows the current document updates with it. */
+  function showTab(target: DocumentTab): void {
+    const { view } = editor;
+    if (target !== active && tabs.includes(active)) {
+      active.scrollTop = view.scrollDOM.scrollTop;
+      active.scrollSnapshot = view.scrollSnapshot();
+    }
+    editor.switchSession(target.doc);
+    active = target;
+    syncDocumentPath();
+    view.scrollDOM.scrollTop = target.scrollTop;
+    if (target.scrollSnapshot) view.dispatch({ effects: target.scrollSnapshot });
+    sidebar.setActiveFile(target.path);
+    sidebar.outline.refreshNow();
+    wordCounter.flush();
+    renderTabs();
+    scheduleMenuSync();
+    if (!preferences.isOpen()) view.focus();
+  }
+
+  function activateTab(id: string): boolean {
+    const tab = findTab(id);
+    if (!tab) return false;
+    if (tab !== active) showTab(tab);
+    return true;
+  }
+
+  function newTab(): boolean {
+    const tab = makeTab(editor.createSession(""), null);
+    tabs.push(tab);
+    showTab(tab);
+    setStatus("", false);
+    return true;
+  }
+
+  /** Puts a different document in the active tab's place (open / import / restore in place). */
+  function replaceActiveTab(next: DocumentTab): void {
+    clearAutosaveTimer(active);
+    const index = tabs.indexOf(active);
+    tabs[index] = next;
+    showTab(next);
+  }
+
+  function isPristine(tab: DocumentTab): boolean {
+    return (
+      tab.path === null &&
+      !editor.isSessionDirty(tab.doc) &&
+      editor.getSessionContent(tab.doc).length === 0
+    );
+  }
+
+  function cycleTab(delta: 1 | -1): boolean {
+    if (tabs.length < 2) return false;
+    showTab(tabs[cycleIndex(tabs.indexOf(active), tabs.length, delta)]);
+    return true;
+  }
+
+  function moveTab(id: string, toIndex: number): boolean {
+    const from = tabs.findIndex((t) => t.id === id);
+    if (from < 0) return false;
+    const reordered = moveItem(tabs, from, toIndex);
+    tabs.splice(0, tabs.length, ...reordered);
+    renderTabs();
+    return true;
+  }
+
+  /** Unsaved changes in a tab about to close: true = go ahead and close it. */
+  async function settleBeforeClose(tab: DocumentTab): Promise<boolean> {
+    if (!editor.isSessionDirty(tab.doc)) return true;
+    // Autosave is on: a named file is simply written, as when switching documents.
+    if (tab.path !== null && currentSettings.autoSave !== false) {
+      clearAutosaveTimer(tab);
+      return persistFileToPath(tab.path, tab, editor.getSessionContent(tab.doc));
+    }
+    // Show the tab being asked about.
+    if (tab !== active) showTab(tab);
+    const label = currentLabels().get(tab.id) ?? "";
+    const choice = await askSaveChanges(`「${label}」有未儲存的變更，要在關閉前儲存嗎？`);
+    if (choice === "cancel" || !tabs.includes(tab)) return false;
+    if (choice === "discard") {
+      clearAutosaveTimer(tab);
+      await clearRecovery(tab.docId).catch(() => null);
+      return true;
+    }
+    if (tab.path !== null) {
+      clearAutosaveTimer(tab);
+      return persistFileToPath(tab.path, tab, editor.getSessionContent(tab.doc));
+    }
+    if (tab !== active) showTab(tab);
+    return saveDocumentAs();
+  }
+
+  let closing = false;
+  async function closeTab(id?: string): Promise<boolean> {
+    if (closing) return false;
+    const tab = findTab(id);
+    if (!tab) return false;
+    closing = true;
+    try {
+      if (!(await settleBeforeClose(tab))) return false;
+      const index = tabs.indexOf(tab);
+      if (index < 0) return true;
+      clearAutosaveTimer(tab);
+      if (tabs.length === 1) {
+        // The last tab: the window stays, with a blank untitled tab.
+        tabs.splice(0, 1);
+        const blank = makeTab(editor.createSession(""), null);
+        tabs.push(blank);
+        showTab(blank);
+      } else {
+        const activeIndex = tabs.indexOf(active);
+        const count = tabs.length;
+        tabs.splice(index, 1);
+        if (tab === active) {
+          showTab(tabs[activeIndexAfterClose(index, activeIndex, count)]);
+        } else {
+          renderTabs();
+        }
+      }
+      setStatus("", false);
+      return true;
+    } finally {
+      closing = false;
+    }
+  }
+
+  // Cmd+T new tab, Cmd+W close tab, Ctrl+Tab / Ctrl+Shift+Tab next / previous tab.
+  const onTabKeydown = (event: KeyboardEvent) => {
+    if (event.defaultPrevented || preferences.isOpen()) return;
+    if (event.key === "Tab" && event.ctrlKey && !event.metaKey && !event.altKey) {
+      event.preventDefault();
+      cycleTab(event.shiftKey ? -1 : 1);
+      return;
+    }
+    if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return;
+    if (event.metaKey && event.ctrlKey) return;
+    if (event.code === "KeyT" || event.key.toLowerCase() === "t") {
+      event.preventDefault();
+      newTab();
+    } else if (event.code === "KeyW" || event.key.toLowerCase() === "w") {
+      event.preventDefault();
+      void closeTab();
+    }
+  };
+  window.addEventListener("keydown", onTabKeydown);
 
   const windowHandlers = {
     ...handlers,
@@ -509,41 +773,44 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
     },
     onOpenSearchHit: async (hit) => {
       // #73 B: the current document is not reopened (no unsaved prompt).
-      if (currentPath !== hit.path && !(await openDocument(hit.path))) return;
+      if (active.path !== hit.path && !(await openDocument(hit.path))) return;
       const range = lineColumnToRange(editor.view.state, hit.line, hit.column, hit.length);
       revealRange(editor.view, range.from, range.to);
     },
     onPathRenamed: (from, to) => {
-      if (currentPath === null) return;
-      if (currentPath === from) {
-        currentPath = to;
-        syncDocumentPath();
-        sidebar.setActiveFile(currentPath);
-        if (editor.isDirty()) {
-          scheduleNamedAutosave();
+      // Every open tab follows the rename, so a background autosave never recreates the old path.
+      for (const tab of tabs) {
+        if (tab.path === null) continue;
+        let renamed: string | null = null;
+        if (tab.path === from) renamed = to;
+        else if (tab.path.startsWith(`${from}/`)) renamed = `${to}${tab.path.slice(from.length)}`;
+        if (renamed === null) continue;
+        tab.path = renamed;
+        if (tab === active) {
+          syncDocumentPath();
+          sidebar.setActiveFile(tab.path);
         }
-      } else if (currentPath.startsWith(`${from}/`)) {
-        currentPath = `${to}${currentPath.slice(from.length)}`;
-        syncDocumentPath();
-        sidebar.setActiveFile(currentPath);
-        if (editor.isDirty()) {
-          scheduleNamedAutosave();
+        if (editor.isSessionDirty(tab.doc)) {
+          scheduleNamedAutosave(tab);
         }
       }
+      renderTabs();
     },
     onPathTrashed: (trashedPath) => {
-      if (currentPath === null) return;
-      if (
-        currentPath === trashedPath ||
-        currentPath.startsWith(`${trashedPath}/`)
-      ) {
-        clearAutosaveTimer();
-        currentPath = null;
-        syncDocumentPath();
-        editor.markDirty();
-        sidebar.setActiveFile(null);
-        setStatus("檔案已移到垃圾桶，內容保留為未命名文件", false);
+      for (const tab of tabs) {
+        if (tab.path === null) continue;
+        if (tab.path !== trashedPath && !tab.path.startsWith(`${trashedPath}/`)) continue;
+        clearAutosaveTimer(tab);
+        tab.path = null;
+        tab.untitledNumber = nextUntitledNumber(untitledNumbersInUse());
+        editor.markSessionDirty(tab.doc);
+        if (tab === active) {
+          syncDocumentPath();
+          sidebar.setActiveFile(null);
+          setStatus("檔案已移到垃圾桶，內容保留為未命名文件", false);
+        }
       }
+      renderTabs();
     },
     onError: (prefix, err) => {
       setStatus(formatErrorMessage(prefix, err), true);
@@ -631,8 +898,10 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
     if (Object.keys(plain).length > 0) {
       currentSettings = { ...currentSettings, ...plain };
       if (plain.fontSize !== undefined || plain.contentWidth !== undefined) applyLayoutSettings();
-      if (plain.autoSave === true && editor.isDirty()) scheduleNamedAutosave();
-      if (plain.autoSave === false) clearAutosaveTimer();
+      for (const tab of tabs) {
+        if (plain.autoSave === true && editor.isSessionDirty(tab.doc)) scheduleNamedAutosave(tab);
+        if (plain.autoSave === false) clearAutosaveTimer(tab);
+      }
       await persistEditorSettingPatch(plain);
     }
   }
@@ -695,6 +964,8 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
   const menuCommands: Record<string, MenuCommand> = {
     "app.preferences": () => preferences.open(),
     "file.new": () => newDocument(),
+    "file.newTab": () => newTab(),
+    "file.closeTab": () => closeTab(),
     "file.open": () => openDocument(),
     "file.openFolder": () => sidebar.openFolder(),
     "file.save": () => saveDocument(),
@@ -856,7 +1127,7 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
       const chosen = format ?? (await pickExportFormat());
       if (!chosen) return false;
       const info = formatInfo(chosen);
-      const docPath = currentPath;
+      const docPath = active.path;
       let outPath: string | null;
       try {
         outPath =
@@ -926,12 +1197,7 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
         setStatus("", false);
         return false;
       }
-      clearAutosaveTimer();
-      currentPath = null;
-      docId = generateDocId();
-      editor.setContent(markdown, { dirty: true });
-      syncDocumentPath();
-      sidebar.setActiveFile(null);
+      replaceActiveTab(makeTab(editor.createSession(markdown, { dirty: true }), null));
       setStatus(importedMessage(source), false);
       return true;
     } finally {
@@ -958,11 +1224,13 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
   };
   window.addEventListener("keydown", onPandocKeydown);
 
+  // #81: every untitled tab with changes has its own recovery file (its docId), not just the active one.
   const recoveryInterval = setInterval(() => {
-    if (currentPath === null && editor.isDirty()) {
-      const content = editor.getContent();
+    for (const tab of tabs) {
+      if (tab.path !== null || !editor.isSessionDirty(tab.doc)) continue;
+      const content = editor.getSessionContent(tab.doc);
       if (content.length > 0) {
-        void writeRecovery(docId, content, null).catch((err) => {
+        void writeRecovery(tab.docId, content, null).catch((err) => {
           setStatus(formatErrorMessage("寫入救回檔失敗", err), true);
         });
       }
@@ -973,7 +1241,8 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
     pos: number,
     importers: Array<(docPath: string) => Promise<string>>,
   ): Promise<boolean> {
-    const docPath = currentPath;
+    const targetTab = active;
+    const docPath = targetTab.path;
     if (docPath === null) {
       setStatus(SAVE_BEFORE_IMAGE_MESSAGE, true);
       return false;
@@ -993,7 +1262,7 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
       }
       return false;
     }
-    if (currentPath !== docPath) return false;
+    if (active !== targetTab || active.path !== docPath) return false;
     const { view } = editor;
     const anchor = Math.min(pos, view.state.doc.length);
     const lengthBefore = view.state.doc.length;
@@ -1004,7 +1273,7 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
       setStatus("", false);
     }
     const settings = await refreshUploadSettings();
-    if (settings.uploadOnInsert && lastError === null && currentPath === docPath) {
+    if (settings.uploadOnInsert && lastError === null && active === targetTab && active.path === docPath) {
       const insertedTo = anchor + (view.state.doc.length - lengthBefore);
       await runImageUpload(collectUploadTargetsInRange(view.state, anchor, insertedTo));
     }
@@ -1105,12 +1374,8 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
     if (!selectedPath) return false;
     try {
       const content = await openFile(selectedPath);
-      clearAutosaveTimer();
-      currentPath = selectedPath;
-      docId = generateDocId();
-      editor.setContent(content, { dirty: false });
-      syncDocumentPath();
-      sidebar.setActiveFile(currentPath);
+      // #81 A: still opens in the current tab (opening in tabs is part B).
+      replaceActiveTab(makeTab(editor.createSession(content), selectedPath));
       setStatus("", false);
       return true;
     } catch (err) {
@@ -1146,40 +1411,31 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
   }
 
   async function saveDocument(): Promise<boolean> {
-    clearAutosaveTimer();
-    if (currentPath === null) {
+    const tab = active;
+    clearAutosaveTimer(tab);
+    if (tab.path === null) {
       return saveDocumentAs();
     }
-    const contentToSave = editor.getContent();
-    return persistFileToPath(currentPath, docId, contentToSave);
+    return persistFileToPath(tab.path, tab, editor.getSessionContent(tab.doc));
   }
 
   async function saveDocumentAs(explicitPath?: string): Promise<boolean> {
-    clearAutosaveTimer();
+    const tab = active;
+    clearAutosaveTimer(tab);
     let selectedPath: string | null = null;
     try {
-      selectedPath = explicitPath ?? (await pickSaveFilePath(currentPath));
+      selectedPath = explicitPath ?? (await pickSaveFilePath(tab.path));
     } catch (err) {
       setStatus(formatErrorMessage("存檔失敗", err), true);
       return false;
     }
     if (!selectedPath) return false;
-    const contentToSave = editor.getContent();
-    return persistFileToPath(selectedPath, docId, contentToSave);
+    return persistFileToPath(selectedPath, tab, editor.getSessionContent(tab.doc));
   }
 
+  /** #81: Cmd+N opens a new tab instead of replacing the current document. */
   async function newDocument(): Promise<boolean> {
-    if (!(await prepareBeforeSwitchDocument())) {
-      return false;
-    }
-    clearAutosaveTimer();
-    currentPath = null;
-    docId = generateDocId();
-    editor.setContent("", { dirty: false });
-    syncDocumentPath();
-    sidebar.setActiveFile(null);
-    setStatus("", false);
-    return true;
+    return newTab();
   }
 
   let exportingPdf = false;
@@ -1188,7 +1444,7 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
     if (exportingPdf) return false;
     exportingPdf = true;
     try {
-      const docPath = currentPath;
+      const docPath = active.path;
       let outPath: string | null = null;
       try {
         outPath = explicitPath ?? (await pickSavePdfPath(defaultPdfPath(docPath)));
@@ -1223,14 +1479,17 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
     const entry = pendingRecovery;
     pendingRecovery = null;
     setRecoveryBannerVisible(false);
-    clearAutosaveTimer();
-    docId = entry.docId;
-    currentPath = entry.path;
-    editor.setContent(entry.content, { dirty: true });
-    syncDocumentPath();
+    const restored = makeTab(editor.createSession(entry.content, { dirty: true }), entry.path, entry.docId);
+    // A blank untitled tab is reused; otherwise the restored text gets its own tab.
+    if (isPristine(active)) {
+      replaceActiveTab(restored);
+    } else {
+      tabs.push(restored);
+      showTab(restored);
+    }
     await clearRecovery(entry.docId).catch(() => null);
-    if (currentPath !== null) {
-      scheduleNamedAutosave();
+    if (restored.path !== null && tabs.includes(restored)) {
+      scheduleNamedAutosave(restored);
     }
     return true;
   }
@@ -1244,15 +1503,16 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
     return true;
   }
 
+  /** Window closing: every tab's changes are written (named files) or kept for recovery (untitled). */
   async function flushBeforeClose(): Promise<void> {
-    clearAutosaveTimer();
-    if (!editor.isDirty()) return;
-    if (currentPath !== null) {
-      await persistFileToPath(currentPath, docId, editor.getContent());
-    } else {
-      const content = editor.getContent();
-      if (content.length > 0) {
-        await writeRecovery(docId, content, null).catch(() => null);
+    for (const tab of [...tabs]) {
+      clearAutosaveTimer(tab);
+      if (!editor.isSessionDirty(tab.doc)) continue;
+      const content = editor.getSessionContent(tab.doc);
+      if (tab.path !== null) {
+        await persistFileToPath(tab.path, tab, content);
+      } else if (content.length > 0) {
+        await writeRecovery(tab.docId, content, null).catch(() => null);
       }
     }
   }
@@ -1293,6 +1553,7 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
       editor.setAutoPairMarkdown(Boolean(settings.autoPairMarkdown), false);
     }
     applyLayoutSettings();
+    renderTabs();
     await themeMenu.init();
     await sidebar.init({ restoreFolder: settings?.startupBehavior !== "blank" });
     const unlistenMenuAction = await onMenuAction(({ action, arg }) => {
@@ -1330,7 +1591,9 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
 
   function destroy(): void {
     destroyed = true;
-    clearAutosaveTimer();
+    for (const tab of tabs) clearAutosaveTimer(tab);
+    window.removeEventListener("keydown", onTabKeydown);
+    tabBar.destroy();
     unlistenFileDrop?.();
     unlistenFileDrop = null;
     unlistenOpenFiles?.();
@@ -1360,14 +1623,32 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
 
   return {
     editor,
+    tabBar,
+    getTabs: () => {
+      const labels = currentLabels();
+      return tabs.map((tab) => ({
+        id: tab.id,
+        label: labels.get(tab.id) ?? "",
+        path: tab.path,
+        docId: tab.docId,
+        dirty: editor.isSessionDirty(tab.doc),
+        active: tab === active,
+      }));
+    },
+    getActiveTabId: () => active.id,
+    newTab,
+    closeTab,
+    activateTab,
+    cycleTab,
+    moveTab,
     preferences,
     menu,
     getZoom: () => zoom,
     sidebar,
     themeMenu,
     wordCounter,
-    getDocId: () => docId,
-    getCurrentPath: () => currentPath,
+    getDocId: () => active.docId,
+    getCurrentPath: () => active.path,
     getPendingRecovery: () => pendingRecovery,
     getStatusText: () => statusText,
     openDocument,

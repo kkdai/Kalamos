@@ -4,6 +4,7 @@ import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   ask as askDialog,
+  message as messageDialog,
   open as openDialog,
   save as saveDialog,
 } from "@tauri-apps/plugin-dialog";
@@ -149,6 +150,9 @@ type DialogSaveHandler = (
   defaultPath?: string | null,
 ) => string | null | Promise<string | null>;
 type DialogAskHandler = (message: string) => boolean | Promise<boolean>;
+/** #81: answer of the 儲存 / 不儲存 / 取消 prompt. */
+export type SaveChangesChoice = "save" | "discard" | "cancel";
+type DialogSaveChangesHandler = (message: string) => SaveChangesChoice | Promise<SaveChangesChoice>;
 type DialogPromptHandler = (
   message: string,
   defaultValue?: string,
@@ -164,6 +168,9 @@ let mockOpenDialogHandler: DialogOpenHandler | null = null;
 let mockOpenFolderDialogHandler: DialogOpenHandler | null = null;
 let mockSaveDialogHandler: DialogSaveHandler | null = null;
 let mockAskDialogHandler: DialogAskHandler | null = null;
+let mockSaveChangesDialogHandler: DialogSaveChangesHandler | null = null;
+const mockSaveChangesPrompts: string[] = [];
+let mockWindowTitle = "Kalamos";
 let mockPromptDialogHandler: DialogPromptHandler | null = null;
 let mockSaveInterceptor: MockSaveInterceptor | null = null;
 const mockCloseListeners = new Set<() => void | Promise<void>>();
@@ -316,6 +323,9 @@ export function resetMockState(): void {
   mockOpenFolderDialogHandler = null;
   mockSaveDialogHandler = null;
   mockAskDialogHandler = null;
+  mockSaveChangesDialogHandler = null;
+  mockSaveChangesPrompts.length = 0;
+  mockWindowTitle = "Kalamos";
   mockPromptDialogHandler = null;
   mockSaveInterceptor = null;
   mockCloseListeners.clear();
@@ -345,7 +355,11 @@ export function setMockDialogHandlers(handlers: {
   save?: DialogSaveHandler | null;
   ask?: DialogAskHandler | null;
   prompt?: DialogPromptHandler | null;
+  saveChanges?: DialogSaveChangesHandler | null;
 }): void {
+  if (handlers.saveChanges !== undefined) {
+    mockSaveChangesDialogHandler = handlers.saveChanges;
+  }
   if (handlers.open !== undefined) {
     mockOpenDialogHandler = handlers.open;
   }
@@ -1090,6 +1104,46 @@ export async function askDiscardChanges(
     return await mockAskDialogHandler(message);
   }
   return true;
+}
+
+export const SAVE_CHANGES_LABELS = { yes: "儲存", no: "不儲存", cancel: "取消" } as const;
+
+/** #81: 儲存 / 不儲存 / 取消 before closing a tab with unsaved changes. */
+export async function askSaveChanges(message: string): Promise<SaveChangesChoice> {
+  if (isTauri()) {
+    const result = await messageDialog(message, {
+      title: "Kalamos",
+      kind: "warning",
+      buttons: { ...SAVE_CHANGES_LABELS },
+    });
+    // The plugin answers with the button key ("Yes") or, on some platforms, its label.
+    if (result === "Yes" || result === SAVE_CHANGES_LABELS.yes) return "save";
+    if (result === "No" || result === SAVE_CHANGES_LABELS.no) return "discard";
+    return "cancel";
+  }
+  mockSaveChangesPrompts.push(message);
+  if (mockSaveChangesDialogHandler) {
+    return await mockSaveChangesDialogHandler(message);
+  }
+  return "discard";
+}
+
+export function getMockSaveChangesPrompts(): string[] {
+  return [...mockSaveChangesPrompts];
+}
+
+/** #81: the window title follows the active tab. */
+export async function setWindowTitle(title: string): Promise<void> {
+  if (typeof document !== "undefined") document.title = title;
+  if (isTauri()) {
+    await getCurrentWindow().setTitle(title);
+    return;
+  }
+  mockWindowTitle = title;
+}
+
+export function getMockWindowTitle(): string {
+  return mockWindowTitle;
 }
 
 export function hasMockPromptHandler(): boolean {

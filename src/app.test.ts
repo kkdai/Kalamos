@@ -278,30 +278,31 @@ describe("Kalamos app — shortcuts, byte-exact save, autosave & crash recovery"
     userTypeText(app, "unsaved untitled text");
     await vi.advanceTimersByTimeAsync(UNTITLED_RECOVERY_INTERVAL_MS);
     expect(await listRecovery()).toHaveLength(1);
+    seedMockFile("/tmp/other.md", "other");
 
-    // User cancels discard dialog
+    // User cancels discard dialog: opening another file in this tab is refused
     setMockDialogHandlers({ ask: () => false });
-    const createdWhenCanceled = await app.newDocument();
-    expect(createdWhenCanceled).toBe(false);
+    const openedWhenCanceled = await app.openDocument("/tmp/other.md");
+    expect(openedWhenCanceled).toBe(false);
     expect(app.editor.getContent()).toBe("unsaved untitled text");
     expect(await listRecovery()).toHaveLength(1);
 
-    // User confirms discard dialog -> clears recovery and resets document
-    setMockDialogHandlers({ ask: () => true });
-    const createdWhenConfirmed = await app.newDocument();
-    expect(createdWhenConfirmed).toBe(true);
+    // #81: Cmd+N opens a new tab; the untitled draft stays (and keeps its recovery file)
+    const created = await app.newDocument();
+    expect(created).toBe(true);
     expect(app.editor.getContent()).toBe("");
-    expect(await listRecovery()).toHaveLength(0);
+    expect(app.getTabs()).toHaveLength(2);
+    expect(await listRecovery()).toHaveLength(1);
 
-    // Named dirty document flushes save before switching to newDocument
+    // Named dirty document flushes save before another file replaces it
     seedMockFile("/tmp/named-switch.md", "base");
     await app.openDocument("/tmp/named-switch.md");
     userTypeText(app, " + edit");
     expect(app.editor.isDirty()).toBe(true);
 
-    await app.newDocument();
+    await app.openDocument("/tmp/other.md");
     expect(readMockFile("/tmp/named-switch.md")).toBe("base + edit");
-    expect(app.getCurrentPath()).toBeNull();
+    expect(app.getCurrentPath()).toBe("/tmp/other.md");
   });
 
   it("flushes named file save or untitled recovery on window close requested", async () => {

@@ -22,6 +22,7 @@
     "label": "檔案",
     "items": [
       { "type": "action", "id": "file.new", "label": "新增", "accel": "CmdOrCtrl+N" },
+      { "type": "action", "id": "file.newTab", "label": "新增分頁", "accel": "CmdOrCtrl+T" },
       { "type": "action", "id": "file.open", "label": "開啟…", "accel": "CmdOrCtrl+O" },
       { "type": "action", "id": "file.openFolder", "label": "開啟資料夾…", "accel": "CmdOrCtrl+Shift+O" },
       { "type": "predefined", "item": "separator" },
@@ -38,7 +39,7 @@
       },
       { "type": "action", "id": "file.import", "label": "匯入…", "accel": "CmdOrCtrl+Alt+I" },
       { "type": "predefined", "item": "separator" },
-      { "type": "predefined", "item": "closeWindow", "label": "關閉視窗" }
+      { "type": "action", "id": "file.closeTab", "label": "關閉分頁", "accel": "CmdOrCtrl+W" }
     ]
   },
   {

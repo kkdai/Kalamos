@@ -1,0 +1,168 @@
+/* #81 A: document tab bar — a capsule track of equal-width tabs plus a round ＋. */
+
+.k-tabbar {
+  display: none;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+  /* Top / right leave room for the fixed theme button (theme-menu.css: top 10px, right 16px, 30px)
+     so the row lines up with it. */
+  padding: 10px calc(16px + 30px + 10px) 6px 12px;
+  background-color: var(--k-bg);
+  font-family: var(--k-font-ui, Inter, "Noto Sans TC", sans-serif);
+  user-select: none;
+  -webkit-user-select: none;
+  transition: padding-left var(--k-transition, 180ms ease-out);
+}
+
+.k-tabbar[data-visible="true"] {
+  display: flex;
+}
+
+/* The fixed sidebar covers the left edge; start the bar after it (like #editor-container). */
+.k-sidebar[data-visible="true"] ~ .k-tabbar {
+  padding-left: calc(var(--k-sidebar-width, 260px) + 12px);
+}
+
+.k-tabbar-track {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 999px;
+  background-color: var(--k-tab-track-bg, var(--k-surface));
+  border: 1px solid var(--k-tab-track-border, var(--k-divider));
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.k-tabbar-track::-webkit-scrollbar {
+  display: none;
+}
+
+.k-tab {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 120px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 28px;
+  box-sizing: border-box;
+  border-radius: 999px;
+  color: var(--k-tab-inactive-text, var(--k-text-muted));
+  font-size: 12.5px;
+  line-height: 1;
+  cursor: default;
+  transition:
+    background-color var(--k-transition-fast, 150ms ease-out),
+    color var(--k-transition-fast, 150ms ease-out),
+    box-shadow var(--k-transition-fast, 150ms ease-out);
+}
+
+.k-tab:hover {
+  color: var(--k-text);
+}
+
+.k-tab[data-active="true"] {
+  background-color: var(--k-tab-active-bg, var(--k-bg));
+  color: var(--k-text);
+  box-shadow: var(--k-tab-active-shadow, 0 1px 2px rgba(0, 0, 0, 0.08));
+}
+
+.k-tab[data-dragging="true"] {
+  z-index: 1;
+  transition: none;
+  opacity: 0.85;
+}
+
+.k-tab-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.k-tab-close {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  width: 18px;
+  height: 18px;
+  margin-top: -9px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--k-text-muted);
+  cursor: default;
+  opacity: 0;
+  transition:
+    opacity var(--k-transition-fast, 150ms ease-out),
+    background-color var(--k-transition-fast, 150ms ease-out);
+}
+
+.k-tab-close svg {
+  display: block;
+}
+
+.k-tab:hover .k-tab-close,
+.k-tab-close:focus-visible {
+  opacity: 1;
+}
+
+.k-tab-close:hover {
+  background-color: var(--k-tab-close-hover-bg, rgba(127, 112, 90, 0.18));
+  color: var(--k-text);
+}
+
+/* Unsaved: a small dot where the × goes; hovering the tab turns it back into the ×. */
+.k-tab-dirty-dot {
+  display: none;
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: currentColor;
+}
+
+.k-tab[data-dirty="true"] .k-tab-close {
+  opacity: 1;
+}
+
+.k-tab[data-dirty="true"]:not(:hover) .k-tab-close svg {
+  visibility: hidden;
+}
+
+.k-tab[data-dirty="true"]:not(:hover) .k-tab-dirty-dot {
+  display: block;
+}
+
+.k-tabbar-new {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid var(--k-tab-track-border, var(--k-divider));
+  background-color: var(--k-tab-active-bg, var(--k-bg));
+  color: var(--k-text);
+  cursor: default;
+  transition: background-color var(--k-transition-fast, 150ms ease-out);
+}
+
+.k-tabbar-new:hover {
+  background-color: var(--k-tab-track-bg, var(--k-surface));
+}
+
+.k-tabbar-new svg {
+  display: block;
+}
