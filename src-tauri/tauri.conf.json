@@ -72,6 +72,23 @@
           "net.daringfireball.markdown"
         ]
       }
-    ]
+    ],
+    "macOS": {
+      "signingIdentity": "-"
+    },
+    "windows": {
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper",
+        "silent": true
+      },
+      "nsis": {
+        "installMode": "currentUser",
+        "languages": [
+          "English",
+          "TradChinese"
+        ],
+        "displayLanguageSelector": false
+      }
+    }
   }
 }
