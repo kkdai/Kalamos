@@ -101,7 +101,17 @@ export interface Settings {
   autoPairBrackets?: boolean;
   /** ED-09: auto-close Markdown * _ ` ~ (default off). */
   autoPairMarkdown?: boolean;
+  /** #74: reopen the last folder on launch, or start blank. */
+  startupBehavior?: StartupBehavior;
+  /** #74: autosave named documents (default on). */
+  autoSave?: boolean;
+  /** #74: editor font size in px. */
+  fontSize?: number;
+  /** #74: content column width in px (--k-max-width). */
+  contentWidth?: number;
 }
+
+export type StartupBehavior = "restoreFolder" | "blank";
 
 export const DEFAULT_SETTINGS: Settings = {
   theme: "system",
@@ -119,6 +129,10 @@ export const DEFAULT_SETTINGS: Settings = {
   uploadOnInsert: false,
   autoPairBrackets: true,
   autoPairMarkdown: false,
+  startupBehavior: "restoreFolder",
+  autoSave: true,
+  fontSize: 17,
+  contentWidth: 720,
 };
 
 export const MAX_EXCERPT_CHARS = 120;
@@ -982,8 +996,17 @@ export async function setSettings(settings: Settings): Promise<null> {
     uploadOnInsert: settings.uploadOnInsert ?? DEFAULT_SETTINGS.uploadOnInsert,
     autoPairBrackets: settings.autoPairBrackets ?? DEFAULT_SETTINGS.autoPairBrackets,
     autoPairMarkdown: settings.autoPairMarkdown ?? DEFAULT_SETTINGS.autoPairMarkdown,
+    startupBehavior: settings.startupBehavior ?? DEFAULT_SETTINGS.startupBehavior,
+    autoSave: settings.autoSave ?? DEFAULT_SETTINGS.autoSave,
+    fontSize: settings.fontSize ?? DEFAULT_SETTINGS.fontSize,
+    contentWidth: settings.contentWidth ?? DEFAULT_SETTINGS.contentWidth,
   };
   return null;
+}
+
+/** Test hook: replace the mock settings file wholesale (e.g. an old settings.json). */
+export function seedMockSettings(settings: Partial<Settings>): void {
+  mockSettings = { ...(settings as Settings) };
 }
 
 function isValidThemeStem(stem: string): boolean {
@@ -1708,4 +1731,85 @@ export function setMockUploadHandler(handler: MockUploadHandler | null): void {
 
 export function getMockUploadCalls(): string[][] {
   return mockUploadCalls.map((c) => [...c]);
+}
+
+// ---------------------------------------------------------------------------
+// #74: native menu bar + preferences.
+
+export const MENU_ACTION_EVENT = "menu-action";
+
+export interface MenuActionPayload {
+  action: string;
+  arg?: string | null;
+}
+
+export interface MenuSyncState {
+  checks: Record<string, boolean>;
+  theme: string;
+  themes: Array<{ id: string; label: string }>;
+}
+
+type MenuActionListener = (payload: MenuActionPayload) => void | Promise<void>;
+const mockMenuActionListeners = new Set<MenuActionListener>();
+let mockMenuState: MenuSyncState | null = null;
+let mockZoom = 1;
+let mockThemesDirOpened = 0;
+
+/** A native menu item was chosen (Rust emits `menu-action`). */
+export async function onMenuAction(listener: MenuActionListener): Promise<() => void> {
+  if (isTauri()) {
+    return listen<MenuActionPayload>(MENU_ACTION_EVENT, (event) => {
+      void listener(event.payload);
+    });
+  }
+  mockMenuActionListeners.add(listener);
+  return () => {
+    mockMenuActionListeners.delete(listener);
+  };
+}
+
+/** Test hook: act as if a native menu item had been chosen. */
+export async function emitMockMenuAction(action: string, arg: string | null = null): Promise<void> {
+  for (const listener of Array.from(mockMenuActionListeners)) {
+    await listener({ action, arg });
+  }
+}
+
+/** Updates the check marks of the native menu. */
+export async function syncMenuState(state: MenuSyncState): Promise<null> {
+  if (isTauri()) {
+    return invoke<null>("sync_menu_state", { state });
+  }
+  mockMenuState = JSON.parse(JSON.stringify(state)) as MenuSyncState;
+  return null;
+}
+
+export function getMockMenuState(): MenuSyncState | null {
+  return mockMenuState;
+}
+
+/** 檢視 > 實際大小 / 放大 / 縮小. */
+export async function setWebviewZoom(factor: number): Promise<void> {
+  if (isTauri()) {
+    await getCurrentWebview().setZoom(factor);
+    return;
+  }
+  mockZoom = factor;
+}
+
+export function getMockZoom(): number {
+  return mockZoom;
+}
+
+/** Shows the custom CSS theme folder in Finder; resolves with its path. */
+export async function openThemesDir(): Promise<string> {
+  if (isTauri()) {
+    return invoke<string>("open_themes_dir");
+  }
+  mockThemesDirOpened += 1;
+  return "/mock/app-data/themes";
+}
+
+export function getMockThemesDirOpenCount(): number {
+  return mockThemesDirOpened;
 }

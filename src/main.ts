@@ -38,15 +38,47 @@ import {
   readFileAsBase64,
 } from "./editor/images";
 import { collectUploadTargetsInRange, uploadImagesInEditor } from "./editor/image-upload";
-import { bindWindowShortcuts } from "./editor/keymaps";
-import { lineColumnToRange, revealRange } from "./editor/search";
+import type { EditorView } from "@codemirror/view";
+import {
+  bindWindowShortcuts,
+  toggleEmphasis,
+  toggleInlineCode,
+  toggleLink,
+  toggleStrikethrough,
+  toggleStrong,
+} from "./editor/keymaps";
+import {
+  insertCodeBlock,
+  insertMathBlock,
+  setHeadingLevel,
+  toggleBlockquote,
+} from "./editor/paragraph-commands";
+import {
+  findNextMatch,
+  findPreviousMatch,
+  lineColumnToRange,
+  openFind,
+  revealRange,
+} from "./editor/search";
+import { openInsertTableDialog } from "./editor/table-insert-dialog";
 import { FOCUS_MODE_MESSAGE, TYPEWRITER_MODE_MESSAGE } from "./editor/writing-modes";
 import { AUTO_PAIR_BRACKETS_MESSAGE, AUTO_PAIR_MARKDOWN_MESSAGE } from "./editor/auto-pair";
 import { createWordCounter, type WordCounter } from "./editor/word-count-view";
 import {
   jumpToHeadingSlug,
   resolveRelativeMarkdownPath,
+  toggleBulletList,
+  toggleOrderedList,
+  toggleTaskList,
 } from "./editor/lists";
+import { createMenuDispatcher, type MenuCommand, type MenuDispatcher } from "./menu/menu-dispatch";
+import {
+  clampContentWidth,
+  clampFontSize,
+  createPreferences,
+  type PreferencesController,
+  type PreferencesPatch,
+} from "./preferences/preferences";
 import {
   allowAssetDir,
   askDiscardChanges,
@@ -64,6 +96,11 @@ import {
   importImageBytes,
   listRecovery,
   onFileDrop,
+  onMenuAction,
+  openThemesDir,
+  setWebviewZoom,
+  syncMenuState,
+  type MenuSyncState,
   onOpenFilesRequested,
   onWindowCloseRequested,
   openFile,
@@ -157,8 +194,24 @@ export const IMAGE_ROOT_STATUS_PREFIX = "圖片根目錄：";
 export const IMAGE_ROOT_CLEARED_MESSAGE = "已清除圖片根目錄";
 export const IMAGE_ROOT_TOO_BROAD_PREFIX = "圖片根目錄範圍過大：";
 
+export const ZOOM_LEVELS = [0.5, 0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3];
+
+/** #74 檢視 > 放大 / 縮小: the next zoom level in `direction` (+1 / -1). */
+export function nextZoomLevel(current: number, direction: 1 | -1): number {
+  if (direction > 0) {
+    return ZOOM_LEVELS.find((z) => z > current + 1e-6) ?? ZOOM_LEVELS[ZOOM_LEVELS.length - 1];
+  }
+  const smaller = ZOOM_LEVELS.filter((z) => z < current - 1e-6);
+  return smaller.length > 0 ? smaller[smaller.length - 1] : ZOOM_LEVELS[0];
+}
+
 export interface KalamosApp {
   editor: KalamosEditor;
+  /** #74: Cmd+, preferences modal. */
+  preferences: PreferencesController;
+  /** #74: native menu action dispatcher (menu-action events land here). */
+  menu: MenuDispatcher;
+  getZoom: () => number;
   sidebar: SidebarController;
   themeMenu: ThemeMenuController;
   wordCounter: WordCounter;
@@ -290,6 +343,8 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
   function scheduleNamedAutosave(): void {
     clearAutosaveTimer();
     if (currentPath === null) return;
+    // #74 preference: autosave off = only explicit saves (and switching / closing) write the file.
+    if (currentSettings.autoSave === false) return;
     const targetPath = currentPath;
     const targetDocId = docId;
     autosaveTimer = setTimeout(() => {
@@ -336,6 +391,7 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
       autoPairMarkdown: editor.isAutoPairMarkdown(),
       ...patch,
     };
+    scheduleMenuSync();
     await setSettings(currentSettings).catch(() => null);
   }
 
@@ -494,6 +550,7 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
     onError: (prefix, err) => {
       setStatus(formatErrorMessage(prefix, err), true);
     },
+    onLayoutChange: () => scheduleMenuSync(),
   });
 
   const themeMenu = createThemeMenu({
@@ -503,6 +560,7 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
         ...currentSettings,
         theme: themeId,
       };
+      scheduleMenuSync();
     },
     onError: (prefix, err) => {
       setStatus(formatErrorMessage(prefix, err), true);
@@ -538,6 +596,199 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
 
   navWidgetEl.append(sidebarToggleBtn, openFileQuickBtn);
   (editorContainer.parentElement ?? document.body).appendChild(navWidgetEl);
+
+  // ---- #74: layout preferences, zoom, preferences modal, native menu ----
+
+  function applyLayoutSettings(): void {
+    if (typeof document === "undefined") return;
+    const style = document.documentElement.style;
+    style.setProperty("--k-font-size", `${clampFontSize(currentSettings.fontSize ?? 17)}px`);
+    style.setProperty("--k-max-width", `${clampContentWidth(currentSettings.contentWidth ?? 720)}px`);
+    editor.view.requestMeasure();
+  }
+
+  let zoom = 1;
+  function setZoom(next: number): void {
+    zoom = next;
+    void setWebviewZoom(next).catch(() => null);
+    setStatus(`縮放 ${Math.round(next * 100)}%`, false);
+  }
+
+  const preferences = createPreferences({
+    getValues: () => ({
+      startupBehavior: currentSettings.startupBehavior ?? "restoreFolder",
+      autoSave: currentSettings.autoSave ?? true,
+      fontSize: clampFontSize(currentSettings.fontSize ?? 17),
+      contentWidth: clampContentWidth(currentSettings.contentWidth ?? 720),
+      autoPairBrackets: editor.isAutoPairBrackets(),
+      autoPairMarkdown: editor.isAutoPairMarkdown(),
+      codeLineNumbers: editor.isCodeLineNumbers(),
+      mathAutoNumber: editor.isMathAutoNumber(),
+      theme: themeMenu.getCurrentTheme(),
+      imageRootDir: editor.getImageRootDir(),
+      uploadOnInsert: Boolean(currentSettings.uploadOnInsert),
+      uploadCommand: currentSettings.uploadCommand ?? null,
+      uploadArgs: currentSettings.uploadArgs ?? [],
+    }),
+    getThemes: () => themeMenu.getAvailableOptions().map((o) => ({ id: o.id, label: o.label })),
+    refresh: async () => {
+      await themeMenu.refreshThemes();
+      await refreshUploadSettings();
+      scheduleMenuSync();
+    },
+    applyChange: applyPreferencesChange,
+    pickImageRootDir: () => pickImageRootDir(),
+    clearImageRootDir: () => setImageRootDir(null),
+    openThemesDir: async () => {
+      try {
+        await openThemesDir();
+      } catch (err) {
+        setStatus(formatErrorMessage("無法開啟主題資料夾", err), true);
+      }
+    },
+  });
+
+  async function applyPreferencesChange(patch: PreferencesPatch): Promise<void> {
+    if (patch.theme !== undefined) await themeMenu.selectTheme(patch.theme, true);
+    if (patch.autoPairBrackets !== undefined) editor.setAutoPairBrackets(patch.autoPairBrackets, true);
+    if (patch.autoPairMarkdown !== undefined) editor.setAutoPairMarkdown(patch.autoPairMarkdown, true);
+    if (patch.codeLineNumbers !== undefined) editor.setCodeLineNumbers(patch.codeLineNumbers, true);
+    if (patch.mathAutoNumber !== undefined) editor.setMathAutoNumber(patch.mathAutoNumber, true);
+    const plain: Partial<Settings> = {};
+    if (patch.startupBehavior !== undefined) plain.startupBehavior = patch.startupBehavior;
+    if (patch.autoSave !== undefined) plain.autoSave = patch.autoSave;
+    if (patch.fontSize !== undefined) plain.fontSize = clampFontSize(patch.fontSize);
+    if (patch.contentWidth !== undefined) plain.contentWidth = clampContentWidth(patch.contentWidth);
+    if (patch.uploadOnInsert !== undefined) plain.uploadOnInsert = patch.uploadOnInsert;
+    if (Object.keys(plain).length > 0) {
+      currentSettings = { ...currentSettings, ...plain };
+      if (plain.fontSize !== undefined || plain.contentWidth !== undefined) applyLayoutSettings();
+      if (plain.autoSave === true && editor.isDirty()) scheduleNamedAutosave();
+      if (plain.autoSave === false) clearAutosaveTimer();
+      await persistEditorSettingPatch(plain);
+    }
+  }
+
+  function computeMenuState(): MenuSyncState {
+    const sidebarVisible = sidebar.isVisible();
+    return {
+      checks: {
+        "view.sourceMode": editor.isSourceMode(),
+        "view.sidebar": sidebarVisible,
+        "view.outline": sidebarVisible && sidebar.getTab() === "outline",
+        "view.focusMode": editor.isFocusMode(),
+        "view.typewriterMode": editor.isTypewriterMode(),
+        "view.codeLineNumbers": editor.isCodeLineNumbers(),
+        "view.mathAutoNumber": editor.isMathAutoNumber(),
+      },
+      theme: themeMenu.getCurrentTheme(),
+      themes: themeMenu.getAvailableOptions().map((o) => ({ id: o.id, label: o.label })),
+    };
+  }
+
+  let lastMenuStateJson = "";
+  let menuSyncTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Coalesces state changes into one sync_menu_state call; `force` resends unchanged state. */
+  function scheduleMenuSync(force = false): void {
+    if (force) lastMenuStateJson = "";
+    if (menuSyncTimer !== null) return;
+    menuSyncTimer = setTimeout(() => {
+      menuSyncTimer = null;
+      if (destroyed) return;
+      preferences.sync();
+      const state = computeMenuState();
+      const json = JSON.stringify(state);
+      if (json === lastMenuStateJson) return;
+      lastMenuStateJson = json;
+      void syncMenuState(state).catch(() => null);
+    }, 0);
+  }
+
+  /** Editing command: runs on the editor and gives it focus unless focus is already inside (e.g. a table cell). */
+  const onEditor =
+    (run: (view: EditorView) => unknown): MenuCommand =>
+    () => {
+      const { view } = editor;
+      const result = run(view);
+      if (!view.dom.contains(document.activeElement)) view.focus();
+      return result;
+    };
+
+  async function toggleOutline(): Promise<void> {
+    if (sidebar.isVisible() && sidebar.getTab() === "outline") {
+      await sidebar.setVisible(false);
+      return;
+    }
+    await sidebar.setTab("outline");
+    if (!sidebar.isVisible()) await sidebar.setVisible(true);
+  }
+
+  // Same handlers as the keyboard shortcuts (keymaps.ts / the keydown listeners below).
+  const menuCommands: Record<string, MenuCommand> = {
+    "app.preferences": () => preferences.open(),
+    "file.new": () => newDocument(),
+    "file.open": () => openDocument(),
+    "file.openFolder": () => sidebar.openFolder(),
+    "file.save": () => saveDocument(),
+    "file.saveAs": () => saveDocumentAs(),
+    "file.exportPdf": () => exportDocumentPdf(),
+    "file.exportPandoc": () => exportDocumentAs(),
+    "file.import": () => importDocument(),
+    "edit.find": () => openFind(editor.view),
+    "edit.replace": () => openFind(editor.view, { replace: true }),
+    "edit.findNext": () => findNextMatch(editor.view),
+    "edit.findPrevious": () => findPreviousMatch(editor.view),
+    "edit.findInFolder": () => sidebar.openSearch(),
+    "para.heading1": onEditor((v) => setHeadingLevel(v, 1)),
+    "para.heading2": onEditor((v) => setHeadingLevel(v, 2)),
+    "para.heading3": onEditor((v) => setHeadingLevel(v, 3)),
+    "para.heading4": onEditor((v) => setHeadingLevel(v, 4)),
+    "para.heading5": onEditor((v) => setHeadingLevel(v, 5)),
+    "para.heading6": onEditor((v) => setHeadingLevel(v, 6)),
+    "para.paragraph": onEditor((v) => setHeadingLevel(v, 0)),
+    "para.orderedList": onEditor(toggleOrderedList),
+    "para.bulletList": onEditor(toggleBulletList),
+    "para.taskList": onEditor(toggleTaskList),
+    "para.table": () => openInsertTableDialog(editor.view),
+    "para.codeBlock": onEditor(insertCodeBlock),
+    "para.mathBlock": onEditor(insertMathBlock),
+    "para.quote": onEditor(toggleBlockquote),
+    "fmt.bold": onEditor(toggleStrong),
+    "fmt.italic": onEditor(toggleEmphasis),
+    "fmt.code": onEditor(toggleInlineCode),
+    "fmt.strike": onEditor(toggleStrikethrough),
+    "fmt.link": onEditor(toggleLink),
+    "view.sourceMode": () => windowHandlers.onToggleSourceMode(),
+    "view.sidebar": () => sidebar.toggleVisible(),
+    "view.outline": () => toggleOutline(),
+    "view.focusMode": () => windowHandlers.onToggleFocusMode(),
+    "view.typewriterMode": () => windowHandlers.onToggleTypewriterMode(),
+    "view.codeLineNumbers": () => windowHandlers.onToggleCodeLineNumbers(),
+    "view.mathAutoNumber": () => windowHandlers.onToggleMathAutoNumber(),
+    "view.cycleTheme": () => themeMenu.cycleTheme(),
+    "view.setTheme": (themeId) => (themeId ? themeMenu.selectTheme(themeId, true) : false),
+    "view.actualSize": () => setZoom(1),
+    "view.zoomIn": () => setZoom(nextZoomLevel(zoom, 1)),
+    "view.zoomOut": () => setZoom(nextZoomLevel(zoom, -1)),
+  };
+
+  const menu = createMenuDispatcher({
+    commands: menuCommands,
+    target: window,
+    // While the preferences modal is open, editing commands would act on the hidden document.
+    canRun: (action) => !(preferences.isOpen() && /^(edit|para|fmt)\./.test(action)),
+    afterRun: () => scheduleMenuSync(true),
+  });
+
+  // Cmd+, opens the preferences (also offered by the native menu; see menu-dispatch.ts).
+  const onPreferencesKeydown = (event: KeyboardEvent) => {
+    if (event.defaultPrevented) return;
+    if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return;
+    if (event.code !== "Comma" && event.key !== ",") return;
+    event.preventDefault();
+    void preferences.open();
+  };
+  window.addEventListener("keydown", onPreferencesKeydown);
 
   const onSidebarKeydown = (event: KeyboardEvent) => {
     if (event.defaultPrevented) return;
@@ -869,6 +1120,7 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
 
   let unlistenFileDrop: (() => void) | null = null;
   let unlistenOpenFiles: (() => void) | null = null;
+  let unlistenMenu: (() => void) | null = null;
   let destroyed = false;
 
   async function openDocument(explicitPath?: string): Promise<boolean> {
@@ -1088,8 +1340,18 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
       editor.setAutoPairBrackets(settings.autoPairBrackets ?? true, false);
       editor.setAutoPairMarkdown(Boolean(settings.autoPairMarkdown), false);
     }
+    applyLayoutSettings();
     await themeMenu.init();
-    await sidebar.init();
+    await sidebar.init({ restoreFolder: settings?.startupBehavior !== "blank" });
+    const unlistenMenuAction = await onMenuAction(({ action, arg }) => {
+      menu.dispatch(action, arg ?? null);
+    }).catch(() => null);
+    if (destroyed) {
+      unlistenMenuAction?.();
+    } else {
+      unlistenMenu = unlistenMenuAction;
+      scheduleMenuSync(true);
+    }
     const entries = await listRecovery().catch(() => []);
     if (entries.length > 0) {
       pendingRecovery = entries[0];
@@ -1121,6 +1383,12 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
     unlistenFileDrop = null;
     unlistenOpenFiles?.();
     unlistenOpenFiles = null;
+    unlistenMenu?.();
+    unlistenMenu = null;
+    if (menuSyncTimer !== null) clearTimeout(menuSyncTimer);
+    menu.destroy();
+    preferences.destroy();
+    window.removeEventListener("keydown", onPreferencesKeydown);
     clearInterval(recoveryInterval);
     unbindShortcuts();
     window.removeEventListener("keydown", onSidebarKeydown);
@@ -1141,6 +1409,9 @@ export function createKalamosApp(root: Document | HTMLElement = document): Kalam
 
   return {
     editor,
+    preferences,
+    menu,
+    getZoom: () => zoom,
     sidebar,
     themeMenu,
     wordCounter,

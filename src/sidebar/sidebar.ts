@@ -42,6 +42,13 @@ export interface CreateSidebarOptions {
   /** #73 B: a folder-search hit was clicked. */
   onOpenSearchHit?: (hit: FolderSearchHit) => void | Promise<void>;
   onError?: (prefix: string, err: unknown) => void;
+  /** #74: visibility or tab changed (keeps the native menu check marks in sync). */
+  onLayoutChange?: () => void;
+}
+
+export interface SidebarInitOptions {
+  /** #74: false = do not reopen the last folder (preference "start blank"). */
+  restoreFolder?: boolean;
 }
 
 export interface SidebarController {
@@ -66,7 +73,7 @@ export interface SidebarController {
   renameItem: (fromPath: string, newName: string) => Promise<boolean>;
   trashItem: (targetPath: string) => Promise<boolean>;
   registerTab: (descriptor: SidebarTabDescriptor) => void;
-  init: () => Promise<void>;
+  init: (options?: SidebarInitOptions) => Promise<void>;
   destroy: () => void;
 }
 
@@ -323,6 +330,7 @@ export function createSidebar(options: CreateSidebarOptions): SidebarController 
   async function setVisible(nextVisible: boolean, persist = true): Promise<void> {
     visible = nextVisible;
     element.dataset.visible = visible ? "true" : "false";
+    options.onLayoutChange?.();
     if (persist) {
       await persistSettingsPatch({ sidebarVisible: visible });
     }
@@ -336,6 +344,7 @@ export function createSidebar(options: CreateSidebarOptions): SidebarController 
   async function setTab(tab: SidebarTab, persist = true): Promise<void> {
     currentTab = tab;
     renderActiveTabView();
+    options.onLayoutChange?.();
     if (persist) {
       await persistSettingsPatch({ sidebarTab: currentTab });
     }
@@ -638,7 +647,7 @@ export function createSidebar(options: CreateSidebarOptions): SidebarController 
     renderActiveTabView();
   }
 
-  async function init(): Promise<void> {
+  async function init(initOptions: SidebarInitOptions = {}): Promise<void> {
     unlistenFsChanged = await onFsChanged(async () => {
       if (currentFolder) {
         await refresh();
@@ -650,7 +659,7 @@ export function createSidebar(options: CreateSidebarOptions): SidebarController 
       await setVisible(Boolean(settings.sidebarVisible), false);
       const savedTab = settings.sidebarTab ?? "tree";
       await setTab(savedTab, false);
-      if (settings.lastFolder) {
+      if (settings.lastFolder && initOptions.restoreFolder !== false) {
         await openFolder(settings.lastFolder, false);
       }
     }

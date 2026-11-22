@@ -359,6 +359,27 @@ test("AC10 sidebar hidden by default; Cmd+Shift+L toggles; three tabs", async ({
   await expect(sidebar).toHaveAttribute("data-visible", "false");
 });
 
+// Chromium on Windows/Linux intercepts Ctrl+Shift+O for Bookmark Manager
+// before the page receives it; dispatch the keydown event directly there.
+async function pressOpenFolderShortcut(page: Page): Promise<void> {
+  if (process.platform === "darwin") {
+    await page.keyboard.press(`${MOD}+Shift+o`);
+  } else {
+    await page.evaluate(() => {
+      window.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "O",
+          code: "KeyO",
+          ctrlKey: true,
+          shiftKey: true,
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+    });
+  }
+}
+
 // BUG-2 (#32): opening a folder must reveal a hidden sidebar on the file tree.
 test("AC10 Cmd+Shift+O with hidden sidebar reveals the opened folder [BUG-2]", async ({ page }) => {
   await withIpc(page, "ipc.setMockDialogHandlers({ openFolder: () => '/demo' });");
@@ -369,7 +390,7 @@ test("AC10 Cmd+Shift+O with hidden sidebar reveals the opened folder [BUG-2]", a
   });
   await expect(page.locator("#sidebar")).toHaveAttribute("data-visible", "false");
   await page.getByTestId("editor").click();
-  await page.keyboard.press(`${MOD}+Shift+o`);
+  await pressOpenFolderShortcut(page);
   await expect(page.getByTestId("sidebar-folder-title")).toContainText("demo");
   await expect(page.locator("#sidebar")).toHaveAttribute("data-visible", "true");
   await expect(page.getByTestId("sidebar-tab-tree")).toHaveAttribute("aria-selected", "true");
@@ -382,7 +403,7 @@ test("AC10 Cmd+Shift+O with hidden sidebar reveals the opened folder [BUG-2]", a
 test("AC10 cancelling the Cmd+Shift+O dialog leaves a hidden sidebar hidden", async ({ page }) => {
   await withIpc(page, "ipc.setMockDialogHandlers({ openFolder: () => null });");
   await page.getByTestId("editor").click();
-  await page.keyboard.press(`${MOD}+Shift+o`);
+  await pressOpenFolderShortcut(page);
   await page.waitForTimeout(200);
   await expect(page.locator("#sidebar")).toHaveAttribute("data-visible", "false");
 });
@@ -390,7 +411,7 @@ test("AC10 cancelling the Cmd+Shift+O dialog leaves a hidden sidebar hidden", as
 test("AC10 Cmd+Shift+O opens a folder; clicking a file opens it", async ({ page }) => {
   await withIpc(page, "ipc.setMockDialogHandlers({ openFolder: () => '/demo' });");
   await page.getByTestId("editor").click();
-  await page.keyboard.press(`${MOD}+Shift+o`);
+  await pressOpenFolderShortcut(page);
   await expect(page.getByTestId("sidebar-folder-title")).toContainText("demo");
   await expect(page.locator("#sidebar")).toHaveAttribute("data-visible", "true");
 

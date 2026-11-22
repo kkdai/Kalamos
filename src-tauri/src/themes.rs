@@ -130,9 +130,45 @@ pub fn read_theme_css(app: tauri::AppHandle, id: String) -> Result<String, AppEr
     read_theme_css_in(&app_data_dir, &id)
 }
 
+/// #74: the custom theme folder (created when missing).
+pub fn ensure_themes_dir_in(app_data_dir: &Path) -> Result<std::path::PathBuf, AppError> {
+    let themes_dir = app_data_dir.join("themes");
+    fs::create_dir_all(&themes_dir)?;
+    Ok(themes_dir)
+}
+
+/// #74 preferences: show the custom CSS theme folder in Finder; returns its path.
+#[tauri::command]
+pub fn open_themes_dir(app: tauri::AppHandle) -> Result<String, AppError> {
+    use tauri_plugin_opener::OpenerExt;
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| AppError::invalid_path(e.to_string()))?;
+    let themes_dir = ensure_themes_dir_in(&app_data_dir)?;
+    let path = themes_dir
+        .to_str()
+        .ok_or_else(|| AppError::invalid_path("Non-UTF-8 themes path"))?
+        .to_string();
+    app.opener()
+        .open_path(path.clone(), None::<&str>)
+        .map_err(|e| AppError::new(crate::error::ErrorKind::Io, e.to_string()))?;
+    Ok(path)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ensure_themes_dir_creates_the_folder() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let themes = ensure_themes_dir_in(dir.path()).expect("themes dir");
+        assert_eq!(themes, dir.path().join("themes"));
+        assert!(themes.is_dir());
+        // Idempotent.
+        ensure_themes_dir_in(dir.path()).expect("again");
+    }
     use crate::error::ErrorKind;
     use tempfile::tempdir;
 
