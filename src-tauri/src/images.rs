@@ -403,7 +403,9 @@ mod tests {
         let err = check_asset_dir(&blog.join(".."), Some(&home)).unwrap_err();
         assert_eq!(err.kind, ErrorKind::InvalidPath);
         assert!(err.message.starts_with(TOO_BROAD_MESSAGE));
-        let err = check_asset_dir(Path::new("/"), Some(&home)).unwrap_err();
+        // The filesystem root (`/` on Unix, `C:\` on Windows) is always too broad.
+        let fs_root = home.ancestors().last().expect("filesystem root");
+        let err = check_asset_dir(fs_root, Some(&home)).unwrap_err();
         assert!(err.message.starts_with(TOO_BROAD_MESSAGE));
         // Missing folders are an InvalidPath error, not "too broad".
         let err = check_asset_dir(&home.join("missing"), Some(&home)).unwrap_err();

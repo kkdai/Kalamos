@@ -385,6 +385,24 @@ mod imp {
             .unwrap_or(false)
     }
 
+    /// Writes a Chromium/Edge profile `Default/Preferences` file that disables
+    /// JavaScript via Content Settings (`javascript: 2`).
+    ///
+    /// `--blink-settings=scriptEnabled=false` breaks Chromium/Edge headless
+    /// `--print-to-pdf` (the browser exits 0 without writing a PDF), so we
+    /// disable page JavaScript through the profile content setting here, in
+    /// addition to the strict CSP (`default-src 'none'`) emitted by
+    /// `src/export/html.ts`.
+    pub(super) fn prepare_no_js_profile(profile: &Path) -> Result<(), AppError> {
+        let default_dir = profile.join("Default");
+        fs::create_dir_all(&default_dir)?;
+        fs::write(
+            default_dir.join("Preferences"),
+            r#"{"profile":{"default_content_setting_values":{"javascript":2}}}"#,
+        )?;
+        Ok(())
+    }
+
     pub(super) fn pdf_print_args(page: &Path, profile: &Path, out: &Path) -> Vec<OsString> {
         let mut print_arg = OsString::from("--print-to-pdf=");
         print_arg.push(out.as_os_str());
@@ -400,8 +418,6 @@ mod imp {
             OsString::from("--disable-sync"),
             OsString::from("--disable-background-networking"),
             OsString::from("--disable-component-update"),
-            // Match macOS WKWebView's setAllowsContentJavaScript(false): the exported page is static.
-            OsString::from("--blink-settings=scriptEnabled=false"),
             OsString::from("--no-pdf-header-footer"),
             OsString::from("--generate-pdf-document-outline"),
             profile_arg,
@@ -410,19 +426,38 @@ mod imp {
         ]
     }
 
+    fn read_stderr_tail(path: &Path) -> String {
+        let Ok(bytes) = fs::read(path) else {
+            return String::new();
+        };
+        let text = String::from_utf8_lossy(&bytes);
+        let trimmed = text.trim();
+        if trimmed.is_empty() {
+            return String::new();
+        }
+        let start = trimmed.char_indices().rev().nth(499).map_or(0, |(i, _)| i);
+        trimmed[start..].to_string()
+    }
+
     fn print_to_pdf(
         browser: &Path,
         page: &Path,
         profile: &Path,
+        stderr_log: &Path,
         out: &Path,
         timeout: Duration,
     ) -> Result<(), AppError> {
+        prepare_no_js_profile(profile)?;
+        let stderr_stdio = fs::File::create(stderr_log)
+            .map(Stdio::from)
+            .unwrap_or_else(|_| Stdio::null());
+
         let mut cmd = Command::new(browser);
         crate::platform::no_console(&mut cmd)
             .args(pdf_print_args(page, profile, out))
             .stdin(Stdio::null())
             .stdout(Stdio::null())
-            .stderr(Stdio::null());
+            .stderr(stderr_stdio);
         let mut child = cmd
             .spawn()
             .map_err(|e| AppError::new(ErrorKind::Io, format!("無法啟動 {}：{e}", browser.display())))?;
@@ -435,9 +470,15 @@ mod imp {
                     if Instant::now() >= deadline {
                         let _ = child.kill();
                         let _ = child.wait();
+                        let stderr_tail = read_stderr_tail(stderr_log);
+                        let detail = if stderr_tail.is_empty() {
+                            String::new()
+                        } else {
+                            format!("；stderr：{stderr_tail}")
+                        };
                         return Err(AppError::new(
                             ErrorKind::Io,
-                            format!("PDF 匯出逾時（超過 {} 秒）", timeout.as_secs()),
+                            format!("PDF 匯出逾時（超過 {} 秒）{detail}", timeout.as_secs()),
                         ));
                     }
                     std::thread::sleep(Duration::from_millis(50));
@@ -445,14 +486,21 @@ mod imp {
                 Err(e) => return Err(AppError::new(ErrorKind::Io, e.to_string())),
             }
         };
-        if !status.success() && !is_pdf(out) {
+        if !is_pdf(out) {
+            let code = status
+                .code()
+                .map(|c| c.to_string())
+                .unwrap_or_else(|| "unknown".to_string());
+            let stderr_tail = read_stderr_tail(stderr_log);
+            let detail = if stderr_tail.is_empty() {
+                String::new()
+            } else {
+                format!("；stderr：{stderr_tail}")
+            };
             return Err(AppError::new(
                 ErrorKind::Io,
-                format!("PDF 匯出失敗（瀏覽器結束碼 {}）", status.code().unwrap_or(-1)),
+                format!("PDF 匯出失敗：瀏覽器沒有產生 PDF（結束碼 {code}{detail}）"),
             ));
-        }
-        if !is_pdf(out) {
-            return Err(AppError::new(ErrorKind::Io, "PDF 匯出失敗：瀏覽器沒有產生 PDF"));
         }
         Ok(())
     }
@@ -471,7 +519,14 @@ mod imp {
         let result = (|| {
             let page = work.join("page.html");
             fs::write(&page, html)?;
-            print_to_pdf(&browser, &page, &work.join("profile"), &tmp_pdf, timeout)?;
+            print_to_pdf(
+                &browser,
+                &page,
+                &work.join("profile"),
+                &work.join("stderr.log"),
+                &tmp_pdf,
+                timeout,
+            )?;
             fs::rename(&tmp_pdf, target)?;
             file_meta(target)
         })();
@@ -1191,7 +1246,7 @@ mod tests {
 
     #[cfg(target_os = "windows")]
     #[test]
-    fn windows_pdf_args_disable_js_and_drop_redundant_flags() {
+    fn windows_pdf_args_and_profile_disable_js() {
         let args: Vec<String> = super::imp::pdf_print_args(
             Path::new(r"C:\Temp\page.html"),
             Path::new(r"C:\Temp\profile"),
@@ -1200,10 +1255,19 @@ mod tests {
         .into_iter()
         .map(|s| s.to_string_lossy().into_owned())
         .collect();
-        assert!(args.iter().any(|a| a == "--blink-settings=scriptEnabled=false"));
         assert!(args.iter().any(|a| a == "--no-pdf-header-footer"));
+        assert!(args.iter().any(|a| a == "--generate-pdf-document-outline"));
+        assert!(!args.iter().any(|a| a == "--blink-settings=scriptEnabled=false"));
         assert!(!args.iter().any(|a| a == "--allow-file-access-from-files"));
         assert!(!args.iter().any(|a| a == "--print-to-pdf-no-header"));
+
+        let dir = tempfile::tempdir().unwrap();
+        let profile = dir.path().join("profile");
+        super::imp::prepare_no_js_profile(&profile).unwrap();
+        let prefs: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(profile.join("Default").join("Preferences")).unwrap())
+                .unwrap();
+        assert_eq!(prefs["profile"]["default_content_setting_values"]["javascript"], 2);
     }
 
     #[cfg(target_os = "windows")]
@@ -1215,7 +1279,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let out = dir.path().join("exported.pdf");
         let headings = vec![h(1, "第一章 蘆葦筆"), h(2, "小節 1.1")];
-        let html = "<!doctype html><html><head><meta charset=\"utf-8\"><style>@page{size:A4;margin:18mm 20mm}</style></head><body><h1>第一章 蘆葦筆</h1><p>內文段落</p><h2>小節 1.1</h2><p>更多內容</p></body></html>";
+        let html = "<!doctype html><html><head><meta charset=\"utf-8\"><style>@page{size:A4;margin:18mm 20mm}</style></head><body><h1>第一章 蘆葦筆</h1><p>內文段落</p><h2>小節 1.1</h2><p>更多內容</p><script>document.body.innerHTML='<h1>JS_EXECUTED</h1>'</script></body></html>";
         let meta = export_pdf_blocking(
             html,
             &out.to_string_lossy(),
@@ -1226,5 +1290,9 @@ mod tests {
         assert!(meta.size > 1000);
         let bytes = std::fs::read(&out).unwrap();
         assert!(bytes.starts_with(b"%PDF-"));
+        assert!(
+            !bytes.windows(b"JS_EXECUTED".len()).any(|w| w == b"JS_EXECUTED"),
+            "JavaScript must not execute during headless PDF export"
+        );
     }
 }
