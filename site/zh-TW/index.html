@@ -3,8 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Kalamos — 落筆即成文 | macOS 所見即所得 Markdown 編輯器</title>
-    <meta name="description" content="Kalamos 是一款安靜、離線的 macOS 即時預覽 Markdown 編輯器，基於 Tauri 2 打造。支援視覺化表格、MathJax 公式、Mermaid 圖表、PDF 書籤、Pandoc 匯入匯出與自訂 CSS 主題。" />
+    <title>Kalamos — 落筆即成文 | macOS / Windows 所見即所得 Markdown 編輯器</title>
+    <meta name="description" content="Kalamos 是一款安靜、離線的 macOS 與 Windows 即時預覽 Markdown 編輯器，基於 Tauri 2 打造。支援視覺化表格、MathJax 公式、Mermaid 圖表、PDF 書籤、Pandoc 匯入匯出與自訂 CSS 主題。" />
     <link rel="icon" type="image/svg+xml" href="../assets/kalamos-icon.svg" />
     <link rel="alternate" hreflang="en" href="https://kkdai.github.io/Kalamos/" />
     <link rel="alternate" hreflang="zh-Hant" href="https://kkdai.github.io/Kalamos/zh-TW/" />
@@ -14,7 +14,7 @@
     <meta property="og:type" content="website" />
     <meta property="og:locale" content="zh_TW" />
     <meta property="og:title" content="Kalamos — 落筆即成文" />
-    <meta property="og:description" content="安靜、離線的 macOS 所見即所得 Markdown 編輯器：視覺化表格、MathJax、Mermaid 圖表、PDF 書籤與自訂 CSS 主題。" />
+    <meta property="og:description" content="安靜、離線的 macOS / Windows 所見即所得 Markdown 編輯器：視覺化表格、MathJax、Mermaid 圖表、PDF 書籤與自訂 CSS 主題。" />
     <meta property="og:image" content="https://kkdai.github.io/Kalamos/assets/screenshots/hero-live-preview-zh-TW.png" />
     <meta name="twitter:card" content="summary_large_image" />
     <link rel="stylesheet" href="../assets/style.css" />
@@ -53,12 +53,46 @@
           <img class="hero-icon" src="../assets/kalamos-icon.svg" alt="Kalamos 應用程式圖示" width="84" height="84" />
           <h1 class="hero-title">Kalamos</h1>
           <p class="hero-tagline">落筆即成文</p>
-          <p class="hero-lead">專為 macOS 打造的所見即所得（WYSIWYM）Markdown 桌面編輯器。以古希臘「蘆葦筆」為名，讓純文字 GFM 文件在你書寫的瞬間化作清朗紙面——免費、離線、無須帳號。</p>
-          <div class="hero-actions">
-            <a class="btn btn-primary" href="https://github.com/kkdai/Kalamos/releases" rel="noopener">下載 macOS 版本</a>
-            <a class="btn btn-secondary" href="https://github.com/kkdai/Kalamos" rel="noopener">前往 GitHub</a>
+          <p class="hero-lead">專為 macOS 與 Windows 打造的所見即所得（WYSIWYM）Markdown 桌面編輯器。以古希臘「蘆葦筆」為名，讓純文字 GFM 文件在你書寫的瞬間化作清朗紙面——免費、離線、免帳號。</p>
+          <div class="download-actions" data-download-group>
+            <a
+              class="btn btn-download"
+              data-platform="macos-arm"
+              href="https://github.com/kkdai/Kalamos/releases/latest"
+              rel="noopener"
+            >
+              <span class="btn-download-title">macOS Apple Silicon</span>
+              <span class="btn-download-sub">M1–M4 · .dmg</span>
+            </a>
+            <a
+              class="btn btn-download"
+              data-platform="macos-intel"
+              href="https://github.com/kkdai/Kalamos/releases/latest"
+              rel="noopener"
+            >
+              <span class="btn-download-title">macOS Intel</span>
+              <span class="btn-download-sub">x64 · .dmg</span>
+            </a>
+            <a
+              class="btn btn-download"
+              data-platform="windows"
+              href="https://github.com/kkdai/Kalamos/releases/latest"
+              rel="noopener"
+            >
+              <span class="btn-download-title">
+                Windows
+                <span class="platform-badge">實驗性</span>
+              </span>
+              <span class="btn-download-sub">Win 10/11 x64 · .exe / .msi</span>
+            </a>
           </div>
-          <p class="hero-meta">macOS（.dmg）· Tauri 2 + CodeMirror 6 · 完全離線、標準 GFM</p>
+          <p class="download-note">
+            Windows 版目前為實驗性且未簽章（出現 SmartScreen 警告請點「其他資訊」→「仍要執行」）；macOS 版未經公證（首次開啟請對應用程式按右鍵選「打開」）。
+          </p>
+          <p class="hero-meta">
+            Tauri 2 + CodeMirror 6 · 完全離線、標準 GFM ·
+            <a href="https://github.com/kkdai/Kalamos" rel="noopener">前往 GitHub</a>
+          </p>
 
           <div class="hero-shot">
             <div class="window-frame">
@@ -235,7 +269,7 @@
 
             <article class="feature-card">
               <h3>原生 PDF 書籤與 Pandoc</h3>
-              <p>按 <kbd>Cmd+Shift+E</kbd> 透過 macOS 原生管線匯出 A4 PDF，自動建立對應標題層級的巢狀 PDF 書籤，數學公式與圖表完整呈現。選用安裝 Pandoc 後更可匯出 DOCX、ODT、LaTeX、MediaWiki、EPUB，或反向匯入為乾淨的 Markdown。</p>
+              <p>按 <kbd>Cmd+Shift+E</kbd> 匯出 A4 PDF，自動建立對應標題層級的巢狀 PDF 書籤，數學公式與圖表完整呈現（macOS 使用原生 PDFKit，Windows 使用無頭 Edge／Chrome）。選用安裝 Pandoc 後更可匯出 DOCX、ODT、LaTeX、MediaWiki、EPUB，或反向匯入為乾淨的 Markdown。</p>
               <ul class="feature-tags">
                 <li>PDF + 巢狀書籤</li>
                 <li>DOCX · ODT · EPUB</li>
@@ -331,7 +365,7 @@
           <div class="showcase-header">
             <span class="eyebrow">鍵盤優先</span>
             <h2 class="section-title">常用快捷鍵一覽</h2>
-            <p class="section-desc">雙手無須離開鍵盤，所有核心操作皆可一鍵完成。</p>
+            <p class="section-desc">雙手無須離開鍵盤，所有核心操作皆可一鍵完成。在 Windows 上請將 <code>Cmd</code> 對應為 <code>Ctrl</code>、<code>Opt</code> 對應為 <code>Alt</code>。</p>
           </div>
 
           <div class="shortcuts-grid">
@@ -407,7 +441,7 @@
               <summary>需要安裝 Pandoc 嗎？</summary>
               <div class="faq-answer">
                 <p>不一定——Pandoc 完全是選用的。日常編輯、即時預覽、MathJax、Mermaid 圖表與含書籤的原生 PDF 匯出皆可開箱即用，不需額外安裝工具。</p>
-                <p>只有需要匯出 DOCX、ODT、LaTeX、MediaWiki、EPUB，或將這些格式匯入轉成 Markdown 時，才需要安裝 Pandoc（<code>brew install pandoc</code>；匯入功能需 2.15 以上以支援沙盒模式）。</p>
+                <p>只有需要匯出 DOCX、ODT、LaTeX、MediaWiki、EPUB，或將這些格式匯入轉成 Markdown 時，才需要安裝 Pandoc（macOS 用 <code>brew install pandoc</code>、Windows 用 <code>winget install JohnMacFarlane.Pandoc</code>；匯入功能需 2.15 以上以支援沙盒模式）。</p>
               </div>
             </details>
 
@@ -419,7 +453,7 @@
             </details>
 
             <details class="faq-item">
-              <summary>下載的未簽章 macOS 應用程式如何開啟？</summary>
+              <summary>下載的未公證 macOS 應用程式如何開啟？</summary>
               <div class="faq-answer">
                 <p>目前發佈版尚未進行 Apple 公證。將 <strong>Kalamos.app</strong> 拖入 <code>/Applications</code> 後，請在 Finder 對應用程式按右鍵選擇「<strong>打開</strong>」（或至「<strong>系統設定 → 隱私權與安全性</strong>」點選「仍要打開」），也可以在終端機執行以下指令移除隔離屬性：</p>
                 <div class="code-chip">
@@ -430,9 +464,17 @@
             </details>
 
             <details class="faq-item">
+              <summary>Windows 版本有什麼需要注意的地方？</summary>
+              <div class="faq-answer">
+                <p>Windows 版（支援 <strong>Windows 10 / 11 x64</strong>）目前為<strong>實驗性</strong>且<strong>未簽章</strong>。執行 <code>-setup.exe</code> 或 <code>.msi</code> 安裝程式時若出現 Windows Defender SmartScreen 警告，請點選「<strong>其他資訊</strong>」→「<strong>仍要執行</strong>」。</p>
+                <p>執行環境需要 <strong>Microsoft Edge WebView2 Runtime</strong>——Windows 11 已內建，Windows 10 若尚未安裝，安裝程式會自動透過內含的 bootstrapper 下載並安裝。</p>
+              </div>
+            </details>
+
+            <details class="faq-item">
               <summary>可以自訂主題或串接圖床上傳嗎？</summary>
               <div class="faq-answer">
-                <p>可以。將使用 <code>:root[data-custom-theme]</code> 選擇器的 <code>.css</code> 檔放入 <code>~/Library/Application Support/io.kalamos.app/themes/</code> 即可覆寫色票、字體或標題自動編號。若要串接圖床，在 <code>~/Library/Application Support/io.kalamos.app/settings.json</code> 設定 <code>uploadCommand</code>（例如 PicGo CLI）後按 <kbd>Cmd+Opt+U</kbd> 即可上傳。</p>
+                <p>可以。將使用 <code>:root[data-custom-theme]</code> 選擇器的 <code>.css</code> 檔放入 <code>~/Library/Application Support/io.kalamos.app/themes/</code>（macOS）或 <code>%APPDATA%\io.kalamos.app\themes\</code>（Windows）即可覆寫色票、字體或標題自動編號。若要串接圖床，在同目錄下的 <code>settings.json</code> 設定 <code>uploadCommand</code>（例如 PicGo CLI）後按 <kbd>Cmd+Opt+U</kbd> 即可上傳。</p>
               </div>
             </details>
           </div>
@@ -445,11 +487,45 @@
           <div class="cta-box">
             <img src="../assets/kalamos-icon.svg" alt="Kalamos 圖示" width="64" height="64" loading="lazy" />
             <h2>在安靜的紙面上開始書寫</h2>
-            <p>前往 GitHub Releases 下載最新 macOS 安裝檔，或直接從原始碼自行建置。</p>
-            <div class="hero-actions">
-              <a class="btn btn-primary" href="https://github.com/kkdai/Kalamos/releases" rel="noopener">下載 macOS 版本</a>
-              <a class="btn btn-secondary" href="https://github.com/kkdai/Kalamos" rel="noopener">原始碼與文件</a>
+            <p>前往 GitHub Releases 下載最新 macOS 或 Windows 安裝檔，或直接從原始碼自行建置。</p>
+            <div class="download-actions" data-download-group>
+              <a
+                class="btn btn-download"
+                data-platform="macos-arm"
+                href="https://github.com/kkdai/Kalamos/releases/latest"
+                rel="noopener"
+              >
+                <span class="btn-download-title">macOS Apple Silicon</span>
+                <span class="btn-download-sub">M1–M4 · .dmg</span>
+              </a>
+              <a
+                class="btn btn-download"
+                data-platform="macos-intel"
+                href="https://github.com/kkdai/Kalamos/releases/latest"
+                rel="noopener"
+              >
+                <span class="btn-download-title">macOS Intel</span>
+                <span class="btn-download-sub">x64 · .dmg</span>
+              </a>
+              <a
+                class="btn btn-download"
+                data-platform="windows"
+                href="https://github.com/kkdai/Kalamos/releases/latest"
+                rel="noopener"
+              >
+                <span class="btn-download-title">
+                  Windows
+                  <span class="platform-badge">實驗性</span>
+                </span>
+                <span class="btn-download-sub">Win 10/11 x64 · .exe / .msi</span>
+              </a>
             </div>
+            <p class="download-note">
+              Windows 版目前為實驗性且未簽章（出現 SmartScreen 警告請點「其他資訊」→「仍要執行」）；macOS 版未經公證（首次開啟請對應用程式按右鍵選「打開」）。
+            </p>
+            <p class="cta-links">
+              <a href="https://github.com/kkdai/Kalamos" rel="noopener">前往 GitHub 查看原始碼與文件</a>
+            </p>
           </div>
         </div>
       </section>
@@ -460,7 +536,7 @@
         <span>Kalamos · 落筆即成文</span>
         <div class="footer-links">
           <a href="https://github.com/kkdai/Kalamos" rel="noopener">GitHub</a>
-          <a href="https://github.com/kkdai/Kalamos/releases" rel="noopener">Releases</a>
+          <a href="https://github.com/kkdai/Kalamos/releases/latest" rel="noopener">Releases</a>
           <a href="../" hreflang="en">English</a>
           <a href="./" aria-current="page">繁體中文</a>
           <a href="../ja/" hreflang="ja">日本語</a>

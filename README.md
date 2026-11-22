@@ -64,7 +64,7 @@
 - **Custom CLI Uploader** (`IM-05`): Press `Cmd+Opt+U` (or enable `uploadOnInsert`) to upload local images through any CLI tool such as PicGo CLI, configured exclusively via `settings.json` for security. See [docs/image-upload.md](docs/image-upload.md).
 
 ### Export & Import
-- **Native PDF Export** (`EX-01`, `Cmd+Shift+E`): Paginates to A4 via a hidden JavaScript-disabled `WKWebView` + `NSPrintOperation` and embeds a nested PDF outline bookmark tree (`PDFKit`) matching heading hierarchy, including rendered math and diagrams.
+- **Native PDF Export** (`EX-01`, `Cmd+Shift+E`): Paginates to A4 and embeds a nested PDF outline bookmark tree matching heading hierarchy, including rendered math and diagrams (uses `WKWebView` + `NSPrintOperation` + `PDFKit` on macOS, and headless Microsoft Edge or Google Chrome on Windows).
 - **Pandoc Export** (`EX-02`, `Cmd+Opt+E`): Export to **DOCX**, **ODT** (OpenOffice / LibreOffice), **LaTeX**, **MediaWiki**, and **EPUB** (requires optional Pandoc). Resolves `[TOC]`, local image paths, and `<img>` sizes automatically.
 - **Pandoc Import** (`EX-03`, `Cmd+Opt+I`): Import **DOCX**, **ODT**, **EPUB**, **LaTeX**, **HTML**, and **MediaWiki** into clean GFM Markdown with `$...$` / `$$...$$` math and extracted media (requires Pandoc 2.15+ for `--sandbox`).
 
@@ -74,7 +74,7 @@
 
 ### Themes
 - **Built-in Themes** (`TH-01`): **Papyros** (warm papyrus light), **Melan** (ink dark), and **System** auto-switching (`prefers-color-scheme`), paired with bundled open-source typography (`Source Serif 4`, `Noto Serif TC`, `Inter`, `Noto Sans TC`, `JetBrains Mono`).
-- **Custom CSS Themes**: Place `.css` files in `~/Library/Application Support/io.kalamos.app/themes/` to customize `--k-*` variables, typography, paragraph alignment, or automatic heading counters. Switch via the theme menu or `Cmd+Shift+T`. See [docs/themes.md](docs/themes.md).
+- **Custom CSS Themes**: Place `.css` files in `~/Library/Application Support/io.kalamos.app/themes/` (macOS) or `%APPDATA%\io.kalamos.app\themes\` (Windows) to customize `--k-*` variables, typography, paragraph alignment, or automatic heading counters. Switch via the theme menu or `Cmd+Shift+T`. See [docs/themes.md](docs/themes.md).
 
 <p align="center">
   <img src="site/assets/screenshots/dark-theme-melan.png" alt="Kalamos Melan dark theme" width="760" />
@@ -126,26 +126,41 @@
 
 ---
 
-## Installation (Windows — Experimental)
+## System Requirements
 
-> Windows support is currently **experimental** and **unsigned** (Windows SmartScreen may show a warning on first launch). Prebuilt Windows installers are not published on GitHub Releases yet (coming soon) — build from source below for now.
+- **macOS**: Apple Silicon (`aarch64`, M1 / M2 / M3 / M4) or Intel (`x64`).
+- **Windows (Experimental)**: **Windows 10 / 11 (x64)** with **Microsoft Edge WebView2 Runtime** (pre-installed on Windows 11; automatically installed by the `.exe` / `.msi` installer bootstrapper on Windows 10). Headless A4 PDF export with bookmarks uses **Microsoft Edge** (or Google Chrome as fallback).
+- **Optional**: **Pandoc** (2.15+ required for sandboxed import) for DOCX / ODT / LaTeX / MediaWiki / EPUB export and import.
 
-1. Build the Windows installer (`.msi` or `-setup.exe`) from source using the steps under [Building from Source](#building-from-source).
-2. **WebView2 & PDF export**: Windows 11 ships with **WebView2** and **Microsoft Edge**. On Windows 10 (especially LTSC or older builds), WebView2 may not be pre-installed — the MSI / NSIS installers include the WebView2 bootstrapper. Headless A4 PDF export with document outline bookmarks uses Microsoft Edge (or Google Chrome as fallback).
-3. The installer registers `.md`, `.markdown`, `.mdown`, `.mkd`, `.mkdn`, `.mdwn`, and `.mdtxt` file associations; double-clicking or choosing **Open with Kalamos** in File Explorer opens the file in the running window.
-4. Settings and custom CSS themes live in `%APPDATA%\io.kalamos.app\` (`settings.json` and `themes\*.css`).
+## Installation
 
-## Installation (macOS)
+### macOS (Apple Silicon / Intel)
 
-1. Download the latest `.dmg` from [GitHub Releases](https://github.com/kkdai/Kalamos/releases).
+1. Download the `.dmg` for your Mac from [GitHub Releases](https://github.com/kkdai/Kalamos/releases/latest):
+   - **Apple Silicon (M1 / M2 / M3 / M4)**: `Kalamos_<version>_aarch64.dmg`
+   - **Intel Mac**: `Kalamos_<version>_x64.dmg`
+   - *(Optional)* Verify checksums against `SHA256SUMS.txt`.
 2. Open the `.dmg` and drag **Kalamos.app** into `/Applications`.
-3. **Opening an unsigned build**: Release builds are currently not Apple-notarized. On first launch, macOS Gatekeeper may block the app. To open it:
+3. **Opening an unnotarized build**: Release builds use ad-hoc signing and are currently not Apple-notarized. On first launch, macOS Gatekeeper may block the app. To open it:
    - **Option A (Finder)**: Right-click (or Control-click) **Kalamos.app** → **Open** → confirm **Open** (or go to **System Settings → Privacy & Security** and click **Open Anyway**).
    - **Option B (Terminal)**: Clear the quarantine attribute:
      ```bash
      xattr -cr /Applications/Kalamos.app
      ```
 4. **Make Kalamos the default for Markdown**: in Finder, select any `.md` file → **Get Info** (⌘I) → **Open with: Kalamos** → **Change All…**. Double-clicking a `.md` file, dropping one on the Dock icon, or `open -a Kalamos file.md` then opens it in Kalamos.
+
+### Windows (x64 — Experimental)
+
+> **Experimental & Unsigned**: Windows builds are currently **experimental** and **unsigned**. When running the installer, Windows Defender SmartScreen may display a warning — click **More info** → **Run anyway**.
+
+1. Download a Windows installer from [GitHub Releases](https://github.com/kkdai/Kalamos/releases/latest):
+   - **NSIS installer (recommended, no admin privileges required)**: `Kalamos_<version>_x64-setup.exe`
+   - **MSI installer**: `Kalamos_<version>_x64_en-US.msi`
+   - *(Optional)* Verify checksums against `SHA256SUMS.txt`.
+2. Run the installer. If Windows Defender SmartScreen shows a warning, click **More info** → **Run anyway**.
+3. **WebView2 & PDF export**: Windows 11 ships with **WebView2** and **Microsoft Edge**. On Windows 10 (especially LTSC or older builds), WebView2 may not be pre-installed — the `.exe` / `.msi` installers include the WebView2 bootstrapper to download and install it automatically. Headless A4 PDF export with document outline bookmarks uses Microsoft Edge (or Google Chrome as fallback).
+4. **File associations**: The installer registers `.md`, `.markdown`, `.mdown`, `.mkd`, `.mkdn`, `.mdwn`, and `.mdtxt`; double-clicking or choosing **Open with Kalamos** in File Explorer opens the file in the running window.
+5. **Settings & custom themes**: Stored in `%APPDATA%\io.kalamos.app\` (`settings.json` and `themes\*.css`).
 
 ---
 
@@ -206,7 +221,7 @@ npm run bench
 - **macOS & Windows (experimental)**: macOS uses `WKWebView`, `NSPrintOperation`, and `PDFKit` for bookmarked PDF export; Windows uses headless Microsoft Edge (or Google Chrome) to paginate onto A4 and build PDF outline bookmarks from `<h1>`–`<h6>`.
 - **Preferences & CLI uploader config**: Preferences (`Cmd+,` / `Ctrl+,`) manage general, editor, appearance, and image settings and persist to `~/Library/Application Support/io.kalamos.app/settings.json` (`%APPDATA%\io.kalamos.app\settings.json` on Windows); for security, CLI image uploader commands (`uploadCommand`, `uploadArgs`) are edited directly in `settings.json`.
 - **Pandoc is external**: Multi-format export (`EX-02`) and import (`EX-03`) require installing Pandoc separately (2.15+ for sandboxed import).
-- **Unsigned builds**: Prebuilt macOS `.dmg` releases require manual Gatekeeper approval on first launch; Windows builds are currently unsigned and trigger SmartScreen warnings.
+- **Unnotarized / unsigned builds**: Prebuilt macOS `.dmg` releases are not Apple-notarized (right-click **Kalamos.app** → **Open** on first launch); Windows builds are experimental and unsigned, triggering Windows SmartScreen (**More info** → **Run anyway**).
 - **iPic preset**: macOS iPic is not built in as a preset; any CLI image uploader matching the stdout URL contract can be configured as `uploadCommand`.
 - **Out of scope by design**: No accounts, cloud sync service (use local iCloud/Dropbox folders), real-time collaboration, plugin marketplace, or built-in AI assistant.
 

@@ -3,10 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Kalamos — Write, and it appears. | WYSIWYM Markdown Editor for macOS</title>
+    <title>Kalamos — Write, and it appears. | WYSIWYM Markdown Editor for macOS &amp; Windows</title>
     <meta
       name="description"
-      content="Kalamos is a calm, offline, live-preview Markdown editor for macOS built with Tauri 2. Visual tables, MathJax, Mermaid diagrams, PDF bookmarks, Pandoc, and custom CSS themes."
+      content="Kalamos is a calm, offline, live-preview Markdown editor for macOS and Windows built with Tauri 2. Visual tables, MathJax, Mermaid diagrams, PDF bookmarks, Pandoc, and custom CSS themes."
     />
     <link rel="icon" type="image/svg+xml" href="assets/kalamos-icon.svg" />
     <link rel="alternate" hreflang="en" href="https://kkdai.github.io/Kalamos/" />
@@ -19,7 +19,7 @@
     <meta property="og:title" content="Kalamos — Write, and it appears." />
     <meta
       property="og:description"
-      content="A calm, offline, live-preview Markdown editor for macOS with visual tables, MathJax, Mermaid diagrams, PDF bookmarks, and custom CSS themes."
+      content="A calm, offline, live-preview Markdown editor for macOS and Windows with visual tables, MathJax, Mermaid diagrams, PDF bookmarks, and custom CSS themes."
     />
     <meta property="og:image" content="https://kkdai.github.io/Kalamos/assets/screenshots/hero-live-preview.png" />
     <meta name="twitter:card" content="summary_large_image" />
@@ -60,18 +60,49 @@
           <h1 class="hero-title">Kalamos</h1>
           <p class="hero-tagline">Write, and it appears.</p>
           <p class="hero-lead">
-            A distraction-free, live-preview Markdown editor for macOS. Named after the Ancient Greek reed pen,
+            A distraction-free, live-preview Markdown editor for macOS and Windows. Named after the Ancient Greek reed pen,
             Kalamos turns plain GFM files into crisp paper as you type — free, offline, and without accounts.
           </p>
-          <div class="hero-actions">
-            <a class="btn btn-primary" href="https://github.com/kkdai/Kalamos/releases" rel="noopener">
-              Download for macOS
+          <div class="download-actions" data-download-group>
+            <a
+              class="btn btn-download"
+              data-platform="macos-arm"
+              href="https://github.com/kkdai/Kalamos/releases/latest"
+              rel="noopener"
+            >
+              <span class="btn-download-title">macOS Apple Silicon</span>
+              <span class="btn-download-sub">M1–M4 · .dmg</span>
             </a>
-            <a class="btn btn-secondary" href="https://github.com/kkdai/Kalamos" rel="noopener">
-              View on GitHub
+            <a
+              class="btn btn-download"
+              data-platform="macos-intel"
+              href="https://github.com/kkdai/Kalamos/releases/latest"
+              rel="noopener"
+            >
+              <span class="btn-download-title">macOS Intel</span>
+              <span class="btn-download-sub">x64 · .dmg</span>
+            </a>
+            <a
+              class="btn btn-download"
+              data-platform="windows"
+              href="https://github.com/kkdai/Kalamos/releases/latest"
+              rel="noopener"
+            >
+              <span class="btn-download-title">
+                Windows
+                <span class="platform-badge">Experimental</span>
+              </span>
+              <span class="btn-download-sub">Win 10/11 x64 · .exe / .msi</span>
             </a>
           </div>
-          <p class="hero-meta">macOS (.dmg) · Built with Tauri 2 &amp; CodeMirror 6 · Offline &amp; Standard GFM</p>
+          <p class="download-note">
+            Windows build is experimental &amp; unsigned (SmartScreen: More info → Run anyway).
+            macOS build is unnotarized (right-click → Open on first launch).
+          </p>
+          <p class="hero-meta">
+            Built with Tauri 2 &amp; CodeMirror 6 · Offline &amp; Standard GFM ·
+            <a href="https://github.com/kkdai/Kalamos" rel="noopener">View on GitHub</a>
+          </p>
 
           <div class="hero-shot">
             <div class="window-frame">
@@ -277,8 +308,8 @@
             <article class="feature-card">
               <h3>Native PDF &amp; Pandoc Export</h3>
               <p>
-                Export crisp A4 PDFs (<kbd>Cmd+Shift+E</kbd>) with nested PDFKit bookmarks matching your headings —
-                complete with rendered math and diagrams. With optional Pandoc installed, export to DOCX, ODT, LaTeX,
+                Export crisp A4 PDFs (<kbd>Cmd+Shift+E</kbd>) with nested outline bookmarks matching your headings —
+                complete with rendered math and diagrams (PDFKit on macOS, headless Edge/Chrome on Windows). With optional Pandoc installed, export to DOCX, ODT, LaTeX,
                 MediaWiki, and EPUB, or import existing documents back into clean Markdown.
               </p>
               <ul class="feature-tags">
@@ -393,7 +424,8 @@
             <span class="eyebrow">Keyboard First</span>
             <h2 class="section-title">Essential shortcuts at your fingertips</h2>
             <p class="section-desc">
-              Every core action is reachable without leaving the keyboard.
+              Every core action is reachable without leaving the keyboard. On Windows, <code>Cmd</code> maps to
+              <code>Ctrl</code> and <code>Opt</code> maps to <code>Alt</code>.
             </p>
           </div>
 
@@ -480,7 +512,7 @@
                   native PDF export with bookmarks all work out of the box with zero external dependencies.
                 </p>
                 <p>
-                  Install Pandoc (<code>brew install pandoc</code>) only if you want to export to DOCX, ODT, LaTeX,
+                  Install Pandoc (<code>brew install pandoc</code> on macOS or <code>winget install JohnMacFarlane.Pandoc</code> on Windows) only if you want to export to DOCX, ODT, LaTeX,
                   MediaWiki, or EPUB, or import those formats into Markdown (Pandoc 2.15+ is required for sandboxed
                   import).
                 </p>
@@ -499,7 +531,7 @@
             </details>
 
             <details class="faq-item">
-              <summary>How do I open an unsigned macOS build?</summary>
+              <summary>How do I open an unnotarized macOS build?</summary>
               <div class="faq-answer">
                 <p>
                   Release builds are not Apple-notarized yet. After dragging <strong>Kalamos.app</strong> to
@@ -522,14 +554,30 @@
             </details>
 
             <details class="faq-item">
+              <summary>What should I know about the Windows version?</summary>
+              <div class="faq-answer">
+                <p>
+                  Windows support (Windows 10 / 11 x64) is currently <strong>experimental</strong> and
+                  <strong>unsigned</strong>. When launching the <code>-setup.exe</code> or <code>.msi</code> installer,
+                  Windows Defender SmartScreen may show a warning — click <strong>More info</strong> →
+                  <strong>Run anyway</strong>.
+                </p>
+                <p>
+                  Kalamos requires the <strong>Microsoft Edge WebView2 Runtime</strong>, which is pre-installed on
+                  Windows 11 and automatically installed by the installer bootstrapper on Windows 10.
+                </p>
+              </div>
+            </details>
+
+            <details class="faq-item">
               <summary>Can I customize themes or configure an image uploader?</summary>
               <div class="faq-answer">
                 <p>
                   Yes. Place any <code>.css</code> file using <code>:root[data-custom-theme]</code> inside
-                  <code>~/Library/Application Support/io.kalamos.app/themes/</code> to customize colors, typography, or
+                  <code>~/Library/Application Support/io.kalamos.app/themes/</code> (macOS) or
+                  <code>%APPDATA%\io.kalamos.app\themes\</code> (Windows) to customize colors, typography, or
                   heading numbering. For image hosting, configure <code>uploadCommand</code> (such as PicGo CLI) in
-                  <code>~/Library/Application Support/io.kalamos.app/settings.json</code> and press
-                  <kbd>Cmd+Opt+U</kbd>.
+                  <code>settings.json</code> inside that same app data folder and press <kbd>Cmd+Opt+U</kbd>.
                 </p>
               </div>
             </details>
@@ -544,16 +592,47 @@
             <img src="assets/kalamos-icon.svg" alt="Kalamos icon" width="64" height="64" loading="lazy" />
             <h2>Start writing on quiet paper</h2>
             <p>
-              Download the latest macOS release from GitHub or build Kalamos directly from source.
+              Download the latest macOS or Windows release from GitHub, or build Kalamos directly from source.
             </p>
-            <div class="hero-actions">
-              <a class="btn btn-primary" href="https://github.com/kkdai/Kalamos/releases" rel="noopener">
-                Download for macOS
+            <div class="download-actions" data-download-group>
+              <a
+                class="btn btn-download"
+                data-platform="macos-arm"
+                href="https://github.com/kkdai/Kalamos/releases/latest"
+                rel="noopener"
+              >
+                <span class="btn-download-title">macOS Apple Silicon</span>
+                <span class="btn-download-sub">M1–M4 · .dmg</span>
               </a>
-              <a class="btn btn-secondary" href="https://github.com/kkdai/Kalamos" rel="noopener">
-                Source &amp; Documentation
+              <a
+                class="btn btn-download"
+                data-platform="macos-intel"
+                href="https://github.com/kkdai/Kalamos/releases/latest"
+                rel="noopener"
+              >
+                <span class="btn-download-title">macOS Intel</span>
+                <span class="btn-download-sub">x64 · .dmg</span>
+              </a>
+              <a
+                class="btn btn-download"
+                data-platform="windows"
+                href="https://github.com/kkdai/Kalamos/releases/latest"
+                rel="noopener"
+              >
+                <span class="btn-download-title">
+                  Windows
+                  <span class="platform-badge">Experimental</span>
+                </span>
+                <span class="btn-download-sub">Win 10/11 x64 · .exe / .msi</span>
               </a>
             </div>
+            <p class="download-note">
+              Windows build is experimental &amp; unsigned (SmartScreen: More info → Run anyway).
+              macOS build is unnotarized (right-click → Open on first launch).
+            </p>
+            <p class="cta-links">
+              <a href="https://github.com/kkdai/Kalamos" rel="noopener">Source &amp; Documentation on GitHub</a>
+            </p>
           </div>
         </div>
       </section>
@@ -564,7 +643,7 @@
         <span>Kalamos · Write, and it appears.</span>
         <div class="footer-links">
           <a href="https://github.com/kkdai/Kalamos" rel="noopener">GitHub</a>
-          <a href="https://github.com/kkdai/Kalamos/releases" rel="noopener">Releases</a>
+          <a href="https://github.com/kkdai/Kalamos/releases/latest" rel="noopener">Releases</a>
           <a href="./" aria-current="page">English</a>
           <a href="zh-TW/" hreflang="zh-Hant">繁體中文</a>
           <a href="ja/" hreflang="ja">日本語</a>

@@ -64,7 +64,7 @@
 - **自訂上傳指令**（`IM-05`）：按 `Cmd+Opt+U`（或開啟 `uploadOnInsert`）呼叫外部 CLI 工具（如 PicGo CLI）上傳本機圖片並自動替換為遠端網址；基於安全考量，上傳指令僅能透過 `settings.json` 設定。詳見 [docs/image-upload.md](docs/image-upload.md)。
 
 ### 匯出與匯入
-- **原生 PDF 匯出**（`EX-01`，`Cmd+Shift+E`）：透過隱藏且停用 JavaScript 的 macOS `WKWebView` 與 `NSPrintOperation` 進行 A4 分頁，並以 `PDFKit` 自動寫入對應標題層級的巢狀 PDF 書籤，完整保留數學公式與圖表。
+- **原生 PDF 匯出**（`EX-01`，`Cmd+Shift+E`）：自動進行 A4 分頁並寫入對應標題層級的巢狀 PDF 書籤，完整保留數學公式與圖表（macOS 使用 `WKWebView`、`NSPrintOperation` 與 `PDFKit`；Windows 使用無頭 Microsoft Edge 或 Google Chrome）。
 - **Pandoc 多格式匯出**（`EX-02`，`Cmd+Opt+E`）：支援匯出 **DOCX**、**ODT**（OpenOffice / LibreOffice）、**LaTeX**、**MediaWiki** 與 **EPUB**（需選用安裝 Pandoc），自動轉換 `[TOC]`、本機圖片路徑與 `<img>` 尺寸。
 - **Pandoc 匯入**（`EX-03`，`Cmd+Opt+I`）：可將 **DOCX**、**ODT**、**EPUB**、**LaTeX**、**HTML** 與 **MediaWiki** 匯入為乾淨的 GFM Markdown，保留 `$...$` / `$$...$$` 數學公式並提取內嵌媒體（需 Pandoc 2.15 以上以啟用 `--sandbox`）。
 
@@ -74,7 +74,7 @@
 
 ### 主題系統
 - **內建主題**（`TH-01`）：提供 **Papyros（莎草紙，淺色）**、**Melan（墨，深色）** 與 **跟隨系統外觀**，並內建開源中英文字體（`Source Serif 4`、`Noto Serif TC`、`Inter`、`Noto Sans TC`、`JetBrains Mono`）。
-- **自訂 CSS 主題**：將 `.css` 檔案放入 `~/Library/Application Support/io.kalamos.app/themes/` 即可覆寫 `--k-*` 色彩與排版變數、兩端對齊或標題自動編號，可由主題選單或 `Cmd+Shift+T` 循環切換。詳見 [docs/themes.md](docs/themes.md)。
+- **自訂 CSS 主題**：將 `.css` 檔案放入 `~/Library/Application Support/io.kalamos.app/themes/`（macOS）或 `%APPDATA%\io.kalamos.app\themes\`（Windows）即可覆寫 `--k-*` 色彩與排版變數、兩端對齊或標題自動編號，可由主題選單或 `Cmd+Shift+T` 循環切換。詳見 [docs/themes.md](docs/themes.md)。
 
 <p align="center">
   <img src="site/assets/screenshots/dark-theme-melan.png" alt="Kalamos Melan 深色主題畫面" width="760" />
@@ -126,26 +126,41 @@
 
 ---
 
-## 安裝方式（Windows，實驗性）
+## 系統需求
 
-> Windows 支援目前為**實驗性**且**尚未簽章**（首次執行時 Windows SmartScreen 會跳出警告）。GitHub Releases 尚未提供預先建置的 Windows 安裝檔（即將推出），目前請先從原始碼建置。
+- **macOS**：Apple Silicon（`aarch64`，M1 / M2 / M3 / M4）或 Intel（`x64`）。
+- **Windows（實驗性）**：**Windows 10 / 11（x64）**，需具備 **Microsoft Edge WebView2 Runtime**（Windows 11 已內建；Windows 10 若未預載，安裝程式內的 bootstrapper 會自動下載並安裝）。無頭 A4 PDF 匯出與書籤生成會使用 **Microsoft Edge**（或以 Google Chrome 作為備援）。
+- **選用相依**：**Pandoc**（匯入需 2.15 以上），僅在使用 DOCX / ODT / LaTeX / MediaWiki / EPUB 匯出與匯入時需要。
 
-1. 依下方[從原始碼建置](#從原始碼建置)步驟建置 Windows 安裝檔（`.msi` 或 `-setup.exe`）。
-2. **WebView2 與 PDF 匯出**：Windows 11 已內建 **WebView2** 與 **Microsoft Edge**；部分 Windows 10 環境（例如 LTSC 或未更新的系統）可能未預載 WebView2，MSI／NSIS 安裝程式已內含 WebView2 bootstrapper。無頭 A4 PDF 匯出與書籤生成會使用 Microsoft Edge（或以 Google Chrome 作為備援）。
-3. 安裝程式會自動註冊 `.md`、`.markdown`、`.mdown`、`.mkd`、`.mkdn`、`.mdwn`、`.mdtxt` 檔案關聯；在檔案總管雙擊或選擇「以 Kalamos 開啟」即可直接於執行中的視窗開啟。
-4. 設定檔與自訂主題目錄位於 `%APPDATA%\io.kalamos.app\`（`settings.json` 與 `themes\*.css`）。
+## 安裝方式
 
-## 安裝方式（macOS）
+### macOS（Apple Silicon / Intel）
 
-1. 前往 [GitHub Releases](https://github.com/kkdai/Kalamos/releases) 下載最新 `.dmg` 安裝檔。
-2. 開啟 `.dmg`，將 **Kalamos.app** 拖曳至 `/Applications` 資料夾。
-3. **開啟未簽章的應用程式**：目前發佈版尚未進行 Apple 公證，首次開啟時可能會遇到 macOS Gatekeeper 阻擋，請用以下任一方式放行：
+1. 前往 [GitHub Releases](https://github.com/kkdai/Kalamos/releases/latest) 下載對應架構的 `.dmg` 安裝檔：
+   - **Apple Silicon（M1 / M2 / M3 / M4）**：`Kalamos_<版本>_aarch64.dmg`
+   - **Intel Mac**：`Kalamos_<版本>_x64.dmg`
+   - *（選用）* 可比對 `SHA256SUMS.txt` 驗證檔案校驗碼。
+2. 開啟 `.dmg`，將 **Kalamos.app** 拖曳至 `/Applications`（應用程式）資料夾。
+3. **開啟未公證的應用程式**：目前發佈版採用 ad-hoc 簽章，尚未經過 Apple 公證，首次開啟時可能會遇到 macOS Gatekeeper 阻擋，請用以下任一方式放行：
    - **方法一（Finder）**：在 **Kalamos.app** 上按右鍵（或 Control+點擊）→ 選擇「**打開**」→ 確認打開（或至 **系統設定 → 隱私權與安全性** 點選「**仍要打開**」）。
    - **方法二（終端機）**：移除隔離屬性：
      ```bash
      xattr -cr /Applications/Kalamos.app
      ```
-4. **設為 .md 預設 app**：在 Finder 選取任一 `.md` 檔 →「**取得資訊**」（⌘I）→「**打開檔案的應用程式**」選 **Kalamos** →「**全部更改…**」。之後雙擊 `.md`、拖到 Dock 圖示或 `open -a Kalamos 檔案.md` 都會用 Kalamos 開啟。
+4. **設為 .md 預設應用程式**：在 Finder 選取任一 `.md` 檔 →「**取得資訊**」（⌘I）→「**打開檔案的應用程式**」選 **Kalamos** →「**全部更改…**」。之後雙擊 `.md`、拖到 Dock 圖示或 `open -a Kalamos 檔案.md` 都會用 Kalamos 開啟。
+
+### Windows（x64，實驗性）
+
+> **實驗性、未簽章**：Windows 版目前為**實驗性**且**未簽章**（尚未進行 Windows 程式碼簽章）。執行安裝程式時若出現 Windows Defender SmartScreen 警告，請點選「**其他資訊**」→「**仍要執行**」。
+
+1. 前往 [GitHub Releases](https://github.com/kkdai/Kalamos/releases/latest) 下載 Windows 安裝檔：
+   - **NSIS 安裝程式（建議，免系統管理員權限）**：`Kalamos_<版本>_x64-setup.exe`
+   - **MSI 安裝程式**：`Kalamos_<版本>_x64_en-US.msi`
+   - *（選用）* 可比對 `SHA256SUMS.txt` 驗證檔案校驗碼。
+2. 執行安裝程式；若 Windows Defender SmartScreen 跳出警告，請點選「**其他資訊**」→「**仍要執行**」。
+3. **WebView2 與 PDF 匯出**：Windows 11 已內建 **WebView2** 與 **Microsoft Edge**；部分 Windows 10 環境（例如 LTSC 或較舊版本）若未預載 WebView2，`.exe`／`.msi` 安裝程式已內含 WebView2 bootstrapper，會自動下載並安裝。無頭 A4 PDF 匯出與書籤生成會使用 Microsoft Edge（或以 Google Chrome 作為備援）。
+4. **檔案關聯**：安裝程式會自動註冊 `.md`、`.markdown`、`.mdown`、`.mkd`、`.mkdn`、`.mdwn`、`.mdtxt` 檔案關聯；在檔案總管雙擊或選擇「以 Kalamos 開啟」即可直接於執行中的視窗開啟。
+5. **設定檔與自訂主題**：儲存於 `%APPDATA%\io.kalamos.app\`（`settings.json` 與 `themes\*.css`）。
 
 ---
 
@@ -206,7 +221,7 @@ npm run bench
 - **平台支援（macOS 與實驗性 Windows）**：macOS 使用 `WKWebView`、`NSPrintOperation` 與 `PDFKit` 匯出含書籤的 PDF；Windows 使用系統內建的無頭 Microsoft Edge（或 Google Chrome）渲染 A4 PDF 並自動由 `<h1>`–`<h6>` 產生 PDF 書籤大綱。
 - **偏好設定與圖床上傳設定**：多數一般、編輯器、外觀與圖片設定皆可在偏好設定視窗（`Cmd+,` / `Ctrl+,`）調整並自動儲存於 `~/Library/Application Support/io.kalamos.app/settings.json`（Windows 為 `%APPDATA%\io.kalamos.app\settings.json`）；基於安全考量，圖床上傳指令（`uploadCommand`、`uploadArgs`）仍需直接編輯該檔案。
 - **Pandoc 為外部選用相依**：多格式匯出（`EX-02`）與匯入（`EX-03`）需自行安裝 Pandoc（匯入需 2.15 以上以支援 `--sandbox`）。
-- **未簽章建置**：macOS `.dmg` 首次啟動時需手動通過 Gatekeeper 驗證；Windows 建置目前未簽章，執行時會觸發 SmartScreen 警告。
+- **未公證／未簽章建置**：macOS `.dmg` 尚未經過 Apple 公證，首次開啟時請對 App 按右鍵選「打開」；Windows 版目前為實驗性且未簽章，執行時會觸發 SmartScreen 警告（請點「其他資訊」→「仍要執行」）。
 - **iPic 預設整合**：尚未內建 macOS iPic 預設設定；任何符合 stdout 網址輸出規則的命令列上傳工具皆可作為 `uploadCommand` 使用。
 - **刻意不納入的範疇**：不設帳號、不內建雲端同步（請搭配 iCloud / Dropbox 本機資料夾）、不做多人協作、外掛市集或內建 AI 寫作輔助。
 

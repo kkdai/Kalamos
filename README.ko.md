@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>Write, and it appears. ／ 쓰는 순간, 그대로 문서가 됩니다.</strong><br />
-  Tauri 2와 CodeMirror 6으로 만든 macOS용 Typora 스타일 WYSIWYM 실시간 미리보기 Markdown 에디터.<br />
+  Tauri 2와 CodeMirror 6으로 만든 macOS 및 Windows용 Typora 스타일 WYSIWYM 실시간 미리보기 Markdown 에디터.<br />
   무료, 완전 오프라인, 계정 불필요, 텔레메트리 없음.
 </p>
 
@@ -64,7 +64,7 @@
 - **커스텀 CLI 업로더**(`IM-05`): `Cmd+Opt+U`(또는 `uploadOnInsert` 옵션)로 PicGo CLI 같은 외부 명령을 실행해 로컬 이미지를 업로드하고 원격 URL로 자동 치환합니다. 보안을 위해 업로드 명령은 `settings.json`에서만 설정할 수 있습니다. 자세한 내용은 [docs/image-upload.md](docs/image-upload.md)를 참고하세요.
 
 ### 내보내기 및 가져오기
-- **네이티브 PDF 내보내기**(`EX-01`, `Cmd+Shift+E`): JavaScript가 비활성화된 숨김 `WKWebView`와 `NSPrintOperation`으로 A4 페이지네이션을 수행하고, `PDFKit`으로 제목 계층에 맞춘 중첩 PDF 북마크(개요)를 자동 생성합니다. 렌더링된 수식과 다이어그램도 그대로 포함됩니다.
+- **네이티브 PDF 내보내기**(`EX-01`, `Cmd+Shift+E`): A4 페이지네이션과 제목 계층에 맞춘 중첩 PDF 북마크(개요)를 자동 생성하며, 렌더링된 수식과 다이어그램도 그대로 포함합니다(macOS는 `WKWebView`·`NSPrintOperation`·`PDFKit`, Windows는 헤드리스 Microsoft Edge 또는 Google Chrome 사용).
 - **Pandoc 내보내기**(`EX-02`, `Cmd+Opt+E`): **DOCX**, **ODT**(OpenOffice / LibreOffice), **LaTeX**, **MediaWiki**, **EPUB** 형식으로 내보낼 수 있습니다(Pandoc 별도 설치 필요). `[TOC]`, 로컬 이미지 경로, `<img>` 크기 속성을 자동으로 변환합니다.
 - **Pandoc 가져오기**(`EX-03`, `Cmd+Opt+I`): **DOCX**, **ODT**, **EPUB**, **LaTeX**, **HTML**, **MediaWiki** 문서를 `$...$` / `$$...$$` 수식과 추출된 미디어가 포함된 깔끔한 GFM Markdown으로 가져옵니다(`--sandbox` 사용을 위해 Pandoc 2.15 이상 필요).
 
@@ -74,7 +74,7 @@
 
 ### 테마 시스템
 - **기본 제공 테마**(`TH-01`): **Papyros**(따뜻한 파피루스 라이트), **Melan**(먹색 다크), 시스템 자동 전환(`prefers-color-scheme`)을 지원하며 오픈소스 서체(`Source Serif 4`, `Noto Serif TC`, `Inter`, `Noto Sans TC`, `JetBrains Mono`)를 내장했습니다.
-- **커스텀 CSS 테마**: `~/Library/Application Support/io.kalamos.app/themes/`에 `.css` 파일을 추가해 `--k-*` 변수, 글꼴 크기, 양쪽 정렬, 자동 제목 번호 등을 자유롭게 꾸밀 수 있습니다. 테마 메뉴 또는 `Cmd+Shift+T`로 전환합니다. 자세한 내용은 [docs/themes.md](docs/themes.md)를 참고하세요.
+- **커스텀 CSS 테마**: `~/Library/Application Support/io.kalamos.app/themes/`(macOS) 또는 `%APPDATA%\io.kalamos.app\themes\`(Windows)에 `.css` 파일을 추가해 `--k-*` 변수, 글꼴 크기, 양쪽 정렬, 자동 제목 번호 등을 자유롭게 꾸밀 수 있습니다. 테마 메뉴 또는 `Cmd+Shift+T`로 전환합니다. 자세한 내용은 [docs/themes.md](docs/themes.md)를 참고하세요.
 
 <p align="center">
   <img src="site/assets/screenshots/dark-theme-melan.png" alt="Kalamos Melan 다크 테마 화면" width="760" />
@@ -122,13 +122,26 @@
 | | Pandoc 내보내기(DOCX/ODT/LaTeX/Wiki/EPUB) | `Cmd+Opt+E` |
 | | Pandoc 가져오기 | `Cmd+Opt+I` |
 
+> **Windows 단축키**: 위 표의 모든 `Cmd`는 `Ctrl`로, `Opt`는 `Alt`로 대응됩니다(예: `Cmd+Opt+T` → `Ctrl+Alt+T`).
+
 ---
 
-## 설치 방법 (macOS)
+## 시스템 요구사항
 
-1. [GitHub Releases](https://github.com/kkdai/Kalamos/releases)에서 최신 `.dmg` 파일을 다운로드합니다.
+- **macOS**: Apple Silicon(`aarch64`, M1 / M2 / M3 / M4) 또는 Intel(`x64`).
+- **Windows (실험적)**: **Windows 10 / 11 (x64)** 및 **Microsoft Edge WebView2 런타임**(Windows 11에 기본 탑재되며, Windows 10에서 미설치된 경우 `.exe` / `.msi` 설치 프로그램에 포함된 부트스트래퍼가 자동으로 다운로드·설치합니다). 북마크 포함 A4 PDF 내보내기에는 **Microsoft Edge**(또는 대체로 Google Chrome)를 사용합니다.
+- **선택 사항**: DOCX / ODT / LaTeX / MediaWiki / EPUB 내보내기·가져오기에는 **Pandoc**이 필요합니다(가져오기는 2.15 이상).
+
+## 설치 방법
+
+### macOS (Apple Silicon / Intel)
+
+1. [GitHub Releases](https://github.com/kkdai/Kalamos/releases/latest)에서 사용하는 Mac에 맞는 `.dmg` 파일을 다운로드합니다:
+   - **Apple Silicon (M1 / M2 / M3 / M4)**: `Kalamos_<버전>_aarch64.dmg`
+   - **Intel Mac**: `Kalamos_<버전>_x64.dmg`
+   - *(선택)* `SHA256SUMS.txt`로 SHA-256 체크섬을 검증할 수 있습니다.
 2. `.dmg`를 열고 **Kalamos.app**을 `/Applications` 폴더로 드래그합니다.
-3. **서명되지 않은 앱 열기**: 현재 릴리스 빌드는 Apple 공증(Notarization)이 적용되어 있지 않아 최초 실행 시 macOS Gatekeeper가 차단할 수 있습니다. 아래 방법 중 하나로 열어 주세요:
+3. **공증되지 않은 앱 열기**: 현재 릴리스 빌드는 ad-hoc 서명만 적용되어 있으며 Apple 공증(Notarization)이 완료되지 않아 최초 실행 시 macOS Gatekeeper가 차단할 수 있습니다. 아래 방법 중 하나로 열어 주세요:
    - **방법 A (Finder)**: **Kalamos.app**을 우클릭(또는 Control+클릭) → **열기** → 확인 창에서 **열기** 선택(또는 **시스템 설정 → 개인정보 보호 및 보안**에서 **확인 없이 열기** 클릭).
    - **방법 B (터미널)**: 격리 속성을 제거합니다:
      ```bash
@@ -136,17 +149,33 @@
      ```
 4. **.md 기본 앱으로 설정**: Finder에서 아무 `.md` 파일을 선택 → **정보 가져오기**(⌘I) → **다음으로 열기**에서 **Kalamos** 선택 → **모두 변경…**. 이후 `.md` 더블클릭, Dock 아이콘에 드롭, `open -a Kalamos 파일.md`로 Kalamos에서 열립니다.
 
+### Windows (x64 — 실험적)
+
+> **실험적 · 미서명**: Windows 버전은 현재 **실험적**이며 **코드 서명이 되어 있지 않습니다**. 설치 프로그램을 실행할 때 Windows Defender SmartScreen 경고가 표시되면 **추가 정보** → **실행**을 클릭하세요.
+
+1. [GitHub Releases](https://github.com/kkdai/Kalamos/releases/latest)에서 Windows 설치 파일을 다운로드합니다:
+   - **NSIS 설치 프로그램(권장, 관리자 권한 불필요)**: `Kalamos_<버전>_x64-setup.exe`
+   - **MSI 설치 프로그램**: `Kalamos_<버전>_x64_en-US.msi`
+   - *(선택)* `SHA256SUMS.txt`로 SHA-256 체크섬을 검증할 수 있습니다.
+2. 설치 프로그램을 실행합니다. Windows Defender SmartScreen 경고가 나타나면 **추가 정보** → **실행**을 클릭하세요.
+3. **WebView2 및 PDF 내보내기**: Windows 11에는 **WebView2**와 **Microsoft Edge**가 기본 포함되어 있습니다. 일부 Windows 10 환경(LTSC 또는 구버전 등)에 WebView2가 없는 경우 `.exe` / `.msi` 설치 프로그램에 포함된 부트스트래퍼가 자동으로 설치합니다. 북마크 포함 헤드리스 A4 PDF 내보내기에는 Microsoft Edge(또는 Google Chrome)를 사용합니다.
+4. **파일 연결**: 설치 프로그램이 `.md`, `.markdown`, `.mdown`, `.mkd`, `.mkdn`, `.mdwn`, `.mdtxt` 확장자를 자동 연결합니다. 파일 탐색기에서 더블클릭하거나 **Kalamos로 열기**를 선택하면 실행 중인 창에서 열립니다.
+5. **설정 및 커스텀 테마**: `%APPDATA%\io.kalamos.app\`(`settings.json`, `themes\*.css`)에 저장됩니다.
+
 ---
 
 ## 소스에서 빌드하기
 
 ### 사전 요구사항
-- **macOS** 및 Xcode Command Line Tools (`xcode-select --install`)
+- **macOS**(Xcode Command Line Tools: `xcode-select --install`) 또는 **Windows 10/11 (x64)**(Visual Studio 2022 C++ Build Tools 및 WebView2)
 - **Node.js** 22 이상 및 npm
 - **Rust** stable 툴체인 (`rustup`)
 - **Pandoc** *(선택)* — DOCX / ODT / LaTeX / MediaWiki / EPUB 내보내기·가져오기 사용 시에만 필요(가져오기는 2.15 이상 필요):
   ```bash
+  # macOS
   brew install pandoc
+  # Windows
+  winget install JohnMacFarlane.Pandoc
   ```
 
 ### 빌드 명령어
@@ -155,7 +184,7 @@ npm ci
 npm run tauri build
 ```
 
-생성된 `.app` 및 `.dmg` 번들은 `src-tauri/target/release/bundle/` 경로에 저장됩니다.
+생성된 설치 파일은 `src-tauri/target/release/bundle/` 경로에 저장됩니다(macOS는 `.app` / `.dmg`, Windows는 `msi/*.msi` 및 `nsis/*-setup.exe`, 단일 실행 파일은 `src-tauri/target/release/kalamos.exe`).
 
 ---
 
@@ -189,10 +218,10 @@ npm run bench
 
 ## 알려진 제한사항
 
-- **macOS 전용**: 네이티브 PDF 내보내기가 macOS의 `WKWebView`, `NSPrintOperation`, `PDFKit`에 의존하므로 Windows / Linux 패키징은 아직 지원하지 않습니다.
-- **GUI 환경설정 창 미지원**: 대부분의 옵션은 단축키로 전환하며 `~/Library/Application Support/io.kalamos.app/settings.json`에 자동 저장되지만, 이미지 업로더 설정(`uploadCommand`, `uploadArgs`, `uploadOnInsert`)은 해당 파일을 직접 편집해야 합니다.
+- **플랫폼 지원(macOS 및 실험적 Windows)**: macOS는 `WKWebView`, `NSPrintOperation`, `PDFKit`으로 북마크 포함 PDF를 내보내며, Windows는 헤드리스 Microsoft Edge(또는 Google Chrome)로 A4 페이지네이션과 `<h1>`–`<h6>` 기반 PDF 북마크 개요를 생성합니다.
+- **환경설정 및 CLI 업로더 설정**: 일반·에디터·테마·이미지 설정은 환경설정 창(`Cmd+,` / `Ctrl+,`)에서 변경할 수 있으며 `~/Library/Application Support/io.kalamos.app/settings.json`(Windows는 `%APPDATA%\io.kalamos.app\settings.json`)에 저장됩니다. 보안을 위해 CLI 이미지 업로더 설정(`uploadCommand`, `uploadArgs`)은 `settings.json`을 직접 편집해야 합니다.
 - **Pandoc 별도 설치 필요**: 다중 형식 내보내기(`EX-02`) 및 가져오기(`EX-03`)는 Pandoc을 따로 설치해야 합니다(샌드박스 가져오기는 2.15 이상).
-- **미서명 macOS 빌드**: 배포된 `.dmg`는 최초 실행 시 macOS Gatekeeper 승인이 필요합니다.
+- **미공증 · 미서명 빌드**: 배포된 macOS `.dmg`는 Apple 공증이 없어 최초 실행 시 우클릭 → **열기**로 허용해야 합니다. Windows 빌드는 실험적이며 미서명 상태이므로 SmartScreen 경고가 표시됩니다(**추가 정보** → **실행**).
 - **iPic 프리셋 미내장**: macOS iPic 기본 프리셋은 없으며, 표준 출력으로 URL을 반환하는 모든 CLI 업로더를 `uploadCommand`로 연결할 수 있습니다.
 - **설계상 제외된 항목**: 계정 시스템, 자체 클라우드 동기화(iCloud / Dropbox 로컬 폴더 활용), 실시간 공동 편집, 플러그인 마켓, 내장 AI 도우미는 포함하지 않습니다.
 
