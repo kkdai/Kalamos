@@ -1,4 +1,4 @@
-import { expect, type Page } from "@playwright/test";
+import { expect, type Browser, type BrowserContext, type Page } from "@playwright/test";
 
 /**
  * Shared helpers for the Kalamos e2e suite.
@@ -9,6 +9,50 @@ import { expect, type Page } from "@playwright/test";
  */
 
 export const MOD = "ControlOrMeta";
+
+const PLATFORM_PROFILES = {
+  macos: {
+    userAgent:
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)",
+    platform: "MacIntel",
+    uaDataPlatform: "macOS",
+  },
+  windows: {
+    userAgent:
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    platform: "Win32",
+    uaDataPlatform: "Windows",
+  },
+} as const;
+
+/**
+ * Creates a BrowserContext that consistently simulates macOS or Windows across
+ * every source platform detection may read (userAgent, navigator.platform,
+ * navigator.userAgentData), regardless of the host OS running Playwright.
+ */
+export async function newPlatformContext(
+  browser: Browser,
+  target: keyof typeof PLATFORM_PROFILES,
+): Promise<BrowserContext> {
+  const profile = PLATFORM_PROFILES[target];
+  const ctx = await browser.newContext({ userAgent: profile.userAgent });
+  await ctx.addInitScript(({ platform, uaDataPlatform }) => {
+    Object.defineProperty(navigator, "platform", {
+      configurable: true,
+      get: () => platform,
+    });
+    Object.defineProperty(navigator, "userAgentData", {
+      configurable: true,
+      get: () => ({
+        brands: [],
+        mobile: false,
+        platform: uaDataPlatform,
+        getHighEntropyValues: async () => ({ platform: uaDataPlatform }),
+      }),
+    });
+  }, profile);
+  return ctx;
+}
 
 export async function boot(page: Page): Promise<void> {
   await page.goto("/");

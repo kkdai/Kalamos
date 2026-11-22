@@ -1,13 +1,15 @@
 import menuSpec from "./menu-spec.json";
+import { PLATFORM } from "../platform";
 
 /**
- * #74: runs native menu actions through the same handlers as the keyboard
+ * #74 / #89: runs native menu actions through the same handlers as the keyboard
  * shortcuts, and makes sure one key press runs a command once.
  *
- * WKWebView offers a key equivalent to the page first; the menu only gets it
- * when the page did not call preventDefault. Depending on the WebKit build
- * (and on whether a menu accelerator wins), a shortcut can therefore reach
- * the app as a keydown, as a menu event, or — in theory — both. The guard:
+ * WKWebView (and WebView2 on Windows) offers a key equivalent to the page
+ * first; the menu only gets it when the page did not call preventDefault.
+ * Depending on the WebView build (and on whether a menu accelerator wins), a
+ * shortcut can therefore reach the app as a keydown, as a menu event, or — in
+ * theory — both. The guard:
  *  - a menu event whose accelerator matches the last keydown, which the page
  *    already handled (defaultPrevented) moments ago, is dropped;
  *  - a keydown matching the accelerator of a menu action that just ran is
@@ -15,14 +17,97 @@ import menuSpec from "./menu-spec.json";
  * Each guard consumes its record, so key repeat cannot chain them.
  */
 
+export type MenuPlatform = "macos" | "windows" | "linux";
+
 export type MenuNode =
-  | { type: "submenu"; label: string; role?: "app" | "window" | "help"; items: MenuNode[] }
-  | { type: "themes"; label: string; items: MenuNode[] }
-  | { type: "action"; id: string; label: string; accel?: string; check?: boolean }
-  | { type: "predefined"; item: string; label?: string }
-  | { type: "link"; id: string; label: string; url: string };
+  | {
+      type: "submenu";
+      label: string;
+      role?: "app" | "window" | "help";
+      platforms?: MenuPlatform[];
+      items: MenuNode[];
+    }
+  | { type: "themes"; label: string; platforms?: MenuPlatform[]; items: MenuNode[] }
+  | {
+      type: "action";
+      id: string;
+      label: string;
+      accel?: string;
+      check?: boolean;
+      platforms?: MenuPlatform[];
+    }
+  | { type: "predefined"; item: string; label?: string; platforms?: MenuPlatform[] }
+  | { type: "link"; id: string; label: string; url: string; platforms?: MenuPlatform[] };
 
 export const MENU_SPEC = menuSpec as MenuNode[];
+
+export function currentMenuPlatform(): MenuPlatform {
+  if (PLATFORM === "windows") return "windows";
+  if (PLATFORM === "linux") return "linux";
+  return "macos";
+}
+
+/** Filters `spec` to the items that belong on `platform` (matches Rust `filter_menu_spec`). */
+export function filterMenuSpec(spec: MenuNode[], platform: MenuPlatform): MenuNode[] {
+  const out: MenuNode[] = [];
+  for (const node of spec) {
+    if (node.platforms && !node.platforms.includes(platform)) continue;
+    if (node.type === "submenu") {
+      out.push({ ...node, items: filterMenuSpec(node.items, platform) });
+    } else if (node.type === "themes") {
+      out.push({ ...node, items: filterMenuSpec(node.items, platform) });
+    } else {
+      out.push(node);
+    }
+  }
+  return out;
+}
+
+export function menuSpecFor(platform: MenuPlatform = currentMenuPlatform()): MenuNode[] {
+  return filterMenuSpec(MENU_SPEC, platform);
+}
+
+/** Formats a Tauri accelerator ("CmdOrCtrl+Shift+S") for display on `platform`. */
+export function formatAccelerator(
+  accel: string,
+  platform: MenuPlatform = currentMenuPlatform(),
+): string {
+  const parts = accel.split("+").map((p) => p.trim());
+  const keyPart = parts.pop() ?? "";
+  const isMac = platform === "macos";
+  let ctrl = false;
+  let meta = false;
+  let alt = false;
+  let shift = false;
+  for (const raw of parts) {
+    const modifier = raw.toLowerCase();
+    if (modifier === "cmdorctrl" || modifier === "commandorcontrol") {
+      if (isMac) meta = true;
+      else ctrl = true;
+    } else if (modifier === "cmd" || modifier === "command" || modifier === "super" || modifier === "meta") {
+      meta = true;
+    } else if (modifier === "ctrl" || modifier === "control") {
+      ctrl = true;
+    } else if (modifier === "alt" || modifier === "option") {
+      alt = true;
+    } else if (modifier === "shift") {
+      shift = true;
+    }
+  }
+  if (isMac) {
+    const mods = `${ctrl ? "⌃" : ""}${alt ? "⌥" : ""}${shift ? "⇧" : ""}${meta ? "⌘" : ""}`;
+    const key = keyPart.toLowerCase() === "tab" ? "⇥" : keyPart;
+    return `${mods}${key}`;
+  }
+  const mods: string[] = [];
+  if (ctrl) mods.push("Ctrl");
+  if (meta) mods.push("Win");
+  if (alt) mods.push("Alt");
+  if (shift) mods.push("Shift");
+  const key = keyPart.toLowerCase() === "tab" ? "Tab" : keyPart;
+  return [...mods, key].join("+");
+}
+
 /** Generated per theme by the Rust side; carries the theme id as `arg`. */
 export const SET_THEME_ACTION = "view.setTheme";
 /** A menu event this soon after a handled keydown of the same shortcut is that key press. */
@@ -42,7 +127,7 @@ export interface MenuActionNode {
   check?: boolean;
 }
 
-export function menuActions(spec: MenuNode[] = MENU_SPEC): MenuActionNode[] {
+export function menuActions(spec: MenuNode[] = menuSpecFor()): MenuActionNode[] {
   const out: MenuActionNode[] = [];
   const walk = (nodes: MenuNode[]) => {
     for (const node of nodes) {
@@ -145,7 +230,7 @@ export function createMenuDispatcher(options: MenuDispatcherOptions): MenuDispat
   const { commands, target } = options;
   const now = options.now ?? (() => Date.now());
   const matchers = new Map<string, KeyMatcher>();
-  for (const node of menuActions(options.spec ?? MENU_SPEC)) {
+  for (const node of menuActions(options.spec ?? menuSpecFor())) {
     if (node.accel) matchers.set(node.id, parseAccelerator(node.accel));
   }
 

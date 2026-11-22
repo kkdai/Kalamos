@@ -15,7 +15,7 @@ import {
   type FolderSearchOptions,
   type FolderSearchResults,
 } from "../ipc";
-import { shortcutLabel } from "../platform";
+import { shortcutLabel, toNativePath } from "../platform";
 
 export const FOLDER_SEARCH_DEBOUNCE_MS = 250;
 
@@ -191,13 +191,13 @@ export function createFolderSearch(init: FolderSearchOptionsInit): FolderSearchV
       header.className = "k-folder-search-file";
       header.dataset.testid = "folder-search-file";
       header.setAttribute("aria-expanded", isCollapsed ? "false" : "true");
-      header.title = group.path;
+      header.title = toNativePath(group.path);
       const name = document.createElement("span");
       name.className = "k-folder-search-file-name";
       name.textContent = basename(group.path);
       const dir = document.createElement("span");
       dir.className = "k-folder-search-file-dir";
-      dir.textContent = relativeDir(root, group.path);
+      dir.textContent = toNativePath(relativeDir(root, group.path));
       const count = document.createElement("span");
       count.className = "k-folder-search-file-count";
       count.textContent = String(group.hits.length);

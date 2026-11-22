@@ -15,13 +15,14 @@
 function detectPlatform(): "mac" | "windows" | "linux" | "other" {
   if (typeof navigator === "undefined") return "other";
   const ua = navigator.userAgent || "";
-  if (/Windows NT|Win64|WOW64/i.test(ua)) return "windows";
+  const plat = navigator.platform || "";
+  if (/Windows NT|Win64|WOW64/i.test(ua) || /^Win/i.test(plat)) return "windows";
   if (/Macintosh|Mac OS X/i.test(ua)) return "mac";
   if (/Linux|X11/i.test(ua) && !/jsdom/i.test(ua)) return "linux";
   return "other";
 }
 
-const PLATFORM = detectPlatform();
+export const PLATFORM = detectPlatform();
 
 /** True inside the Windows app (WebView2). False under jsdom / vitest. */
 export const IS_WINDOWS = PLATFORM === "windows";
@@ -65,6 +66,14 @@ export function toNativePath(path: string | null): string | null;
 export function toNativePath(path: string | null | undefined): string | null | undefined;
 export function toNativePath(path: string | null | undefined): string | null | undefined {
   if (!path || !IS_WINDOWS) return path;
+  // Real Windows paths are drive ("C:/…"), UNC ("//srv/share/…"), or relative ("a/b").
+  // Leave single-leading-slash POSIX paths ("/Users/…", "/tmp/…") untouched.
+  if (path.startsWith("/") && !path.startsWith("//")) return path;
+  return slashToWindows(path);
+}
+
+/** Pure conversion (exported for tests). */
+export function slashToWindows(path: string): string {
   return path.replace(/\//g, "\\");
 }
 
@@ -100,21 +109,21 @@ export function isDrivePath(path: string): boolean {
  * Rewrites a macOS-style shortcut label for the current platform:
  * `⌥⇧⌘←` → `Ctrl+Alt+Shift+←`, `Cmd+Opt+T` → `Ctrl+Alt+T`.
  */
-export function shortcutLabel(label: string): string {
-  return USES_CTRL ? toCtrlLabel(label) : label;
+export function shortcutLabel(label: string, usesCtrl: boolean = USES_CTRL): string {
+  return usesCtrl ? toCtrlLabel(label) : label;
 }
 
 /** Pure conversion (exported for tests). */
 export function toCtrlLabel(label: string): string {
   let out = label.replace(/\bCmd\+/g, "Ctrl+").replace(/\bOpt\+/g, "Alt+");
-  // Symbol runs such as ⌥⇧⌘G / ⇧⌘⌫: Ctrl, Alt, Shift order.
-  out = out.replace(/[⌘⌥⇧⌃]+(⌫|Enter|←|→|↑|↓|[A-Za-z0-9/])/g, (run: string, key: string) => {
+  // Symbol runs such as ⌥⇧⌘G / ⇧⌘⌫ / ⌃⇥: Ctrl, Alt, Shift order.
+  out = out.replace(/[⌘⌥⇧⌃]+(⌫|⇥|Enter|←|→|↑|↓|[A-Za-z0-9/,`[\]=-])/g, (run: string, key: string) => {
     const mods = run.slice(0, run.length - key.length);
     const parts: string[] = [];
     if (mods.includes("⌘") || mods.includes("⌃")) parts.push("Ctrl");
     if (mods.includes("⌥")) parts.push("Alt");
     if (mods.includes("⇧")) parts.push("Shift");
-    const k = key === "⌫" ? "Backspace" : key;
+    const k = key === "⌫" ? "Backspace" : key === "⇥" ? "Tab" : key;
     return [...parts, k].join("+");
   });
   return out;

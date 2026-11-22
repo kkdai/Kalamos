@@ -1,7 +1,7 @@
 import "./preferences.css";
 
 import type { StartupBehavior } from "../ipc";
-import { shortcutLabel } from "../platform";
+import { IS_WINDOWS, shortcutLabel, toNativePath } from "../platform";
 
 /**
  * #74 偏好設定 (Cmd+,): an in-app modal. Every control applies its change at
@@ -193,7 +193,11 @@ export function createPreferences(
       select.value = v.startupBehavior;
     });
     panel.append(
-      row("啟動時", select, "從 Finder 開啟的檔案不受影響。"),
+      row(
+        "啟動時",
+        select,
+        IS_WINDOWS ? "從檔案總管開啟的檔案不受影響。" : "從 Finder 開啟的檔案不受影響。",
+      ),
       row(
         "自動儲存",
         checkbox("autoSave", "停止輸入 1 秒後自動儲存已命名的文件", "pref-auto-save"),
@@ -281,7 +285,7 @@ export function createPreferences(
       void host.clearImageRootDir().then(sync);
     });
     syncers.push((v) => {
-      rootPath.textContent = v.imageRootDir ?? "未設定";
+      rootPath.textContent = v.imageRootDir ? toNativePath(v.imageRootDir) : "未設定";
       rootPath.dataset.empty = v.imageRootDir ? "false" : "true";
       clear.disabled = !v.imageRootDir;
     });

@@ -354,13 +354,12 @@ export function createFileKeymap(handlers: FileCommandHandlers): KeyBinding[] {
     ...[0, 1, 2, 3, 4, 5, 6].map(
       (level): KeyBinding => ({
         key: `Mod-${level}`,
-        preventDefault: true,
-        run: (view) => setHeadingLevel(view, level),
+        run: unshifted((view) => setHeadingLevel(view, level)),
       }),
     ),
-    { key: "Mod-Alt-c", preventDefault: true, run: (view) => insertCodeBlock(view) },
-    { key: "Mod-Alt-b", preventDefault: true, run: (view) => insertMathBlock(view) },
-    { key: "Mod-Alt-q", preventDefault: true, run: (view) => toggleBlockquote(view) },
+    { key: "Mod-Alt-c", run: unshifted((view) => insertCodeBlock(view)) },
+    { key: "Mod-Alt-b", run: unshifted((view) => insertMathBlock(view)) },
+    { key: "Mod-Alt-q", run: unshifted((view) => toggleBlockquote(view)) },
     { key: "Mod-Shift-d", preventDefault: true, run: (view) => toggleStrikethrough(view) },
     {
       key: "Mod-Alt-l",
@@ -412,6 +411,14 @@ export function createFileKeymap(handlers: FileCommandHandlers): KeyBinding[] {
   ];
 }
 
+function isFormField(target: EventTarget | null): boolean {
+  return (
+    target instanceof HTMLInputElement ||
+    target instanceof HTMLTextAreaElement ||
+    target instanceof HTMLSelectElement
+  );
+}
+
 export function bindWindowShortcuts(
   target: Window | Document | HTMLElement,
   handlers: FileCommandHandlers,
@@ -431,17 +438,18 @@ export function bindWindowShortcuts(
       void handlers.onToggleTypewriterMode?.();
       return;
     }
-    if (!(event.metaKey || event.ctrlKey)) return;
+    if (!(event.metaKey || event.ctrlKey) || (event.metaKey && event.ctrlKey)) return;
+
+    const editingView = isFormField(event.target) ? null : (getView?.() ?? null);
 
     if (
       event.altKey &&
       !event.shiftKey &&
       (event.key.toLowerCase() === "t" || event.code === "KeyT")
     ) {
-      const view = getView?.();
-      if (view) {
+      if (editingView) {
         event.preventDefault();
-        void openInsertTableDialog(view);
+        void openInsertTableDialog(editingView);
       }
       return;
     }
@@ -461,12 +469,24 @@ export function bindWindowShortcuts(
       } else if (key === "n" || event.code === "KeyN") {
         event.preventDefault();
         void handlers.onToggleMathAutoNumber?.();
+      } else if (editingView && event.code === "KeyC") {
+        event.preventDefault();
+        insertCodeBlock(editingView);
+      } else if (editingView && event.code === "KeyB") {
+        event.preventDefault();
+        insertMathBlock(editingView);
+      } else if (editingView && event.code === "KeyQ") {
+        event.preventDefault();
+        toggleBlockquote(editingView);
       }
       return;
     }
 
     if (event.altKey) return;
-    if (key === "o" && !event.shiftKey) {
+    if (!event.shiftKey && editingView && /^Digit[0-6]$/.test(event.code)) {
+      event.preventDefault();
+      setHeadingLevel(editingView, Number(event.code.slice(5)));
+    } else if (key === "o" && !event.shiftKey) {
       event.preventDefault();
       void handlers.onOpenFile();
     } else if (key === "s" && !event.shiftKey) {
@@ -482,59 +502,56 @@ export function bindWindowShortcuts(
       event.preventDefault();
       void handlers.onToggleSourceMode?.();
     } else if (key === "b" && !event.shiftKey) {
-      const view = getView?.();
-      if (view) {
+      if (editingView) {
         event.preventDefault();
-        toggleStrong(view);
+        toggleStrong(editingView);
       }
     } else if (key === "i" && !event.shiftKey) {
-      const view = getView?.();
-      if (view) {
+      if (editingView) {
         event.preventDefault();
-        toggleEmphasis(view);
+        toggleEmphasis(editingView);
       }
     } else if (
       event.shiftKey &&
       (event.key === "`" || event.key === "~" || event.code === "Backquote")
     ) {
-      const view = getView?.();
-      if (view) {
+      if (editingView) {
         event.preventDefault();
-        toggleInlineCode(view);
+        toggleInlineCode(editingView);
+      }
+    } else if (event.shiftKey && (event.code === "KeyD" || key === "d")) {
+      if (editingView) {
+        event.preventDefault();
+        toggleStrikethrough(editingView);
       }
     } else if (key === "k" && !event.shiftKey) {
-      const view = getView?.();
-      if (view) {
+      if (editingView) {
         event.preventDefault();
-        toggleLink(view);
+        toggleLink(editingView);
       }
     } else if (
       event.shiftKey &&
       (event.key === "[" || event.key === "{" || event.code === "BracketLeft")
     ) {
-      const view = getView?.();
-      if (view) {
+      if (editingView) {
         event.preventDefault();
-        toggleOrderedList(view);
+        toggleOrderedList(editingView);
       }
     } else if (
       event.shiftKey &&
       (event.key === "]" || event.key === "}" || event.code === "BracketRight")
     ) {
-      const view = getView?.();
-      if (view) {
+      if (editingView) {
         event.preventDefault();
-        toggleBulletList(view);
+        toggleBulletList(editingView);
       }
     } else if (key === "x" && event.shiftKey) {
-      const view = getView?.();
-      if (view) {
+      if (editingView) {
         event.preventDefault();
-        toggleTaskList(view);
+        toggleTaskList(editingView);
       }
     } else if (key === "c" && event.shiftKey) {
-      const view = getView?.();
-      if (view && copyHeadingBookmark(view) !== null) {
+      if (editingView && copyHeadingBookmark(editingView) !== null) {
         event.preventDefault();
       }
     }

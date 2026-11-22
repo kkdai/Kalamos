@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { boot, getDoc } from "./helpers";
+import { boot, getDoc, newPlatformContext } from "./helpers";
 
 /** #88 (S4): drag-and-drop dispatch for Markdown files, Pandoc-importable files, and mixed images + Markdown. */
 
@@ -80,9 +80,7 @@ test("#88 drop: mixed image + Markdown inserts image in current doc and opens Ma
 
 test("#88 UI: top-left floating quick buttons show only on Windows and Preferences use Ctrl/Alt labels", async ({ browser }) => {
   // macOS: no top-left floating quick buttons (actions live in the native menu bar).
-  const macCtx = await browser.newContext({
-    userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)",
-  });
+  const macCtx = await newPlatformContext(browser, "macos");
   try {
     const macPage = await macCtx.newPage();
     await boot(macPage);
@@ -93,10 +91,7 @@ test("#88 UI: top-left floating quick buttons show only on Windows and Preferenc
   }
 
   // Windows: top-left quick buttons are rendered and Preferences rewrite Cmd/Opt to Ctrl/Alt.
-  const winCtx = await browser.newContext({
-    userAgent:
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-  });
+  const winCtx = await newPlatformContext(browser, "windows");
   try {
     const winPage = await winCtx.newPage();
     await boot(winPage);
@@ -113,15 +108,9 @@ test("#88 UI: top-left floating quick buttons show only on Windows and Preferenc
 });
 
 test("#88 Windows shortcuts: Control+Shift+o opens folder even with lowercase key (Caps Lock / synthetic)", async ({ browser }) => {
-  const winCtx = await browser.newContext({
-    userAgent:
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-  });
+  const winCtx = await newPlatformContext(browser, "windows");
   try {
     const winPage = await winCtx.newPage();
-    await winPage.addInitScript(() => {
-      Object.defineProperty(navigator, "platform", { get: () => "Win32" });
-    });
     await boot(winPage);
     await runWithApp(
       winPage,

@@ -40,7 +40,7 @@ body {
 }
 
 .k-export {
-  font-family: "Source Serif 4", "Songti TC", "Noto Serif TC", Georgia, serif;
+  font-family: "Source Serif 4", "Songti TC", "Noto Serif TC", Georgia, "Microsoft JhengHei UI", "Microsoft JhengHei", serif;
   font-size: 11pt;
   line-height: 1.7;
   word-wrap: break-word;
@@ -53,7 +53,7 @@ h3,
 h4,
 h5,
 h6 {
-  font-family: Inter, "PingFang TC", "Noto Sans TC", "Helvetica Neue", sans-serif;
+  font-family: Inter, "PingFang TC", "Noto Sans TC", "Segoe UI", "Microsoft JhengHei UI", "Microsoft JhengHei", "Helvetica Neue", sans-serif;
   line-height: 1.35;
   margin: 1.4em 0 0.5em;
   break-after: avoid;
@@ -108,7 +108,7 @@ li.k-task { list-style: none; margin-left: -1.3em; }
 
 code,
 pre {
-  font-family: "JetBrains Mono", Menlo, "SF Mono", monospace;
+  font-family: "JetBrains Mono", "Cascadia Mono", "Cascadia Code", Consolas, Menlo, "SF Mono", monospace;
   font-size: 9pt;
 }
 

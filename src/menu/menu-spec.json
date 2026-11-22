@@ -3,6 +3,7 @@
     "type": "submenu",
     "label": "Kalamos",
     "role": "app",
+    "platforms": ["macos"],
     "items": [
       { "type": "predefined", "item": "about", "label": "關於 Kalamos" },
       { "type": "predefined", "item": "separator" },
@@ -39,7 +40,11 @@
       },
       { "type": "action", "id": "file.import", "label": "匯入…", "accel": "CmdOrCtrl+Alt+I" },
       { "type": "predefined", "item": "separator" },
-      { "type": "action", "id": "file.closeTab", "label": "關閉分頁", "accel": "CmdOrCtrl+W" }
+      { "type": "action", "id": "file.closeTab", "label": "關閉分頁", "accel": "CmdOrCtrl+W" },
+      { "type": "predefined", "item": "separator", "platforms": ["windows", "linux"] },
+      { "type": "action", "id": "app.preferences", "label": "偏好設定…", "accel": "CmdOrCtrl+,", "platforms": ["windows", "linux"] },
+      { "type": "predefined", "item": "separator", "platforms": ["windows", "linux"] },
+      { "type": "action", "id": "app.quit", "label": "結束 Kalamos", "accel": "CmdOrCtrl+Q", "platforms": ["windows", "linux"] }
     ]
   },
   {
@@ -126,8 +131,8 @@
       { "type": "action", "id": "view.actualSize", "label": "實際大小", "accel": "CmdOrCtrl+Shift+0" },
       { "type": "action", "id": "view.zoomIn", "label": "放大", "accel": "CmdOrCtrl+Shift+=" },
       { "type": "action", "id": "view.zoomOut", "label": "縮小", "accel": "CmdOrCtrl+Shift+-" },
-      { "type": "predefined", "item": "separator" },
-      { "type": "predefined", "item": "fullscreen", "label": "進入全螢幕" }
+      { "type": "predefined", "item": "separator", "platforms": ["macos"] },
+      { "type": "predefined", "item": "fullscreen", "label": "進入全螢幕", "platforms": ["macos"] }
     ]
   },
   {
@@ -136,12 +141,13 @@
     "role": "window",
     "items": [
       { "type": "predefined", "item": "minimize", "label": "縮到最小" },
-      { "type": "predefined", "item": "maximize", "label": "縮放" },
+      { "type": "predefined", "item": "maximize", "label": "縮放", "platforms": ["macos"] },
+      { "type": "predefined", "item": "maximize", "label": "最大化", "platforms": ["windows", "linux"] },
       { "type": "predefined", "item": "separator" },
       { "type": "action", "id": "window.nextTab", "label": "顯示下一個分頁", "accel": "Ctrl+Tab" },
       { "type": "action", "id": "window.previousTab", "label": "顯示上一個分頁", "accel": "Ctrl+Shift+Tab" },
-      { "type": "predefined", "item": "separator" },
-      { "type": "predefined", "item": "bringAllToFront", "label": "將全部移至最前" }
+      { "type": "predefined", "item": "separator", "platforms": ["macos"] },
+      { "type": "predefined", "item": "bringAllToFront", "label": "將全部移至最前", "platforms": ["macos"] }
     ]
   },
   {
@@ -151,7 +157,9 @@
     "items": [
       { "type": "link", "id": "help.repo", "label": "Kalamos 產品頁（GitHub）", "url": "https://github.com/kkdai/Kalamos" },
       { "type": "link", "id": "help.releases", "label": "下載最新版本", "url": "https://github.com/kkdai/Kalamos/releases" },
-      { "type": "link", "id": "help.issues", "label": "回報問題", "url": "https://github.com/kkdai/Kalamos/issues" }
+      { "type": "link", "id": "help.issues", "label": "回報問題", "url": "https://github.com/kkdai/Kalamos/issues" },
+      { "type": "predefined", "item": "separator", "platforms": ["windows", "linux"] },
+      { "type": "predefined", "item": "about", "label": "關於 Kalamos", "platforms": ["windows", "linux"] }
     ]
   }
 ]

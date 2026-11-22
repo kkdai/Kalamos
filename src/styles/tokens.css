@@ -4,10 +4,13 @@
  */
 
 :root {
-  /* Typography — Font stacks (PRD §12.4) */
-  --k-font-body: "Source Serif 4", "Noto Serif TC", serif;
-  --k-font-ui: Inter, "Noto Sans TC", sans-serif;
-  --k-font-mono: "JetBrains Mono", monospace;
+  /* Typography — Font stacks (PRD §12.4, #89 Windows Traditional Chinese / English fallbacks) */
+  --k-font-body: "Source Serif 4", "Noto Serif TC", Georgia, "Songti TC", "Microsoft JhengHei UI",
+    "Microsoft JhengHei", serif;
+  --k-font-ui: Inter, "Noto Sans TC", "Segoe UI", "Microsoft JhengHei UI", "Microsoft JhengHei",
+    -apple-system, BlinkMacSystemFont, sans-serif;
+  --k-font-mono: "JetBrains Mono", "Cascadia Mono", "Cascadia Code", Consolas, Menlo, "SF Mono",
+    monospace;
 
   /* Typography — Size & Rhythm (PRD §12.4) */
   --k-font-size: 17px;
