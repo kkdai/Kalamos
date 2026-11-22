@@ -61,6 +61,17 @@ describe("#81 tab naming", () => {
     ]);
     expect(labels.get("a")).toBe("note.md — a");
     expect(labels.get("b")).toBe("note.md — b");
+
+    // #89: Windows displays colliding multi-level parent folders with backslashes.
+    const nested = tabLabels(
+      [
+        { id: "a", path: "C:/x/docs/README.md", untitledNumber: 0 },
+        { id: "b", path: "C:/y/docs/README.md", untitledNumber: 0 },
+      ],
+      { separator: "\\" },
+    );
+    expect(nested.get("a")).toBe("README.md — x\\docs");
+    expect(nested.get("b")).toBe("README.md — y\\docs");
   });
 });
 

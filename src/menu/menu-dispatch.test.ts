@@ -2,11 +2,14 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createMenuDispatcher,
   DUPLICATE_WINDOW_MS,
+  formatAccelerator,
   MENU_THEN_KEY_WINDOW_MS,
   matchesKey,
   menuActions,
   MENU_SPEC,
+  menuSpecFor,
   parseAccelerator,
+  type MenuNode,
 } from "./menu-dispatch";
 
 function key(init: KeyboardEventInit): KeyboardEvent {
@@ -197,5 +200,94 @@ describe("#74 menu dispatcher", () => {
     dispatcher.destroy();
     target.dispatchEvent(key({ key: "F8", code: "F8" }));
     expect(page).toHaveBeenCalledTimes(1);
+  });
+});
+
+function collectPredefined(nodes: MenuNode[]): string[] {
+  const out: string[] = [];
+  for (const node of nodes) {
+    if (node.type === "predefined") out.push(node.item);
+    else if (node.type === "submenu" || node.type === "themes") out.push(...collectPredefined(node.items));
+  }
+  return out;
+}
+
+function assertCleanSeparators(nodes: MenuNode[]): void {
+  let prevSep = true;
+  for (const node of nodes) {
+    const isSep = node.type === "predefined" && node.item === "separator";
+    expect(isSep && prevSep).toBe(false);
+    prevSep = isSep;
+    if (node.type === "submenu" || node.type === "themes") {
+      assertCleanSeparators(node.items);
+    }
+  }
+  const last = nodes[nodes.length - 1];
+  expect(last?.type === "predefined" && last.item === "separator").toBe(false);
+}
+
+describe("#89 platform-aware menu spec & shortcut labels", () => {
+  it("produces distinct macOS and Windows menu layouts from menu-spec.json", () => {
+    const mac = menuSpecFor("macos");
+    const win = menuSpecFor("windows");
+
+    const topLabels = (nodes: MenuNode[]) =>
+      nodes.filter((n) => n.type === "submenu").map((n) => n.label);
+    expect(topLabels(mac)).toEqual(["Kalamos", "檔案", "編輯", "段落", "格式", "檢視", "視窗", "說明"]);
+    expect(topLabels(win)).toEqual(["檔案", "編輯", "段落", "格式", "檢視", "視窗", "說明"]);
+
+    assertCleanSeparators(mac);
+    assertCleanSeparators(win);
+
+    // Windows drops macOS-only predefined items.
+    const winPredefined = new Set(collectPredefined(win));
+    for (const macOnly of ["services", "hide", "hideOthers", "showAll", "fullscreen", "bringAllToFront"]) {
+      expect(winPredefined.has(macOnly), macOnly).toBe(false);
+    }
+    expect(winPredefined.has("about")).toBe(true);
+
+    // Windows puts Preferences and Quit in 檔案, and About in 說明.
+    const fileSub = win.find((n) => n.type === "submenu" && n.label === "檔案");
+    expect(fileSub?.type).toBe("submenu");
+    if (fileSub?.type === "submenu") {
+      expect(fileSub.items.some((n) => n.type === "action" && n.id === "app.preferences" && n.accel === "CmdOrCtrl+,")).toBe(true);
+      expect(fileSub.items.some((n) => n.type === "action" && n.id === "app.quit" && n.accel === "CmdOrCtrl+Q")).toBe(true);
+    }
+    const helpSub = win.find((n) => n.type === "submenu" && n.label === "說明");
+    expect(helpSub?.type).toBe("submenu");
+    if (helpSub?.type === "submenu") {
+      expect(helpSub.items.some((n) => n.type === "predefined" && n.item === "about")).toBe(true);
+    }
+
+    // Both platforms expose unique IDs & accelerators and the exact same action set.
+    for (const spec of [mac, win]) {
+      const actions = menuActions(spec);
+      expect(new Set(actions.map((a) => a.id)).size).toBe(actions.length);
+      const accels = actions.map((a) => a.accel?.toLowerCase()).filter(Boolean);
+      expect(new Set(accels).size).toBe(accels.length);
+    }
+    expect(menuActions(mac).map((a) => a.id).sort()).toEqual(menuActions(win).map((a) => a.id).sort());
+  });
+
+  it("formats Tauri accelerators per platform (⌘/⌥/⇧ on macOS, Ctrl/Alt/Shift on Windows)", () => {
+    expect(formatAccelerator("CmdOrCtrl+,", "macos")).toBe("⌘,");
+    expect(formatAccelerator("CmdOrCtrl+,", "windows")).toBe("Ctrl+,");
+    expect(formatAccelerator("CmdOrCtrl+Q", "macos")).toBe("⌘Q");
+    expect(formatAccelerator("CmdOrCtrl+Q", "windows")).toBe("Ctrl+Q");
+    expect(formatAccelerator("CmdOrCtrl+Alt+Q", "macos")).toBe("⌥⌘Q");
+    expect(formatAccelerator("CmdOrCtrl+Alt+Q", "windows")).toBe("Ctrl+Alt+Q");
+    expect(formatAccelerator("CmdOrCtrl+Shift+S", "macos")).toBe("⇧⌘S");
+    expect(formatAccelerator("CmdOrCtrl+Shift+S", "windows")).toBe("Ctrl+Shift+S");
+    expect(formatAccelerator("Ctrl+Tab", "macos")).toBe("⌃⇥");
+    expect(formatAccelerator("Ctrl+Tab", "windows")).toBe("Ctrl+Tab");
+    expect(formatAccelerator("F8", "macos")).toBe("F8");
+    expect(formatAccelerator("F8", "windows")).toBe("F8");
+
+    // Every accelerator in menu-spec.json formats cleanly without macOS symbols on Windows.
+    for (const action of menuActions(menuSpecFor("windows"))) {
+      if (!action.accel) continue;
+      const winText = formatAccelerator(action.accel, "windows");
+      expect(winText).not.toMatch(/[⌘⌥⇧⌃]/);
+    }
   });
 });

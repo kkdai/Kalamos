@@ -123,7 +123,7 @@ import {
   type Settings,
 } from "./ipc";
 import { isImportablePath } from "./export/pandoc";
-import { IS_WINDOWS, shortcutLabel } from "./platform";
+import { IS_WINDOWS, shortcutLabel, toNativePath } from "./platform";
 import { createSidebar, type SidebarController } from "./sidebar/sidebar";
 import { createTabBar, type TabBar } from "./tabs/tab-bar";
 import {
@@ -498,7 +498,7 @@ export function createKalamosApp(
       await insertPastedImages(files, view.state.selection.main.head);
     },
     onImageRootTooBroad: (root) => {
-      setStatus(`${IMAGE_ROOT_TOO_BROAD_PREFIX}${root}`, true);
+      setStatus(`${IMAGE_ROOT_TOO_BROAD_PREFIX}${toNativePath(root)}`, true);
     },
   });
 
@@ -554,7 +554,7 @@ export function createKalamosApp(
       tabs.map((tab) => ({
         id: tab.id,
         label: labels.get(tab.id) ?? "",
-        title: tab.path ?? labels.get(tab.id) ?? "",
+        title: tab.path ? toNativePath(tab.path) : (labels.get(tab.id) ?? ""),
         dirty: editor.isSessionDirty(tab.doc),
         active: tab === active,
       })),
@@ -767,7 +767,7 @@ export function createKalamosApp(
   const unbindShortcuts = bindWindowShortcuts(
     window,
     windowHandlers,
-    () => editor.view,
+    () => (preferences.isOpen() ? null : editor.view),
   );
 
   const sidebar = createSidebar({
@@ -1038,8 +1038,8 @@ export function createKalamosApp(
   };
   window.addEventListener("keydown", onPreferencesKeydown);
 
-  // Windows-only top-left floating quick controls (toggle sidebar + open Markdown file)
-  // until #89 adds a native Windows menu bar. macOS already exposes these in the menu bar.
+  // Windows-only top-left floating quick controls (toggle sidebar + open Markdown file).
+  // Kept on Windows alongside the native menu bar; macOS does not show these.
   let navWidgetEl: HTMLDivElement | null = null;
   if (options?.showQuickButtons ?? IS_WINDOWS) {
     navWidgetEl = document.createElement("div");
@@ -1071,9 +1071,67 @@ export function createKalamosApp(
     (editorContainer.parentElement ?? document.body).appendChild(navWidgetEl);
   }
 
+  // #89: fallback keydown handlers for menu accelerators (also deduplicated by
+  // menu-dispatch.ts on macOS and Windows so a press never runs twice).
+  const onMenuShortcutKeydown = (event: KeyboardEvent) => {
+    if (event.defaultPrevented) return;
+    // Windows Alt+F4: settle unsaved changes across all tabs before closing.
+    if (
+      IS_WINDOWS &&
+      event.altKey &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      !event.shiftKey &&
+      (event.key === "F4" || event.code === "F4")
+    ) {
+      event.preventDefault();
+      void quit();
+      return;
+    }
+    const mod = (event.metaKey || event.ctrlKey) && !(event.metaKey && event.ctrlKey);
+    if (!mod) return;
+    if (!event.altKey && !event.shiftKey && (event.code === "KeyQ" || event.key.toLowerCase() === "q")) {
+      event.preventDefault();
+      void quit();
+      return;
+    }
+    if (!event.altKey && event.shiftKey) {
+      if (event.code === "Digit1") {
+        event.preventDefault();
+        void toggleOutline();
+        return;
+      }
+      if (event.code === "Digit0") {
+        event.preventDefault();
+        setZoom(1);
+        return;
+      }
+      if (event.code === "Equal") {
+        event.preventDefault();
+        setZoom(nextZoomLevel(zoom, 1));
+        return;
+      }
+      if (event.code === "Minus") {
+        event.preventDefault();
+        setZoom(nextZoomLevel(zoom, -1));
+        return;
+      }
+    }
+    if (preferences.isOpen()) return;
+    if (event.code === "KeyF" && !event.shiftKey) {
+      event.preventDefault();
+      openFind(editor.view, { replace: event.altKey });
+    } else if (event.code === "KeyG" && !event.altKey) {
+      event.preventDefault();
+      if (event.shiftKey) findPreviousMatch(editor.view);
+      else findNextMatch(editor.view);
+    }
+  };
+  window.addEventListener("keydown", onMenuShortcutKeydown);
+
   const onSidebarKeydown = (event: KeyboardEvent) => {
     if (event.defaultPrevented) return;
-    if (!(event.metaKey || event.ctrlKey) || !event.shiftKey || event.altKey) {
+    if (!(event.metaKey || event.ctrlKey) || (event.metaKey && event.ctrlKey) || !event.shiftKey || event.altKey) {
       return;
     }
     const key = event.key.toLowerCase();
@@ -1100,7 +1158,10 @@ export function createKalamosApp(
   async function setImageRootDir(path: string | null): Promise<void> {
     const normalized = path && path.trim() ? path.trim() : null;
     editor.setImageRootDir(normalized);
-    setStatus(normalized ? `${IMAGE_ROOT_STATUS_PREFIX}${normalized}` : IMAGE_ROOT_CLEARED_MESSAGE, false);
+    setStatus(
+      normalized ? `${IMAGE_ROOT_STATUS_PREFIX}${toNativePath(normalized)}` : IMAGE_ROOT_CLEARED_MESSAGE,
+      false,
+    );
     await persistEditorSettingPatch({ imageRootDir: normalized });
     if (!normalized) return;
     try {
@@ -1108,7 +1169,7 @@ export function createKalamosApp(
     } catch (err) {
       // Kept as the setting (images show their fallback), but say why.
       if (isAssetDirTooBroadError(err)) {
-        setStatus(`${IMAGE_ROOT_TOO_BROAD_PREFIX}${normalized}`, true);
+        setStatus(`${IMAGE_ROOT_TOO_BROAD_PREFIX}${toNativePath(normalized)}`, true);
       }
     }
   }
@@ -1745,6 +1806,7 @@ export function createKalamosApp(
     menu.destroy();
     preferences.destroy();
     window.removeEventListener("keydown", onPreferencesKeydown);
+    window.removeEventListener("keydown", onMenuShortcutKeydown);
     clearInterval(recoveryInterval);
     unbindShortcuts();
     window.removeEventListener("keydown", onSidebarKeydown);

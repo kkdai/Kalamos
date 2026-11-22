@@ -15,15 +15,19 @@ import {
   isDrivePath,
   isMarkdownFilePath,
   pathRoot,
+  shortcutLabel,
+  slashToWindows,
   toCtrlLabel,
   windowsToSlash,
 } from "./platform";
 
 describe("platform (Windows & cross-platform helpers)", () => {
-  it("converts Windows paths (and \\\\?\\ verbatim paths) to forward slashes", () => {
+  it("converts Windows paths (and \\\\?\\ verbatim paths) to forward slashes and back", () => {
     expect(windowsToSlash("C:\\Docs\\kalamos-test\\notes\\a.md")).toBe("C:/Docs/kalamos-test/notes/a.md");
     expect(windowsToSlash("\\\\?\\C:\\Docs\\kalamos-test\\a.md")).toBe("C:/Docs/kalamos-test/a.md");
     expect(windowsToSlash("\\\\?\\UNC\\srv\\share\\a.md")).toBe("//srv/share/a.md");
+    expect(slashToWindows("C:/Docs/kalamos-test/notes/a.md")).toBe("C:\\Docs\\kalamos-test\\notes\\a.md");
+    expect(slashToWindows("guides/sub")).toBe("guides\\sub");
   });
 
   it("detects Unix, drive and UNC roots", () => {
@@ -106,6 +110,14 @@ describe("platform (Windows & cross-platform helpers)", () => {
     expect(toCtrlLabel("欄靠左（⌥⇧⌘←）")).toBe("欄靠左（Ctrl+Alt+Shift+←）");
     expect(toCtrlLabel("刪除列（⇧⌘⌫）")).toBe("刪除列（Ctrl+Shift+Backspace）");
     expect(toCtrlLabel("⌥⌘↓")).toBe("Ctrl+Alt+↓");
+    expect(toCtrlLabel("偏好設定（⌘,）")).toBe("偏好設定（Ctrl+,）");
+    expect(toCtrlLabel("下一個分頁（⌃⇥）")).toBe("下一個分頁（Ctrl+Tab）");
+    expect(toCtrlLabel("放大（⇧⌘=）")).toBe("放大（Ctrl+Shift+=）");
+
+    expect(shortcutLabel("新增分頁（⌘T）", false)).toBe("新增分頁（⌘T）");
+    expect(shortcutLabel("新增分頁（⌘T）", true)).toBe("新增分頁（Ctrl+T）");
+    expect(shortcutLabel("自動配對（Cmd+Opt+P）", false)).toBe("自動配對（Cmd+Opt+P）");
+    expect(shortcutLabel("自動配對（Cmd+Opt+P）", true)).toBe("自動配對（Ctrl+Alt+P）");
   });
 
   it("recognizes all Markdown extensions and opens a dropped .md file; quick buttons are Windows-only", async () => {

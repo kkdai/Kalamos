@@ -29,9 +29,8 @@ pub fn run() {
         open_with::handle_cli_args(app, &argv, Some(std::path::Path::new(&cwd)));
     }));
 
-    // #74: native macOS menu bar; items emit `menu-action` to the frontend.
-    // Windows menu bar is tracked separately in #89.
-    #[cfg(target_os = "macos")]
+    // #74 / #89: native menu bar (macOS app menu bar; Windows / Linux window menu bar).
+    // Custom items emit `menu-action` to the frontend.
     let builder = builder
         .menu(menu::build_app_menu)
         .on_menu_event(menu::handle_menu_event);

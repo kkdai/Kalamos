@@ -1,11 +1,14 @@
-//! #74: native macOS menu bar.
+//! #74 / #89: native application menu bar (macOS menu bar; Windows / Linux window menu bar).
 //!
 //! The menu layout lives in `src/menu/menu-spec.json`, shared with the
 //! frontend (which uses the same accelerators to keep a shortcut from running
-//! twice). Clicking a custom item emits `menu-action` to the WebView, where the
-//! existing keyboard handlers run — no command logic is duplicated here.
-//! Standard edit items (undo / copy / paste…) are predefined items, so they go
-//! through the responder chain to the WebView exactly as before.
+//! twice). Items can carry an optional `"platforms"` list (`"macos"`,
+//! `"windows"`, `"linux"`) so macOS-only items stay off Windows and Windows
+//! places Preferences / Quit / About in 檔案 and 說明. Clicking a custom item
+//! emits `menu-action` to the WebView, where the existing keyboard handlers
+//! run — no command logic is duplicated here. Standard edit items (undo / copy
+//! / paste…) are predefined items, so they go through the OS / WebView
+//! responder path.
 
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -25,6 +28,31 @@ pub const MENU_ACTION_EVENT: &str = "menu-action";
 pub const THEME_ITEM_PREFIX: &str = "theme:";
 pub const SET_THEME_ACTION: &str = "view.setTheme";
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum MenuPlatform {
+    Macos,
+    Windows,
+    Linux,
+}
+
+impl MenuPlatform {
+    pub const fn current() -> Self {
+        #[cfg(target_os = "macos")]
+        {
+            Self::Macos
+        }
+        #[cfg(target_os = "windows")]
+        {
+            Self::Windows
+        }
+        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+        {
+            Self::Linux
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum SubmenuRole {
@@ -40,11 +68,18 @@ pub enum MenuNode {
         label: String,
         #[serde(default)]
         role: Option<SubmenuRole>,
+        #[serde(default)]
+        platforms: Option<Vec<MenuPlatform>>,
         items: Vec<MenuNode>,
     },
     /// The 主題 submenu: one check item per theme (filled by `sync_menu_state`),
     /// then a separator and `items`.
-    Themes { label: String, items: Vec<MenuNode> },
+    Themes {
+        label: String,
+        #[serde(default)]
+        platforms: Option<Vec<MenuPlatform>>,
+        items: Vec<MenuNode>,
+    },
     Action {
         id: String,
         label: String,
@@ -52,17 +87,83 @@ pub enum MenuNode {
         accel: Option<String>,
         #[serde(default)]
         check: bool,
+        #[serde(default)]
+        platforms: Option<Vec<MenuPlatform>>,
     },
     Predefined {
         item: String,
         #[serde(default)]
         label: Option<String>,
+        #[serde(default)]
+        platforms: Option<Vec<MenuPlatform>>,
     },
-    Link { id: String, label: String, url: String },
+    Link {
+        id: String,
+        label: String,
+        url: String,
+        #[serde(default)]
+        platforms: Option<Vec<MenuPlatform>>,
+    },
+}
+
+impl MenuNode {
+    fn platforms(&self) -> Option<&[MenuPlatform]> {
+        match self {
+            MenuNode::Submenu { platforms, .. }
+            | MenuNode::Themes { platforms, .. }
+            | MenuNode::Action { platforms, .. }
+            | MenuNode::Predefined { platforms, .. }
+            | MenuNode::Link { platforms, .. } => platforms.as_deref(),
+        }
+    }
+
+    pub fn matches_platform(&self, platform: MenuPlatform) -> bool {
+        match self.platforms() {
+            None => true,
+            Some(list) => list.contains(&platform),
+        }
+    }
+}
+
+pub fn raw_menu_spec() -> Vec<MenuNode> {
+    serde_json::from_str(MENU_SPEC_JSON).expect("src/menu/menu-spec.json is valid")
+}
+
+/// Filters `nodes` to those visible on `platform`, matching frontend `filterMenuSpec`.
+pub fn filter_menu_spec(nodes: &[MenuNode], platform: MenuPlatform) -> Vec<MenuNode> {
+    let mut out = Vec::new();
+    for node in nodes {
+        if !node.matches_platform(platform) {
+            continue;
+        }
+        match node {
+            MenuNode::Submenu { label, role, platforms, items } => {
+                out.push(MenuNode::Submenu {
+                    label: label.clone(),
+                    role: role.clone(),
+                    platforms: platforms.clone(),
+                    items: filter_menu_spec(items, platform),
+                });
+            }
+            MenuNode::Themes { label, platforms, items } => {
+                out.push(MenuNode::Themes {
+                    label: label.clone(),
+                    platforms: platforms.clone(),
+                    items: filter_menu_spec(items, platform),
+                });
+            }
+            other => out.push(other.clone()),
+        }
+    }
+    out
+}
+
+pub fn menu_spec_for(platform: MenuPlatform) -> Vec<MenuNode> {
+    filter_menu_spec(&raw_menu_spec(), platform)
 }
 
 pub fn menu_spec() -> Vec<MenuNode> {
-    serde_json::from_str(MENU_SPEC_JSON).expect("src/menu/menu-spec.json is valid")
+    menu_spec_for(MenuPlatform::current())
 }
 
 fn walk<'a>(nodes: &'a [MenuNode], out: &mut Vec<&'a MenuNode>) {
@@ -200,7 +301,7 @@ fn build_items<R: Runtime>(
     let mut out: Vec<MenuItemKind<R>> = Vec::new();
     for node in nodes {
         match node {
-            MenuNode::Submenu { label, role, items } => {
+            MenuNode::Submenu { label, role, items, .. } => {
                 let children = build_items(app, items, handles)?;
                 let refs: Vec<&dyn IsMenuItem<R>> =
                     children.iter().map(|c| c as &dyn IsMenuItem<R>).collect();
@@ -218,7 +319,7 @@ fn build_items<R: Runtime>(
                 }
                 out.push(MenuItemKind::Submenu(submenu));
             }
-            MenuNode::Themes { label, items } => {
+            MenuNode::Themes { label, items, .. } => {
                 let mut children = vec![MenuItemKind::Predefined(PredefinedMenuItem::separator(app)?)];
                 children.extend(build_items(app, items, handles)?);
                 let refs: Vec<&dyn IsMenuItem<R>> =
@@ -227,7 +328,7 @@ fn build_items<R: Runtime>(
                 handles.theme_submenu = Some(submenu.clone());
                 out.push(MenuItemKind::Submenu(submenu));
             }
-            MenuNode::Action { id, label, accel, check } => {
+            MenuNode::Action { id, label, accel, check, .. } => {
                 if *check {
                     let item = CheckMenuItem::with_id(
                         app,
@@ -244,7 +345,7 @@ fn build_items<R: Runtime>(
                     out.push(MenuItemKind::MenuItem(item));
                 }
             }
-            MenuNode::Predefined { item, label } => {
+            MenuNode::Predefined { item, label, .. } => {
                 if let Some(built) = predefined(app, item, label.as_deref())? {
                     out.push(MenuItemKind::Predefined(built));
                 }
@@ -359,35 +460,62 @@ mod tests {
     use super::*;
     use std::collections::HashSet;
 
-    #[test]
-    fn spec_parses_and_ids_are_unique() {
-        let spec = menu_spec();
-        let mut seen = HashSet::new();
-        for node in all_nodes(&spec) {
-            let id = match node {
-                MenuNode::Action { id, .. } | MenuNode::Link { id, .. } => id,
-                _ => continue,
-            };
-            assert!(seen.insert(id.clone()), "duplicate menu id {id}");
-            assert!(!id.starts_with(THEME_ITEM_PREFIX));
+    fn assert_clean_separators(nodes: &[MenuNode]) {
+        let mut prev_sep = true; // disallow leading separator
+        for (i, node) in nodes.iter().enumerate() {
+            let is_sep = matches!(node, MenuNode::Predefined { item, .. } if item == "separator");
+            assert!(!(is_sep && prev_sep), "leading or consecutive separator at index {i}");
+            prev_sep = is_sep;
+            match node {
+                MenuNode::Submenu { items, .. } | MenuNode::Themes { items, .. } => {
+                    assert_clean_separators(items);
+                }
+                _ => {}
+            }
         }
-        assert!(seen.len() > 30);
+        assert!(
+            !matches!(nodes.last(), Some(MenuNode::Predefined { item, .. }) if item == "separator"),
+            "trailing separator in submenu"
+        );
     }
 
     #[test]
-    fn accelerators_are_unique() {
-        let spec = menu_spec();
-        let mut seen = HashSet::new();
-        for node in all_nodes(&spec) {
-            if let MenuNode::Action { accel: Some(accel), id, .. } = node {
-                assert!(seen.insert(accel.to_lowercase()), "accelerator {accel} reused by {id}");
+    fn spec_parses_and_ids_are_unique_per_platform() {
+        for platform in [MenuPlatform::Macos, MenuPlatform::Windows, MenuPlatform::Linux] {
+            let spec = menu_spec_for(platform);
+            assert_clean_separators(&spec);
+            let mut seen = HashSet::new();
+            for node in all_nodes(&spec) {
+                let id = match node {
+                    MenuNode::Action { id, .. } | MenuNode::Link { id, .. } => id,
+                    _ => continue,
+                };
+                assert!(seen.insert(id.clone()), "duplicate menu id {id} on {platform:?}");
+                assert!(!id.starts_with(THEME_ITEM_PREFIX));
+            }
+            assert!(seen.len() > 30);
+        }
+    }
+
+    #[test]
+    fn accelerators_are_unique_per_platform() {
+        for platform in [MenuPlatform::Macos, MenuPlatform::Windows, MenuPlatform::Linux] {
+            let spec = menu_spec_for(platform);
+            let mut seen = HashSet::new();
+            for node in all_nodes(&spec) {
+                if let MenuNode::Action { accel: Some(accel), id, .. } = node {
+                    assert!(
+                        seen.insert(accel.to_lowercase()),
+                        "accelerator {accel} reused by {id} on {platform:?}"
+                    );
+                }
             }
         }
     }
 
     #[test]
-    fn spec_has_the_required_menus_and_items() {
-        let spec = menu_spec();
+    fn macos_spec_has_the_required_menus_and_items() {
+        let spec = menu_spec_for(MenuPlatform::Macos);
         let labels: Vec<&str> = spec
             .iter()
             .filter_map(|n| match n {
@@ -421,7 +549,7 @@ mod tests {
         assert_eq!(accel_of("file.closeTab").as_deref(), Some("CmdOrCtrl+W"));
         assert_eq!(accel_of("window.nextTab").as_deref(), Some("Ctrl+Tab"));
         assert!(!predefined.contains("quit") && !predefined.contains("closeWindow"));
-        for item in ["undo", "redo", "cut", "copy", "paste", "selectAll", "about"] {
+        for item in ["undo", "redo", "cut", "copy", "paste", "selectAll", "about", "services", "hideOthers", "showAll"] {
             assert!(predefined.contains(item), "missing predefined {item}");
         }
         // Every predefined item name is one we know how to build.
@@ -433,6 +561,65 @@ mod tests {
         for item in &predefined {
             assert!(known.contains(item), "unknown predefined {item}");
         }
+    }
+
+    #[test]
+    fn windows_spec_omits_macos_only_items_and_places_preferences_quit_about() {
+        let win = menu_spec_for(MenuPlatform::Windows);
+        let labels: Vec<&str> = win
+            .iter()
+            .filter_map(|n| match n {
+                MenuNode::Submenu { label, .. } => Some(label.as_str()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(labels, ["檔案", "編輯", "段落", "格式", "檢視", "視窗", "說明"]);
+
+        let nodes = all_nodes(&win);
+        let predefined: HashSet<&str> = nodes
+            .iter()
+            .filter_map(|n| match n {
+                MenuNode::Predefined { item, .. } => Some(item.as_str()),
+                _ => None,
+            })
+            .collect();
+        for mac_only in ["services", "hide", "hideOthers", "showAll", "fullscreen", "bringAllToFront"] {
+            assert!(!predefined.contains(mac_only), "Windows menu must not contain {mac_only}");
+        }
+        assert!(predefined.contains("about"));
+        assert!(!predefined.contains("quit") && !predefined.contains("closeWindow"));
+
+        let submenu_items = |wanted: &str| -> &[MenuNode] {
+            win.iter()
+                .find_map(|n| match n {
+                    MenuNode::Submenu { label, items, .. } if label == wanted => Some(items.as_slice()),
+                    _ => None,
+                })
+                .expect("submenu exists")
+        };
+        let file_items = submenu_items("檔案");
+        assert!(file_items.iter().any(|n| matches!(
+            n,
+            MenuNode::Action { id, accel: Some(a), .. } if id == "app.preferences" && a == "CmdOrCtrl+,"
+        )));
+        assert!(file_items.iter().any(|n| matches!(
+            n,
+            MenuNode::Action { id, accel: Some(a), .. } if id == "app.quit" && a == "CmdOrCtrl+Q"
+        )));
+        let help_items = submenu_items("說明");
+        assert!(help_items.iter().any(|n| matches!(n, MenuNode::Predefined { item, .. } if item == "about")));
+
+        // macOS and Windows expose the exact same set of custom action ids and accelerators.
+        let action_pairs = |platform: MenuPlatform| -> HashSet<(String, Option<String>)> {
+            all_nodes(&menu_spec_for(platform))
+                .into_iter()
+                .filter_map(|n| match n {
+                    MenuNode::Action { id, accel, .. } => Some((id.clone(), accel.clone())),
+                    _ => None,
+                })
+                .collect()
+        };
+        assert_eq!(action_pairs(MenuPlatform::Macos), action_pairs(MenuPlatform::Windows));
     }
 
     #[test]

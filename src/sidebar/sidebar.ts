@@ -24,7 +24,7 @@ import { createFileList, type FileListView } from "./file-list";
 import { createFileTree, type FileTreeView } from "./file-tree";
 import { createFolderSearch, type FolderSearchView } from "./folder-search";
 import { createOutline, type OutlineView } from "./outline";
-import { pathRoot, shortcutLabel } from "../platform";
+import { pathRoot, shortcutLabel, toNativePath } from "../platform";
 
 export interface SidebarTabDescriptor {
   id: SidebarTab;
@@ -366,7 +366,7 @@ export function createSidebar(options: CreateSidebarOptions): SidebarController 
     currentTree = tree;
     currentFiles = files;
     folderTitleEl.textContent = basenameOf(folderPath) || folderPath;
-    folderTitleEl.title = folderPath;
+    folderTitleEl.title = toNativePath(folderPath);
     renderActiveTabView();
     return true;
   }

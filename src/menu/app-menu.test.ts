@@ -2,11 +2,14 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   emitMockMenuAction,
   getMockMenuState,
+  getMockQuitCount,
+  getMockSaveChangesPrompts,
   getMockThemesDirOpenCount,
   getMockZoom,
   getSettings,
   resetMockState,
   seedMockSettings,
+  setMockDialogHandlers,
 } from "../ipc";
 import { createKalamosApp, nextZoomLevel, type KalamosApp } from "../main";
 import { MENU_THEN_KEY_WINDOW_MS, menuActions } from "./menu-dispatch";
@@ -127,6 +130,63 @@ describe("#74 native menu → app handlers", () => {
     await emitMockMenuAction("para.heading1");
     expect(app!.editor.getContent()).toBe("x");
     app!.preferences.close();
+  });
+
+  it("#89 window keydown handles menu-only & paragraph shortcuts once (deduped with menu)", async () => {
+    app!.editor.setContent("hello", { dirty: false });
+    app!.editor.view.dispatch({ selection: { anchor: 0, head: 5 } });
+
+    // Ctrl+1..6 / Ctrl+0 / Ctrl+Alt+Q / Ctrl+Shift+D work via window keydown even outside CM focus.
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "2", code: "Digit2", ctrlKey: true, cancelable: true }),
+    );
+    await emitMockMenuAction("para.heading2");
+    expect(app!.editor.getContent()).toBe("## hello");
+
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "q", code: "KeyQ", ctrlKey: true, altKey: true, cancelable: true }),
+    );
+    await emitMockMenuAction("para.quote");
+    expect(app!.editor.getContent()).toBe("> ## hello");
+
+    // Ctrl+Shift+1 toggles outline and is deduped against menu-action.
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "!", code: "Digit1", ctrlKey: true, shiftKey: true, cancelable: true }),
+    );
+    await settle();
+    await emitMockMenuAction("view.outline");
+    await settle();
+    expect(app!.sidebar.isVisible()).toBe(true);
+    expect(app!.sidebar.getTab()).toBe("outline");
+
+    // Zoom shortcuts: Ctrl+Shift+= / - / 0.
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "+", code: "Equal", ctrlKey: true, shiftKey: true, cancelable: true }),
+    );
+    await emitMockMenuAction("view.zoomIn");
+    expect(getMockZoom()).toBe(1.1);
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "_", code: "Minus", ctrlKey: true, shiftKey: true, cancelable: true }),
+    );
+    expect(getMockZoom()).toBe(1);
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "+", code: "Equal", ctrlKey: true, shiftKey: true, cancelable: true }),
+    );
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", { key: ")", code: "Digit0", ctrlKey: true, shiftKey: true, cancelable: true }),
+    );
+    expect(getMockZoom()).toBe(1);
+
+    // Ctrl+Q checks unsaved changes across tabs before quitting, and is deduped with menu.
+    app!.editor.markDirty();
+    setMockDialogHandlers({ saveChanges: () => "cancel" });
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "q", code: "KeyQ", ctrlKey: true, cancelable: true }),
+    );
+    await emitMockMenuAction("app.quit");
+    await settle();
+    expect(getMockQuitCount()).toBe(0);
+    expect(getMockSaveChangesPrompts()).toHaveLength(1);
   });
 });
 

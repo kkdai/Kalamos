@@ -480,9 +480,18 @@ function field(testid: string, placeholder: string): HTMLInputElement {
 /** Window-level shortcuts that would edit the document while typing a query. */
 function isDocumentEditingShortcut(e: KeyboardEvent): boolean {
   if (!(e.metaKey || e.ctrlKey)) return false;
-  if (e.altKey) return e.code === "KeyT";
-  if (!e.shiftKey) return e.code === "KeyB" || e.code === "KeyI" || e.code === "KeyK";
-  return ["Backquote", "BracketLeft", "BracketRight", "KeyX", "KeyC"].includes(e.code);
+  if (e.altKey) {
+    return ["KeyT", "KeyC", "KeyB", "KeyQ"].includes(e.code);
+  }
+  if (!e.shiftKey) {
+    return (
+      e.code === "KeyB" ||
+      e.code === "KeyI" ||
+      e.code === "KeyK" ||
+      /^Digit[0-6]$/.test(e.code)
+    );
+  }
+  return ["Backquote", "BracketLeft", "BracketRight", "KeyX", "KeyC", "KeyD"].includes(e.code);
 }
 
 class KalamosSearchPanel implements Panel {

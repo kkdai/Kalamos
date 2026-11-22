@@ -2,7 +2,7 @@
  * #81 A: pure helpers for the document tabs (naming, collision labels,
  * keyboard cycling, which tab becomes active after a close, reordering).
  */
-import { isMarkdownFilePath, MARKDOWN_EXTENSIONS } from "../platform";
+import { IS_WINDOWS, isMarkdownFilePath, MARKDOWN_EXTENSIONS } from "../platform";
 
 export { MARKDOWN_EXTENSIONS };
 
@@ -38,12 +38,21 @@ export function baseNameOf(path: string): string {
   return parts[parts.length - 1] ?? path;
 }
 
+export interface TabLabelsOptions {
+  /** Path separator used when showing parent folders (defaults to `\` on Windows, `/` elsewhere). */
+  separator?: string;
+}
+
 /**
  * Tab labels keyed by tab id. Saved tabs show their file name; when two open
  * files share a name, each also shows as many parent folders as it takes to
- * tell them apart, e.g. 「README.md — docs」.
+ * tell them apart, e.g. 「README.md — docs」 (or 「README.md — x\docs」 on Windows).
  */
-export function tabLabels(tabs: TabNameInput[]): Map<string, string> {
+export function tabLabels(
+  tabs: TabNameInput[],
+  options?: TabLabelsOptions,
+): Map<string, string> {
+  const sep = options?.separator ?? (IS_WINDOWS ? "\\" : "/");
   const labels = new Map<string, string>();
   const byName = new Map<string, TabNameInput[]>();
   for (const tab of tabs) {
@@ -64,7 +73,7 @@ export function tabLabels(tabs: TabNameInput[]): Map<string, string> {
     }
     const parents = new Map(group.map((t) => [t.id, splitPath(t.path!).slice(0, -1)]));
     const maxDepth = Math.max(...[...parents.values()].map((p) => p.length));
-    const suffix = (dirs: string[], depth: number) => dirs.slice(Math.max(0, dirs.length - depth)).join("/");
+    const suffix = (dirs: string[], depth: number) => dirs.slice(Math.max(0, dirs.length - depth)).join(sep);
     for (const tab of group) {
       const dirs = parents.get(tab.id)!;
       let depth = 1;

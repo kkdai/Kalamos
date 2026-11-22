@@ -1,3 +1,5 @@
+import { toNativePath } from "../platform";
+
 /** EX-01 helpers shared by the app shell (src/main.ts). */
 
 export const EXPORTING_PDF_MESSAGE = "匯出中…";
@@ -29,5 +31,5 @@ export function ensurePdfExtension(path: string): string {
 }
 
 export function exportedPdfMessage(path: string): string {
-  return `已匯出 PDF：${path}`;
+  return `已匯出 PDF：${toNativePath(path)}`;
 }

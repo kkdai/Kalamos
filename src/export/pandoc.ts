@@ -8,7 +8,7 @@ import type { MarkdownParser } from "@lezer/markdown";
 import { findTyporaRootUrlInText, parseImgTag } from "../editor/image-attrs";
 import { resolveImageRoot, resolveImageSrc } from "../editor/images";
 import { documentTitle } from "./pdf";
-import { IS_WINDOWS } from "../platform";
+import { IS_WINDOWS, toNativePath } from "../platform";
 
 export type PandocFormat = "docx" | "odt" | "latex" | "mediawiki" | "epub";
 
@@ -56,11 +56,12 @@ export function ensureExportExtension(path: string, format: PandocFormat): strin
 }
 
 export function exportedMessage(format: PandocFormat, path: string): string {
-  return `已匯出 ${formatInfo(format).label}：${path}`;
+  return `已匯出 ${formatInfo(format).label}：${toNativePath(path)}`;
 }
 
 export function importedMessage(path: string): string {
-  return `已匯入：${path.slice(path.lastIndexOf("/") + 1)}`;
+  const slash = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
+  return `已匯入：${path.slice(slash + 1)}`;
 }
 
 export function isImportablePath(path: string): boolean {
