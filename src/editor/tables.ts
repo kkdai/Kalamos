@@ -1295,14 +1295,42 @@ export function getActiveTableCell(state: EditorState): ActiveTableCell | null {
  * Put the selection (and, in live preview, keyboard focus) on a cell; the
  * cell's whole text is selected. `row` 0 is the header. Out-of-range rows and
  * columns are clamped. Returns false if there is no table at `tableFrom`.
+ *
+ * With `range` (document positions, clamped to the cell's content), only that
+ * part of the cell is selected — used by find & replace (#73) to select a hit.
  */
 export function focusTableCell(
   view: EditorView,
   tableFrom: number,
   row: number,
   col: number,
+  range?: { from: number; to: number },
 ): boolean {
-  return focusCellWithMode(view, tableFrom, row, col, "all");
+  if (!range) return focusCellWithMode(view, tableFrom, row, col, "all");
+  const table = findTableAtPos(view.state, clampPos(tableFrom, view.state.doc.length));
+  if (!table) return false;
+  const rows = navRowsOf(table);
+  const r = Math.max(0, Math.min(row, rows.length - 1));
+  const c = Math.max(0, Math.min(col, table.colCount - 1));
+  const cell = rows[r].cells[c];
+  const clampToCell = (pos: number) => Math.max(cell.contentFrom, Math.min(pos, cell.contentTo));
+  const from = clampToCell(Math.min(range.from, range.to));
+  const to = clampToCell(Math.max(range.from, range.to));
+  view.dispatch({
+    selection: EditorSelection.range(from, to),
+    scrollIntoView: true,
+    annotations: tableCellSync.of(true),
+  });
+  const el = findCellElement(view, table.from, r, c);
+  if (!el) {
+    view.focus();
+    return true;
+  }
+  const raw = cell.text;
+  const toDisplay = (pos: number) =>
+    rawOffsetToDisplay(raw, Math.max(0, Math.min(pos - cell.contentFrom, raw.length)));
+  focusCellElement(el, toDisplay(from), toDisplay(to));
+  return true;
 }
 
 function exitTableAbove(view: EditorView, table: ParsedTable): void {

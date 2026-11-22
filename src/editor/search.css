@@ -1,0 +1,229 @@
+/* #73 A: find & replace bar and match marks (Papyros / Melan, light & dark). */
+
+.cm-panels.cm-panels-top {
+  border-bottom: none;
+  background: transparent;
+  z-index: 6;
+}
+
+.k-search {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 8px auto 0;
+  padding: 6px 8px;
+  width: min(var(--k-max-width, 720px), calc(100% - 32px));
+  box-sizing: border-box;
+  background-color: var(--k-surface, #ede4cf);
+  color: var(--k-text, #2b2622);
+  border: 1px solid var(--k-divider, #d9cdb3);
+  border-radius: 10px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.1);
+  font-family: var(--k-font-ui, inherit);
+  font-size: 13px;
+  line-height: 1.2;
+  animation: k-search-in var(--k-transition, 180ms ease-out);
+}
+
+@keyframes k-search-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .k-search {
+    animation: none;
+  }
+}
+
+.k-search-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.k-search-row[hidden] {
+  display: none;
+}
+
+.k-search-field {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  height: 28px;
+  padding: 0 4px 0 8px;
+  background-color: var(--k-bg, #f5efe0);
+  border: 1px solid var(--k-divider, #d9cdb3);
+  border-radius: 6px;
+  transition:
+    border-color var(--k-transition-fast, 150ms ease-out),
+    box-shadow var(--k-transition-fast, 150ms ease-out);
+}
+
+.k-search-field:focus-within {
+  border-color: var(--k-accent, #5e7a4a);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--k-accent, #5e7a4a) 22%, transparent);
+}
+
+.k-search-field[data-invalid="true"] {
+  border-color: var(--k-link, #a4552f);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--k-link, #a4552f) 22%, transparent);
+}
+
+.k-search-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+.k-search-input::placeholder {
+  color: var(--k-text-muted, #6e6355);
+}
+
+.k-search-options {
+  display: flex;
+  gap: 1px;
+  flex: none;
+}
+
+.k-search-opt,
+.k-search-btn,
+.k-search-text-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--k-text-muted, #6e6355);
+  font: inherit;
+  cursor: pointer;
+  transition:
+    background-color var(--k-transition-fast, 150ms ease-out),
+    color var(--k-transition-fast, 150ms ease-out);
+}
+
+.k-search-opt {
+  min-width: 24px;
+  height: 22px;
+  padding: 0 4px;
+  font-family: var(--k-font-mono, monospace);
+  font-size: 11.5px;
+}
+
+.k-search-opt-word {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.k-search-btn {
+  width: 28px;
+  height: 28px;
+}
+
+.k-search-text-btn {
+  height: 28px;
+  padding: 0 10px;
+  color: var(--k-text, #2b2622);
+  border: 1px solid var(--k-divider, #d9cdb3);
+}
+
+.k-search-opt:hover,
+.k-search-btn:hover,
+.k-search-text-btn:hover {
+  background-color: color-mix(in srgb, var(--k-text, #2b2622) 8%, transparent);
+  color: var(--k-text, #2b2622);
+}
+
+.k-search-opt:focus-visible,
+.k-search-btn:focus-visible,
+.k-search-text-btn:focus-visible {
+  outline: 2px solid var(--k-accent, #5e7a4a);
+  outline-offset: 1px;
+}
+
+.k-search-opt[aria-pressed="true"] {
+  background-color: color-mix(in srgb, var(--k-accent, #5e7a4a) 20%, transparent);
+  color: var(--k-accent, #5e7a4a);
+}
+
+.k-search-icon {
+  stroke-width: var(--k-icon-stroke-width, 1.5px);
+}
+
+.k-search-toggle .k-search-icon {
+  transition: transform var(--k-transition, 180ms ease-out);
+}
+
+.k-search-toggle[aria-expanded="true"] .k-search-icon {
+  transform: rotate(90deg);
+}
+
+.k-search-spacer {
+  flex: none;
+  width: 28px;
+}
+
+.k-search-count {
+  flex: none;
+  min-width: 56px;
+  padding: 0 4px;
+  text-align: center;
+  color: var(--k-text-muted, #6e6355);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.k-search-count[data-state="none"],
+.k-search-count[data-state="invalid"] {
+  color: var(--k-link, #a4552f);
+}
+
+/* Match marks in the text (CodeMirror decorations from @codemirror/search). */
+.cm-editor .cm-scroller .cm-content .cm-searchMatch {
+  background-color: var(--k-search-match-bg, color-mix(in srgb, var(--k-accent, #5e7a4a) 24%, transparent));
+  border-radius: 2px;
+  outline: none;
+}
+
+.cm-editor .cm-scroller .cm-content .cm-searchMatch.cm-searchMatch-selected {
+  background-color: var(--k-search-current-bg, color-mix(in srgb, var(--k-link, #a4552f) 42%, transparent));
+  box-shadow: 0 0 0 1px var(--k-search-current-ring, var(--k-link, #a4552f));
+}
+
+.cm-editor {
+  --k-search-match-bg: color-mix(in srgb, var(--k-accent, #5e7a4a) 24%, transparent);
+  --k-search-current-bg: color-mix(in srgb, var(--k-link, #a4552f) 42%, transparent);
+  --k-search-current-ring: var(--k-link, #a4552f);
+}
+
+/* Hits inside table widgets (CSS Custom Highlight API). */
+::highlight(k-search-match) {
+  background-color: color-mix(in srgb, var(--k-accent, #5e7a4a) 24%, transparent);
+}
+
+::highlight(k-search-current) {
+  background-color: color-mix(in srgb, var(--k-link, #a4552f) 42%, transparent);
+}
+
+/* The cell holding the current hit (also where ::highlight is unsupported). */
+.k-search-cell-current {
+  box-shadow: inset 0 0 0 1.5px var(--k-link, #a4552f);
+  transition: box-shadow var(--k-transition-fast, 150ms ease-out);
+}

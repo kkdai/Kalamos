@@ -27,6 +27,7 @@ import {
 import { footnoteExtension } from "./footnotes";
 import { frontMatterExtension } from "./front-matter";
 import { mathAutoNumberFacet, mathMarkdownExtension } from "./math";
+import { kalamosSearchExtension, kalamosSearchKeymap } from "./search";
 import { createSourceModeController } from "./source-mode";
 import { focusModeExtension, typewriterModeExtension } from "./writing-modes";
 import { autoPairBracketsExtension, autoPairMarkdownExtension } from "./auto-pair";
@@ -218,7 +219,9 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
         extensions: [mathMarkdownExtension, cjkEmphasisExtension, frontMatterExtension, footnoteExtension],
       }),
       sourceModeController.extension,
+      kalamosSearchExtension,
       keymap.of([
+        ...kalamosSearchKeymap,
         ...createFileKeymap(combinedHandlers),
         ...defaultKeymap,
         ...historyKeymap,
