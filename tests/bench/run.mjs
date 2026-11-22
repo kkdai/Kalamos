@@ -52,12 +52,35 @@ function buildDoc(lines) {
       `這是 **粗體** 與 *斜體*、\`inline code\`、~~刪除~~ 與 [連結](https://example.com/${section}) 的混排段落 ${section}。`,
       "",
     );
-    out.push("- 清單項目一", "- 清單項目二 **重點**", "  - 巢狀項目", "- [ ] 待辦事項", "- [x] 已完成", "");
+    out.push(
+      "- 清單項目一",
+      "- 清單項目二 **重點**",
+      "  - 巢狀項目",
+      "- [ ] 待辦事項",
+      "- [x] 已完成",
+      "",
+    );
     out.push("| 欄位 | 數值 | 說明 |", "| --- | ---: | :---: |");
-    for (let r = 0; r < 4; r++) out.push(`| row${r} | ${section * 10 + r} | *註解* ${r} |`);
+    for (let r = 0; r < 4; r++)
+      out.push(`| row${r} | ${section * 10 + r} | *註解* ${r} |`);
     out.push("");
-    out.push("```ts", `function f${section}(x: number): number {`, "  // comment", `  return x * ${section};`, "}", "```", "");
-    out.push(`行內公式 $a_${section}^2 + b^2 = c^2$ 與區塊公式：`, "", "$$", `\\sum_{i=1}^{${section}} i = \\frac{n(n+1)}{2}`, "$$", "");
+    out.push(
+      "```ts",
+      `function f${section}(x: number): number {`,
+      "  // comment",
+      `  return x * ${section};`,
+      "}",
+      "```",
+      "",
+    );
+    out.push(
+      `行內公式 $a_${section}^2 + b^2 = c^2$ 與區塊公式：`,
+      "",
+      "$$",
+      `\\sum_{i=1}^{${section}} i = \\frac{n(n+1)}{2}`,
+      "$$",
+      "",
+    );
     out.push("1. 有序一", "2. 有序二", "3. 有序三", "");
     out.push("> 引用文字 blockquote", "");
   }
@@ -66,7 +89,10 @@ function buildDoc(lines) {
 
 function percentile(sorted, p) {
   if (sorted.length === 0) return null;
-  const idx = Math.min(sorted.length - 1, Math.max(0, Math.ceil((p / 100) * sorted.length) - 1));
+  const idx = Math.min(
+    sorted.length - 1,
+    Math.max(0, Math.ceil((p / 100) * sorted.length) - 1),
+  );
   return sorted[idx];
 }
 
@@ -82,14 +108,23 @@ function summarize(values) {
   };
 }
 
-async function runScenario(browser, baseURL, doc, { name, writingModes = false }) {
-  const context = await browser.newContext({ viewport: { width: 1200, height: 800 } });
+async function runScenario(
+  browser,
+  baseURL,
+  doc,
+  { name, writingModes = false },
+) {
+  const context = await browser.newContext({
+    viewport: { width: 1200, height: 800 },
+  });
   const page = await context.newPage();
   const pageErrors = [];
   page.on("pageerror", (e) => pageErrors.push(e.message));
   await page.goto(baseURL);
   await page.waitForFunction(() => Boolean(window.__kalamos));
-  await page.waitForFunction(async () => Boolean((await import("/src/main.ts")).getActiveApp()));
+  await page.waitForFunction(async () =>
+    Boolean((await import("/src/main.ts")).getActiveApp()),
+  );
 
   await page.evaluate(async (content) => {
     const ipc = await import("/src/ipc.ts");
@@ -117,10 +152,14 @@ async function runScenario(browser, baseURL, doc, { name, writingModes = false }
     const ms = await page.evaluate(async () => {
       const app = (await import("/src/main.ts")).getActiveApp();
       await app.newDocument();
-      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      await new Promise((r) =>
+        requestAnimationFrame(() => requestAnimationFrame(r)),
+      );
       const t0 = performance.now();
       await app.openDocument("/bench/10k.md");
-      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      await new Promise((r) =>
+        requestAnimationFrame(() => requestAnimationFrame(r)),
+      );
       const ok = document.querySelectorAll(".cm-content .cm-line").length > 0;
       return ok ? performance.now() - t0 : -1;
     });
@@ -137,7 +176,8 @@ async function runScenario(browser, baseURL, doc, { name, writingModes = false }
         const start = e.timeStamp;
         requestAnimationFrame(() => {
           const ch = new MessageChannel();
-          ch.port1.onmessage = () => window.__benchLat.push(performance.now() - start);
+          ch.port1.onmessage = () =>
+            window.__benchLat.push(performance.now() - start);
           ch.port2.postMessage(0);
         });
       },
@@ -165,13 +205,16 @@ async function runScenario(browser, baseURL, doc, { name, writingModes = false }
       const view = app.editor.view;
       view.focus();
       view.dispatch({ selection: { anchor: p }, scrollIntoView: true });
-      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      await new Promise((r) =>
+        requestAnimationFrame(() => requestAnimationFrame(r)),
+      );
       window.__benchLat.length = 0;
     }, pos);
     const text = "abc 中文 xyz ".repeat(10);
     for (let k = 0; k < KEYS_PER_SPOT; k++) {
       const ch = text[k % text.length];
-      if (/[a-z ]/.test(ch)) await page.keyboard.press(ch === " " ? "Space" : ch);
+      if (/[a-z ]/.test(ch))
+        await page.keyboard.press(ch === " " ? "Space" : ch);
       else await page.keyboard.insertText(ch); // CJK goes through insertText (no keydown)
       await page.waitForTimeout(20);
     }
@@ -191,7 +234,10 @@ async function runScenario(browser, baseURL, doc, { name, writingModes = false }
     return app.editor.view.state.doc.lines;
   });
   const mathRendered = await page.evaluate(
-    () => document.querySelectorAll('[data-testid="math-block"] svg, [data-testid="math-inline"] svg').length > 0,
+    () =>
+      document.querySelectorAll(
+        '[data-testid="math-block"] svg, [data-testid="math-inline"] svg',
+      ).length > 0,
   );
 
   await context.close();
@@ -200,9 +246,16 @@ async function runScenario(browser, baseURL, doc, { name, writingModes = false }
     name,
     mathRendered,
     lines: lineCount,
-    openToFirstRenderMs: { runs: openTimes.map((v) => Math.round(v * 100) / 100), ...summarize(openTimes) },
+    openToFirstRenderMs: {
+      runs: openTimes.map((v) => Math.round(v * 100) / 100),
+      ...summarize(openTimes),
+    },
     inputLatencyMs: { ...input, perSpot },
-    pass: input.p95 !== null && input.p95 < BUDGET_MS && mathRendered && pageErrors.length === 0,
+    pass:
+      input.p95 !== null &&
+      input.p95 < BUDGET_MS &&
+      mathRendered &&
+      pageErrors.length === 0,
     pageErrors: [...new Set(pageErrors)],
   };
 }
@@ -216,13 +269,17 @@ async function main() {
     server: { port: PORT, strictPort: false },
   });
   await server.listen();
-  const baseURL = server.resolvedUrls?.local?.[0] ?? `http://localhost:${PORT}/`;
+  const baseURL =
+    server.resolvedUrls?.local?.[0] ?? `http://localhost:${PORT}/`;
   log(`vite dev server at ${baseURL}`);
   const browser = await chromium.launch();
   const browserVersion = browser.version();
   const results = [];
   try {
-    for (const scenario of [{ name: "as-is" }, { name: "ataraxia+stichos", writingModes: true }]) {
+    for (const scenario of [
+      { name: "as-is" },
+      { name: "ataraxia+stichos", writingModes: true },
+    ]) {
       log(`scenario ${scenario.name} …`);
       results.push(await runScenario(browser, baseURL, doc, scenario));
     }
@@ -234,7 +291,8 @@ async function main() {
     tool: "kalamos-bench",
     date: new Date().toISOString(),
     budgetMs: BUDGET_MS,
-    metric: "keydown.timeStamp → rAF + MessageChannel (≈ next frame), headless Chromium, Vite dev build",
+    metric:
+      "keydown.timeStamp → rAF + MessageChannel (≈ next frame), headless Chromium, Vite dev build",
     browser: `chromium ${browserVersion}`,
     platform: `${process.platform}-${process.arch}`,
     keysPerSpot: KEYS_PER_SPOT,

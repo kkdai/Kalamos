@@ -13,7 +13,10 @@ const views: EditorView[] = [];
 
 function viewOf(doc: string, anchor: number, head = anchor): EditorView {
   const view = new EditorView({
-    state: EditorState.create({ doc, selection: EditorSelection.single(anchor, head) }),
+    state: EditorState.create({
+      doc,
+      selection: EditorSelection.single(anchor, head),
+    }),
     parent: document.body,
   });
   views.push(view);

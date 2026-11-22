@@ -1,12 +1,18 @@
-import { CompletionContext, currentCompletions, startCompletion } from "@codemirror/autocomplete";
+import {
+  CompletionContext,
+  currentCompletions,
+  startCompletion,
+} from "@codemirror/autocomplete";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { EditorSelection, EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { resetMockState } from "../ipc";
+import { createKalamosApp } from "../main";
 import {
+  type EmojiIndex,
   emojiCompletionSource,
   emojiExtension,
-  type EmojiIndex,
   getLoadedEmojiIndex,
   isExcludedEmojiContext,
   loadEmojiIndex,
@@ -15,8 +21,6 @@ import {
   shortcodeBefore,
 } from "./emoji";
 import { frontMatterExtension } from "./front-matter";
-import { resetMockState } from "../ipc";
-import { createKalamosApp } from "../main";
 import { mathMarkdownExtension } from "./math";
 
 function stateOf(doc: string, cursor = doc.length): EditorState {
@@ -24,13 +28,18 @@ function stateOf(doc: string, cursor = doc.length): EditorState {
     doc,
     selection: EditorSelection.cursor(cursor),
     extensions: [
-      markdown({ base: markdownLanguage, extensions: [mathMarkdownExtension, frontMatterExtension] }),
+      markdown({
+        base: markdownLanguage,
+        extensions: [mathMarkdownExtension, frontMatterExtension],
+      }),
     ],
   });
 }
 
 async function complete(doc: string, cursor = doc.length) {
-  return emojiCompletionSource(new CompletionContext(stateOf(doc, cursor), cursor, false));
+  return emojiCompletionSource(
+    new CompletionContext(stateOf(doc, cursor), cursor, false),
+  );
 }
 
 let index: EmojiIndex;
@@ -52,8 +61,14 @@ describe("ED-08 emoji data and ranking", () => {
     expect(names[0]).toBe("smile");
     const firstSubstring = names.findIndex((n) => !n.startsWith("smile"));
     expect(firstSubstring).toBeGreaterThan(0);
-    expect(names.slice(firstSubstring).every((n) => n.includes("smile") && !n.startsWith("smile"))).toBe(true);
-    expect(names.slice(0, firstSubstring).every((n) => n.startsWith("smile"))).toBe(true);
+    expect(
+      names
+        .slice(firstSubstring)
+        .every((n) => n.includes("smile") && !n.startsWith("smile")),
+    ).toBe(true);
+    expect(
+      names.slice(0, firstSubstring).every((n) => n.startsWith("smile")),
+    ).toBe(true);
     expect(searchEmoji(index, "a").length).toBe(MAX_EMOJI_OPTIONS);
     expect(searchEmoji(index, "zzzzzz")).toEqual([]);
   });
@@ -64,7 +79,11 @@ describe("ED-08 trigger contexts", () => {
     const result = await complete("今天很開心 :smile");
     expect(result).not.toBeNull();
     expect(result!.from).toBe("今天很開心 ".length);
-    const first = result!.options[0] as { label: string; apply: string; emoji: string };
+    const first = result!.options[0] as {
+      label: string;
+      apply: string;
+      emoji: string;
+    };
     expect(first.label).toBe(":smile:");
     expect(first.apply).toBe("😄");
     expect(first.emoji).toBe("😄");
@@ -72,7 +91,13 @@ describe("ED-08 trigger contexts", () => {
   });
 
   it("works at line start, after CJK punctuation and inside emphasis / lists", async () => {
-    for (const doc of [":sm", "好。:sm", "**粗體 :sm", "- 項目 :sm", "> 引用 :sm"]) {
+    for (const doc of [
+      ":sm",
+      "好。:sm",
+      "**粗體 :sm",
+      "- 項目 :sm",
+      "> 引用 :sm",
+    ]) {
       expect(await complete(doc), doc).not.toBeNull();
     }
   });
@@ -117,8 +142,14 @@ describe("ED-08 trigger contexts", () => {
 describe("ED-08 `:name:` conversion", () => {
   it("a known shortcode followed by `:` becomes the emoji", () => {
     const doc = "開心 :smile";
-    expect(shortcodeBefore(stateOf(doc), doc.length, index)).toEqual({ from: 3, emoji: "😄" });
-    expect(shortcodeBefore(stateOf(":+1"), 3, index)).toEqual({ from: 0, emoji: "👍" });
+    expect(shortcodeBefore(stateOf(doc), doc.length, index)).toEqual({
+      from: 3,
+      emoji: "😄",
+    });
+    expect(shortcodeBefore(stateOf(":+1"), 3, index)).toEqual({
+      from: 0,
+      emoji: "👍",
+    });
   });
 
   it("unknown shortcodes and excluded contexts stay untouched", () => {
@@ -152,21 +183,36 @@ describe("ED-08 in an editor", () => {
   function typeChar(v: EditorView, ch: string): void {
     const { from, to } = v.state.selection.main;
     const insert = () =>
-      v.state.update({ changes: { from, to, insert: ch }, selection: { anchor: from + 1 }, userEvent: "input.type" });
-    if (!v.state.facet(EditorView.inputHandler).some((h) => h(v, from, to, ch, insert))) v.dispatch(insert());
+      v.state.update({
+        changes: { from, to, insert: ch },
+        selection: { anchor: from + 1 },
+        userEvent: "input.type",
+      });
+    if (
+      !v.state
+        .facet(EditorView.inputHandler)
+        .some((h) => h(v, from, to, ch, insert))
+    )
+      v.dispatch(insert());
   }
 
   it("the completion list opens for :smile and accepting inserts the emoji", async () => {
     view = mount("哈 :smile");
     startCompletion(view);
-    for (let i = 0; i < 50 && currentCompletions(view.state).length === 0; i++) {
+    for (
+      let i = 0;
+      i < 50 && currentCompletions(view.state).length === 0;
+      i++
+    ) {
       await new Promise((r) => setTimeout(r, 10));
     }
     const options = currentCompletions(view.state);
     expect(options[0]?.label).toBe(":smile:");
     // Apply the first option the way CodeMirror does.
     const apply = options[0].apply as string;
-    view.dispatch({ changes: { from: 2, to: view.state.doc.length, insert: apply } });
+    view.dispatch({
+      changes: { from: 2, to: view.state.doc.length, insert: apply },
+    });
     expect(view.state.doc.toString()).toBe("哈 😄");
   });
 

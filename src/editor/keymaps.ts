@@ -1,6 +1,5 @@
 import type { EditorState } from "@codemirror/state";
 import type { EditorView, KeyBinding } from "@codemirror/view";
-import { expandSpanBeforeCursor } from "./live-preview";
 import {
   copyHeadingBookmark,
   handleListBackspace,
@@ -11,6 +10,7 @@ import {
   toggleOrderedList,
   toggleTaskList,
 } from "./lists";
+import { expandSpanBeforeCursor } from "./live-preview";
 import {
   insertCodeBlock,
   insertMathBlock,
@@ -20,7 +20,11 @@ import {
 import { openInsertTableDialog } from "./table-insert-dialog";
 import { convertPipeRowToTable } from "./table-ops";
 import { tableKeymap } from "./table-toolbar";
-import { handleTableEnter, handleTableShiftTab, handleTableTab } from "./tables";
+import {
+  handleTableEnter,
+  handleTableShiftTab,
+  handleTableTab,
+} from "./tables";
 
 export interface FileCommandHandlers {
   onOpenFile: () => void | Promise<void>;
@@ -72,7 +76,11 @@ function isWrappedOutsideSelection(
     const after2 = to + 2 <= state.doc.length ? state.sliceDoc(to, to + 2) : "";
     const before3 = from >= 3 ? state.sliceDoc(from - 3, from) : "";
     const after3 = to + 3 <= state.doc.length ? state.sliceDoc(to, to + 3) : "";
-    if (before2 === "**" && after2 === "**" && !(before3 === "***" && after3 === "***")) {
+    if (
+      before2 === "**" &&
+      after2 === "**" &&
+      !(before3 === "***" && after3 === "***")
+    ) {
       return false;
     }
   }
@@ -207,7 +215,9 @@ export function createFileKeymap(handlers: FileCommandHandlers): KeyBinding[] {
     {
       key: "Enter",
       run: (view) =>
-        handleTableEnter(view) || convertPipeRowToTable(view) || handleListEnter(view),
+        handleTableEnter(view) ||
+        convertPipeRowToTable(view) ||
+        handleListEnter(view),
     },
     {
       key: "Backspace",
@@ -334,10 +344,26 @@ export function createFileKeymap(handlers: FileCommandHandlers): KeyBinding[] {
         run: (view) => setHeadingLevel(view, level),
       }),
     ),
-    { key: "Mod-Alt-c", preventDefault: true, run: (view) => insertCodeBlock(view) },
-    { key: "Mod-Alt-b", preventDefault: true, run: (view) => insertMathBlock(view) },
-    { key: "Mod-Alt-q", preventDefault: true, run: (view) => toggleBlockquote(view) },
-    { key: "Mod-Shift-d", preventDefault: true, run: (view) => toggleStrikethrough(view) },
+    {
+      key: "Mod-Alt-c",
+      preventDefault: true,
+      run: (view) => insertCodeBlock(view),
+    },
+    {
+      key: "Mod-Alt-b",
+      preventDefault: true,
+      run: (view) => insertMathBlock(view),
+    },
+    {
+      key: "Mod-Alt-q",
+      preventDefault: true,
+      run: (view) => toggleBlockquote(view),
+    },
+    {
+      key: "Mod-Shift-d",
+      preventDefault: true,
+      run: (view) => toggleStrikethrough(view),
+    },
     {
       key: "Mod-Alt-l",
       preventDefault: true,
@@ -397,7 +423,8 @@ export function bindWindowShortcuts(
   const listener = (rawEvent: Event) => {
     const event = rawEvent as KeyboardEvent;
     if (event.defaultPrevented) return;
-    const noModifiers = !event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey;
+    const noModifiers =
+      !event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey;
     if (noModifiers && event.key === "F8") {
       event.preventDefault();
       void handlers.onToggleFocusMode?.();

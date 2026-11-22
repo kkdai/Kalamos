@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 import { boot, getDoc, line, nextFrames, setDoc } from "./helpers";
 
 /**
@@ -16,7 +16,8 @@ async function markState(page: Page, lineNo = 1) {
   return line(page, lineNo).evaluate((el) => {
     const hidden = Array.from(el.querySelectorAll(".k-mark-hidden"));
     const clone = el.cloneNode(true) as HTMLElement;
-    for (const h of Array.from(clone.querySelectorAll(".k-mark-hidden"))) h.remove();
+    for (const h of Array.from(clone.querySelectorAll(".k-mark-hidden")))
+      h.remove();
     return {
       hiddenCount: hidden.length,
       hiddenWidths: hidden.map((h) => h.getBoundingClientRect().width),
@@ -35,7 +36,9 @@ const CASES = [
 ];
 
 for (const c of CASES) {
-  test(`#54 AC: ${c.name} renders as soon as the closing mark is typed`, async ({ page }) => {
+  test(`#54 AC: ${c.name} renders as soon as the closing mark is typed`, async ({
+    page,
+  }) => {
     await page.keyboard.type(c.src);
     await nextFrames(page);
     expect(await getDoc(page)).toBe(c.src);
@@ -48,7 +51,9 @@ for (const c of CASES) {
 
     // One step left: into the span → source shows; one step right: hidden again.
     await page.keyboard.press("ArrowLeft");
-    await expect.poll(async () => (await markState(page)).shown).toBeGreaterThan(0);
+    await expect
+      .poll(async () => (await markState(page)).shown)
+      .toBeGreaterThan(0);
     expect((await markState(page)).visibleText).toBe(c.src);
     await page.keyboard.press("ArrowRight");
     await expect.poll(async () => (await markState(page)).shown).toBe(0);
@@ -56,7 +61,9 @@ for (const c of CASES) {
   });
 }
 
-test("#54 AC: CJK mixed `中文**粗體**中文` renders right after `**`", async ({ page }) => {
+test("#54 AC: CJK mixed `中文**粗體**中文` renders right after `**`", async ({
+  page,
+}) => {
   await page.keyboard.type("中文**粗體**");
   await expect(line(page, 1).locator(".k-strong")).toHaveText("粗體");
   expect((await markState(page)).visibleText).toBe("中文粗體");
@@ -65,23 +72,31 @@ test("#54 AC: CJK mixed `中文**粗體**中文` renders right after `**`", asyn
   expect(await getDoc(page)).toBe("中文**粗體**中文");
 });
 
-test("#54 Backspace right after a rendered span expands it first, then deletes", async ({ page }) => {
+test("#54 Backspace right after a rendered span expands it first, then deletes", async ({
+  page,
+}) => {
   await page.keyboard.type("**bold**");
   await expect.poll(async () => (await markState(page)).shown).toBe(0);
   await page.keyboard.press("Backspace");
   expect(await getDoc(page)).toBe("**bold**");
-  await expect.poll(async () => (await markState(page)).shown).toBeGreaterThan(0);
+  await expect
+    .poll(async () => (await markState(page)).shown)
+    .toBeGreaterThan(0);
   await page.keyboard.press("Backspace");
   expect(await getDoc(page)).toBe("**bold*");
 });
 
-test("#54 an image renders after `)`; ArrowLeft steps into its source", async ({ page }) => {
+test("#54 an image renders after `)`; ArrowLeft steps into its source", async ({
+  page,
+}) => {
   await page.keyboard.type("![alt](https://example.test/a.png)");
   expect(await getDoc(page)).toBe("![alt](https://example.test/a.png)");
   await expect(page.getByTestId("image-widget")).toHaveCount(1);
   await page.keyboard.press("ArrowLeft");
   await expect(page.getByTestId("image-widget")).toHaveCount(0);
-  await expect(line(page, 1)).toContainText("![alt](https://example.test/a.png)");
+  await expect(line(page, 1)).toContainText(
+    "![alt](https://example.test/a.png)",
+  );
   const head = await page.evaluate(async () => {
     const app = (await import("/src/main.ts" as string)).getActiveApp();
     return app.editor.view.state.selection.main.head;
@@ -91,13 +106,19 @@ test("#54 an image renders after `)`; ArrowLeft steps into its source", async ({
   await expect(page.getByTestId("image-widget")).toHaveCount(1);
 });
 
-test("#54 decorations stay frozen while composing right after a span", async ({ page }) => {
+test("#54 decorations stay frozen while composing right after a span", async ({
+  page,
+}) => {
   await page.keyboard.type("**bold**");
   await expect.poll(async () => (await markState(page)).shown).toBe(0);
   const before = await markState(page);
   const cdp = await page.context().newCDPSession(page);
   for (const step of ["z", "zh", "中"]) {
-    await cdp.send("Input.imeSetComposition", { text: step, selectionStart: step.length, selectionEnd: step.length });
+    await cdp.send("Input.imeSetComposition", {
+      text: step,
+      selectionStart: step.length,
+      selectionEnd: step.length,
+    });
     await nextFrames(page);
     expect((await markState(page)).hiddenCount).toBe(before.hiddenCount);
   }

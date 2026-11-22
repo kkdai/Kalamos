@@ -10,10 +10,10 @@
  *   snippet, and clicking a hit asks the app to open the file at that spot.
  */
 import {
-  searchInFolder,
   type FolderSearchHit,
   type FolderSearchOptions,
   type FolderSearchResults,
+  searchInFolder,
 } from "../ipc";
 
 export const FOLDER_SEARCH_DEBOUNCE_MS = 250;
@@ -22,7 +22,11 @@ export interface FolderSearchOptionsInit {
   getFolder: () => string | null;
   onOpenHit: (hit: FolderSearchHit) => void | Promise<void>;
   /** Override the IPC call (tests). */
-  search?: (root: string, query: string, opts: FolderSearchOptions) => Promise<FolderSearchResults>;
+  search?: (
+    root: string,
+    query: string,
+    opts: FolderSearchOptions,
+  ) => Promise<FolderSearchResults>;
 }
 
 export interface FolderSearchView {
@@ -86,7 +90,12 @@ export function summaryText(results: FolderSearchResults): string {
   return results.truncated ? `${base}（已截斷，請縮小搜尋範圍）` : base;
 }
 
-function optionButton(label: string, title: string, testid: string, extraClass = ""): HTMLButtonElement {
+function optionButton(
+  label: string,
+  title: string,
+  testid: string,
+  extraClass = "",
+): HTMLButtonElement {
   const b = document.createElement("button");
   b.type = "button";
   b.className = `k-folder-search-opt ${extraClass}`.trim();
@@ -118,7 +127,9 @@ function chevron(): SVGSVGElement {
   return svg;
 }
 
-export function createFolderSearch(init: FolderSearchOptionsInit): FolderSearchView {
+export function createFolderSearch(
+  init: FolderSearchOptionsInit,
+): FolderSearchView {
   const doSearch = init.search ?? searchInFolder;
 
   const element = document.createElement("div");
@@ -136,7 +147,12 @@ export function createFolderSearch(init: FolderSearchOptionsInit): FolderSearchV
   input.spellcheck = false;
   input.autocomplete = "off";
   const caseBtn = optionButton("Aa", "區分大小寫", "folder-search-case");
-  const wordBtn = optionButton("ab", "全字比對", "folder-search-word", "k-folder-search-opt-word");
+  const wordBtn = optionButton(
+    "ab",
+    "全字比對",
+    "folder-search-word",
+    "k-folder-search-opt-word",
+  );
   const regexBtn = optionButton(".*", "正規表示式", "folder-search-regex");
   const opts = document.createElement("div");
   opts.className = "k-folder-search-options";
@@ -161,7 +177,8 @@ export function createFolderSearch(init: FolderSearchOptionsInit): FolderSearchV
   const collapsed = new Set<string>();
   let lastResults: { root: string; results: FolderSearchResults } | null = null;
 
-  const pressed = (b: HTMLButtonElement) => b.getAttribute("aria-pressed") === "true";
+  const pressed = (b: HTMLButtonElement) =>
+    b.getAttribute("aria-pressed") === "true";
 
   function setStatus(text: string, state: string): void {
     status.textContent = text;
@@ -230,13 +247,17 @@ export function createFolderSearch(init: FolderSearchOptionsInit): FolderSearchV
         const mark = document.createElement("mark");
         mark.textContent = s.slice(hit.snippetMatchStart, hit.snippetMatchEnd);
         text.append(
-          document.createTextNode(shortenLead(s.slice(0, hit.snippetMatchStart))),
+          document.createTextNode(
+            shortenLead(s.slice(0, hit.snippetMatchStart)),
+          ),
           mark,
           document.createTextNode(s.slice(hit.snippetMatchEnd)),
         );
         item.append(lineNo, text);
         item.addEventListener("click", () => {
-          for (const el of resultsEl.querySelectorAll('.k-folder-search-hit[data-active="true"]')) {
+          for (const el of resultsEl.querySelectorAll(
+            '.k-folder-search-hit[data-active="true"]',
+          )) {
             (el as HTMLElement).dataset.active = "false";
           }
           item.dataset.active = "true";
@@ -277,15 +298,24 @@ export function createFolderSearch(init: FolderSearchOptionsInit): FolderSearchV
       if (destroyed || mySeq !== seq) return; // a newer search owns the UI
       lastResults = { root, results };
       renderResults(root, results);
-      setStatus(summaryText(results), results.hits.length ? (results.truncated ? "truncated" : "some") : "none");
+      setStatus(
+        summaryText(results),
+        results.hits.length
+          ? results.truncated
+            ? "truncated"
+            : "some"
+          : "none",
+      );
     } catch (err) {
       if (destroyed || mySeq !== seq) return;
       lastResults = null;
       resultsEl.innerHTML = "";
       const kind = (err as { kind?: string } | null)?.kind;
-      if (kind === "Parse" && options.regex) setStatus("正規表示式無效", "invalid");
+      if (kind === "Parse" && options.regex)
+        setStatus("正規表示式無效", "invalid");
       else {
-        const message = (err as { message?: string } | null)?.message ?? String(err);
+        const message =
+          (err as { message?: string } | null)?.message ?? String(err);
         setStatus(`搜尋失敗：${message}`, "error");
       }
     }

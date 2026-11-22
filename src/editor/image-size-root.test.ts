@@ -45,13 +45,19 @@ const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 function stateOf(doc: string): EditorState {
   return EditorState.create({
     doc,
-    extensions: [markdown({ base: markdownLanguage }), imageDocPathField, imageRootSettingField],
+    extensions: [
+      markdown({ base: markdownLanguage }),
+      imageDocPathField,
+      imageRootSettingField,
+    ],
   });
 }
 
 describe("IM-03 <img> attribute parser", () => {
   it("reads double-, single- and unquoted values; names are case-insensitive", () => {
-    const attrs = parseImgAttributes(`<IMG SRC="a b.png" alt='貓' title=hi width=120 />`);
+    const attrs = parseImgAttributes(
+      `<IMG SRC="a b.png" alt='貓' title=hi width=120 />`,
+    );
     expect(attrs && Object.fromEntries(attrs)).toEqual({
       src: "a b.png",
       alt: "貓",
@@ -63,7 +69,9 @@ describe("IM-03 <img> attribute parser", () => {
   });
 
   it("decodes entities, keeps the first duplicate", () => {
-    const attrs = parseImgAttributes(`<img src="a&amp;b.png" alt="&quot;x&quot;" src="other.png">`);
+    const attrs = parseImgAttributes(
+      `<img src="a&amp;b.png" alt="&quot;x&quot;" src="other.png">`,
+    );
     expect(attrs?.get("src")).toBe("a&b.png");
     expect(attrs?.get("alt")).toBe('"x"');
   });
@@ -83,7 +91,9 @@ describe("IM-03 <img> attribute parser", () => {
   });
 
   it("ignores unknown attributes such as onerror / srcset", () => {
-    const tag = parseImgTag(`<img src="a.png" onerror="alert(1)" srcset="b.png 2x" class="x">`);
+    const tag = parseImgTag(
+      `<img src="a.png" onerror="alert(1)" srcset="b.png 2x" class="x">`,
+    );
     expect(tag).toEqual({ src: "a.png", alt: "", title: null, size: {} });
   });
 
@@ -96,9 +106,15 @@ describe("IM-03 <img> attribute parser", () => {
   });
 
   it("zoom / width / height → sizes; only allow-listed style properties", () => {
-    expect(parseImgTag(`<img src="a.png" style="zoom:50%">`)?.size).toEqual({ zoom: 0.5 });
-    expect(parseImgTag(`<img src="a.png" style="zoom: 0.25;">`)?.size).toEqual({ zoom: 0.25 });
-    expect(parseImgTag(`<img src="a.png" width="300" height="50%">`)?.size).toEqual({
+    expect(parseImgTag(`<img src="a.png" style="zoom:50%">`)?.size).toEqual({
+      zoom: 0.5,
+    });
+    expect(parseImgTag(`<img src="a.png" style="zoom: 0.25;">`)?.size).toEqual({
+      zoom: 0.25,
+    });
+    expect(
+      parseImgTag(`<img src="a.png" width="300" height="50%">`)?.size,
+    ).toEqual({
       width: "300px",
       height: "50%",
     });
@@ -109,11 +125,15 @@ describe("IM-03 <img> attribute parser", () => {
       )?.size,
     ).toEqual({ width: "20em", maxWidth: "100%" });
     expect(parseImageStyle("width: 12; height: -3px; zoom: 0")).toEqual({});
-    expect(parseImgTag(`<img src="a.png" width="abc" height="1e9">`)?.size).toEqual({});
+    expect(
+      parseImgTag(`<img src="a.png" width="abc" height="1e9">`)?.size,
+    ).toEqual({});
   });
 
   it("imageSizeCss only emits normalised values", () => {
-    expect(imageSizeCss({ maxWidth: "100%", zoom: 0.5 })).toBe("max-width:100%;zoom:0.5");
+    expect(imageSizeCss({ maxWidth: "100%", zoom: 0.5 })).toBe(
+      "max-width:100%;zoom:0.5",
+    );
     expect(imageSizeCss({ width: "200px", zoom: 0.5 })).toBe("width:100px");
     expect(imageSizeCss(undefined)).toBe("");
   });
@@ -122,7 +142,10 @@ describe("IM-03 <img> attribute parser", () => {
 describe("IM-03 sizes in the widget", () => {
   function fakeImg(natural: number): HTMLImageElement {
     const img = document.createElement("img");
-    Object.defineProperty(img, "naturalWidth", { value: natural, configurable: true });
+    Object.defineProperty(img, "naturalWidth", {
+      value: natural,
+      configurable: true,
+    });
     Object.defineProperty(img, "complete", { value: true, configurable: true });
     return img;
   }
@@ -137,7 +160,10 @@ describe("IM-03 sizes in the widget", () => {
     const img = document.createElement("img");
     applyImageSize(img, { zoom: 0.5 });
     expect(img.style.width).toBe("");
-    Object.defineProperty(img, "naturalWidth", { value: 300, configurable: true });
+    Object.defineProperty(img, "naturalWidth", {
+      value: 300,
+      configurable: true,
+    });
     img.dispatchEvent(new Event("load"));
     expect(img.style.width).toBe("150px");
   });
@@ -170,7 +196,9 @@ describe("IM-03 sizes in the widget", () => {
       ["c.png", false, null],
     ]);
     const first = specs[0];
-    expect(doc.slice(first.from, first.to)).toBe(`<img src="a.png" style="zoom:50%">`);
+    expect(doc.slice(first.from, first.to)).toBe(
+      `<img src="a.png" style="zoom:50%">`,
+    );
     expect(specs[1].alt).toBe("B");
   });
 
@@ -195,7 +223,8 @@ describe("IM-03 sizes in the widget", () => {
     await vi.waitFor(() =>
       expect(view.contentDOM.querySelector("img.k-image-img")).not.toBeNull(),
     );
-    const img = view.contentDOM.querySelector<HTMLImageElement>("img.k-image-img");
+    const img =
+      view.contentDOM.querySelector<HTMLImageElement>("img.k-image-img");
     expect(decodeURIComponent(img!.src)).toContain("/pics/a.png");
     expect(img!.classList.contains("k-image-sized")).toBe(true);
     view.dispatch({ selection: { anchor: 5 } });
@@ -211,27 +240,37 @@ describe("IM-04 image root resolution", () => {
       kind: "local",
       path: "/img/a.png",
     });
-    expect(resolveImageSrc("img/a.png", "/notes/d.md", toUrl, "/blog")).toMatchObject({
+    expect(
+      resolveImageSrc("img/a.png", "/notes/d.md", toUrl, "/blog"),
+    ).toMatchObject({
       path: "/notes/img/a.png",
     });
   });
 
   it("with a root, /-rooted paths resolve under it and cannot escape it", () => {
-    expect(resolveImageSrc("/img/a.png", "/notes/d.md", toUrl, "/Users/me/blog")).toMatchObject({
+    expect(
+      resolveImageSrc("/img/a.png", "/notes/d.md", toUrl, "/Users/me/blog"),
+    ).toMatchObject({
       kind: "local",
       path: "/Users/me/blog/img/a.png",
     });
-    expect(resolveImageSrc("/../../etc/passwd", null, toUrl, "/blog")).toMatchObject({
+    expect(
+      resolveImageSrc("/../../etc/passwd", null, toUrl, "/blog"),
+    ).toMatchObject({
       path: "/blog/etc/passwd",
     });
     // Untitled documents can still use rooted paths.
-    expect(resolveImageSrc("/img/a.png", null, toUrl, "/blog").kind).toBe("local");
+    expect(resolveImageSrc("/img/a.png", null, toUrl, "/blog").kind).toBe(
+      "local",
+    );
   });
 
   it("front matter typora-root-url wins over the setting; relative resolves against the doc", () => {
     expect(resolveImageRoot(null, "/n/d.md", "/blog")).toBe("/blog");
     expect(resolveImageRoot("/site", "/n/d.md", "/blog")).toBe("/site");
-    expect(resolveImageRoot("../static", "/n/posts/d.md", "/blog")).toBe("/n/static");
+    expect(resolveImageRoot("../static", "/n/posts/d.md", "/blog")).toBe(
+      "/n/static",
+    );
     expect(resolveImageRoot("./", "/n/posts/d.md", null)).toBe("/n/posts");
     expect(resolveImageRoot("file:///a%20b", null, null)).toBe("/a b");
     // Relative front matter root in an untitled doc falls back to the setting.
@@ -241,20 +280,30 @@ describe("IM-04 image root resolution", () => {
   });
 
   it("parses typora-root-url only from a closed front matter block at the top", () => {
-    expect(findTyporaRootUrlInText("---\ntitle: x\ntypora-root-url: ../static\n---\n# h")).toBe(
-      "../static",
-    );
-    expect(findTyporaRootUrlInText(`---\ntypora-root-url: "/my blog" # c\n...\n`)).toBe("/my blog");
+    expect(
+      findTyporaRootUrlInText(
+        "---\ntitle: x\ntypora-root-url: ../static\n---\n# h",
+      ),
+    ).toBe("../static");
+    expect(
+      findTyporaRootUrlInText(`---\ntypora-root-url: "/my blog" # c\n...\n`),
+    ).toBe("/my blog");
     expect(findTyporaRootUrlInText("---\ntypora-root-url: /x\n")).toBeNull(); // not closed
-    expect(findTyporaRootUrlInText("\n---\ntypora-root-url: /x\n---")).toBeNull(); // not first line
-    expect(findTyporaRootUrlInText("---\ntitle: a\n---\ntypora-root-url: /x")).toBeNull();
+    expect(
+      findTyporaRootUrlInText("\n---\ntypora-root-url: /x\n---"),
+    ).toBeNull(); // not first line
+    expect(
+      findTyporaRootUrlInText("---\ntitle: a\n---\ntypora-root-url: /x"),
+    ).toBeNull();
     expect(findTyporaRootUrlInText("# no front matter")).toBeNull();
   });
 
   it("effectiveImageRoot combines doc path, setting and front matter", () => {
     let state = stateOf("![](/img/a.png)");
     expect(effectiveImageRoot(state)).toBeNull();
-    state = state.update({ effects: setImageRootSettingEffect.of("/blog") }).state;
+    state = state.update({
+      effects: setImageRootSettingEffect.of("/blog"),
+    }).state;
     expect(effectiveImageRoot(state)).toBe("/blog");
     state = state.update({
       changes: { from: 0, insert: "---\ntypora-root-url: ../site\n---\n" },
@@ -279,8 +328,12 @@ describe("IM-03 / IM-04 in PDF export", () => {
       imageRootDir: "/blog",
     });
     expect(html).toContain('<img src="file:///blog/img/a.png" alt="a">');
-    expect(html).toContain('<img src="file:///blog/img/b.png" alt="" style="zoom:0.5">');
-    expect(html).toContain('<img src="file:///n/c.png" alt="" style="width:120px">');
+    expect(html).toContain(
+      '<img src="file:///blog/img/b.png" alt="" style="zoom:0.5">',
+    );
+    expect(html).toContain(
+      '<img src="file:///n/c.png" alt="" style="width:120px">',
+    );
     expect(html).not.toMatch(/onerror/);
   });
 
@@ -315,13 +368,18 @@ describe("IM-04 root folder command", () => {
 
     expect(await app.pickImageRootDir()).toBe(true);
     expect(app.getImageRootDir()).toBe("/Users/me/blog");
-    expect(app.getStatusText()).toBe(`${IMAGE_ROOT_STATUS_PREFIX}/Users/me/blog`);
+    expect(app.getStatusText()).toBe(
+      `${IMAGE_ROOT_STATUS_PREFIX}/Users/me/blog`,
+    );
     expect(getMockAllowedAssetDirs()).toContain("/Users/me/blog");
     expect((await getSettings()).imageRootDir).toBe("/Users/me/blog");
 
     app.editor.setContent("![](/img/a.png)\n\nend");
     app.editor.setCursor(app.editor.view.state.doc.length);
-    const img = app.editor.view.contentDOM.querySelector<HTMLImageElement>("img.k-image-img");
+    const img =
+      app.editor.view.contentDOM.querySelector<HTMLImageElement>(
+        "img.k-image-img",
+      );
     expect(decodeURIComponent(img!.src)).toContain("/Users/me/blog/img/a.png");
 
     await app.setImageRootDir(null);
@@ -344,7 +402,12 @@ describe("IM-04 root folder command", () => {
     await app.init();
     setMockDialogHandlers({ openFolder: () => "/site" });
     window.dispatchEvent(
-      new KeyboardEvent("keydown", { key: "®", code: "KeyR", metaKey: true, altKey: true }),
+      new KeyboardEvent("keydown", {
+        key: "®",
+        code: "KeyR",
+        metaKey: true,
+        altKey: true,
+      }),
     );
     await flush();
     await flush();
@@ -370,7 +433,9 @@ describe("IM-04 root folder command", () => {
   it("a front matter root is allowed for the asset protocol when it comes into effect", async () => {
     app = createKalamosApp(document);
     await app.init();
-    app.editor.setContent("---\ntypora-root-url: /static/site\n---\n\n![](/a.png)");
+    app.editor.setContent(
+      "---\ntypora-root-url: /static/site\n---\n\n![](/a.png)",
+    );
     await flush();
     expect(getMockAllowedAssetDirs()).toContain("/static/site");
   });
@@ -398,26 +463,34 @@ describe("IM-04 root folder command", () => {
     await flush();
     expect(app.getStatusText()).toBe(`${IMAGE_ROOT_TOO_BROAD_PREFIX}/Users`);
     expect(getMockAllowedAssetDirs()).not.toContain("/Users");
-    const widget = app.editor.view.contentDOM.querySelector<HTMLElement>("[data-testid=image-widget]");
+    const widget = app.editor.view.contentDOM.querySelector<HTMLElement>(
+      "[data-testid=image-widget]",
+    );
     expect(widget?.dataset.path).toBe("/Users/img/a.png");
   });
 
   it("a too-broad root from front matter shows a status message without crashing", async () => {
     app = createKalamosApp(document);
     await app.init();
-    app.editor.setContent("---\ntypora-root-url: /\n---\n\n![a](/img/a.png)\n\nend");
+    app.editor.setContent(
+      "---\ntypora-root-url: /\n---\n\n![a](/img/a.png)\n\nend",
+    );
     app.editor.setCursor(app.editor.view.state.doc.length);
     await flush();
     await flush();
     expect(app.getStatusText()).toBe(`${IMAGE_ROOT_TOO_BROAD_PREFIX}/`);
     expect(getMockAllowedAssetDirs()).not.toContain("/");
-    expect(app.editor.view.contentDOM.querySelector("[data-testid=image-widget]")).not.toBeNull();
+    expect(
+      app.editor.view.contentDOM.querySelector("[data-testid=image-widget]"),
+    ).not.toBeNull();
 
     // A relative front matter root that climbs to the home folder is refused too.
     await app.saveDocumentAs(`${MOCK_HOME_DIR}/posts/doc.md`);
     app.editor.setContent("---\ntypora-root-url: ..\n---\n\n![a](/img/a.png)");
     await flush();
     await flush();
-    expect(app.getStatusText()).toBe(`${IMAGE_ROOT_TOO_BROAD_PREFIX}${MOCK_HOME_DIR}`);
+    expect(app.getStatusText()).toBe(
+      `${IMAGE_ROOT_TOO_BROAD_PREFIX}${MOCK_HOME_DIR}`,
+    );
   });
 });

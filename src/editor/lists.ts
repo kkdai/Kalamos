@@ -67,7 +67,8 @@ export function parseListLine(lineText: string): ParsedListLine {
 /** A line holding only blockquote markers (`>`, `> >`, `> `…). */
 const EMPTY_QUOTE_LINE_RE = /^(?:[ \t]{0,3}>[ \t]?)+[ \t]*$/;
 /** Marker prefix of a list item line: indent, marker, spaces, optional task box. */
-const LIST_ITEM_PREFIX_RE = /^([ \t]*)((?:[-+*]|\d{1,9}[.)])(?:[ \t]+\[[ xX]\])?)(?:[ \t]+|$)/;
+const LIST_ITEM_PREFIX_RE =
+  /^([ \t]*)((?:[-+*]|\d{1,9}[.)])(?:[ \t]+\[[ xX]\])?)(?:[ \t]+|$)/;
 
 function isBlank(text: string): boolean {
   return text.trim() === "";
@@ -75,8 +76,18 @@ function isBlank(text: string): boolean {
 
 /** Is `pos` inside code (where list / quote syntax is plain text)? */
 function isInCode(state: EditorState, pos: number): boolean {
-  for (let n: ReturnType<ReturnType<typeof syntaxTree>["resolveInner"]> | null = syntaxTree(state).resolveInner(pos, 1); n; n = n.parent) {
-    if (n.name === "FencedCode" || n.name === "CodeBlock" || n.name === "CodeText") return true;
+  for (
+    let n: ReturnType<ReturnType<typeof syntaxTree>["resolveInner"]> | null =
+      syntaxTree(state).resolveInner(pos, 1);
+    n;
+    n = n.parent
+  ) {
+    if (
+      n.name === "FencedCode" ||
+      n.name === "CodeBlock" ||
+      n.name === "CodeText"
+    )
+      return true;
   }
   return false;
 }
@@ -154,19 +165,32 @@ export function handleListBackspace(view: EditorView): boolean {
     const head = state.selection.main.head;
     const line = state.doc.lineAt(head);
     const m = LIST_ITEM_PREFIX_RE.exec(line.text);
-    if (m && head === line.from + m[0].length && head > line.from && !isInCode(state, line.from)) {
+    if (
+      m &&
+      head === line.from + m[0].length &&
+      head > line.from &&
+      !isInCode(state, line.from)
+    ) {
       const indent = m[1];
       const content = line.text.slice(m[0].length);
       const prev = line.number > 1 ? state.doc.line(line.number - 1) : null;
-      const next = line.number < state.doc.lines ? state.doc.line(line.number + 1) : null;
+      const next =
+        line.number < state.doc.lines ? state.doc.line(line.number + 1) : null;
       const br = state.lineBreak;
-      const blankBefore = !isBlank(content) && prev !== null && !isBlank(prev.text) ? br : "";
-      const blankAfter = !isBlank(content) && next !== null && !isBlank(next.text) ? br : "";
-      const changes = [{ from: line.from, to: head, insert: blankBefore + indent }];
-      if (blankAfter) changes.push({ from: line.to, to: line.to, insert: blankAfter });
+      const blankBefore =
+        !isBlank(content) && prev !== null && !isBlank(prev.text) ? br : "";
+      const blankAfter =
+        !isBlank(content) && next !== null && !isBlank(next.text) ? br : "";
+      const changes = [
+        { from: line.from, to: head, insert: blankBefore + indent },
+      ];
+      if (blankAfter)
+        changes.push({ from: line.to, to: line.to, insert: blankAfter });
       view.dispatch({
         changes,
-        selection: EditorSelection.cursor(line.from + blankBefore.length + indent.length),
+        selection: EditorSelection.cursor(
+          line.from + blankBefore.length + indent.length,
+        ),
         scrollIntoView: true,
         userEvent: "delete.backward",
       });
@@ -406,7 +430,9 @@ function locateTaskMarkerRangeFromDom(
     return { from: domPos - 3, to: domPos };
   }
 
-  const line = state.doc.lineAt(Math.max(0, Math.min(domPos, state.doc.length)));
+  const line = state.doc.lineAt(
+    Math.max(0, Math.min(domPos, state.doc.length)),
+  );
   const match = /^(\s*(?:[-+*]|\d+[.)])\s+)(\[[ xX]\])/.exec(line.text);
   if (!match) return null;
   const from = line.from + match[1].length;
@@ -634,10 +660,7 @@ function normalizeTargetSlug(rawFragment: string): string {
   return decoded.trim().toLowerCase();
 }
 
-export function jumpToHeadingSlug(
-  view: EditorView,
-  rawSlug: string,
-): boolean {
+export function jumpToHeadingSlug(view: EditorView, rawSlug: string): boolean {
   const target = normalizeTargetSlug(rawSlug);
   if (!target) return false;
 
@@ -714,8 +737,7 @@ export function parseRelativeMarkdownLink(
   if (/^[a-zA-Z][a-zA-Z\d+.-]*:/.test(trimmed)) return null;
 
   const hashIndex = trimmed.indexOf("#");
-  const beforeHash =
-    hashIndex >= 0 ? trimmed.slice(0, hashIndex) : trimmed;
+  const beforeHash = hashIndex >= 0 ? trimmed.slice(0, hashIndex) : trimmed;
   const slugPart =
     hashIndex >= 0 && hashIndex + 1 < trimmed.length
       ? trimmed.slice(hashIndex + 1)
@@ -751,8 +773,7 @@ export function resolveRelativeMarkdownPath(
   }
 
   const lastSlash = normalizedCurrent.lastIndexOf("/");
-  const baseDir =
-    lastSlash >= 0 ? normalizedCurrent.slice(0, lastSlash) : "";
+  const baseDir = lastSlash >= 0 ? normalizedCurrent.slice(0, lastSlash) : "";
   const isAbsolute = normalizedCurrent.startsWith("/");
   const segments = baseDir.split("/").filter((s) => s.length > 0);
 

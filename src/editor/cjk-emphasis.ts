@@ -24,10 +24,10 @@
 
 import {
   type DelimiterType,
+  parser as defaultParser,
   type InlineContext,
   type InlineParser,
   type MarkdownConfig,
-  parser as defaultParser,
 } from "@lezer/markdown";
 
 /** Same punctuation class @lezer/markdown uses (Unicode P + S). */
@@ -66,8 +66,10 @@ function captureAsteriskType(): DelimiterType | null {
   const text = "a*b";
   let captured: DelimiterType | null = null;
   const stub = {
-    char: (pos: number) => (pos >= 0 && pos < text.length ? text.charCodeAt(pos) : -1),
-    slice: (from: number, to: number) => text.slice(Math.max(0, from), Math.max(0, to)),
+    char: (pos: number) =>
+      pos >= 0 && pos < text.length ? text.charCodeAt(pos) : -1,
+    slice: (from: number, to: number) =>
+      text.slice(Math.max(0, from), Math.max(0, to)),
     append: (elt: { type?: DelimiterType }) => {
       captured = elt.type ?? null;
       return 0;
@@ -111,7 +113,10 @@ export interface FlankingInfo {
 }
 
 /** Relaxed flanking for a `*` run with `before` / `after` neighbours ("" = line edge). */
-export function cjkAsteriskFlanking(before: string, after: string): FlankingInfo {
+export function cjkAsteriskFlanking(
+  before: string,
+  after: string,
+): FlankingInfo {
   const pBefore = PUNCTUATION.test(before);
   const pAfter = PUNCTUATION.test(after);
   const sBefore = WHITESPACE.test(before);
@@ -137,7 +142,13 @@ export const cjkEmphasisExtension: MarkdownConfig = {
         // Without a CJK neighbour the standard rule applies unchanged.
         if (!isCjkChar(before) && !isCjkChar(after)) return -1;
         const { canOpen, canClose } = cjkAsteriskFlanking(before, after);
-        return cx.addDelimiter(EMPHASIS_ASTERISK, start, pos, canOpen, canClose);
+        return cx.addDelimiter(
+          EMPHASIS_ASTERISK,
+          start,
+          pos,
+          canOpen,
+          canClose,
+        );
       },
     },
   ],

@@ -1,4 +1,9 @@
-import { Compartment, type EditorState, type Extension, type StateEffect } from "@codemirror/state";
+import {
+  Compartment,
+  type EditorState,
+  type Extension,
+  type StateEffect,
+} from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
 import { blocksExtension } from "./blocks";
 import { codeBlocksExtension } from "./code-blocks";
@@ -47,7 +52,9 @@ export function createSourceModeController(options?: {
   ): void {
     sourceMode = enabled;
     view.dispatch({
-      effects: compartment.reconfigure(enabled ? NO_PREVIEW : richPreviewExtensions),
+      effects: compartment.reconfigure(
+        enabled ? NO_PREVIEW : richPreviewExtensions,
+      ),
     });
     if (notify) {
       options?.onSourceModeChange?.(sourceMode);
@@ -59,7 +66,8 @@ export function createSourceModeController(options?: {
     return sourceMode;
   }
 
-  const currentExtension = (): Extension => (sourceMode ? NO_PREVIEW : richPreviewExtensions);
+  const currentExtension = (): Extension =>
+    sourceMode ? NO_PREVIEW : richPreviewExtensions;
 
   return {
     extension: compartment.of(currentExtension()),

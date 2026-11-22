@@ -139,12 +139,20 @@
 }
 
 .k-tree-row:hover {
-  background-color: color-mix(in srgb, var(--k-divider, #d9cdb3) 40%, transparent);
+  background-color: color-mix(
+    in srgb,
+    var(--k-divider, #d9cdb3) 40%,
+    transparent
+  );
 }
 
 .k-tree-row[data-active="true"] {
   border-left-color: var(--k-accent, #5e7a4a);
-  background-color: color-mix(in srgb, var(--k-divider, #d9cdb3) 55%, transparent);
+  background-color: color-mix(
+    in srgb,
+    var(--k-divider, #d9cdb3) 55%,
+    transparent
+  );
   font-weight: 600;
 }
 
@@ -178,17 +186,26 @@
   padding: 8px 14px;
   cursor: pointer;
   border-left: 2px solid transparent;
-  border-bottom: 1px solid color-mix(in srgb, var(--k-divider, #d9cdb3) 45%, transparent);
+  border-bottom: 1px solid
+    color-mix(in srgb, var(--k-divider, #d9cdb3) 45%, transparent);
   transition: background-color var(--k-transition-fast, 150ms ease-out);
 }
 
 .k-file-list-item:hover {
-  background-color: color-mix(in srgb, var(--k-divider, #d9cdb3) 40%, transparent);
+  background-color: color-mix(
+    in srgb,
+    var(--k-divider, #d9cdb3) 40%,
+    transparent
+  );
 }
 
 .k-file-list-item[data-active="true"] {
   border-left-color: var(--k-accent, #5e7a4a);
-  background-color: color-mix(in srgb, var(--k-divider, #d9cdb3) 55%, transparent);
+  background-color: color-mix(
+    in srgb,
+    var(--k-divider, #d9cdb3) 55%,
+    transparent
+  );
 }
 
 .k-file-list-name {
@@ -219,12 +236,20 @@
 }
 
 .k-outline-item:hover {
-  background-color: color-mix(in srgb, var(--k-divider, #d9cdb3) 40%, transparent);
+  background-color: color-mix(
+    in srgb,
+    var(--k-divider, #d9cdb3) 40%,
+    transparent
+  );
 }
 
 .k-outline-item[data-active="true"] {
   border-left-color: var(--k-accent, #5e7a4a);
-  background-color: color-mix(in srgb, var(--k-divider, #d9cdb3) 55%, transparent);
+  background-color: color-mix(
+    in srgb,
+    var(--k-divider, #d9cdb3) 55%,
+    transparent
+  );
   font-weight: 600;
 }
 
@@ -271,7 +296,11 @@
 }
 
 .k-sidebar-context-item:hover {
-  background-color: color-mix(in srgb, var(--k-divider, #d9cdb3) 60%, transparent);
+  background-color: color-mix(
+    in srgb,
+    var(--k-divider, #d9cdb3) 60%,
+    transparent
+  );
 }
 
 /* Inline Input Form (Create / Rename) */
@@ -319,7 +348,8 @@
 
 .k-folder-search-field:focus-within {
   border-color: var(--k-accent, #5e7a4a);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--k-accent, #5e7a4a) 22%, transparent);
+  box-shadow: 0 0 0 2px
+    color-mix(in srgb, var(--k-accent, #5e7a4a) 22%, transparent);
 }
 
 .k-folder-search-input {
@@ -372,7 +402,11 @@
 }
 
 .k-folder-search-opt[aria-pressed="true"] {
-  background-color: color-mix(in srgb, var(--k-accent, #5e7a4a) 20%, transparent);
+  background-color: color-mix(
+    in srgb,
+    var(--k-accent, #5e7a4a) 20%,
+    transparent
+  );
   color: var(--k-accent, #5e7a4a);
 }
 
@@ -422,7 +456,11 @@
 
 .k-folder-search-file:hover,
 .k-folder-search-hit:hover {
-  background-color: color-mix(in srgb, var(--k-divider, #d9cdb3) 40%, transparent);
+  background-color: color-mix(
+    in srgb,
+    var(--k-divider, #d9cdb3) 40%,
+    transparent
+  );
 }
 
 .k-folder-search-chevron {
@@ -461,7 +499,11 @@
   min-width: 18px;
   padding: 0 5px;
   border-radius: 8px;
-  background-color: color-mix(in srgb, var(--k-divider, #d9cdb3) 70%, transparent);
+  background-color: color-mix(
+    in srgb,
+    var(--k-divider, #d9cdb3) 70%,
+    transparent
+  );
   color: var(--k-text-muted, #6e6355);
   font-size: 11px;
   font-weight: 500;
@@ -492,7 +534,11 @@
 
 .k-folder-search-hit[data-active="true"] {
   border-left-color: var(--k-accent, #5e7a4a);
-  background-color: color-mix(in srgb, var(--k-divider, #d9cdb3) 55%, transparent);
+  background-color: color-mix(
+    in srgb,
+    var(--k-divider, #d9cdb3) 55%,
+    transparent
+  );
 }
 
 .k-folder-search-line {

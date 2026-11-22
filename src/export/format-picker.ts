@@ -7,7 +7,9 @@ import { PANDOC_FORMATS, type PandocFormat } from "./pandoc";
  * chosen format, or null on Escape / 取消 / a click outside. Built with
  * textContent only (no HTML strings).
  */
-export function pickExportFormat(doc: Document = document): Promise<PandocFormat | null> {
+export function pickExportFormat(
+  doc: Document = document,
+): Promise<PandocFormat | null> {
   doc.querySelector(".k-format-picker-backdrop")?.remove();
   return new Promise((resolve) => {
     const previousFocus = doc.activeElement as HTMLElement | null;

@@ -42,7 +42,7 @@ export function baseNameOf(path: string): string {
  */
 export function tabLabels(tabs: TabNameInput[]): Map<string, string> {
   const labels = new Map<string, string>();
-  const byName = new Map<string, TabNameInput[]>();
+  const byName = new Map<string, { id: string; path: string }[]>();
   for (const tab of tabs) {
     if (tab.path === null) {
       labels.set(tab.id, untitledLabel(tab.untitledNumber));
@@ -50,8 +50,9 @@ export function tabLabels(tabs: TabNameInput[]): Map<string, string> {
     }
     const name = baseNameOf(tab.path);
     const group = byName.get(name);
-    if (group) group.push(tab);
-    else byName.set(name, [tab]);
+    const savedTab = { id: tab.id, path: tab.path };
+    if (group) group.push(savedTab);
+    else byName.set(name, [savedTab]);
   }
   for (const [name, group] of byName) {
     const distinctPaths = new Set(group.map((t) => t.path));
@@ -59,18 +60,23 @@ export function tabLabels(tabs: TabNameInput[]): Map<string, string> {
       for (const tab of group) labels.set(tab.id, name);
       continue;
     }
-    const parents = new Map(group.map((t) => [t.id, splitPath(t.path!).slice(0, -1)]));
-    const maxDepth = Math.max(...[...parents.values()].map((p) => p.length));
-    const suffix = (dirs: string[], depth: number) => dirs.slice(Math.max(0, dirs.length - depth)).join("/");
-    for (const tab of group) {
-      const dirs = parents.get(tab.id)!;
+    const withParents = group.map((tab) => ({
+      ...tab,
+      dirs: splitPath(tab.path).slice(0, -1),
+    }));
+    const maxDepth = Math.max(...withParents.map((tab) => tab.dirs.length));
+    const suffix = (dirs: string[], depth: number) =>
+      dirs.slice(Math.max(0, dirs.length - depth)).join("/");
+    for (const tab of withParents) {
+      const { dirs } = tab;
       let depth = 1;
       // Grow until no other path in the group shares this suffix.
       while (
         depth < maxDepth &&
-        group.some(
+        withParents.some(
           (other) =>
-            other.path !== tab.path && suffix(parents.get(other.id)!, depth) === suffix(dirs, depth),
+            other.path !== tab.path &&
+            suffix(other.dirs, depth) === suffix(dirs, depth),
         )
       ) {
         depth++;
@@ -83,7 +89,11 @@ export function tabLabels(tabs: TabNameInput[]): Map<string, string> {
 }
 
 /** Next / previous index with wrap-around (Ctrl+Tab / Ctrl+Shift+Tab). */
-export function cycleIndex(index: number, count: number, delta: 1 | -1): number {
+export function cycleIndex(
+  index: number,
+  count: number,
+  delta: 1 | -1,
+): number {
   if (count <= 0) return -1;
   return (((index + delta) % count) + count) % count;
 }
@@ -94,7 +104,11 @@ export function cycleIndex(index: number, count: number, delta: 1 | -1): number 
  * neighbour (or the left one when it was last); closing another tab keeps the
  * active one.
  */
-export function activeIndexAfterClose(closedIndex: number, activeIndex: number, count: number): number {
+export function activeIndexAfterClose(
+  closedIndex: number,
+  activeIndex: number,
+  count: number,
+): number {
   const remaining = count - 1;
   if (remaining <= 0) return -1;
   if (closedIndex === activeIndex) return Math.min(closedIndex, remaining - 1);
@@ -102,7 +116,11 @@ export function activeIndexAfterClose(closedIndex: number, activeIndex: number, 
 }
 
 /** A copy of `items` with the item at `from` moved to `to` (indices in the original list). */
-export function moveItem<T>(items: readonly T[], from: number, to: number): T[] {
+export function moveItem<T>(
+  items: readonly T[],
+  from: number,
+  to: number,
+): T[] {
   const out = items.slice();
   if (from < 0 || from >= out.length) return out;
   const [item] = out.splice(from, 1);
@@ -112,12 +130,22 @@ export function moveItem<T>(items: readonly T[], from: number, to: number): T[] 
 }
 
 /** Extensions Kalamos opens as documents (same list as open_with.rs / bundle.fileAssociations). */
-export const MARKDOWN_EXTENSIONS = ["md", "markdown", "mdown", "mkd", "mkdn", "mdwn", "mdtxt"];
+export const MARKDOWN_EXTENSIONS = [
+  "md",
+  "markdown",
+  "mdown",
+  "mkd",
+  "mkdn",
+  "mdwn",
+  "mdtxt",
+];
 
 export function isMarkdownPath(path: string): boolean {
   const name = baseNameOf(path);
   const dot = name.lastIndexOf(".");
-  return dot > 0 && MARKDOWN_EXTENSIONS.includes(name.slice(dot + 1).toLowerCase());
+  return (
+    dot > 0 && MARKDOWN_EXTENSIONS.includes(name.slice(dot + 1).toLowerCase())
+  );
 }
 
 /**

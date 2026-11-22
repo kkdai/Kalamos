@@ -104,7 +104,8 @@
 
 .k-table th:focus-within,
 .k-table td:focus-within {
-  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--k-accent) 70%, transparent);
+  box-shadow: inset 0 0 0 2px
+    color-mix(in srgb, var(--k-accent) 70%, transparent);
 }
 
 .k-table th.k-table-cell-active:not(:focus-within),

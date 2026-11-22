@@ -1,5 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
-import { MOD, boot, getDoc, nextFrames, setCursor, setDoc } from "./helpers";
+import { expect, type Page, test } from "@playwright/test";
+import { boot, getDoc, MOD, nextFrames, setCursor, setDoc } from "./helpers";
 
 /** #59 B: insert dialog, `|a|b|` + Enter, structure operations (toolbar, menu, keys). */
 
@@ -43,12 +43,20 @@ async function openDialog(page: Page): Promise<void> {
 }
 
 /** Row / column of the focused contenteditable cell, or null. */
-async function focusedCell(page: Page): Promise<{ row: number; col: number } | null> {
+async function focusedCell(
+  page: Page,
+): Promise<{ row: number; col: number } | null> {
   return page.evaluate(() => {
     const el = document.activeElement as HTMLElement | null;
-    if (!el?.classList.contains("k-table-cell-content") || !el.isContentEditable) return null;
+    if (
+      !el?.classList.contains("k-table-cell-content") ||
+      !el.isContentEditable
+    )
+      return null;
     const td = el.closest<HTMLElement>("[data-row][data-col]");
-    return td ? { row: Number(td.dataset.row), col: Number(td.dataset.col) } : null;
+    return td
+      ? { row: Number(td.dataset.row), col: Number(td.dataset.col) }
+      : null;
   });
 }
 
@@ -73,7 +81,14 @@ test("#59 AC: insert 3×3 → type cells → Tab → add row / delete column →
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("table-insert-dialog")).toHaveCount(0);
 
-  for (const [i, text] of ["名稱", "數量", "備註", "蘋果", "3", "紅色"].entries()) {
+  for (const [i, text] of [
+    "名稱",
+    "數量",
+    "備註",
+    "蘋果",
+    "3",
+    "紅色",
+  ].entries()) {
     if (i > 0) await page.keyboard.press("Tab");
     await page.keyboard.type(text);
   }
@@ -99,7 +114,9 @@ test("#59 AC: insert 3×3 → type cells → Tab → add row / delete column →
   await expect(toolbar).toHaveCount(0);
 });
 
-test("#59: the toolbar floats above the table and hides when the cursor leaves", async ({ page }) => {
+test("#59: the toolbar floats above the table and hides when the cursor leaves", async ({
+  page,
+}) => {
   const src = "intro\n\n| a | b |\n| --- | --- |\n| 1 | 2 |\n\nend";
   await setDoc(page, src, src.indexOf("1"));
   const toolbar = page.getByTestId("table-toolbar");
@@ -108,12 +125,16 @@ test("#59: the toolbar floats above the table and hides when the cursor leaves",
   const table = (await page.getByTestId("table-widget").boundingBox())!;
   expect(tb.y + tb.height).toBeLessThanOrEqual(table.y + 1);
   // Not inside the table widget's DOM.
-  expect(await toolbar.evaluate((el) => el.closest(".k-table-wrapper") === null)).toBe(true);
+  expect(
+    await toolbar.evaluate((el) => el.closest(".k-table-wrapper") === null),
+  ).toBe(true);
   await setCursor(page, 0);
   await expect(toolbar).toBeHidden();
 });
 
-test("#59: the dialog picker picks the size; Escape cancels", async ({ page }) => {
+test("#59: the dialog picker picks the size; Escape cancels", async ({
+  page,
+}) => {
   await setDoc(page, "", 0);
   await openDialog(page);
   await page.keyboard.press("Escape");
@@ -121,7 +142,9 @@ test("#59: the dialog picker picks the size; Escape cancels", async ({ page }) =
   expect(await getDoc(page)).toBe("");
 
   await openDialog(page);
-  const cell = page.locator('.k-table-picker-cell[data-rows="2"][data-cols="4"]');
+  const cell = page.locator(
+    '.k-table-picker-cell[data-rows="2"][data-cols="4"]',
+  );
   await cell.hover();
   await expect(page.locator(".k-table-picker-label")).toHaveText("2 列 × 4 欄");
   await cell.click();
@@ -141,10 +164,17 @@ test("#59: fields set rows (header included) × columns", async ({ page }) => {
   await page.getByTestId("table-dialog-ok").click();
   const doc = await getDoc(page);
   expect(doc.startsWith("段落\n\n|")).toBe(true);
-  expect(tableCells(doc)).toEqual([["", ""], ["", ""], ["", ""], ["", ""]]);
+  expect(tableCells(doc)).toEqual([
+    ["", ""],
+    ["", ""],
+    ["", ""],
+    ["", ""],
+  ]);
 });
 
-test("#59: `| 名稱 | 數量 |` + Enter becomes a table; typing fills the body row", async ({ page }) => {
+test("#59: `| 名稱 | 數量 |` + Enter becomes a table; typing fills the body row", async ({
+  page,
+}) => {
   await setDoc(page, "", 0);
   await page.keyboard.type("| 名稱 | 數量 |");
   await page.keyboard.press("Enter");
@@ -152,14 +182,22 @@ test("#59: `| 名稱 | 數量 |` + Enter becomes a table; typing fills the body 
   await page.keyboard.press("Tab");
   await page.keyboard.type("3");
   const doc = await getDoc(page);
-  expect(tableCells(doc)).toEqual([["名稱", "數量"], ["蘋果", "3"]]);
+  expect(tableCells(doc)).toEqual([
+    ["名稱", "數量"],
+    ["蘋果", "3"],
+  ]);
   expect(doc.split("\n")[1]).toMatch(/^\| -+ \| -+ \|$/);
 });
 
-test("#59: right-click on a rendered cell opens the table menu", async ({ page }) => {
+test("#59: right-click on a rendered cell opens the table menu", async ({
+  page,
+}) => {
   const src = "| a | b |\n| --- | --- |\n| 1 | 2 |\n\nend";
   await setDoc(page, src, src.length);
-  await page.getByTestId("table-widget").locator('td[data-row="1"][data-col="1"]').click({ button: "right" });
+  await page
+    .getByTestId("table-widget")
+    .locator('td[data-row="1"][data-col="1"]')
+    .click({ button: "right" });
   const menu = page.getByTestId("table-context-menu");
   await expect(menu).toBeVisible();
   // The table stays rendered (right-click doesn't move the cursor into it).
@@ -168,17 +206,25 @@ test("#59: right-click on a rendered cell opens the table menu", async ({ page }
   await expect(menu.locator('[data-action="deleteRow"]')).toBeEnabled();
   await menu.locator('[data-action="colLeft"]').click();
   await expect(menu).toHaveCount(0);
-  expect(tableCells(await getDoc(page))).toEqual([["a", "", "b"], ["1", "", "2"]]);
+  expect(tableCells(await getDoc(page))).toEqual([
+    ["a", "", "b"],
+    ["1", "", "2"],
+  ]);
 
   // On the header the delete-row item is disabled; Escape closes the menu.
   await setCursor(page, (await getDoc(page)).length);
-  await page.getByTestId("table-widget").locator('th[data-row="0"][data-col="0"]').click({ button: "right" });
+  await page
+    .getByTestId("table-widget")
+    .locator('th[data-row="0"][data-col="0"]')
+    .click({ button: "right" });
   await expect(menu.locator('[data-action="deleteRow"]')).toBeDisabled();
   await page.keyboard.press("Escape");
   await expect(menu).toHaveCount(0);
 });
 
-test("#59: keyboard shortcuts insert / delete rows and columns and align", async ({ page }) => {
+test("#59: keyboard shortcuts insert / delete rows and columns and align", async ({
+  page,
+}) => {
   const src = "| a | b |\n| --- | --- |\n| 1 | 2 |";
   await setDoc(page, src, src.indexOf("1"));
   await page.keyboard.press(`${MOD}+Alt+ArrowDown`);
@@ -188,15 +234,22 @@ test("#59: keyboard shortcuts insert / delete rows and columns and align", async
   await page.keyboard.press(`${MOD}+Alt+ArrowRight`);
   expect(tableCells(await getDoc(page))[0]).toEqual(["a", "", "b"]);
   await page.keyboard.press(`${MOD}+Alt+Shift+ArrowUp`);
-  expect((await getDoc(page)).split("\n")[1]).toMatch(/^\| -+ \| :-+: \| -+ \|$/);
+  expect((await getDoc(page)).split("\n")[1]).toMatch(
+    /^\| -+ \| :-+: \| -+ \|$/,
+  );
   await page.keyboard.press(`${MOD}+Alt+Backspace`);
   expect(tableCells(await getDoc(page))[0]).toEqual(["a", "b"]);
   await page.keyboard.press(`${MOD}+Shift+Backspace`);
-  expect(tableCells(await getDoc(page))).toEqual([["a", "b"], ["1", "2"]]);
+  expect(tableCells(await getDoc(page))).toEqual([
+    ["a", "b"],
+    ["1", "2"],
+  ]);
   expect(isAligned(await getDoc(page))).toBe(true);
 });
 
-test("#59: IME composition in a freshly inserted table never throws", async ({ page }) => {
+test("#59: IME composition in a freshly inserted table never throws", async ({
+  page,
+}) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await setDoc(page, "", 0);
@@ -204,12 +257,20 @@ test("#59: IME composition in a freshly inserted table never throws", async ({ p
   await page.keyboard.press("Enter");
   const cdp = await page.context().newCDPSession(page);
   for (const step of ["ㄇ", "ㄇㄧ", "ㄇㄧㄥ"]) {
-    await cdp.send("Input.imeSetComposition", { text: step, selectionStart: step.length, selectionEnd: step.length });
+    await cdp.send("Input.imeSetComposition", {
+      text: step,
+      selectionStart: step.length,
+      selectionEnd: step.length,
+    });
     await nextFrames(page);
   }
   await cdp.send("Input.insertText", { text: "名" });
   await page.keyboard.press("Tab");
-  await cdp.send("Input.imeSetComposition", { text: "ㄕ", selectionStart: 1, selectionEnd: 1 });
+  await cdp.send("Input.imeSetComposition", {
+    text: "ㄕ",
+    selectionStart: 1,
+    selectionEnd: 1,
+  });
   await nextFrames(page);
   await cdp.send("Input.insertText", { text: "數" });
   await page.keyboard.press(`${MOD}+Alt+ArrowDown`);
@@ -224,7 +285,9 @@ test("#59: IME composition in a freshly inserted table never throws", async ({ p
 // With #59 A: operations from inside a focused (contenteditable) cell
 // ---------------------------------------------------------------------------
 
-test("#59 AC: dialog → type in cells → toolbar +列 → type straight into the new row → markdown", async ({ page }) => {
+test("#59 AC: dialog → type in cells → toolbar +列 → type straight into the new row → markdown", async ({
+  page,
+}) => {
   await setDoc(page, "", 0);
   await openDialog(page);
   await page.keyboard.press("Enter");
@@ -235,10 +298,16 @@ test("#59 AC: dialog → type in cells → toolbar +列 → type straight into t
     await page.keyboard.type(text);
   }
   await expect.poll(() => focusedCell(page)).toEqual({ row: 1, col: 0 });
-  await page.getByTestId("table-toolbar").locator('[data-action="rowBelow"]').click();
+  await page
+    .getByTestId("table-toolbar")
+    .locator('[data-action="rowBelow"]')
+    .click();
   await expect.poll(() => focusedCell(page)).toEqual({ row: 2, col: 0 });
   await page.keyboard.type("香蕉");
-  await page.getByTestId("table-toolbar").locator('[data-action="colRight"]').click();
+  await page
+    .getByTestId("table-toolbar")
+    .locator('[data-action="colRight"]')
+    .click();
   await expect.poll(() => focusedCell(page)).toEqual({ row: 2, col: 1 });
   await page.keyboard.type("12");
 
@@ -251,10 +320,15 @@ test("#59 AC: dialog → type in cells → toolbar +列 → type straight into t
   ]);
 });
 
-test("#59: shortcuts work in a focused cell and keep focus in the target cell", async ({ page }) => {
+test("#59: shortcuts work in a focused cell and keep focus in the target cell", async ({
+  page,
+}) => {
   const src = "| a | b |\n| --- | --- |\n| 1 | 2 |\n\nend";
   await setDoc(page, src, src.length);
-  await page.getByTestId("table-widget").locator('td[data-row="1"][data-col="0"] .k-table-cell-content').click();
+  await page
+    .getByTestId("table-widget")
+    .locator('td[data-row="1"][data-col="0"] .k-table-cell-content')
+    .click();
   await expect.poll(() => focusedCell(page)).toEqual({ row: 1, col: 0 });
 
   await page.keyboard.press(`${MOD}+Alt+ArrowDown`);
@@ -284,27 +358,39 @@ test("#59: shortcuts work in a focused cell and keep focus in the target cell", 
   expect(doc.split("\n")[1]).toMatch(/^\| -+ \| :-+: \| -+ \|$/);
 });
 
-test("#59: the context menu acts on the right-clicked cell while another cell is being edited", async ({ page }) => {
+test("#59: the context menu acts on the right-clicked cell while another cell is being edited", async ({
+  page,
+}) => {
   const src = "| a | b |\n| --- | --- |\n| 1 | 2 |\n\nend";
   await setDoc(page, src, src.length);
   const widget = page.getByTestId("table-widget");
-  await widget.locator('th[data-row="0"][data-col="1"] .k-table-cell-content').click();
+  await widget
+    .locator('th[data-row="0"][data-col="1"] .k-table-cell-content')
+    .click();
   await expect.poll(() => focusedCell(page)).toEqual({ row: 0, col: 1 });
-  await widget.locator('td[data-row="1"][data-col="0"]').click({ button: "right" });
+  await widget
+    .locator('td[data-row="1"][data-col="0"]')
+    .click({ button: "right" });
   const menu = page.getByTestId("table-context-menu");
   await menu.locator('[data-action="rowBelow"]').click();
   await expect(menu).toHaveCount(0);
   await expect.poll(() => focusedCell(page)).toEqual({ row: 2, col: 0 });
   await page.keyboard.type("新");
   // Right-clicking a cell focuses it; Escape closes the menu and keeps that focus.
-  await widget.locator('th[data-row="0"][data-col="0"]').click({ button: "right" });
+  await widget
+    .locator('th[data-row="0"][data-col="0"]')
+    .click({ button: "right" });
   await expect(menu).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(menu).toHaveCount(0);
   await expect.poll(() => focusedCell(page)).toEqual({ row: 0, col: 0 });
 
   const doc = await toSource(page);
-  expect(tableCells(doc)).toEqual([["a", "b"], ["1", "2"], ["新", ""]]);
+  expect(tableCells(doc)).toEqual([
+    ["a", "b"],
+    ["1", "2"],
+    ["新", ""],
+  ]);
 });
 
 // ---------------------------------------------------------------------------
@@ -313,18 +399,26 @@ test("#59: the context menu acts on the right-clicked cell while another cell is
 
 type Box = { x: number; y: number; width: number; height: number };
 const overlaps = (a: Box, b: Box) =>
-  a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+  a.x < b.x + b.width &&
+  b.x < a.x + a.width &&
+  a.y < b.y + b.height &&
+  b.y < a.y + a.height;
 
 /** Client rects of the text of the line containing `needle`. */
 async function textRects(page: Page, needle: string): Promise<Box[]> {
   return page.evaluate((n) => {
-    const lineEl = [...document.querySelectorAll<HTMLElement>(".cm-line")].find((l) =>
-      l.textContent?.includes(n),
+    const lineEl = [...document.querySelectorAll<HTMLElement>(".cm-line")].find(
+      (l) => l.textContent?.includes(n),
     );
     if (!lineEl) return [];
     const range = document.createRange();
     range.selectNodeContents(lineEl);
-    return [...range.getClientRects()].map((r) => ({ x: r.x, y: r.y, width: r.width, height: r.height }));
+    return [...range.getClientRects()].map((r) => ({
+      x: r.x,
+      y: r.y,
+      width: r.width,
+      height: r.height,
+    }));
   }, needle);
 }
 
@@ -334,7 +428,9 @@ test("#59 review: with a long paragraph right above, the toolbar overlaps neithe
   const para = `長段落開頭${"這是一段很長的文字，會換行好幾次，用來確認工具列不會蓋住表格上方的內容。".repeat(6)}段落結尾`;
   const src = `${para}\n\n| 名稱 | 數量 |\n| --- | --- |\n| 蘋果 | 3 |\n\nend`;
   await setDoc(page, src, src.length);
-  const cellEl = page.getByTestId("table-widget").locator('th[data-row="0"][data-col="0"]');
+  const cellEl = page
+    .getByTestId("table-widget")
+    .locator('th[data-row="0"][data-col="0"]');
   await cellEl.locator(".k-table-cell-content").click();
   await expect.poll(() => focusedCell(page)).toEqual({ row: 0, col: 0 });
   const toolbar = page.getByTestId("table-toolbar");
@@ -357,32 +453,46 @@ test("#59 review: with a long paragraph right above, the toolbar overlaps neithe
   expect(Math.abs(tb2.y - tb.y)).toBeLessThan(1);
 });
 
-test("#59 review: the reserved space doesn't make the clicked cell jump", async ({ page }) => {
-  const filler = Array.from({ length: 40 }, (_, i) => `段落 ${i + 1}`).join("\n\n");
-  const after = Array.from({ length: 40 }, (_, i) => `後文第${i + 1}段`).join("\n\n");
+test("#59 review: the reserved space doesn't make the clicked cell jump", async ({
+  page,
+}) => {
+  const filler = Array.from({ length: 40 }, (_, i) => `段落 ${i + 1}`).join(
+    "\n\n",
+  );
+  const after = Array.from({ length: 40 }, (_, i) => `後文第${i + 1}段`).join(
+    "\n\n",
+  );
   const src = `${filler}\n\n| a | b |\n| --- | --- |\n| 1 | 2 |\n\n${after}`;
   // Cursor on a line right after the table (outside it): the table is on screen.
   await setDoc(page, src, src.indexOf("後文第2段"));
   await page.evaluate(async () => {
-    const view = (await import("/src/main.ts" as string)).getActiveApp().editor.view;
+    const view = (await import("/src/main.ts" as string)).getActiveApp().editor
+      .view;
     view.dispatch({ selection: view.state.selection, scrollIntoView: true });
   });
-  const cellEl = page.getByTestId("table-widget").locator('td[data-row="1"][data-col="1"]');
+  const cellEl = page
+    .getByTestId("table-widget")
+    .locator('td[data-row="1"][data-col="1"]');
   await nextFrames(page, 3);
   const before = (await cellEl.boundingBox())!;
   // Mark the widget DOM: reserving the space must not rebuild the table.
   await page.evaluate(() => {
-    document.querySelector<HTMLElement>(".k-table-wrapper")!.dataset.marker = "kept";
+    document.querySelector<HTMLElement>(".k-table-wrapper")!.dataset.marker =
+      "kept";
   });
   const content = cellEl.locator(".k-table-cell-content");
   const cbox = (await content.boundingBox())!;
   // Click just inside the right end of the text so the caret lands after "2".
-  await content.click({ position: { x: Math.max(1, cbox.width - 1), y: cbox.height / 2 } });
+  await content.click({
+    position: { x: Math.max(1, cbox.width - 1), y: cbox.height / 2 },
+  });
   await expect(page.getByTestId("table-toolbar")).toBeVisible();
   await nextFrames(page, 3);
   const afterBox = (await cellEl.boundingBox())!;
   expect(Math.abs(afterBox.y - before.y)).toBeLessThanOrEqual(1);
-  expect(await page.locator('.k-table-wrapper[data-marker="kept"]').count()).toBe(1);
+  expect(
+    await page.locator('.k-table-wrapper[data-marker="kept"]').count(),
+  ).toBe(1);
   // Typing goes into the clicked cell.
   await page.keyboard.type("x");
   await expect(cellEl).toContainText("2x");

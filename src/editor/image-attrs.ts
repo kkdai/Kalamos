@@ -37,18 +37,22 @@ const NAMED_ENTITIES: Record<string, string> = {
 
 /** Decodes the few character references that matter in attribute values. */
 export function decodeAttrEntities(value: string): string {
-  return value.replace(/&(#x[0-9a-f]{1,6}|#\d{1,7}|[a-z]{2,6});/gi, (whole, body: string) => {
-    if (body[0] === "#") {
-      const code =
-        body[1] === "x" || body[1] === "X"
-          ? parseInt(body.slice(2), 16)
-          : parseInt(body.slice(1), 10);
-      if (!Number.isFinite(code) || code <= 0 || code > 0x10ffff) return whole;
-      if (code < 0x20 && code !== 0x09 && code !== 0x0a) return whole;
-      return String.fromCodePoint(code);
-    }
-    return NAMED_ENTITIES[body.toLowerCase()] ?? whole;
-  });
+  return value.replace(
+    /&(#x[0-9a-f]{1,6}|#\d{1,7}|[a-z]{2,6});/gi,
+    (whole, body: string) => {
+      if (body[0] === "#") {
+        const code =
+          body[1] === "x" || body[1] === "X"
+            ? parseInt(body.slice(2), 16)
+            : parseInt(body.slice(1), 10);
+        if (!Number.isFinite(code) || code <= 0 || code > 0x10ffff)
+          return whole;
+        if (code < 0x20 && code !== 0x09 && code !== 0x0a) return whole;
+        return String.fromCodePoint(code);
+      }
+      return NAMED_ENTITIES[body.toLowerCase()] ?? whole;
+    },
+  );
 }
 
 const ATTR_NAME = /^[A-Za-z_:][-A-Za-z0-9_:.]*/;
@@ -66,7 +70,7 @@ export function parseImgAttributes(raw: string): Map<string, string> | null {
   let i = head[0].length;
   const n = text.length;
   for (;;) {
-    const ws = /^\s*/.exec(text.slice(i))![0];
+    const ws = /^\s+/.exec(text.slice(i))?.[0] ?? "";
     i += ws.length;
     if (i >= n) return null; // unterminated
     if (text[i] === ">") {
@@ -112,13 +116,19 @@ const CSS_LENGTH = new RegExp(`^(${NUMBER})\\s*(px|%|em|rem|vw|vh)?$`, "i");
 const MAX_PX = 20_000;
 
 /** `width="120"` / `width="50%"` → CSS length. */
-export function normalizeAttrLength(value: string | undefined): string | undefined {
+export function normalizeAttrLength(
+  value: string | undefined,
+): string | undefined {
   if (value === undefined) return undefined;
   const m = ATTR_LENGTH.exec(value.trim());
   if (!m) return undefined;
   const num = Number(m[1]);
   const unit = (m[2] ?? "px").toLowerCase();
-  if (!(num > 0) || (unit === "px" && num > MAX_PX) || (unit === "%" && num > 1000)) {
+  if (
+    !(num > 0) ||
+    (unit === "px" && num > MAX_PX) ||
+    (unit === "%" && num > 1000)
+  ) {
     return undefined;
   }
   return `${num}${unit}`;
@@ -193,13 +203,20 @@ export function parseImgTag(raw: string): ImgTag | null {
 }
 
 export function hasImageSize(size: ImageSize | undefined): boolean {
-  return Boolean(size && (size.width || size.height || size.maxWidth || size.zoom));
+  return Boolean(
+    size && (size.width || size.height || size.maxWidth || size.zoom),
+  );
 }
 
 /** Stable key for widget equality. */
 export function imageSizeKey(size: ImageSize | undefined): string {
   if (!size) return "";
-  return [size.width ?? "", size.height ?? "", size.maxWidth ?? "", size.zoom ?? ""].join("|");
+  return [
+    size.width ?? "",
+    size.height ?? "",
+    size.maxWidth ?? "",
+    size.zoom ?? "",
+  ].join("|");
 }
 
 /** Multiplies a normalised CSS length (`120px`, `50%`) by `factor`. */
@@ -217,8 +234,10 @@ export function resolveZoomedSize(size: ImageSize): ImageSize {
   if (size.zoom === undefined || (!size.width && !size.height)) return size;
   const out: ImageSize = { ...size };
   delete out.zoom;
-  if (size.width && size.width !== "auto") out.width = scaleCssLength(size.width, size.zoom);
-  if (size.height && size.height !== "auto") out.height = scaleCssLength(size.height, size.zoom);
+  if (size.width && size.width !== "auto")
+    out.width = scaleCssLength(size.width, size.zoom);
+  if (size.height && size.height !== "auto")
+    out.height = scaleCssLength(size.height, size.zoom);
   return out;
 }
 
@@ -261,7 +280,9 @@ function unquoteYamlScalar(value: string): string {
  * (0-based) or undefined past the end, so callers can avoid slicing the whole
  * document.
  */
-export function findTyporaRootUrl(getLine: (index: number) => string | undefined): string | null {
+export function findTyporaRootUrl(
+  getLine: (index: number) => string | undefined,
+): string | null {
   if (getLine(0)?.replace(/\s+$/, "") !== "---") return null;
   for (let i = 1; i < FRONT_MATTER_MAX_LINES; i++) {
     const line = getLine(i);

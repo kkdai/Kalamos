@@ -49,7 +49,11 @@
 
 .k-format-option:hover,
 .k-format-option:focus-visible {
-  background-color: color-mix(in srgb, var(--k-accent, #5e7a4a) 16%, transparent);
+  background-color: color-mix(
+    in srgb,
+    var(--k-accent, #5e7a4a) 16%,
+    transparent
+  );
   outline: none;
 }
 

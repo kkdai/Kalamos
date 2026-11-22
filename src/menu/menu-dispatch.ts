@@ -16,9 +16,20 @@ import menuSpec from "./menu-spec.json";
  */
 
 export type MenuNode =
-  | { type: "submenu"; label: string; role?: "app" | "window" | "help"; items: MenuNode[] }
+  | {
+      type: "submenu";
+      label: string;
+      role?: "app" | "window" | "help";
+      items: MenuNode[];
+    }
   | { type: "themes"; label: string; items: MenuNode[] }
-  | { type: "action"; id: string; label: string; accel?: string; check?: boolean }
+  | {
+      type: "action";
+      id: string;
+      label: string;
+      accel?: string;
+      check?: boolean;
+    }
   | { type: "predefined"; item: string; label?: string }
   | { type: "link"; id: string; label: string; url: string };
 
@@ -47,7 +58,8 @@ export function menuActions(spec: MenuNode[] = MENU_SPEC): MenuActionNode[] {
   const walk = (nodes: MenuNode[]) => {
     for (const node of nodes) {
       if (node.type === "action") out.push(node);
-      else if (node.type === "submenu" || node.type === "themes") walk(node.items);
+      else if (node.type === "submenu" || node.type === "themes")
+        walk(node.items);
     }
   };
   walk(spec);
@@ -83,12 +95,23 @@ const SYMBOL_CODES: Record<string, string> = {
 export function parseAccelerator(accel: string): KeyMatcher {
   const parts = accel.split("+");
   const keyToken = parts.pop() ?? "";
-  const m: KeyMatcher = { cmdOrCtrl: false, meta: false, ctrl: false, alt: false, shift: false };
+  const m: KeyMatcher = {
+    cmdOrCtrl: false,
+    meta: false,
+    ctrl: false,
+    alt: false,
+    shift: false,
+  };
   for (const raw of parts) {
     const token = raw.trim().toLowerCase();
     if (token === "cmdorctrl" || token === "commandorcontrol") {
       m.cmdOrCtrl = true;
-    } else if (token === "cmd" || token === "command" || token === "super" || token === "meta") {
+    } else if (
+      token === "cmd" ||
+      token === "command" ||
+      token === "super" ||
+      token === "meta"
+    ) {
       m.meta = true;
     } else if (token === "ctrl" || token === "control") {
       m.ctrl = true;
@@ -102,7 +125,8 @@ export function parseAccelerator(accel: string): KeyMatcher {
   }
   if (/^[a-z]$/i.test(keyToken)) m.code = `Key${keyToken.toUpperCase()}`;
   else if (/^[0-9]$/.test(keyToken)) m.code = `Digit${keyToken}`;
-  else if (/^F([1-9]|1[0-9]|2[0-4])$/i.test(keyToken)) m.key = keyToken.toUpperCase();
+  else if (/^F([1-9]|1[0-9]|2[0-4])$/i.test(keyToken))
+    m.key = keyToken.toUpperCase();
   else if (SYMBOL_CODES[keyToken]) m.code = SYMBOL_CODES[keyToken];
   else if (keyToken.toLowerCase() === "tab") m.code = "Tab";
   else throw new Error(`Unknown accelerator key "${keyToken}" in ${accel}`);
@@ -141,7 +165,9 @@ export interface MenuDispatcher {
   destroy: () => void;
 }
 
-export function createMenuDispatcher(options: MenuDispatcherOptions): MenuDispatcher {
+export function createMenuDispatcher(
+  options: MenuDispatcherOptions,
+): MenuDispatcher {
   const { commands, target } = options;
   const now = options.now ?? (() => Date.now());
   const matchers = new Map<string, KeyMatcher>();
@@ -154,7 +180,11 @@ export function createMenuDispatcher(options: MenuDispatcherOptions): MenuDispat
 
   const onKeydownCapture = (raw: Event) => {
     const event = raw as KeyboardEvent;
-    if (lastMenuRun && now() - lastMenuRun.at <= MENU_THEN_KEY_WINDOW_MS && matchesKey(lastMenuRun.matcher, event)) {
+    if (
+      lastMenuRun &&
+      now() - lastMenuRun.at <= MENU_THEN_KEY_WINDOW_MS &&
+      matchesKey(lastMenuRun.matcher, event)
+    ) {
       // The menu already ran this shortcut.
       lastMenuRun = null;
       event.preventDefault();
@@ -185,7 +215,9 @@ export function createMenuDispatcher(options: MenuDispatcherOptions): MenuDispat
     try {
       const result = command(arg);
       if (result && typeof (result as Promise<unknown>).then === "function") {
-        void (result as Promise<unknown>).catch(() => null).then(() => options.afterRun?.(action));
+        void (result as Promise<unknown>)
+          .catch(() => null)
+          .then(() => options.afterRun?.(action));
       } else {
         options.afterRun?.(action);
       }
@@ -198,6 +230,7 @@ export function createMenuDispatcher(options: MenuDispatcherOptions): MenuDispat
   return {
     dispatch,
     hasCommand: (action) => action in commands,
-    destroy: () => target.removeEventListener("keydown", onKeydownCapture, true),
+    destroy: () =>
+      target.removeEventListener("keydown", onKeydownCapture, true),
   };
 }

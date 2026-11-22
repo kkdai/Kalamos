@@ -34,10 +34,12 @@ interface DecoInfo {
 
 function decos(state: EditorState): DecoInfo[] {
   const out: DecoInfo[] = [];
-  state.field(mathStateField).decorations.between(0, state.doc.length, (from, to, value) => {
-    const widget = value.spec.widget as { tex?: string } | undefined;
-    out.push({ from, to, value, tex: widget?.tex });
-  });
+  state
+    .field(mathStateField)
+    .decorations.between(0, state.doc.length, (from, to, value) => {
+      const widget = value.spec.widget as { tex?: string } | undefined;
+      out.push({ from, to, value, tex: widget?.tex });
+    });
   return out;
 }
 
@@ -91,13 +93,17 @@ describe("math decorations are incremental (#31 BUG-7)", () => {
     // Formula 10 is active: source marks instead of a widget.
     expect(widgetTexes(state)).not.toContain("x_{10}");
 
-    const moved = state.update({ selection: EditorSelection.cursor(f40 + 2) }).state;
+    const moved = state.update({
+      selection: EditorSelection.cursor(f40 + 2),
+    }).state;
     expect(widgetTexes(moved)).toContain("x_{10}");
     expect(widgetTexes(moved)).not.toContain("x_{40}");
 
     const after = decos(moved);
     const untouched = (list: DecoInfo[]) =>
-      list.filter((d) => d.tex !== undefined && d.tex !== "x_{10}" && d.tex !== "x_{40}");
+      list.filter(
+        (d) => d.tex !== undefined && d.tex !== "x_{10}" && d.tex !== "x_{40}",
+      );
     const b = untouched(before);
     const a = untouched(after);
     expect(a).toHaveLength(b.length);
@@ -114,7 +120,9 @@ describe("math decorations are incremental (#31 BUG-7)", () => {
     }).state;
     // The unterminated $$ swallows nothing that it should not, and the
     // decorations match a from-scratch build of the new document.
-    expect(widgetTexes(next)).toEqual(widgetTexes(createState(next.doc.toString(), 0)));
+    expect(widgetTexes(next)).toEqual(
+      widgetTexes(createState(next.doc.toString(), 0)),
+    );
   });
 
   it("deleting a $$ fence also matches a full rebuild", () => {
@@ -122,8 +130,12 @@ describe("math decorations are incremental (#31 BUG-7)", () => {
     const state = createState(doc, doc.length);
     expect(widgetTexes(state)).toEqual(["\nE=mc^2\n", "q"]);
     const closeFence = doc.indexOf("$$", 3);
-    const next = state.update({ changes: { from: closeFence, to: closeFence + 2 } }).state;
-    expect(widgetTexes(next)).toEqual(widgetTexes(createState(next.doc.toString(), next.doc.length)));
+    const next = state.update({
+      changes: { from: closeFence, to: closeFence + 2 },
+    }).state;
+    expect(widgetTexes(next)).toEqual(
+      widgetTexes(createState(next.doc.toString(), next.doc.length)),
+    );
   });
 });
 
@@ -161,7 +173,9 @@ describe("math preview is frozen during IME composition (#31 BUG-3)", () => {
       userEvent: "input.type.compose",
     }).state;
     expect(cur.doc.toString()).toBe("段落 $ab$ 尾");
-    cur = cur.update({ selection: EditorSelection.cursor(cur.doc.length) }).state;
+    cur = cur.update({
+      selection: EditorSelection.cursor(cur.doc.length),
+    }).state;
     expect(widgetTexes(cur)).toEqual(["ab"]);
   });
 });

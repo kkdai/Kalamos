@@ -35,7 +35,11 @@ function fullyParsed(doc: string, cursor = doc.length): EditorState {
       markdown({
         base: markdownLanguage,
         addKeymap: false,
-        extensions: [mathMarkdownExtension, frontMatterExtension, footnoteExtension],
+        extensions: [
+          mathMarkdownExtension,
+          frontMatterExtension,
+          footnoteExtension,
+        ],
       }),
       blocksExtension,
     ],
@@ -45,7 +49,12 @@ function fullyParsed(doc: string, cursor = doc.length): EditorState {
 }
 
 /** A composition transaction that replaces `from..to` (shrinking the document). */
-function composeReplace(state: EditorState, from: number, to: number, insert: string): EditorState {
+function composeReplace(
+  state: EditorState,
+  from: number,
+  to: number,
+  insert: string,
+): EditorState {
   return state.update({
     changes: { from, to, insert },
     selection: { anchor: from + insert.length },
@@ -64,8 +73,10 @@ describe("#56 positions kept across IME composition stay in range", () => {
     // setCursor to the end (selection-only transaction), then normal typing.
     expect(() => {
       state = state.update({ selection: { anchor: state.doc.length } }).state;
-      state = state.update({ changes: { from: state.doc.length, insert: "x" }, userEvent: "input.type" })
-        .state;
+      state = state.update({
+        changes: { from: state.doc.length, insert: "x" },
+        userEvent: "input.type",
+      }).state;
     }).not.toThrow();
     expect(state.field(footnoteIndexField).index.numbers.get("1")).toBe(1);
   });
@@ -73,7 +84,10 @@ describe("#56 positions kept across IME composition stay in range", () => {
   it("footnote index stays correct after compose + non-compose edits", () => {
     let state = fullyParsed(TABLE_DOC);
     state = composeReplace(state, 0, 5, "");
-    state = state.update({ changes: { from: 0, insert: "前" }, userEvent: "input.type" }).state;
+    state = state.update({
+      changes: { from: 0, insert: "前" },
+      userEvent: "input.type",
+    }).state;
     const def = state.field(footnoteIndexField).index.definitions.get("1");
     expect(def).toBeDefined();
     expect(state.sliceDoc(def!.from, def!.from + 4)).toBe("[^1]");
@@ -127,7 +141,10 @@ describe("#56 every StateField in the real editor survives compose → shrink �
     const run = () => {
       const cell = view.state.doc.toString().indexOf("十二");
       view.dispatch({ selection: { anchor: cell + 2 } });
-      for (const step of [{ from: cell, to: cell + 2, insert: "一" }, { from: cell, to: cell + 1, insert: "一百" }]) {
+      for (const step of [
+        { from: cell, to: cell + 2, insert: "一" },
+        { from: cell, to: cell + 1, insert: "一百" },
+      ]) {
         view.dispatch({
           changes: step,
           selection: { anchor: step.from + step.insert.length },
@@ -141,8 +158,14 @@ describe("#56 every StateField in the real editor survives compose → shrink �
         userEvent: "input.type.compose",
       });
       view.dispatch({ selection: { anchor: view.state.doc.length } });
-      view.dispatch({ changes: { from: view.state.doc.length, insert: "尾" }, userEvent: "input.type" });
-      view.dispatch({ changes: { from: 0, to: 6 }, userEvent: "delete.backward" });
+      view.dispatch({
+        changes: { from: view.state.doc.length, insert: "尾" },
+        userEvent: "input.type",
+      });
+      view.dispatch({
+        changes: { from: 0, to: 6 },
+        userEvent: "delete.backward",
+      });
     };
     expect(run).not.toThrow();
   });

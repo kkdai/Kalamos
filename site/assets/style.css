@@ -7,31 +7,35 @@
   color-scheme: light dark;
 
   /* Kalamos reed-pen palette (light) */
-  --bg: #FAF6EE;
-  --bg-panel: #F3E9D7;
-  --bg-sand: #EADBC2;
+  --bg: #faf6ee;
+  --bg-panel: #f3e9d7;
+  --bg-sand: #eadbc2;
   --bg-header: rgba(250, 246, 238, 0.86);
-  --border: #DFCEB4;
+  --border: #dfceb4;
   --border-subtle: rgba(122, 92, 58, 0.16);
 
-  --ink: #3B2A1E;
-  --ink-secondary: #624B38;
-  --ink-muted: #846A52;
+  --ink: #3b2a1e;
+  --ink-secondary: #624b38;
+  --ink-muted: #846a52;
 
-  --accent: #7A5C3A;
-  --accent-hover: #5E452A;
-  --accent-warm: #A8865A;
-  --accent-contrast: #FAF6EE;
+  --accent: #7a5c3a;
+  --accent-hover: #5e452a;
+  --accent-warm: #a8865a;
+  --accent-contrast: #faf6ee;
 
-  --window-chrome: #EFE4D1;
+  --window-chrome: #efe4d1;
   --window-border: rgba(59, 42, 30, 0.14);
   --shadow-window:
-    0 24px 64px -16px rgba(59, 42, 30, 0.18),
-    0 6px 18px -6px rgba(59, 42, 30, 0.10);
+    0 24px 64px -16px rgba(59, 42, 30, 0.18), 0 6px 18px -6px
+    rgba(59, 42, 30, 0.1);
   --shadow-card: 0 2px 12px rgba(59, 42, 30, 0.05);
 
-  --font-serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Songti TC", "Noto Serif TC", "Hiragino Mincho ProN", "Yu Mincho", "Batang", serif;
-  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "PingFang TC", "Hiragino Sans", "Apple SD Gothic Neo", "Noto Sans", sans-serif;
+  --font-serif:
+    "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Songti TC",
+    "Noto Serif TC", "Hiragino Mincho ProN", "Yu Mincho", "Batang", serif;
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "PingFang TC",
+    "Hiragino Sans", "Apple SD Gothic Neo", "Noto Sans", sans-serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, Monaco, Consolas, monospace;
 
   --radius-sm: 8px;
@@ -43,27 +47,26 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #1A1613;
-    --bg-panel: #241E19;
-    --bg-sand: #2E261F;
+    --bg: #1a1613;
+    --bg-panel: #241e19;
+    --bg-sand: #2e261f;
     --bg-header: rgba(26, 22, 19, 0.86);
-    --border: #3D3228;
+    --border: #3d3228;
     --border-subtle: rgba(234, 219, 194, 0.14);
 
-    --ink: #F3E9D7;
-    --ink-secondary: #D4C3AA;
-    --ink-muted: #A49078;
+    --ink: #f3e9d7;
+    --ink-secondary: #d4c3aa;
+    --ink-muted: #a49078;
 
-    --accent: #C9A877;
-    --accent-hover: #DFC295;
-    --accent-warm: #A8865A;
-    --accent-contrast: #1A1613;
+    --accent: #c9a877;
+    --accent-hover: #dfc295;
+    --accent-warm: #a8865a;
+    --accent-contrast: #1a1613;
 
-    --window-chrome: #2A231D;
+    --window-chrome: #2a231d;
     --window-border: rgba(243, 233, 215, 0.12);
     --shadow-window:
-      0 28px 70px -14px rgba(0, 0, 0, 0.55),
-      0 8px 20px -6px rgba(0, 0, 0, 0.35);
+      0 28px 70px -14px rgba(0, 0, 0, 0.55), 0 8px 20px -6px rgba(0, 0, 0, 0.35);
     --shadow-card: 0 2px 14px rgba(0, 0, 0, 0.24);
   }
 }
@@ -100,7 +103,10 @@ img {
 a {
   color: var(--accent);
   text-decoration: none;
-  transition: color 160ms ease, background-color 160ms ease, border-color 160ms ease;
+  transition:
+    color 160ms ease,
+    background-color 160ms ease,
+    border-color 160ms ease;
 }
 
 a:hover {
@@ -307,7 +313,11 @@ summary:focus-visible {
   line-height: 1.2;
   border: 1px solid transparent;
   cursor: pointer;
-  transition: transform 140ms ease, background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+  transition:
+    transform 140ms ease,
+    background-color 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease;
 }
 
 .btn:active {
@@ -372,7 +382,7 @@ summary:focus-visible {
 }
 
 .window-frame--dark {
-  background-color: #26221D;
+  background-color: #26221d;
   border-color: rgba(243, 233, 215, 0.14);
 }
 
@@ -397,7 +407,7 @@ summary:focus-visible {
 }
 
 .window-frame--dark .window-dot {
-  background-color: #4A4239;
+  background-color: #4a4239;
 }
 
 .window-title {
@@ -409,7 +419,7 @@ summary:focus-visible {
 }
 
 .window-frame--dark .window-title {
-  color: #9C9384;
+  color: #9c9384;
 }
 
 .window-frame img {

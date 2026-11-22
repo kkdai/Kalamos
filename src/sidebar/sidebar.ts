@@ -2,6 +2,8 @@ import "./sidebar.css";
 import type { EditorView } from "@codemirror/view";
 import {
   createFile,
+  type FileEntry,
+  type FolderSearchHit,
   getSettings,
   hasMockPromptHandler,
   isMarkdownName,
@@ -11,14 +13,12 @@ import {
   promptMockInput,
   readTree,
   renamePath,
-  setSettings,
-  trashPath,
-  watchFolder,
-  type FileEntry,
-  type FolderSearchHit,
   type Settings,
   type SidebarTab,
+  setSettings,
   type TreeNode,
+  trashPath,
+  watchFolder,
 } from "../ipc";
 import { createFileList, type FileListView } from "./file-list";
 import { createFileTree, type FileTreeView } from "./file-tree";
@@ -36,7 +36,10 @@ export interface CreateSidebarOptions {
   element: HTMLElement;
   editorView?: EditorView | null;
   /** #81 B: `newTab` = Cmd+click in the file tree / list. */
-  onSelectFile: (path: string, options?: { newTab: boolean }) => void | Promise<void>;
+  onSelectFile: (
+    path: string,
+    options?: { newTab: boolean },
+  ) => void | Promise<void>;
   onPathRenamed?: (fromPath: string, toPath: string) => void | Promise<void>;
   onPathTrashed?: (trashedPath: string) => void | Promise<void>;
   /** #73 B: a folder-search hit was clicked. */
@@ -69,7 +72,10 @@ export interface SidebarController {
   openFolder: (explicitPath?: string) => Promise<boolean>;
   refresh: () => Promise<void>;
   setActiveFile: (path: string | null) => void;
-  createNewFile: (parentDir: string, fileName: string) => Promise<string | null>;
+  createNewFile: (
+    parentDir: string,
+    fileName: string,
+  ) => Promise<string | null>;
   renameItem: (fromPath: string, newName: string) => Promise<boolean>;
   trashItem: (targetPath: string) => Promise<boolean>;
   registerTab: (descriptor: SidebarTabDescriptor) => void;
@@ -120,8 +126,11 @@ function hasFileExtension(name: string): boolean {
   return dotIdx > 0 && dotIdx < name.length - 1;
 }
 
-export function createSidebar(options: CreateSidebarOptions): SidebarController {
-  const { element, onSelectFile, onPathRenamed, onPathTrashed, onError } = options;
+export function createSidebar(
+  options: CreateSidebarOptions,
+): SidebarController {
+  const { element, onSelectFile, onPathRenamed, onPathTrashed, onError } =
+    options;
 
   element.classList.add("k-sidebar");
   element.dataset.testid = "sidebar";
@@ -259,7 +268,13 @@ export function createSidebar(options: CreateSidebarOptions): SidebarController 
   });
 
   bodyEl.addEventListener("contextmenu", (e) => {
-    if (e.defaultPrevented || !currentFolder || currentTab === "outline" || currentTab === "search") return;
+    if (
+      e.defaultPrevented ||
+      !currentFolder ||
+      currentTab === "outline" ||
+      currentTab === "search"
+    )
+      return;
     e.preventDefault();
     openContextMenu(e, { path: currentFolder, kind: "dir" });
   });
@@ -273,7 +288,10 @@ export function createSidebar(options: CreateSidebarOptions): SidebarController 
       btn.dataset.testid = tab.testId;
       btn.dataset.tab = tab.id;
       btn.setAttribute("role", "tab");
-      btn.setAttribute("aria-selected", tab.id === currentTab ? "true" : "false");
+      btn.setAttribute(
+        "aria-selected",
+        tab.id === currentTab ? "true" : "false",
+      );
       btn.textContent = tab.label;
       btn.addEventListener("click", () => {
         void setTab(tab.id, true);
@@ -293,7 +311,10 @@ export function createSidebar(options: CreateSidebarOptions): SidebarController 
     } else if (currentTab === "search") {
       outline.setActiveMount(false);
       // Keep the same DOM (and focus) when the folder data refreshes.
-      if (folderSearch.element.parentElement !== bodyEl || bodyEl.childElementCount !== 1) {
+      if (
+        folderSearch.element.parentElement !== bodyEl ||
+        bodyEl.childElementCount !== 1
+      ) {
         bodyEl.innerHTML = "";
         bodyEl.appendChild(folderSearch.element);
       }
@@ -325,7 +346,10 @@ export function createSidebar(options: CreateSidebarOptions): SidebarController 
     }
   }
 
-  async function setVisible(nextVisible: boolean, persist = true): Promise<void> {
+  async function setVisible(
+    nextVisible: boolean,
+    persist = true,
+  ): Promise<void> {
     visible = nextVisible;
     element.dataset.visible = visible ? "true" : "false";
     options.onLayoutChange?.();
@@ -466,7 +490,7 @@ export function createSidebar(options: CreateSidebarOptions): SidebarController 
       await renamePath(fromPath, toPath);
       if (activeFilePath === fromPath) {
         activeFilePath = toPath;
-      } else if (activeFilePath && activeFilePath.startsWith(`${fromPath}/`)) {
+      } else if (activeFilePath?.startsWith(`${fromPath}/`)) {
         activeFilePath = `${toPath}${activeFilePath.slice(fromPath.length)}`;
       }
       await onPathRenamed?.(fromPath, toPath);
@@ -483,7 +507,7 @@ export function createSidebar(options: CreateSidebarOptions): SidebarController 
       await trashPath(targetPath);
       if (
         activeFilePath === targetPath ||
-        (activeFilePath && activeFilePath.startsWith(`${targetPath}/`))
+        activeFilePath?.startsWith(`${targetPath}/`)
       ) {
         activeFilePath = null;
       }
@@ -558,7 +582,9 @@ export function createSidebar(options: CreateSidebarOptions): SidebarController 
     }
     const winPrompt =
       typeof window !== "undefined"
-        ? (window.prompt as unknown as { mock?: unknown } & typeof window.prompt)
+        ? (window.prompt as unknown as {
+            mock?: unknown;
+          } & typeof window.prompt)
         : undefined;
     if (typeof winPrompt === "function" && winPrompt.mock) {
       const val = winPrompt(promptLabel, defaultValue);

@@ -66,7 +66,8 @@ export const footnoteExtension: MarkdownConfig = {
         for (; i < cx.end; i++) {
           const ch = cx.char(i);
           if (ch === 93 /* ] */) break;
-          if (ch === 91 || ch === 32 || ch === 9 || ch === 10 || ch === 13) return -1;
+          if (ch === 91 || ch === 32 || ch === 9 || ch === 10 || ch === 13)
+            return -1;
         }
         if (i >= cx.end || i === pos + 2) return -1;
         return cx.addElement(cx.elt("FootnoteReference", pos, i + 1));
@@ -104,7 +105,10 @@ function definitionInfo(
   const mark = node.getChild("FootnoteMark");
   if (!mark) return null;
   let contentFrom = mark.to;
-  while (contentFrom < node.to && /[ \t]/.test(slice(contentFrom, contentFrom + 1))) {
+  while (
+    contentFrom < node.to &&
+    /[ \t]/.test(slice(contentFrom, contentFrom + 1))
+  ) {
     contentFrom++;
   }
   return {
@@ -154,7 +158,10 @@ export function buildFootnoteIndex(
   return { numbers, definitions, order };
 }
 
-export function footnoteIndexOfState(state: EditorState, tree: Tree): FootnoteIndex {
+export function footnoteIndexOfState(
+  state: EditorState,
+  tree: Tree,
+): FootnoteIndex {
   return buildFootnoteIndex(tree, (from, to) => state.sliceDoc(from, to));
 }
 

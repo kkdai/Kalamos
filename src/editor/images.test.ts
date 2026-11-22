@@ -1,6 +1,14 @@
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { EditorState } from "@codemirror/state";
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import {
   getMockAllowedAssetDirs,
   getMockAssetFiles,
@@ -8,7 +16,11 @@ import {
   seedMockFile,
   triggerMockFileDrop,
 } from "../ipc";
-import { createKalamosApp, type KalamosApp, SAVE_BEFORE_IMAGE_MESSAGE } from "../main";
+import {
+  createKalamosApp,
+  type KalamosApp,
+  SAVE_BEFORE_IMAGE_MESSAGE,
+} from "../main";
 import {
   buildImageInsertion,
   collectImageSpecs,
@@ -104,7 +116,9 @@ describe("resolveImageSrc (IM-01 path resolution)", () => {
       kind: "local",
       path: "/tmp/pic.png",
     });
-    expect(resolveImageSrc("file:///tmp/my%20pic.png", doc, toUrl)).toMatchObject({
+    expect(
+      resolveImageSrc("file:///tmp/my%20pic.png", doc, toUrl),
+    ).toMatchObject({
       kind: "local",
       path: "/tmp/my pic.png",
     });
@@ -125,7 +139,9 @@ describe("resolveImageSrc (IM-01 path resolution)", () => {
     expect(
       resolveImageSrc("data:image/png;base64,iVBORw0KGgo=", doc, toUrl),
     ).toMatchObject({ kind: "data" });
-    expect(resolveImageSrc("data:image/svg+xml,<svg/>", doc, toUrl)).toMatchObject({
+    expect(
+      resolveImageSrc("data:image/svg+xml,<svg/>", doc, toUrl),
+    ).toMatchObject({
       kind: "data",
     });
     expect(resolveImageSrc("data:text/html,<b>x</b>", doc, toUrl).kind).toBe(
@@ -186,7 +202,8 @@ describe("image helpers", () => {
 
     const mid = stateOf("hello world");
     const ins = buildImageInsertion(mid, 5, ["assets/a.png", "assets/b.png"])!;
-    const next = mid.update({ changes: { from: ins.from, insert: ins.insert } })
+    const next = mid
+      .update({ changes: { from: ins.from, insert: ins.insert } })
       .state.doc.toString();
     expect(next).toBe("hello\n![](assets/a.png)\n![](assets/b.png)\n world");
 
@@ -215,7 +232,7 @@ describe("Images in the editor (IM-01 / IM-02)", () => {
   it("renders an image widget when the cursor is elsewhere and reveals source when clicked", async () => {
     seedMockFile(
       "/tmp/kalamos/img/post.md",
-      "第一段\n\n![小貓](assets/my%20cat.png \"貓\")\n",
+      '第一段\n\n![小貓](assets/my%20cat.png "貓")\n',
     );
     app = createKalamosApp(document);
     await app.init();
@@ -223,7 +240,9 @@ describe("Images in the editor (IM-01 / IM-02)", () => {
     const { view } = app.editor;
     app.editor.setCursor(0);
 
-    const widget = view.dom.querySelector<HTMLElement>('[data-testid="image-widget"]');
+    const widget = view.dom.querySelector<HTMLElement>(
+      '[data-testid="image-widget"]',
+    );
     expect(widget).not.toBeNull();
     const img = widget!.querySelector("img")!;
     expect(img.getAttribute("src")).toBe(
@@ -232,11 +251,15 @@ describe("Images in the editor (IM-01 / IM-02)", () => {
     expect(img.alt).toBe("小貓");
     expect(widget!.title).toBe("貓");
     // Decoration only: document text is unchanged.
-    expect(app.editor.getContent()).toContain("![小貓](assets/my%20cat.png \"貓\")");
+    expect(app.editor.getContent()).toContain(
+      '![小貓](assets/my%20cat.png "貓")',
+    );
     // Document folder was added to the asset scope.
     expect(getMockAllowedAssetDirs()).toContain("/tmp/kalamos/img");
 
-    widget!.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, button: 0 }));
+    widget!.dispatchEvent(
+      new MouseEvent("mousedown", { bubbles: true, button: 0 }),
+    );
     const imageStart = app.editor.getContent().indexOf("![");
     expect(view.state.selection.main.head).toBe(imageStart + 2);
     expect(view.dom.querySelector('[data-testid="image-widget"]')).toBeNull();
@@ -268,12 +291,18 @@ describe("Images in the editor (IM-01 / IM-02)", () => {
     app.editor.setContent("![圖](assets/a.png)\n\n尾");
     app.editor.setCursor(app.editor.getContent().length);
 
-    const hint = app.editor.view.dom.querySelector('[data-testid="image-needs-save"]');
+    const hint = app.editor.view.dom.querySelector(
+      '[data-testid="image-needs-save"]',
+    );
     expect(hint?.textContent).toContain(UNSAVED_RELATIVE_IMAGE_HINT);
 
     await app.saveDocumentAs("/tmp/kalamos/saved/doc.md");
-    expect(app.editor.view.dom.querySelector('[data-testid="image-needs-save"]')).toBeNull();
-    const img = app.editor.view.dom.querySelector('[data-testid="image-widget"] img');
+    expect(
+      app.editor.view.dom.querySelector('[data-testid="image-needs-save"]'),
+    ).toBeNull();
+    const img = app.editor.view.dom.querySelector(
+      '[data-testid="image-widget"] img',
+    );
     expect(img?.getAttribute("src")).toBe(
       `asset://localhost/${encodeURIComponent("/tmp/kalamos/saved/assets/a.png")}`,
     );
@@ -284,11 +313,17 @@ describe("Images in the editor (IM-01 / IM-02)", () => {
     await app.init();
     app.editor.setContent("![x](https://example.com/x.png)\n\nmore");
     app.editor.setCursor(3);
-    expect(app.editor.view.dom.querySelector('[data-testid="image-widget"]')).toBeNull();
+    expect(
+      app.editor.view.dom.querySelector('[data-testid="image-widget"]'),
+    ).toBeNull();
     app.editor.setCursor(app.editor.getContent().length);
-    expect(app.editor.view.dom.querySelector('[data-testid="image-widget"]')).not.toBeNull();
+    expect(
+      app.editor.view.dom.querySelector('[data-testid="image-widget"]'),
+    ).not.toBeNull();
     app.editor.setSourceMode(true);
-    expect(app.editor.view.dom.querySelector('[data-testid="image-widget"]')).toBeNull();
+    expect(
+      app.editor.view.dom.querySelector('[data-testid="image-widget"]'),
+    ).toBeNull();
   });
 
   it("dropping image files inserts ![](assets/...) lines in order, with collision suffixes", async () => {
@@ -299,7 +334,11 @@ describe("Images in the editor (IM-01 / IM-02)", () => {
     app.editor.setCursor(app.editor.getContent().length);
 
     await triggerMockFileDrop({
-      paths: ["/tmp/kalamos-test/Desktop/my cat.png", "/tmp/kalamos-test/notes.txt", "/tmp/kalamos-test/b.JPG"],
+      paths: [
+        "/tmp/kalamos-test/Desktop/my cat.png",
+        "/tmp/kalamos-test/notes.txt",
+        "/tmp/kalamos-test/b.JPG",
+      ],
     });
     await flush();
 
@@ -335,10 +374,17 @@ describe("Images in the editor (IM-01 / IM-02)", () => {
     await app.openDocument("/tmp/kalamos/paste/post.md");
     app.editor.setCursor(2);
 
-    const file = new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], "image.png", {
-      type: "image/png",
-    });
-    const event = new Event("paste", { bubbles: true, cancelable: true }) as ClipboardEvent;
+    const file = new File(
+      [new Uint8Array([0x89, 0x50, 0x4e, 0x47])],
+      "image.png",
+      {
+        type: "image/png",
+      },
+    );
+    const event = new Event("paste", {
+      bubbles: true,
+      cancelable: true,
+    }) as ClipboardEvent;
     Object.defineProperty(event, "clipboardData", {
       value: {
         items: [{ kind: "file", type: "image/png", getAsFile: () => file }],
@@ -358,7 +404,9 @@ describe("Images in the editor (IM-01 / IM-02)", () => {
   it("pasting an image into an untitled document asks to save first", async () => {
     app = createKalamosApp(document);
     await app.init();
-    const file = new File([new Uint8Array([1])], "x.png", { type: "image/png" });
+    const file = new File([new Uint8Array([1])], "x.png", {
+      type: "image/png",
+    });
     const ok = await app.insertPastedImages([file], 0);
     expect(ok).toBe(false);
     expect(app.editor.getContent()).toBe("");

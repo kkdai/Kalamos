@@ -1,5 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
-import { MOD, boot, getDoc, nextFrames, setDoc, withIpc } from "./helpers";
+import { expect, type Page, test } from "@playwright/test";
+import { boot, getDoc, MOD, nextFrames, setDoc, withIpc } from "./helpers";
 
 /** Issues #17 (ED-08 emoji autocomplete) and #18 (ED-09 auto-pairing). */
 
@@ -15,10 +15,16 @@ test.beforeEach(async ({ page }) => {
  * chunk loads late, so results can arrive just before Enter. Condition-based
  * polling, no fixed sleep.
  */
-async function waitForCompletionReady(page: Page, label: string): Promise<void> {
+async function waitForCompletionReady(
+  page: Page,
+  label: string,
+): Promise<void> {
   await page.waitForFunction(
     (label) => {
-      const w = window as unknown as { __kCompHtml?: string; __kCompSince?: number };
+      const w = window as unknown as {
+        __kCompHtml?: string;
+        __kCompSince?: number;
+      };
       const popup = document.querySelector(".cm-tooltip-autocomplete");
       const html = popup?.innerHTML ?? "";
       if (html !== w.__kCompHtml) {
@@ -27,14 +33,19 @@ async function waitForCompletionReady(page: Page, label: string): Promise<void> 
         return false;
       }
       const first = popup?.querySelector("li");
-      return Boolean(first?.textContent?.includes(label)) && Date.now() - (w.__kCompSince ?? 0) > 150;
+      return (
+        Boolean(first?.textContent?.includes(label)) &&
+        Date.now() - (w.__kCompSince ?? 0) > 150
+      );
     },
     label,
     { polling: 25, timeout: 10_000 },
   );
 }
 
-test("#17 AC: typing :smile shows the candidate list; Enter inserts 😄", async ({ page }) => {
+test("#17 AC: typing :smile shows the candidate list; Enter inserts 😄", async ({
+  page,
+}) => {
   await setDoc(page, "今天 ", "今天 ".length);
   await page.keyboard.type(":smile");
   const popup = page.locator(".cm-tooltip-autocomplete");
@@ -42,7 +53,9 @@ test("#17 AC: typing :smile shows the candidate list; Enter inserts 😄", async
   await expect(popup).toBeVisible({ timeout: 10_000 });
   const first = popup.locator("li").first();
   await expect(first).toContainText(":smile:", { timeout: 10_000 });
-  await expect(first.getByTestId("emoji-option")).toHaveText("😄", { timeout: 10_000 });
+  await expect(first.getByTestId("emoji-option")).toHaveText("😄", {
+    timeout: 10_000,
+  });
   await waitForCompletionReady(page, ":smile:");
   await page.keyboard.press("Enter");
   await expect(popup).toHaveCount(0);
@@ -57,7 +70,9 @@ test("#17 spec: typing <di shows no HTML tag completion", async ({ page }) => {
   expect(await getDoc(page)).toBe("段落 <di");
 });
 
-test("#17 spec: a full :smile: converts; no popup inside code or after digits", async ({ page }) => {
+test("#17 spec: a full :smile: converts; no popup inside code or after digits", async ({
+  page,
+}) => {
   await setDoc(page, "", 0);
   await page.keyboard.type("讚 :+1: 時間 12:30");
   await nextFrames(page, 4);
@@ -70,7 +85,9 @@ test("#17 spec: a full :smile: converts; no popup inside code or after digits", 
   await expect(page.locator(".cm-tooltip-autocomplete")).toHaveCount(0);
 });
 
-test("#18 AC: brackets pair by default; with the setting off typing ( inserts only (", async ({ page }) => {
+test("#18 AC: brackets pair by default; with the setting off typing ( inserts only (", async ({
+  page,
+}) => {
   await setDoc(page, "", 0);
   await page.keyboard.type("(");
   expect(await getDoc(page)).toBe("()");
@@ -79,30 +96,45 @@ test("#18 AC: brackets pair by default; with the setting off typing ( inserts on
 
   await page.keyboard.press(`${MOD}+Alt+KeyP`);
   await expect(page.getByTestId("status")).toHaveText("自動配對括號：關");
-  expect(await withIpc<boolean>(page, "return (await ipc.getSettings()).autoPairBrackets;")).toBe(false);
+  expect(
+    await withIpc<boolean>(
+      page,
+      "return (await ipc.getSettings()).autoPairBrackets;",
+    ),
+  ).toBe(false);
   await setDoc(page, "", 0);
-  await page.keyboard.type("(「[\"");
-  expect(await getDoc(page)).toBe("(「[\"");
+  await page.keyboard.type('(「["');
+  expect(await getDoc(page)).toBe('(「["');
 
   await page.keyboard.press(`${MOD}+Alt+KeyP`);
   await expect(page.getByTestId("status")).toHaveText("自動配對括號：開");
 });
 
-test("#18 spec: Markdown symbols pair only when enabled (Cmd+Opt+Shift+P)", async ({ page }) => {
+test("#18 spec: Markdown symbols pair only when enabled (Cmd+Opt+Shift+P)", async ({
+  page,
+}) => {
   await setDoc(page, "a ", 2);
   await page.keyboard.type("*");
   expect(await getDoc(page)).toBe("a *");
   await page.keyboard.press(`${MOD}+Alt+Shift+KeyP`);
-  await expect(page.getByTestId("status")).toHaveText("自動配對 Markdown 符號：開");
+  await expect(page.getByTestId("status")).toHaveText(
+    "自動配對 Markdown 符號：開",
+  );
   await setDoc(page, "a ", 2);
   await page.keyboard.type("**粗體**");
   expect(await getDoc(page)).toBe("a **粗體**");
 });
 
-test("#18 spec: 「 committed through IME composition is inserted once, never duplicated", async ({ page }) => {
+test("#18 spec: 「 committed through IME composition is inserted once, never duplicated", async ({
+  page,
+}) => {
   await setDoc(page, "他說", 2);
   const cdp = await page.context().newCDPSession(page);
-  await cdp.send("Input.imeSetComposition", { text: "「", selectionStart: 1, selectionEnd: 1 });
+  await cdp.send("Input.imeSetComposition", {
+    text: "「",
+    selectionStart: 1,
+    selectionEnd: 1,
+  });
   await nextFrames(page);
   await cdp.send("Input.insertText", { text: "「" });
   await nextFrames(page, 4);

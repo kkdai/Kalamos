@@ -185,6 +185,18 @@ cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 npm run bench
 ```
 
+### Pre-commit hooks
+
+Install [prek](https://prek.j178.dev/installation/), then run these commands from the repository root:
+
+```bash
+prek install          # Run hooks automatically before each commit
+prek run              # Check staged files now
+prek run --all-files  # Check all tracked files
+```
+
+[prek.toml](prek.toml) configures file checks, Biome formatting and lint checks, TypeScript checks with `tsc-rs`, and GitHub Actions checks with `zizmor`. Run `npm ci` before the TypeScript check so it can resolve project dependencies. If a hook fixes a file, review and stage the fix before you commit.
+
 ---
 
 ## Known Limitations

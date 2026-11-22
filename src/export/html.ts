@@ -13,19 +13,34 @@ import { ensureSyntaxTree, syntaxTree } from "@codemirror/language";
 import { EditorState } from "@codemirror/state";
 import type { SyntaxNode } from "@lezer/common";
 import { highlightCode } from "@lezer/highlight";
-import { papyrosHighlightStyle, resolveCodeLanguage } from "../editor/code-blocks";
 import { isTocText, nestTocEntries, type TocEntry } from "../editor/blocks";
-import { buildFootnoteIndex, type FootnoteIndex, footnoteIdOf } from "../editor/footnotes";
+import { cjkEmphasisExtension } from "../editor/cjk-emphasis";
+import {
+  papyrosHighlightStyle,
+  resolveCodeLanguage,
+} from "../editor/code-blocks";
+import type { DiagramRenderResult } from "../editor/diagrams";
+import { resolveDiagramKind } from "../editor/diagrams";
+import {
+  buildFootnoteIndex,
+  type FootnoteIndex,
+  footnoteExtension,
+  footnoteIdOf,
+} from "../editor/footnotes";
 import { frontMatterExtension } from "../editor/front-matter";
-import { findTyporaRootUrlInText, imageSizeCss, parseImgTag } from "../editor/image-attrs";
+import {
+  findTyporaRootUrlInText,
+  imageSizeCss,
+  parseImgTag,
+} from "../editor/image-attrs";
 import { resolveImageRoot, resolveImageSrc } from "../editor/images";
 import { collectDocumentHeadings } from "../editor/lists";
-import { cjkEmphasisExtension } from "../editor/cjk-emphasis";
-import { footnoteExtension } from "../editor/footnotes";
 import { ensureMathJaxLoaded, mathMarkdownExtension } from "../editor/math";
-import { resolveDiagramKind } from "../editor/diagrams";
-import type { DiagramRenderResult } from "../editor/diagrams";
-import { type DiagramFence, diagramErrorTitle, renderExportDiagrams } from "./diagrams";
+import {
+  type DiagramFence,
+  diagramErrorTitle,
+  renderExportDiagrams,
+} from "./diagrams";
 import { PRINT_CSS as printCss } from "./print-css";
 
 export interface ExportHeading {
@@ -126,12 +141,12 @@ function children(node: SyntaxNode): SyntaxNode[] {
   return out;
 }
 
-interface CodeHighlighter {
-  (code: string, info: string): string;
-}
+type CodeHighlighter = (code: string, info: string) => string;
 
 /** Load every language used by a fenced block, then return a sync highlighter. */
-async function prepareCodeHighlighter(infos: string[]): Promise<CodeHighlighter> {
+async function prepareCodeHighlighter(
+  infos: string[],
+): Promise<CodeHighlighter> {
   const parsers = new Map<string, import("@lezer/common").Parser>();
   for (const info of new Set(infos)) {
     const desc = resolveCodeLanguage(info);
@@ -200,7 +215,10 @@ class Renderer {
     private readonly root: SyntaxNode,
     private readonly imageRoot: string | null = null,
     /** Rendered diagrams by FencedCode node start. */
-    private readonly diagrams: ReadonlyMap<number, DiagramRenderResult> = new Map(),
+    private readonly diagrams: ReadonlyMap<
+      number,
+      DiagramRenderResult
+    > = new Map(),
   ) {}
 
   private footnoteReference(node: SyntaxNode): string {
@@ -216,7 +234,11 @@ class Renderer {
 
   /** `[TOC]`: nested list of links to the headings. */
   private toc(): string {
-    const entries: TocEntry[] = this.headings.map((h) => ({ level: h.level, text: h.text, slug: h.id }));
+    const entries: TocEntry[] = this.headings.map((h) => ({
+      level: h.level,
+      text: h.text,
+      slug: h.id,
+    }));
     if (entries.length === 0) return "";
     const list = (nodes: ReturnType<typeof nestTocEntries>): string =>
       `<ul>\n${nodes
@@ -245,7 +267,8 @@ class Renderer {
       const n = i + 1;
       const def = defs.get(id);
       const info = this.footnotes.definitions.get(id);
-      const body = def && info ? this.inline(def, info.contentFrom, def.to).trim() : "";
+      const body =
+        def && info ? this.inline(def, info.contentFrom, def.to).trim() : "";
       return `<li id="fn-${n}">${body} <a class="k-fn-back" href="#fnref-${n}">↩</a></li>\n`;
     });
     return `<section class="k-footnotes">\n<hr>\n<ol>\n${items.join("")}</ol>\n</section>\n`;
@@ -355,21 +378,36 @@ class Renderer {
   private link(node: SyntaxNode): string {
     const { labelFrom, labelTo, href, title } = this.linkParts(node);
     const label = this.inline(node, labelFrom, labelTo);
-    if (!href || !isSafeHref(href)) return `<span class="k-link">${label}</span>`;
+    if (!href || !isSafeHref(href))
+      return `<span class="k-link">${label}</span>`;
     const titleAttr = title ? ` title="${escapeHtml(title)}"` : "";
     return `<a href="${escapeHtml(href)}"${titleAttr}>${label}</a>`;
   }
 
   private image(node: SyntaxNode): string {
     const { labelFrom, labelTo, href, title } = this.linkParts(node);
-    const alt = this.slice(labelFrom, labelTo).replace(/[*_`~]/g, "").trim();
+    const alt = this.slice(labelFrom, labelTo)
+      .replace(/[*_`~]/g, "")
+      .trim();
     return this.imageElement(href, alt, title, "");
   }
 
-  private imageElement(href: string, alt: string, title: string, style: string): string {
-    const resolved = resolveImageSrc(href, this.docPath, fileUrlFromPath, this.imageRoot);
+  private imageElement(
+    href: string,
+    alt: string,
+    title: string,
+    style: string,
+  ): string {
+    const resolved = resolveImageSrc(
+      href,
+      this.docPath,
+      fileUrlFromPath,
+      this.imageRoot,
+    );
     const src =
-      resolved.kind === "remote" || resolved.kind === "data" || resolved.kind === "local"
+      resolved.kind === "remote" ||
+      resolved.kind === "data" ||
+      resolved.kind === "local"
         ? resolved.url
         : null;
     if (!src) {
@@ -384,7 +422,12 @@ class Renderer {
   private htmlImage(raw: string): string | null {
     const tag = parseImgTag(raw);
     if (!tag) return null;
-    return this.imageElement(tag.src, tag.alt, tag.title ?? "", imageSizeCss(tag.size));
+    return this.imageElement(
+      tag.src,
+      tag.alt,
+      tag.title ?? "",
+      imageSizeCss(tag.size),
+    );
   }
 
   /** An HTML block whose every non-blank line is one `<img>` tag. */
@@ -413,7 +456,10 @@ class Renderer {
           .map((c) => this.block(c))
           .join("");
       case "Paragraph":
-        if (node.parent?.name === "Document" && isTocText(this.slice(node.from, node.to))) {
+        if (
+          node.parent?.name === "Document" &&
+          isTocText(this.slice(node.from, node.to))
+        ) {
           return this.toc();
         }
         return `<p>${this.inline(node).trim()}</p>\n`;
@@ -429,7 +475,8 @@ class Renderer {
         const start = firstMark
           ? Number.parseInt(this.slice(firstMark.from, firstMark.to), 10)
           : 1;
-        const startAttr = Number.isFinite(start) && start !== 1 ? ` start="${start}"` : "";
+        const startAttr =
+          Number.isFinite(start) && start !== 1 ? ` start="${start}"` : "";
         return `<ol${startAttr}>\n${this.blocks(node)}</ol>\n`;
       }
       case "ListItem":
@@ -518,21 +565,33 @@ class Renderer {
   }
 
   /** Info string, body (dedented) and whether the fence is closed. */
-  fenceParts(node: SyntaxNode): { infoString: string; code: string; closed: boolean } {
+  fenceParts(node: SyntaxNode): {
+    infoString: string;
+    code: string;
+    closed: boolean;
+  } {
     const info = node.getChild("CodeInfo");
     const infoString = info ? this.slice(info.from, info.to).trim() : "";
     const marks = node.getChildren("CodeMark");
     const open = marks[0];
     const close = marks.length >= 2 ? marks[marks.length - 1] : null;
     const openLineEnd = this.doc.indexOf("\n", open ? open.to : node.from);
-    const bodyFrom = openLineEnd < 0 || openLineEnd >= node.to ? node.to : openLineEnd + 1;
+    const bodyFrom =
+      openLineEnd < 0 || openLineEnd >= node.to ? node.to : openLineEnd + 1;
     let bodyTo = node.to;
     if (close && close.from >= bodyFrom) {
       const closeLineStart = this.doc.lastIndexOf("\n", close.from - 1) + 1;
       bodyTo = Math.max(bodyFrom, closeLineStart - 1);
     }
-    const code = this.dedent(this.slice(bodyFrom, bodyTo), this.columnOf(node.from));
-    return { infoString, code, closed: close !== null && close.from >= bodyFrom };
+    const code = this.dedent(
+      this.slice(bodyFrom, bodyTo),
+      this.columnOf(node.from),
+    );
+    return {
+      infoString,
+      code,
+      closed: close !== null && close.from >= bodyFrom,
+    };
   }
 
   private fencedCode(node: SyntaxNode): string {
@@ -565,19 +624,25 @@ class Renderer {
       (c) => c.name === "TableDelimiter" && /-/.test(this.slice(c.from, c.to)),
     );
     const aligns = delimiterRow
-      ? this.splitRowText(this.slice(delimiterRow.from, delimiterRow.to)).map((cell) => {
-          const t = cell.trim();
-          const left = t.startsWith(":");
-          const right = t.endsWith(":");
-          if (left && right) return "center";
-          if (right) return "right";
-          if (left) return "left";
-          return "";
-        })
+      ? this.splitRowText(this.slice(delimiterRow.from, delimiterRow.to)).map(
+          (cell) => {
+            const t = cell.trim();
+            const left = t.startsWith(":");
+            const right = t.endsWith(":");
+            if (left && right) return "center";
+            if (right) return "right";
+            if (left) return "left";
+            return "";
+          },
+        )
       : [];
     const header = rows.find((c) => c.name === "TableHeader");
     const body = rows.filter((c) => c.name === "TableRow");
-    const columnCount = Math.max(aligns.length, header ? this.rowCells(header).length : 0, 1);
+    const columnCount = Math.max(
+      aligns.length,
+      header ? this.rowCells(header).length : 0,
+      1,
+    );
 
     const renderRow = (row: SyntaxNode, tag: "th" | "td") => {
       const cells = this.rowCells(row);
@@ -643,7 +708,12 @@ function createParseState(content: string): EditorState {
         base: markdownLanguage,
         addKeymap: false,
         completeHTMLTags: false,
-        extensions: [mathMarkdownExtension, cjkEmphasisExtension, frontMatterExtension, footnoteExtension],
+        extensions: [
+          mathMarkdownExtension,
+          cjkEmphasisExtension,
+          frontMatterExtension,
+          footnoteExtension,
+        ],
       }),
     ],
   });
@@ -663,7 +733,8 @@ export async function buildExportHtml(
   options: ExportHtmlOptions,
 ): Promise<ExportHtmlResult> {
   const state = createParseState(content);
-  const tree = ensureSyntaxTree(state, state.doc.length, 10_000) ?? syntaxTree(state);
+  const tree =
+    ensureSyntaxTree(state, state.doc.length, 10_000) ?? syntaxTree(state);
   const doc = state.doc.toString();
   const headings = collectDocumentHeadings(state).map((h) => ({
     level: h.level,
@@ -695,19 +766,30 @@ export async function buildExportHtml(
     options.imageRootDir ?? null,
   );
   // Diagrams: collect closed mermaid / flow / sequence fences, render them in order.
-  const probe = new Renderer(doc, headings, options.docPath, highlight, math, footnotes, tree.topNode);
+  const probe = new Renderer(
+    doc,
+    headings,
+    options.docPath,
+    highlight,
+    math,
+    footnotes,
+    tree.topNode,
+  );
   const fenceNodes: Array<{ from: number; fence: DiagramFence }> = [];
   tree.iterate({
     enter: (ref) => {
       if (ref.name !== "FencedCode") return undefined;
       const { infoString, code, closed } = probe.fenceParts(ref.node);
       const kind = resolveDiagramKind(infoString);
-      if (kind && closed) fenceNodes.push({ from: ref.from, fence: { kind, source: code } });
+      if (kind && closed)
+        fenceNodes.push({ from: ref.from, fence: { kind, source: code } });
       return false;
     },
   });
   const rendered = await renderExportDiagrams(fenceNodes.map((f) => f.fence));
-  const diagrams = new Map(fenceNodes.map((f, i) => [f.from, rendered[i]] as const));
+  const diagrams = new Map(
+    fenceNodes.map((f, i) => [f.from, rendered[i]] as const),
+  );
 
   const renderer = new Renderer(
     doc,

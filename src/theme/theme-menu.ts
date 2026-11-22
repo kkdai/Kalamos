@@ -16,10 +16,16 @@ export interface ThemeOptionItem {
 }
 
 function detectBaseThemeForCustomCss(css: string): "papyros" | "melan" {
-  if (/color-scheme\s*:\s*dark/i.test(css) || /data-base-theme\s*:\s*melan/i.test(css)) {
+  if (
+    /color-scheme\s*:\s*dark/i.test(css) ||
+    /data-base-theme\s*:\s*melan/i.test(css)
+  ) {
     return "melan";
   }
-  if (/color-scheme\s*:\s*light/i.test(css) || /data-base-theme\s*:\s*papyros/i.test(css)) {
+  if (
+    /color-scheme\s*:\s*light/i.test(css) ||
+    /data-base-theme\s*:\s*papyros/i.test(css)
+  ) {
     return "papyros";
   }
   if (
@@ -40,7 +46,10 @@ function removeCustomThemeStyleEl(): void {
   }
 }
 
-function setCustomThemeStyleEl(themeId: string, css: string): HTMLStyleElement | null {
+function setCustomThemeStyleEl(
+  themeId: string,
+  css: string,
+): HTMLStyleElement | null {
   if (typeof document === "undefined") return null;
   let styleEl = document.getElementById(
     CUSTOM_THEME_STYLE_ID,
@@ -286,7 +295,7 @@ export function createThemeMenu(
   async function init(): Promise<void> {
     await refreshThemes();
     const settings = await getSettings().catch(() => null);
-    if (settings && settings.theme) {
+    if (settings?.theme) {
       await selectTheme(settings.theme, false);
     } else {
       await selectTheme("system", false);

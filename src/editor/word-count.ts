@@ -38,10 +38,12 @@ export const EMPTY_STATS: TextStats = {
   readingMinutes: 0,
 };
 
-const CJK_RE = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/gu;
+const CJK_RE =
+  /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/gu;
 const WORD_RE = /[\p{L}\p{N}\p{M}]+(?:['’-][\p{L}\p{N}\p{M}]+)*/gu;
 /** Text where code points ≠ graphemes (ZWJ emoji, variation selectors, flags, marks…). */
-const COMPLEX_GRAPHEME_RE = /[‍︎️\u{1F3FB}-\u{1F3FF}\u{1F1E6}-\u{1F1FF}\u{E0020}-\u{E007F}\p{M}]/u;
+const COMPLEX_GRAPHEME_RE =
+  /[‍︎️\u{1F3FB}-\u{1F3FF}\u{1F1E6}-\u{1F1FF}\u{E0020}-\u{E007F}\p{M}]/u;
 
 let segmenter: { segment: (s: string) => Iterable<unknown> } | null | undefined;
 
@@ -52,8 +54,11 @@ function graphemeCount(text: string): number {
     return n;
   }
   if (segmenter === undefined) {
-    const Seg = (Intl as unknown as { Segmenter?: new (l?: string, o?: object) => typeof segmenter })
-      .Segmenter;
+    const Seg = (
+      Intl as unknown as {
+        Segmenter?: new (l?: string, o?: object) => typeof segmenter;
+      }
+    ).Segmenter;
     segmenter = Seg ? new Seg(undefined, { granularity: "grapheme" }) : null;
   }
   if (!segmenter) return Array.from(text).length;
@@ -82,7 +87,8 @@ export function countPlain(visible: string, lines: number): TextStats {
   const noBreaks = visible.replace(/[\r\n\u2028\u2029]/g, "");
   const chars = graphemeCount(noBreaks);
   const charsNoSpaces = graphemeCount(noBreaks.replace(/\s/gu, ""));
-  const readingMinutes = words > 0 ? Math.max(1, Math.ceil(cjk / 400 + others / 200)) : 0;
+  const readingMinutes =
+    words > 0 ? Math.max(1, Math.ceil(cjk / 400 + others / 200)) : 0;
   return { words, chars, charsNoSpaces, lines, readingMinutes };
 }
 
@@ -131,7 +137,11 @@ function markupRanges(
       const name = ref.name;
       if (DROP_NODES.has(name)) {
         // A URL that is the whole content of an autolink / bare GFM link is visible text.
-        if (name === "URL" && ref.node.parent?.name !== "Link" && ref.node.parent?.name !== "Image") {
+        if (
+          name === "URL" &&
+          ref.node.parent?.name !== "Link" &&
+          ref.node.parent?.name !== "Image"
+        ) {
           return false;
         }
         out.push({ from: ref.from, to: ref.to, br: false });
@@ -148,10 +158,12 @@ function markupRanges(
       if (name === "HTMLBlock") {
         // Keep the text between tags.
         const text = slice(ref.from, ref.to);
-        const tag = /<[^>]*>/g;
-        let m: RegExpExecArray | null;
-        while ((m = tag.exec(text)) !== null) {
-          out.push({ from: ref.from + m.index, to: ref.from + m.index + m[0].length, br: true });
+        for (const m of text.matchAll(/<[^>]*>/g)) {
+          out.push({
+            from: ref.from + m.index,
+            to: ref.from + m.index + m[0].length,
+            br: true,
+          });
         }
         return false;
       }
@@ -173,7 +185,9 @@ export function visibleText(
   let out = "";
   let pos = from;
   if (parsedTo > from) {
-    const ranges = markupRanges(tree, from, parsedTo, slice).sort((a, b) => a.from - b.from);
+    const ranges = markupRanges(tree, from, parsedTo, slice).sort(
+      (a, b) => a.from - b.from,
+    );
     for (const r of ranges) {
       const rFrom = Math.max(r.from, from);
       const rTo = Math.min(r.to, to);
@@ -203,7 +217,11 @@ export function countText(text: string): TextStats {
 }
 
 /** Statistics for `[from, to)` of an editor state, using its syntax tree. */
-export function countRange(state: EditorState, from: number, to: number): TextStats {
+export function countRange(
+  state: EditorState,
+  from: number,
+  to: number,
+): TextStats {
   if (from >= to) return { ...EMPTY_STATS };
   const slice = (a: number, b: number) => state.sliceDoc(a, b);
   const visible = visibleText(syntaxTree(state), from, to, slice);

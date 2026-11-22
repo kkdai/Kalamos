@@ -17,7 +17,7 @@ import {
 import {
   Decoration,
   type DecorationSet,
-  EditorView,
+  type EditorView,
   ViewPlugin,
   type ViewUpdate,
   WidgetType,
@@ -58,7 +58,14 @@ export const papyrosHighlightStyle = HighlightStyle.define([
     class: "k-tok-comment",
   },
   {
-    tag: [tags.number, tags.integer, tags.float, tags.bool, tags.atom, tags.null],
+    tag: [
+      tags.number,
+      tags.integer,
+      tags.float,
+      tags.bool,
+      tags.atom,
+      tags.null,
+    ],
     color: "var(--k-syntax-number)",
     class: "k-tok-number",
   },
@@ -117,7 +124,14 @@ export const melanHighlightStyle = HighlightStyle.define([
     class: "k-tok-comment",
   },
   {
-    tag: [tags.number, tags.integer, tags.float, tags.bool, tags.atom, tags.null],
+    tag: [
+      tags.number,
+      tags.integer,
+      tags.float,
+      tags.bool,
+      tags.atom,
+      tags.null,
+    ],
     color: "var(--k-syntax-number)",
     class: "k-tok-number",
   },

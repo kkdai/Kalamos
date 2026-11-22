@@ -49,7 +49,9 @@ if (typeof Range !== "undefined") {
 
 afterEach(() => {
   if (typeof document === "undefined") return;
-  for (const el of Array.from(document.querySelectorAll<HTMLElement>(".cm-editor"))) {
+  for (const el of Array.from(
+    document.querySelectorAll<HTMLElement>(".cm-editor"),
+  )) {
     EditorView.findFromDOM(el)?.destroy();
   }
 });

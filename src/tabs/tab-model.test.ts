@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   activeIndexAfterClose,
-  isMarkdownPath,
-  resolveOpenTarget,
-  unsavedChangesMessage,
   cycleIndex,
+  isMarkdownPath,
   moveItem,
   nextUntitledNumber,
+  resolveOpenTarget,
   tabLabels,
+  unsavedChangesMessage,
   untitledLabel,
 } from "./tab-model";
 
@@ -99,23 +99,38 @@ describe("#81 B open rules", () => {
 
   it("an already open file is switched to, whatever the mode", () => {
     for (const mode of ["tab", "current", "newTab"] as const) {
-      expect(resolveOpenTarget(tabs, "u", "/n/a.md", mode)).toEqual({ kind: "existing", id: "a" });
+      expect(resolveOpenTarget(tabs, "u", "/n/a.md", mode)).toEqual({
+        kind: "existing",
+        id: "a",
+      });
     }
   });
 
   it("a blank untitled tab is reused (not for Cmd+click)", () => {
-    expect(resolveOpenTarget(tabs, "u", "/n/b.md", "tab")).toEqual({ kind: "replace" });
-    expect(resolveOpenTarget(tabs, "u", "/n/b.md", "current")).toEqual({ kind: "replace" });
-    expect(resolveOpenTarget(tabs, "u", "/n/b.md", "newTab")).toEqual({ kind: "new" });
+    expect(resolveOpenTarget(tabs, "u", "/n/b.md", "tab")).toEqual({
+      kind: "replace",
+    });
+    expect(resolveOpenTarget(tabs, "u", "/n/b.md", "current")).toEqual({
+      kind: "replace",
+    });
+    expect(resolveOpenTarget(tabs, "u", "/n/b.md", "newTab")).toEqual({
+      kind: "new",
+    });
   });
 
   it("Cmd+O / Finder / drop / search open a new tab", () => {
-    expect(resolveOpenTarget(tabs, "a", "/n/b.md", "tab")).toEqual({ kind: "new" });
+    expect(resolveOpenTarget(tabs, "a", "/n/b.md", "tab")).toEqual({
+      kind: "new",
+    });
   });
 
   it("a sidebar click uses the current tab unless it has unsaved changes", () => {
-    expect(resolveOpenTarget(tabs, "a", "/n/b.md", "current")).toEqual({ kind: "replace" });
-    expect(resolveOpenTarget(tabs, "d", "/n/b.md", "current")).toEqual({ kind: "new" });
+    expect(resolveOpenTarget(tabs, "a", "/n/b.md", "current")).toEqual({
+      kind: "replace",
+    });
+    expect(resolveOpenTarget(tabs, "d", "/n/b.md", "current")).toEqual({
+      kind: "new",
+    });
   });
 
   it("recognises Markdown files", () => {

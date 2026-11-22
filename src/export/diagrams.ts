@@ -51,13 +51,18 @@ export function scopeSvgIds(svg: string, prefix: string): string {
   if (ids.size === 0) return svg;
   // Longest first so `a-1` is not rewritten inside `a-10`.
   const sorted = [...ids].sort((a, b) => b.length - a.length);
-  const rename = new Map(sorted.map((id, i) => [id, `${prefix}-${i}`] as const));
+  const rename = new Map(
+    sorted.map((id, i) => [id, `${prefix}-${i}`] as const),
+  );
   const alternatives = sorted.map(escapeRegExp).join("|");
   const idAttr = new RegExp(`(\\sid=")(${alternatives})(")`, "g");
   const ref = new RegExp(`#(${alternatives})(?![\\w-])`, "g");
   const aria = /(\saria-(?:labelledby|describedby)=")([^"]*)(")/g;
   return svg
-    .replace(idAttr, (_m, a: string, id: string, b: string) => `${a}${rename.get(id)}${b}`)
+    .replace(
+      idAttr,
+      (_m, a: string, id: string, b: string) => `${a}${rename.get(id)}${b}`,
+    )
     .replace(ref, (_m, id: string) => `#${rename.get(id)}`)
     .replace(
       aria,
@@ -72,16 +77,28 @@ export function scopeSvgIds(svg: string, prefix: string): string {
 /** Static-safety net on top of DOMPurify: no scripts, foreignObject or handlers. */
 export function isStaticSvg(svg: string): boolean {
   // Checked inside tags only, so label text such as "one = two" is fine.
-  return !/<script|<foreignObject|<[^>]*\son[a-z]+\s*=|<[^>]*=\s*["']?\s*javascript:/i.test(svg);
+  return !/<script|<foreignObject|<[^>]*\son[a-z]+\s*=|<[^>]*=\s*["']?\s*javascript:/i.test(
+    svg,
+  );
 }
 
 /** Render the fences in order (serialised and cached by `renderDiagram`). */
-export async function renderExportDiagrams(fences: readonly DiagramFence[]): Promise<DiagramRenderResult[]> {
+export async function renderExportDiagrams(
+  fences: readonly DiagramFence[],
+): Promise<DiagramRenderResult[]> {
   const results: DiagramRenderResult[] = [];
   for (const [i, fence] of fences.entries()) {
-    const result = await renderDiagram(fence.kind, fence.source, PRINT_DIAGRAM_THEME);
+    const result = await renderDiagram(
+      fence.kind,
+      fence.source,
+      PRINT_DIAGRAM_THEME,
+    );
     if (result.error || !result.svg) {
-      results.push({ svg: "", error: result.error ?? "圖表語法錯誤", line: result.line });
+      results.push({
+        svg: "",
+        error: result.error ?? "圖表語法錯誤",
+        line: result.line,
+      });
       continue;
     }
     const svg = scopeSvgIds(result.svg, `k-export-diagram-${i + 1}`);
@@ -96,5 +113,7 @@ export async function renderExportDiagrams(fences: readonly DiagramFence[]): Pro
 
 /** Short error line, same wording as the editor's diagram error. */
 export function diagramErrorTitle(result: DiagramRenderResult): string {
-  return result.line !== null ? `圖表語法錯誤（第 ${result.line} 行）` : "圖表語法錯誤";
+  return result.line !== null
+    ? `圖表語法錯誤（第 ${result.line} 行）`
+    : "圖表語法錯誤";
 }

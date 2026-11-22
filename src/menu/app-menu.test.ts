@@ -8,7 +8,7 @@ import {
   resetMockState,
   seedMockSettings,
 } from "../ipc";
-import { createKalamosApp, nextZoomLevel, type KalamosApp } from "../main";
+import { createKalamosApp, type KalamosApp, nextZoomLevel } from "../main";
 import { MENU_THEN_KEY_WINDOW_MS, menuActions } from "./menu-dispatch";
 
 function setupDom(): void {
@@ -59,7 +59,9 @@ describe("#74 native menu → app handlers", () => {
 
     // The F8 shortcut (pressed later) toggles it back; the menu follows.
     await new Promise((r) => setTimeout(r, MENU_THEN_KEY_WINDOW_MS + 30));
-    window.dispatchEvent(new KeyboardEvent("keydown", { key: "F8", code: "F8", cancelable: true }));
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "F8", code: "F8", cancelable: true }),
+    );
     await settle();
     expect(app!.editor.isFocusMode()).toBe(false);
     expect(getMockMenuState()?.checks["view.focusMode"]).toBe(false);
@@ -67,7 +69,12 @@ describe("#74 native menu → app handlers", () => {
 
   it("a shortcut the page handled is not run again by the menu", async () => {
     window.dispatchEvent(
-      new KeyboardEvent("keydown", { key: "/", code: "Slash", metaKey: true, cancelable: true }),
+      new KeyboardEvent("keydown", {
+        key: "/",
+        code: "Slash",
+        metaKey: true,
+        cancelable: true,
+      }),
     );
     expect(app!.editor.isSourceMode()).toBe(true);
     await emitMockMenuAction("view.sourceMode");
@@ -82,7 +89,9 @@ describe("#74 native menu → app handlers", () => {
     expect(app!.themeMenu.getCurrentTheme()).toBe("melan");
     const state = getMockMenuState()!;
     expect(state.theme).toBe("melan");
-    expect(state.themes.map((t) => t.id)).toEqual(expect.arrayContaining(["system", "papyros", "melan"]));
+    expect(state.themes.map((t) => t.id)).toEqual(
+      expect.arrayContaining(["system", "papyros", "melan"]),
+    );
   });
 
   it("大綱 shows the outline tab and hides the sidebar the second time", async () => {
@@ -122,7 +131,9 @@ describe("#74 native menu → app handlers", () => {
     await emitMockMenuAction("app.preferences");
     await settle();
     expect(app!.preferences.isOpen()).toBe(true);
-    expect(document.querySelector('[data-testid="preferences"]')).not.toBeNull();
+    expect(
+      document.querySelector('[data-testid="preferences"]'),
+    ).not.toBeNull();
     app!.editor.setContent("x", { dirty: false });
     await emitMockMenuAction("para.heading1");
     expect(app!.editor.getContent()).toBe("x");
@@ -151,10 +162,14 @@ describe("#74 preferences apply immediately and persist", () => {
     resetMockState();
     const a = await boot();
     await a.preferences.open("editor");
-    const font = document.querySelector<HTMLInputElement>('[data-testid="pref-font-size"]')!;
+    const font = document.querySelector<HTMLInputElement>(
+      '[data-testid="pref-font-size"]',
+    )!;
     font.value = "20";
     font.dispatchEvent(new Event("input"));
-    const width = document.querySelector<HTMLInputElement>('[data-testid="pref-content-width"]')!;
+    const width = document.querySelector<HTMLInputElement>(
+      '[data-testid="pref-content-width"]',
+    )!;
     width.value = "900";
     width.dispatchEvent(new Event("input"));
     await settle();
@@ -170,7 +185,9 @@ describe("#74 preferences apply immediately and persist", () => {
     resetMockState();
     const a = await boot();
     await a.preferences.open("editor");
-    const box = document.querySelector<HTMLInputElement>('[data-testid="pref-code-line-numbers"]')!;
+    const box = document.querySelector<HTMLInputElement>(
+      '[data-testid="pref-code-line-numbers"]',
+    )!;
     expect(box.checked).toBe(false);
     box.checked = true;
     box.dispatchEvent(new Event("change"));
@@ -189,7 +206,9 @@ describe("#74 preferences apply immediately and persist", () => {
     resetMockState();
     const a = await boot();
     await a.preferences.open("general");
-    const box = document.querySelector<HTMLInputElement>('[data-testid="pref-auto-save"]')!;
+    const box = document.querySelector<HTMLInputElement>(
+      '[data-testid="pref-auto-save"]',
+    )!;
     expect(box.checked).toBe(true);
     box.checked = false;
     box.dispatchEvent(new Event("change"));
@@ -200,12 +219,22 @@ describe("#74 preferences apply immediately and persist", () => {
   it("an old settings file loads with defaults; start blank skips the last folder", async () => {
     resetMockState();
     // v0.1.1 file: none of the #74 keys.
-    seedMockSettings({ theme: "melan", lastFolder: "/demo", sidebarVisible: true, sidebarTab: "tree", sourceMode: false });
+    seedMockSettings({
+      theme: "melan",
+      lastFolder: "/demo",
+      sidebarVisible: true,
+      sidebarTab: "tree",
+      sourceMode: false,
+    });
     let a = await boot();
     expect(a.sidebar.getCurrentFolder()).toBe("/demo");
-    expect(document.documentElement.style.getPropertyValue("--k-font-size")).toBe("17px");
+    expect(
+      document.documentElement.style.getPropertyValue("--k-font-size"),
+    ).toBe("17px");
     await a.preferences.open("general");
-    const startup = document.querySelector<HTMLSelectElement>('[data-testid="pref-startup"]')!;
+    const startup = document.querySelector<HTMLSelectElement>(
+      '[data-testid="pref-startup"]',
+    )!;
     expect(startup.value).toBe("restoreFolder");
     startup.value = "blank";
     startup.dispatchEvent(new Event("change"));
@@ -222,7 +251,9 @@ describe("#74 preferences apply immediately and persist", () => {
     resetMockState();
     const a = await boot();
     await a.preferences.open("appearance");
-    document.querySelector<HTMLButtonElement>('[data-testid="pref-open-themes-dir"]')!.click();
+    document
+      .querySelector<HTMLButtonElement>('[data-testid="pref-open-themes-dir"]')!
+      .click();
     await settle();
     expect(getMockThemesDirOpenCount()).toBe(1);
   });

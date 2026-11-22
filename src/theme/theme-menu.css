@@ -66,13 +66,21 @@
 }
 
 .k-theme-option:hover {
-  background-color: color-mix(in srgb, var(--k-divider, #d9cdb3) 50%, transparent);
+  background-color: color-mix(
+    in srgb,
+    var(--k-divider, #d9cdb3) 50%,
+    transparent
+  );
 }
 
 .k-theme-option[data-active="true"] {
   font-weight: 600;
   color: var(--k-text, #2b2622);
-  background-color: color-mix(in srgb, var(--k-divider, #d9cdb3) 65%, transparent);
+  background-color: color-mix(
+    in srgb,
+    var(--k-divider, #d9cdb3) 65%,
+    transparent
+  );
 }
 
 .k-theme-option-check {

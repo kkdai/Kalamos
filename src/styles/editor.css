@@ -37,12 +37,17 @@ body {
 .cm-content ::selection,
 .cm-line ::selection {
   background-color: var(--k-selection-bg, rgba(164, 85, 47, 0.22));
+  /* biome-ignore lint/suspicious/noDuplicateProperties: keep the fallback for WebKit versions without color-mix(). */
   background-color: color-mix(in srgb, var(--k-link) 22%, transparent);
 }
 
 .cm-editor .cm-selectionBackground,
-.cm-editor.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground {
+.cm-editor.cm-focused
+  > .cm-scroller
+  > .cm-selectionLayer
+  .cm-selectionBackground {
   background-color: var(--k-selection-bg, rgba(164, 85, 47, 0.22)) !important;
+  /* biome-ignore lint/suspicious/noDuplicateProperties: keep the fallback for WebKit versions without color-mix(). */
   background-color: color-mix(in srgb, var(--k-link) 22%, transparent) !important;
 }
 

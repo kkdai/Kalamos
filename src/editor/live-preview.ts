@@ -10,7 +10,7 @@ import {
 import {
   Decoration,
   type DecorationSet,
-  EditorView,
+  type EditorView,
   ViewPlugin,
   type ViewUpdate,
 } from "@codemirror/view";
@@ -144,7 +144,11 @@ export function isSelectionInsideSpan(
   to: number,
 ): boolean {
   for (const range of selection.ranges) {
-    if (range.empty ? range.head > from && range.head < to : range.from < to && range.to > from) {
+    if (
+      range.empty
+        ? range.head > from && range.head < to
+        : range.from < to && range.to > from
+    ) {
       return true;
     }
   }
@@ -156,9 +160,15 @@ export function isSelectionInsideSpan(
  * Backspace right after a rendered span (Typora "expand first"), cleared by
  * the next edit or cursor move.
  */
-export const expandSpanEffect = StateEffect.define<{ from: number; to: number } | null>();
+export const expandSpanEffect = StateEffect.define<{
+  from: number;
+  to: number;
+} | null>();
 
-export const expandedSpanField = StateField.define<{ from: number; to: number } | null>({
+export const expandedSpanField = StateField.define<{
+  from: number;
+  to: number;
+} | null>({
   create: () => null,
   update(value, tr) {
     for (const e of tr.effects) {
@@ -170,7 +180,11 @@ export const expandedSpanField = StateField.define<{ from: number; to: number } 
 });
 
 /** Inline span shown as source: cursor / selection inside it, or expanded by Backspace. */
-export function isInlineSpanActive(state: EditorState, from: number, to: number): boolean {
+export function isInlineSpanActive(
+  state: EditorState,
+  from: number,
+  to: number,
+): boolean {
   if (isSelectionInsideSpan(state.selection, from, to)) return true;
   const expanded = state.field(expandedSpanField, false);
   return Boolean(expanded && expanded.from === from && expanded.to === to);
@@ -199,13 +213,19 @@ export function expandSpanBeforeCursor(view: EditorView): boolean {
   const head = sel.main.head;
   if (head === 0) return false;
   const expanded = state.field(expandedSpanField, false);
-  for (let n: ReturnType<ReturnType<typeof syntaxTree>["resolveInner"]> | null = syntaxTree(state).resolveInner(head, -1); n; n = n.parent) {
+  for (
+    let n: ReturnType<ReturnType<typeof syntaxTree>["resolveInner"]> | null =
+      syntaxTree(state).resolveInner(head, -1);
+    n;
+    n = n.parent
+  ) {
     if (n.to !== head) {
       if (n.to < head) continue;
       break;
     }
     if (!INLINE_SPAN_NODES.has(n.name)) continue;
-    if (expanded && expanded.from === n.from && expanded.to === n.to) return false;
+    if (expanded && expanded.from === n.from && expanded.to === n.to)
+      return false;
     if (isSelectionInsideSpan(sel, n.from, n.to)) return false;
     view.dispatch({ effects: expandSpanEffect.of({ from: n.from, to: n.to }) });
     return true;
@@ -231,7 +251,10 @@ export function collectLivePreviewSpecsInRanges(
         const { name, from, to } = nodeRef;
         if (from >= to) return;
 
-        if (name === "Table" && !isSelectionTouchingRange(selection, from, to)) {
+        if (
+          name === "Table" &&
+          !isSelectionTouchingRange(selection, from, to)
+        ) {
           return false;
         }
 
@@ -264,7 +287,9 @@ export function collectLivePreviewSpecsInRanges(
           // while the cursor is on the marker itself (`-`, `1.`, `- [ ]`),
           // not anywhere on the line — typing `- ` gives a bullet at once.
           const markerEnd =
-            taskMarker && taskMarker.from < taskMarker.to ? taskMarker.to : listMark.to;
+            taskMarker && taskMarker.from < taskMarker.to
+              ? taskMarker.to
+              : listMark.to;
           const activeOnLine = isSelectionTouchingRange(
             selection,
             listMark.from,
@@ -291,10 +316,7 @@ export function collectLivePreviewSpecsInRanges(
                 to: taskMarker.from,
                 className: "k-mark-hidden",
               });
-              const markerText = state.sliceDoc(
-                taskMarker.from,
-                taskMarker.to,
-              );
+              const markerText = state.sliceDoc(taskMarker.from, taskMarker.to);
               const checked = /^\[[xX]\]$/.test(markerText);
               specs.push({
                 from: taskMarker.from,
@@ -475,10 +497,7 @@ export function buildLivePreviewDecorations(view: EditorView): DecorationSet {
         widget: new TaskCheckboxWidget(Boolean(spec.checked)),
       }).range(spec.from, spec.to);
     }
-    return Decoration.mark({ class: spec.className }).range(
-      spec.from,
-      spec.to,
-    );
+    return Decoration.mark({ class: spec.className }).range(spec.from, spec.to);
   });
   return Decoration.set(ranges, true);
 }

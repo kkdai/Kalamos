@@ -2,18 +2,25 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createMenuDispatcher,
   DUPLICATE_WINDOW_MS,
+  MENU_SPEC,
   MENU_THEN_KEY_WINDOW_MS,
   matchesKey,
   menuActions,
-  MENU_SPEC,
   parseAccelerator,
 } from "./menu-dispatch";
 
 function key(init: KeyboardEventInit): KeyboardEvent {
-  return new KeyboardEvent("keydown", { bubbles: true, cancelable: true, ...init });
+  return new KeyboardEvent("keydown", {
+    bubbles: true,
+    cancelable: true,
+    ...init,
+  });
 }
 
-function setup(commands: Record<string, () => unknown>, extra: Partial<Parameters<typeof createMenuDispatcher>[0]> = {}) {
+function setup(
+  commands: Record<string, () => unknown>,
+  extra: Partial<Parameters<typeof createMenuDispatcher>[0]> = {},
+) {
   let clock = 1000;
   const target = document.createElement("div");
   document.body.append(target);
@@ -50,8 +57,14 @@ describe("#74 menu accelerators", () => {
       alt: false,
       shift: true,
     });
-    expect(parseAccelerator("CmdOrCtrl+,")).toMatchObject({ code: "Comma", cmdOrCtrl: true });
-    expect(parseAccelerator("F8")).toMatchObject({ key: "F8", cmdOrCtrl: false });
+    expect(parseAccelerator("CmdOrCtrl+,")).toMatchObject({
+      code: "Comma",
+      cmdOrCtrl: true,
+    });
+    expect(parseAccelerator("F8")).toMatchObject({
+      key: "F8",
+      cmdOrCtrl: false,
+    });
     expect(parseAccelerator("CmdOrCtrl+Shift+[").code).toBe("BracketLeft");
     expect(parseAccelerator("CmdOrCtrl+Shift+`").code).toBe("Backquote");
     expect(() => parseAccelerator("Hyper+K")).toThrow();
@@ -59,26 +72,63 @@ describe("#74 menu accelerators", () => {
 
   it("#81 Ctrl+Tab matches Ctrl only, not Cmd", () => {
     const m = parseAccelerator("Ctrl+Shift+Tab");
-    expect(m).toMatchObject({ code: "Tab", ctrl: true, shift: true, cmdOrCtrl: false });
-    expect(matchesKey(m, key({ code: "Tab", key: "Tab", ctrlKey: true, shiftKey: true }))).toBe(true);
-    expect(matchesKey(m, key({ code: "Tab", key: "Tab", metaKey: true, shiftKey: true }))).toBe(false);
+    expect(m).toMatchObject({
+      code: "Tab",
+      ctrl: true,
+      shift: true,
+      cmdOrCtrl: false,
+    });
+    expect(
+      matchesKey(
+        m,
+        key({ code: "Tab", key: "Tab", ctrlKey: true, shiftKey: true }),
+      ),
+    ).toBe(true);
+    expect(
+      matchesKey(
+        m,
+        key({ code: "Tab", key: "Tab", metaKey: true, shiftKey: true }),
+      ),
+    ).toBe(false);
   });
 
   it("CmdOrCtrl matches Cmd or Ctrl, but not both or neither", () => {
     const m = parseAccelerator("CmdOrCtrl+S");
     expect(matchesKey(m, key({ code: "KeyS", metaKey: true }))).toBe(true);
     expect(matchesKey(m, key({ code: "KeyS", ctrlKey: true }))).toBe(true);
-    expect(matchesKey(m, key({ code: "KeyS", metaKey: true, ctrlKey: true }))).toBe(false);
+    expect(
+      matchesKey(m, key({ code: "KeyS", metaKey: true, ctrlKey: true })),
+    ).toBe(false);
     expect(matchesKey(m, key({ code: "KeyS" }))).toBe(false);
-    expect(matchesKey(parseAccelerator("F8"), key({ key: "F8", metaKey: true }))).toBe(false);
+    expect(
+      matchesKey(parseAccelerator("F8"), key({ key: "F8", metaKey: true })),
+    ).toBe(false);
   });
 
   it("matches keydowns by physical key and exact modifiers", () => {
     const m = parseAccelerator("CmdOrCtrl+Alt+E");
     // Option changes event.key on macOS; event.code is what counts.
-    expect(matchesKey(m, key({ key: "´", code: "KeyE", metaKey: true, altKey: true }))).toBe(true);
-    expect(matchesKey(m, key({ key: "e", code: "KeyE", metaKey: true }))).toBe(false);
-    expect(matchesKey(m, key({ key: "e", code: "KeyE", metaKey: true, altKey: true, shiftKey: true }))).toBe(false);
+    expect(
+      matchesKey(
+        m,
+        key({ key: "´", code: "KeyE", metaKey: true, altKey: true }),
+      ),
+    ).toBe(true);
+    expect(matchesKey(m, key({ key: "e", code: "KeyE", metaKey: true }))).toBe(
+      false,
+    );
+    expect(
+      matchesKey(
+        m,
+        key({
+          key: "e",
+          code: "KeyE",
+          metaKey: true,
+          altKey: true,
+          shiftKey: true,
+        }),
+      ),
+    ).toBe(false);
   });
 });
 
@@ -87,7 +137,10 @@ describe("#74 menu dispatcher", () => {
     const save = vi.fn();
     const setTheme = vi.fn();
     const afterRun = vi.fn();
-    const { dispatcher } = setup({ "file.save": save, "view.setTheme": setTheme }, { afterRun });
+    const { dispatcher } = setup(
+      { "file.save": save, "view.setTheme": setTheme },
+      { afterRun },
+    );
     expect(dispatcher.dispatch("file.save")).toBe(true);
     expect(dispatcher.dispatch("view.setTheme", "melan")).toBe(true);
     expect(save).toHaveBeenCalledTimes(1);
@@ -159,7 +212,9 @@ describe("#74 menu dispatcher", () => {
 
   it("a key press well after a menu click is a new press", () => {
     const page = vi.fn();
-    const { target, dispatcher, advance } = setup({ "view.focusMode": vi.fn() });
+    const { target, dispatcher, advance } = setup({
+      "view.focusMode": vi.fn(),
+    });
     target.addEventListener("keydown", page);
     dispatcher.dispatch("view.focusMode");
     advance(MENU_THEN_KEY_WINDOW_MS + 1);
@@ -183,7 +238,10 @@ describe("#74 menu dispatcher", () => {
 
   it("canRun can block an action", () => {
     const bold = vi.fn();
-    const { dispatcher } = setup({ "fmt.bold": bold }, { canRun: (a) => a !== "fmt.bold" });
+    const { dispatcher } = setup(
+      { "fmt.bold": bold },
+      { canRun: (a) => a !== "fmt.bold" },
+    );
     expect(dispatcher.dispatch("fmt.bold")).toBe(false);
     expect(bold).not.toHaveBeenCalled();
   });

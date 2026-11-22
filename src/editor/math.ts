@@ -21,7 +21,12 @@ import {
 } from "@codemirror/view";
 import type { SyntaxNode } from "@lezer/common";
 import { tags } from "@lezer/highlight";
-import type { BlockContext, InlineContext, Line, MarkdownConfig } from "@lezer/markdown";
+import type {
+  BlockContext,
+  InlineContext,
+  Line,
+  MarkdownConfig,
+} from "@lezer/markdown";
 import { isSelectionTouchingRange } from "./live-preview";
 import { mapPosClamped } from "./positions";
 
@@ -264,7 +269,9 @@ export async function ensureMathJaxLoaded(
         import("mathjax-full/js/input/tex/ams/AmsConfiguration.js"),
         import("mathjax-full/js/input/tex/mhchem/MhchemConfiguration.js"),
         import("mathjax-full/js/input/tex/bbox/BboxConfiguration.js"),
-        import("mathjax-full/js/input/tex/newcommand/NewcommandConfiguration.js"),
+        import(
+          "mathjax-full/js/input/tex/newcommand/NewcommandConfiguration.js"
+        ),
       ]);
 
       const adaptor = liteAdaptor();
@@ -276,7 +283,10 @@ export async function ensureMathJaxLoaded(
       const texNone = new TeX({
         packages,
         tags: "none",
-        formatError: (jax: { formatError: (e: Error) => unknown }, err: Error) => {
+        formatError: (
+          jax: { formatError: (e: Error) => unknown },
+          err: Error,
+        ) => {
           capturedError = err.message || "TeX syntax error";
           return jax.formatError(err);
         },
@@ -285,14 +295,20 @@ export async function ensureMathJaxLoaded(
       const texAms = new TeX({
         packages,
         tags: "ams",
-        formatError: (jax: { formatError: (e: Error) => unknown }, err: Error) => {
+        formatError: (
+          jax: { formatError: (e: Error) => unknown },
+          err: Error,
+        ) => {
           capturedError = err.message || "TeX syntax error";
           return jax.formatError(err);
         },
       });
 
       const svg = new SVG({ fontCache: "none" });
-      const docNone = mathjax.document("", { InputJax: texNone, OutputJax: svg });
+      const docNone = mathjax.document("", {
+        InputJax: texNone,
+        OutputJax: svg,
+      });
       const docAms = mathjax.document("", { InputJax: texAms, OutputJax: svg });
 
       function runConvert(
@@ -320,9 +336,7 @@ export async function ensureMathJaxLoaded(
         }
 
         const eqNums: number[] = [];
-        const tagRe = /id="mjx-eqn:(\d+)"/g;
-        let m: RegExpExecArray | null;
-        while ((m = tagRe.exec(html)) !== null) {
+        for (const m of html.matchAll(/id="mjx-eqn:(\d+)"/g)) {
           const n = Number(m[1]);
           if (!Number.isNaN(n) && !eqNums.includes(n)) {
             eqNums.push(n);
@@ -362,7 +376,12 @@ export async function ensureMathJaxLoaded(
             ? prepareDisplayTexForAutoNumber(trimmed, true)
             : trimmed;
 
-          let conv = runConvert(effectiveTex, display, useAms, startEquationNumber);
+          let conv = runConvert(
+            effectiveTex,
+            display,
+            useAms,
+            startEquationNumber,
+          );
           if (conv.err && effectiveTex !== trimmed) {
             conv = runConvert(trimmed, display, useAms, startEquationNumber);
           }
@@ -805,7 +824,13 @@ function buildAllMathDecorations(state: EditorState): {
   let nextEquationNumber = 1;
 
   for (const formula of formulas) {
-    decorateFormula(state, formula, decorations, autoNumber, nextEquationNumber);
+    decorateFormula(
+      state,
+      formula,
+      decorations,
+      autoNumber,
+      nextEquationNumber,
+    );
     if (formula.kind === "block" && autoNumber && mathEngineInstance) {
       nextEquationNumber += equationCountFor(formula.tex, nextEquationNumber);
     }
@@ -857,11 +882,15 @@ function isStructuralChange(tr: Transaction): boolean {
 }
 
 /** Expands `[from, to]` to whole top-level blocks (paragraph, `$$` block, list…). */
-function expandToBlocks(state: EditorState, from: number, to: number): PosRange {
+function expandToBlocks(
+  state: EditorState,
+  from: number,
+  to: number,
+): PosRange {
   const tree = syntaxTree(state);
   const topLevelAt = (pos: number, side: -1 | 1): PosRange | null => {
     let node: SyntaxNode | null = tree.resolveInner(pos, side);
-    while (node && node.parent && node.parent.parent) {
+    while (node?.parent?.parent) {
       node = node.parent;
     }
     if (!node || !node.parent) return null;
@@ -962,8 +991,7 @@ export const mathStateField = StateField.define<MathFieldValue>({
       return {
         decorations: value.decorations.map(tr.changes),
         dirty,
-        dirtyAll:
-          value.dirtyAll || (tr.docChanged && isStructuralChange(tr)),
+        dirtyAll: value.dirtyAll || (tr.docChanged && isStructuralChange(tr)),
         // Mapped, not copied: a copied position can fall outside the next
         // (shorter) document and make mapPos throw (#56).
         parsedTo: mapPosClamped(tr.changes, value.parsedTo, 1),

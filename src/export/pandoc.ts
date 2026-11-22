@@ -20,16 +20,36 @@ export interface PandocFormatInfo {
 
 export const PANDOC_FORMATS: readonly PandocFormatInfo[] = [
   { id: "docx", label: "DOCX", ext: "docx", description: "Microsoft Word" },
-  { id: "odt", label: "ODT", ext: "odt", description: "OpenOffice / LibreOffice" },
+  {
+    id: "odt",
+    label: "ODT",
+    ext: "odt",
+    description: "OpenOffice / LibreOffice",
+  },
   { id: "latex", label: "LaTeX", ext: "tex", description: "LaTeX 原始檔" },
-  { id: "mediawiki", label: "MediaWiki", ext: "wiki", description: "MediaWiki 標記" },
+  {
+    id: "mediawiki",
+    label: "MediaWiki",
+    ext: "wiki",
+    description: "MediaWiki 標記",
+  },
   { id: "epub", label: "EPUB", ext: "epub", description: "電子書" },
 ];
 
 /** Extensions `import_pandoc` accepts. */
-export const PANDOC_IMPORT_EXTENSIONS = ["docx", "odt", "epub", "tex", "html", "htm", "wiki", "mediawiki"];
+export const PANDOC_IMPORT_EXTENSIONS = [
+  "docx",
+  "odt",
+  "epub",
+  "tex",
+  "html",
+  "htm",
+  "wiki",
+  "mediawiki",
+];
 
-export const PANDOC_MISSING_MESSAGE = "找不到 Pandoc：請先安裝（brew install pandoc）";
+export const PANDOC_MISSING_MESSAGE =
+  "找不到 Pandoc：請先安裝（brew install pandoc）";
 export const EXPORTING_MESSAGE = "匯出中…";
 export const IMPORTING_MESSAGE = "匯入中…";
 
@@ -38,7 +58,10 @@ export function formatInfo(format: PandocFormat): PandocFormatInfo {
 }
 
 /** Suggested save path: next to the document, same name, format extension. */
-export function defaultExportPath(docPath: string | null, format: PandocFormat): string {
+export function defaultExportPath(
+  docPath: string | null,
+  format: PandocFormat,
+): string {
   const name = `${documentTitle(docPath)}.${formatInfo(format).ext}`;
   if (!docPath) return name;
   const idx = docPath.lastIndexOf("/");
@@ -46,7 +69,10 @@ export function defaultExportPath(docPath: string | null, format: PandocFormat):
 }
 
 /** Make sure the chosen path ends with the format's extension. */
-export function ensureExportExtension(path: string, format: PandocFormat): string {
+export function ensureExportExtension(
+  path: string,
+  format: PandocFormat,
+): string {
   const ext = formatInfo(format).ext;
   return path.toLowerCase().endsWith(`.${ext}`) ? path : `${path}.${ext}`;
 }
@@ -61,7 +87,10 @@ export function importedMessage(path: string): string {
 
 export function isImportablePath(path: string): boolean {
   const dot = path.lastIndexOf(".");
-  return dot > path.lastIndexOf("/") && PANDOC_IMPORT_EXTENSIONS.includes(path.slice(dot + 1).toLowerCase());
+  return (
+    dot > path.lastIndexOf("/") &&
+    PANDOC_IMPORT_EXTENSIONS.includes(path.slice(dot + 1).toLowerCase())
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -80,11 +109,17 @@ const identityUrl = (path: string): string => path;
 
 /** A link destination pandoc reads as-is (angle brackets when needed). */
 function destination(path: string): string {
-  return /[\s()<>]/.test(path) ? `<${path.replace(/[<>]/g, encodeURIComponent)}>` : path;
+  return /[\s()<>]/.test(path)
+    ? `<${path.replace(/[<>]/g, encodeURIComponent)}>`
+    : path;
 }
 
 /** Local image sources become absolute paths (root and `%20` resolved like the editor). */
-function resolvedImagePath(src: string, docPath: string | null, root: string | null): string | null {
+function resolvedImagePath(
+  src: string,
+  docPath: string | null,
+  root: string | null,
+): string | null {
   const resolved = resolveImageSrc(src, docPath, identityUrl, root);
   return resolved.kind === "local" ? resolved.path : null;
 }
@@ -94,7 +129,8 @@ function pandocSizeAttrs(size: { width?: string; height?: string }): string {
   const parts: string[] = [];
   for (const key of ["width", "height"] as const) {
     const value = size[key];
-    if (value && /^\d+(\.\d+)?(px|%)$/.test(value)) parts.push(`${key}=${value}`);
+    if (value && /^\d+(\.\d+)?(px|%)$/.test(value))
+      parts.push(`${key}=${value}`);
   }
   return parts.length > 0 ? `{${parts.join(" ")}}` : "";
 }
@@ -117,7 +153,11 @@ export function prepareMarkdownForPandoc(
   docPath: string | null,
   settingRoot: string | null,
 ): PreparedMarkdown {
-  const imageRoot = resolveImageRoot(findTyporaRootUrlInText(content), docPath, settingRoot);
+  const imageRoot = resolveImageRoot(
+    findTyporaRootUrlInText(content),
+    docPath,
+    settingRoot,
+  );
   const tree = (markdownLanguage.parser as MarkdownParser).parse(content);
   const edits: Array<{ from: number; to: number; insert: string }> = [];
   let toc = false;
@@ -125,7 +165,12 @@ export function prepareMarkdownForPandoc(
   tree.iterate({
     enter: (ref) => {
       const name = ref.name;
-      if (name === "FencedCode" || name === "CodeBlock" || name === "InlineCode") return false;
+      if (
+        name === "FencedCode" ||
+        name === "CodeBlock" ||
+        name === "InlineCode"
+      )
+        return false;
       if (name === "Paragraph") {
         const text = content.slice(ref.from, ref.to);
         if (/^\s*\[toc\]\s*$/i.test(text)) {
@@ -138,8 +183,13 @@ export function prepareMarkdownForPandoc(
       if (name === "Image") {
         const url = ref.node.getChild("URL");
         if (!url) return false;
-        const path = resolvedImagePath(content.slice(url.from, url.to), docPath, imageRoot);
-        if (path) edits.push({ from: url.from, to: url.to, insert: destination(path) });
+        const path = resolvedImagePath(
+          content.slice(url.from, url.to),
+          docPath,
+          imageRoot,
+        );
+        if (path)
+          edits.push({ from: url.from, to: url.to, insert: destination(path) });
         return false;
       }
       if (name === "HTMLTag" || name === "HTMLBlock") {
@@ -158,9 +208,15 @@ export function prepareMarkdownForPandoc(
           const src = path ?? tag.src;
           if (!path && !/^(https?:|data:image\/)/i.test(src)) return false;
           const title = tag.title ? ` "${tag.title.replace(/"/g, '\\"')}"` : "";
-          converted.push(`![${escapeAlt(tag.alt)}](${destination(src)}${title})${pandocSizeAttrs(tag.size)}`);
+          converted.push(
+            `![${escapeAlt(tag.alt)}](${destination(src)}${title})${pandocSizeAttrs(tag.size)}`,
+          );
         }
-        edits.push({ from: ref.from, to: ref.to, insert: converted.join("\n") });
+        edits.push({
+          from: ref.from,
+          to: ref.to,
+          insert: converted.join("\n"),
+        });
         return false;
       }
       return undefined;
@@ -169,7 +225,8 @@ export function prepareMarkdownForPandoc(
 
   let markdown = content;
   for (const edit of edits.sort((a, b) => b.from - a.from)) {
-    markdown = markdown.slice(0, edit.from) + edit.insert + markdown.slice(edit.to);
+    markdown =
+      markdown.slice(0, edit.from) + edit.insert + markdown.slice(edit.to);
   }
   return { markdown, toc, imageRoot };
 }

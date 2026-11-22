@@ -1,0 +1,19 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.1.1/schema.json",
+  "formatter": {
+    "indentStyle": "space",
+    "indentWidth": 2
+  },
+  "overrides": [
+    {
+      "includes": ["src/**/*.test.ts", "tests/e2e/**/*.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noNonNullAssertion": "off"
+          }
+        }
+      }
+    }
+  ]
+}

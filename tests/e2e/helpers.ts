@@ -22,7 +22,11 @@ export async function boot(page: Page): Promise<void> {
 }
 
 /** Replace the whole document (as if a file had been opened) and focus it. */
-export async function setDoc(page: Page, content: string, cursor = 0): Promise<void> {
+export async function setDoc(
+  page: Page,
+  content: string,
+  cursor = 0,
+): Promise<void> {
   await page.evaluate(
     async ({ content, cursor }) => {
       const main = await import("/src/main.ts" as string);
@@ -45,7 +49,9 @@ export async function setCursor(page: Page, pos: number): Promise<void> {
   await nextFrames(page);
 }
 
-export async function getSelection(page: Page): Promise<{ anchor: number; head: number }> {
+export async function getSelection(
+  page: Page,
+): Promise<{ anchor: number; head: number }> {
   return page.evaluate(async () => {
     const main = await import("/src/main.ts" as string);
     const sel = main.getActiveApp().editor.view.state.selection.main;
@@ -53,7 +59,11 @@ export async function getSelection(page: Page): Promise<{ anchor: number; head: 
   });
 }
 
-export async function selectRange(page: Page, from: number, to: number): Promise<void> {
+export async function selectRange(
+  page: Page,
+  from: number,
+  to: number,
+): Promise<void> {
   await page.evaluate(
     async ({ from, to }) => {
       const main = await import("/src/main.ts" as string);
@@ -71,7 +81,8 @@ export async function nextFrames(page: Page, n = 2): Promise<void> {
     (count) =>
       new Promise<void>((resolve) => {
         let left = count;
-        const tick = () => (--left <= 0 ? resolve() : requestAnimationFrame(tick));
+        const tick = () =>
+          --left <= 0 ? resolve() : requestAnimationFrame(tick);
         requestAnimationFrame(tick);
       }),
     n,
@@ -79,10 +90,16 @@ export async function nextFrames(page: Page, n = 2): Promise<void> {
 }
 
 /** Element width collapsed (k-mark-hidden uses font-size: 0). */
-export async function isCollapsed(page: Page, selector: string, index = 0): Promise<boolean> {
+export async function isCollapsed(
+  page: Page,
+  selector: string,
+  index = 0,
+): Promise<boolean> {
   return page.evaluate(
     ({ selector, index }) => {
-      const el = document.querySelectorAll(selector)[index] as HTMLElement | undefined;
+      const el = document.querySelectorAll(selector)[index] as
+        | HTMLElement
+        | undefined;
       if (!el) return false;
       return el.getBoundingClientRect().width < 0.5;
     },

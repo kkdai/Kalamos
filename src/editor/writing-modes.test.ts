@@ -1,9 +1,18 @@
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { ensureSyntaxTree } from "@codemirror/language";
-import { EditorSelection, EditorState, type Transaction } from "@codemirror/state";
+import {
+  EditorSelection,
+  EditorState,
+  type Transaction,
+} from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { afterEach, describe, expect, it } from "vitest";
-import { getSettings, resetMockState, setSettings, DEFAULT_SETTINGS } from "../ipc";
+import {
+  DEFAULT_SETTINGS,
+  getSettings,
+  resetMockState,
+  setSettings,
+} from "../ipc";
 import { createKalamosApp, type KalamosApp } from "../main";
 import { cjkEmphasisExtension } from "./cjk-emphasis";
 import { footnoteExtension } from "./footnotes";
@@ -24,14 +33,30 @@ const md = () =>
   markdown({
     base: markdownLanguage,
     addKeymap: false,
-    extensions: [mathMarkdownExtension, cjkEmphasisExtension, frontMatterExtension, footnoteExtension],
+    extensions: [
+      mathMarkdownExtension,
+      cjkEmphasisExtension,
+      frontMatterExtension,
+      footnoteExtension,
+    ],
   });
 
-function stateOf(doc: string, selection: EditorSelection | number = 0, extra: unknown[] = []): EditorState {
+function stateOf(
+  doc: string,
+  selection: EditorSelection | number = 0,
+  extra: unknown[] = [],
+): EditorState {
   const state = EditorState.create({
     doc,
-    selection: typeof selection === "number" ? EditorSelection.cursor(selection) : selection,
-    extensions: [EditorState.allowMultipleSelections.of(true), md(), ...(extra as [])],
+    selection:
+      typeof selection === "number"
+        ? EditorSelection.cursor(selection)
+        : selection,
+    extensions: [
+      EditorState.allowMultipleSelections.of(true),
+      md(),
+      ...(extra as []),
+    ],
   });
   ensureSyntaxTree(state, state.doc.length, 5000);
   return state;
@@ -85,9 +110,9 @@ describe("WM-01 current block detection", () => {
     const state = stateOf(DOC, blank);
     expect(blockAt(state, blank)).toEqual({ from: blank, to: blank });
     const end = DOC.indexOf("line B") + "line B".length;
-    expect(state.sliceDoc(blockAt(state, end).from, blockAt(state, end).to)).toBe(
-      "para one line A\npara one line B",
-    );
+    expect(
+      state.sliceDoc(blockAt(state, end).from, blockAt(state, end).to),
+    ).toBe("para one line A\npara one line B");
   });
 
   it("keeps every block touched by a selection undimmed", () => {
@@ -97,7 +122,8 @@ describe("WM-01 current block detection", () => {
     const spans = currentBlocks(state);
     const lines = (pos: number) => state.doc.lineAt(pos).number;
     const undimmed = new Set<number>();
-    for (const s of spans) for (let n = lines(s.from); n <= lines(s.to); n++) undimmed.add(n);
+    for (const s of spans)
+      for (let n = lines(s.from); n <= lines(s.to); n++) undimmed.add(n);
     expect([...undimmed].sort((a, b) => a - b)).toEqual([2, 3, 4, 5, 6, 7, 8]);
   });
 
@@ -106,7 +132,10 @@ describe("WM-01 current block detection", () => {
     const all = dimmedLineStarts(state, [{ from: 0, to: state.doc.length }]);
     expect(all).not.toContain(0);
     expect(all.length).toBe(state.doc.lines - 1);
-    const visible = { from: state.doc.line(10).from, to: state.doc.line(12).to };
+    const visible = {
+      from: state.doc.line(10).from,
+      to: state.doc.line(12).to,
+    };
     expect(dimmedLineStarts(state, [visible])).toEqual([
       state.doc.line(10).from,
       state.doc.line(11).from,
@@ -125,9 +154,14 @@ describe("WM-01 focus mode plugin", () => {
   it("dims non-current lines and follows the cursor, but not while composing", () => {
     const parent = document.createElement("div");
     document.body.appendChild(parent);
-    view = new EditorView({ parent, state: stateOf("one\n\ntwo\n\nthree", 0, [focusModeExtension]) });
+    view = new EditorView({
+      parent,
+      state: stateOf("one\n\ntwo\n\nthree", 0, [focusModeExtension]),
+    });
     const dimmed = () =>
-      Array.from(view!.contentDOM.querySelectorAll(".cm-line")).map((l) => l.classList.contains(FOCUS_DIM_CLASS));
+      Array.from(view!.contentDOM.querySelectorAll(".cm-line")).map((l) =>
+        l.classList.contains(FOCUS_DIM_CLASS),
+      );
     expect(view.dom.classList.contains("k-focus-mode")).toBe(true);
     expect(dimmed()).toEqual([false, true, true, true, true]);
 
@@ -138,7 +172,10 @@ describe("WM-01 focus mode plugin", () => {
     const before = plugin.decorations;
     plugin.isComposing = true;
     view.dispatch({ selection: { anchor: 11 } });
-    view.dispatch({ changes: { from: 11, insert: "中" }, userEvent: "input.type.compose" });
+    view.dispatch({
+      changes: { from: 11, insert: "中" },
+      userEvent: "input.type.compose",
+    });
     expect(plugin.current).toEqual([{ from: 5, to: 8 }]);
     expect(plugin.decorations).not.toBe(before);
     plugin.isComposing = false;
@@ -149,23 +186,50 @@ describe("WM-01 focus mode plugin", () => {
 
 describe("WM-02 typewriter mode", () => {
   // scrollIntoView's effect type is private; recognise it by its value's class.
-  const scrollTargetClass = (EditorView.scrollIntoView(0).value as object).constructor;
+  const scrollTargetClass = (EditorView.scrollIntoView(0).value as object)
+    .constructor;
   const isScroll = (e: { value: unknown }) =>
-    typeof e.value === "object" && e.value !== null && e.value.constructor === scrollTargetClass;
+    typeof e.value === "object" &&
+    e.value !== null &&
+    e.value.constructor === scrollTargetClass;
   const centered = (tr: Transaction) => tr.effects.some(isScroll);
 
   it("re-centres on keyboard moves and typing, not on pointer selections or IME", () => {
     const state = stateOf("a\nb\nc", 0, [typewriterModeExtension]);
-    expect(centered(state.update({ selection: { anchor: 2 }, scrollIntoView: true, userEvent: "select" }))).toBe(true);
     expect(
-      centered(state.update({ changes: { from: 0, insert: "x" }, scrollIntoView: true, userEvent: "input.type" })),
+      centered(
+        state.update({
+          selection: { anchor: 2 },
+          scrollIntoView: true,
+          userEvent: "select",
+        }),
+      ),
     ).toBe(true);
     expect(
-      centered(state.update({ selection: { anchor: 2 }, scrollIntoView: true, userEvent: "select.pointer" })),
+      centered(
+        state.update({
+          changes: { from: 0, insert: "x" },
+          scrollIntoView: true,
+          userEvent: "input.type",
+        }),
+      ),
+    ).toBe(true);
+    expect(
+      centered(
+        state.update({
+          selection: { anchor: 2 },
+          scrollIntoView: true,
+          userEvent: "select.pointer",
+        }),
+      ),
     ).toBe(false);
     expect(
       centered(
-        state.update({ changes: { from: 0, insert: "中" }, scrollIntoView: true, userEvent: "input.type.compose" }),
+        state.update({
+          changes: { from: 0, insert: "中" },
+          scrollIntoView: true,
+          userEvent: "input.type.compose",
+        }),
       ),
     ).toBe(false);
     // Programmatic changes that don't ask for scrolling are left alone.
@@ -174,7 +238,11 @@ describe("WM-02 typewriter mode", () => {
 
   it("the effect targets the new cursor head and centres it", () => {
     const state = stateOf("a\nb\nc", 0, [typewriterModeExtension]);
-    const tr = state.update({ selection: { anchor: 4 }, scrollIntoView: true, userEvent: "select" });
+    const tr = state.update({
+      selection: { anchor: 4 },
+      scrollIntoView: true,
+      userEvent: "select",
+    });
     expect(wantsTypewriterScroll(tr)).toBe(true);
     const effect = tr.effects.find(isScroll);
     const target = effect?.value as { range: { head: number }; y: string };
@@ -198,19 +266,28 @@ describe("WM-01 / WM-02 app wiring", () => {
     expect(DEFAULT_SETTINGS.focusMode).toBe(false);
     expect(DEFAULT_SETTINGS.typewriterMode).toBe(false);
 
-    window.dispatchEvent(new KeyboardEvent("keydown", { key: "F8", bubbles: true }));
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "F8", bubbles: true }),
+    );
     expect(app.editor.isFocusMode()).toBe(true);
     expect(app.getStatusText()).toBe("Ataraxia 專注模式：開");
-    window.dispatchEvent(new KeyboardEvent("keydown", { key: "F9", bubbles: true }));
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "F9", bubbles: true }),
+    );
     expect(app.editor.isTypewriterMode()).toBe(true);
     expect(app.getStatusText()).toBe("Stichos 打字機模式：開");
     await Promise.resolve();
-    expect(await getSettings()).toMatchObject({ focusMode: true, typewriterMode: true });
+    expect(await getSettings()).toMatchObject({
+      focusMode: true,
+      typewriterMode: true,
+    });
 
     // Both work in source mode too.
     app.editor.setSourceMode(true);
     expect(app.editor.view.dom.classList.contains("k-focus-mode")).toBe(true);
-    expect(app.editor.view.dom.classList.contains("k-typewriter-mode")).toBe(true);
+    expect(app.editor.view.dom.classList.contains("k-typewriter-mode")).toBe(
+      true,
+    );
 
     // Relaunch: modes off locally, init() restores them from settings.
     app.editor.setFocusMode(false);
@@ -219,7 +296,9 @@ describe("WM-01 / WM-02 app wiring", () => {
     expect(app.editor.isFocusMode()).toBe(true);
     expect(app.editor.isTypewriterMode()).toBe(true);
 
-    window.dispatchEvent(new KeyboardEvent("keydown", { key: "F8", bubbles: true }));
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "F8", bubbles: true }),
+    );
     expect(app.getStatusText()).toBe("Ataraxia 專注模式：關");
     await setSettings({ ...(await getSettings()) });
     expect((await getSettings()).focusMode).toBe(false);

@@ -17,7 +17,12 @@ import {
   type ViewUpdate,
   WidgetType,
 } from "@codemirror/view";
-import { allowAssetDir, allowAssetFile, isAssetDirTooBroadError, localFileUrl } from "../ipc";
+import {
+  allowAssetDir,
+  allowAssetFile,
+  isAssetDirTooBroadError,
+  localFileUrl,
+} from "../ipc";
 import {
   findTyporaRootUrl,
   hasImageSize,
@@ -53,7 +58,8 @@ export const imageDocPathField = StateField.define<string | null>({
 
 /** Called when the asset protocol refuses an image root as too broad. */
 export type ImageRootTooBroadHandler = (root: string) => void;
-export const imageRootTooBroadHandlerFacet = Facet.define<ImageRootTooBroadHandler>();
+export const imageRootTooBroadHandlerFacet =
+  Facet.define<ImageRootTooBroadHandler>();
 
 /** The `imageRootDir` setting (absolute folder or null). */
 export const setImageRootSettingEffect = StateEffect.define<string | null>();
@@ -426,7 +432,10 @@ export function renderImageFallback(
 }
 
 /** Applies IM-03 sizes; `zoom` scales the natural size once it is known. */
-export function applyImageSize(img: HTMLImageElement, input: ImageSize | undefined): void {
+export function applyImageSize(
+  img: HTMLImageElement,
+  input: ImageSize | undefined,
+): void {
   if (!input || !hasImageSize(input)) return;
   const size = resolveZoomedSize(input);
   img.classList.add("k-image-sized");
@@ -596,11 +605,10 @@ export function buildImageDecorations(
       resolved,
       spec.size,
       spec.html ? 1 : 2,
-      resolved.kind === "local" && needsAssetFileAllow(resolved.path, docPath, root),
+      resolved.kind === "local" &&
+        needsAssetFileAllow(resolved.path, docPath, root),
     );
-    decorations.push(
-      Decoration.replace({ widget }).range(spec.from, spec.to),
-    );
+    decorations.push(Decoration.replace({ widget }).range(spec.from, spec.to));
   }
   return Decoration.set(decorations, true);
 }
@@ -810,7 +818,9 @@ export function enterImageOnArrow(tr: Transaction): number | null {
   if (Math.abs(h1 - h0) < 2) return null;
   const line = tr.startState.doc.lineAt(h0);
   if (h1 < line.from || h1 > line.to) return null;
-  for (const spec of collectImageSpecs(tr.startState, [{ from: line.from, to: line.to }])) {
+  for (const spec of collectImageSpecs(tr.startState, [
+    { from: line.from, to: line.to },
+  ])) {
     if (isInlineSpanActive(tr.startState, spec.from, spec.to)) continue;
     if (h0 === spec.to && h1 === spec.from) return spec.to - 1;
     if (h0 === spec.from && h1 === spec.to) return spec.from + 1;
@@ -821,7 +831,17 @@ export function enterImageOnArrow(tr: Transaction): number | null {
 const enterImageFilter = EditorState.transactionFilter.of((tr) => {
   const target = enterImageOnArrow(tr);
   if (target === null) return tr;
-  return [tr, { selection: EditorSelection.cursor(target), scrollIntoView: tr.scrollIntoView, sequential: true }];
+  return [
+    tr,
+    {
+      selection: EditorSelection.cursor(target),
+      scrollIntoView: tr.scrollIntoView,
+      sequential: true,
+    },
+  ];
 });
 
-export const imagePreviewExtension: Extension = [imagePreviewPlugin, enterImageFilter];
+export const imagePreviewExtension: Extension = [
+  imagePreviewPlugin,
+  enterImageFilter,
+];
