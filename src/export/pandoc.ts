@@ -8,6 +8,7 @@ import type { MarkdownParser } from "@lezer/markdown";
 import { findTyporaRootUrlInText, parseImgTag } from "../editor/image-attrs";
 import { resolveImageRoot, resolveImageSrc } from "../editor/images";
 import { documentTitle } from "./pdf";
+import { IS_WINDOWS } from "../platform";
 
 export type PandocFormat = "docx" | "odt" | "latex" | "mediawiki" | "epub";
 
@@ -29,7 +30,10 @@ export const PANDOC_FORMATS: readonly PandocFormatInfo[] = [
 /** Extensions `import_pandoc` accepts. */
 export const PANDOC_IMPORT_EXTENSIONS = ["docx", "odt", "epub", "tex", "html", "htm", "wiki", "mediawiki"];
 
-export const PANDOC_MISSING_MESSAGE = "找不到 Pandoc：請先安裝（brew install pandoc）";
+/** Must match `PANDOC_MISSING_MESSAGE` in src-tauri/src/pandoc.rs (per platform). */
+export const PANDOC_MISSING_MESSAGE = IS_WINDOWS
+  ? "找不到 Pandoc：請先安裝（winget install JohnMacFarlane.Pandoc，或至 pandoc.org 下載安裝程式）"
+  : "找不到 Pandoc：請先安裝（brew install pandoc）";
 export const EXPORTING_MESSAGE = "匯出中…";
 export const IMPORTING_MESSAGE = "匯入中…";
 

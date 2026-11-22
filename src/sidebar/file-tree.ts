@@ -1,4 +1,5 @@
 import type { TreeNode } from "../ipc";
+import { shortcutLabel } from "../platform";
 
 export interface FileTreeContextTarget {
   path: string;
@@ -134,7 +135,7 @@ export function createFileTree(options: FileTreeOptions): FileTreeView {
     if (!tree) {
       const emptyEl = document.createElement("div");
       emptyEl.className = "k-sidebar-empty";
-      emptyEl.textContent = "尚未開啟資料夾（Cmd+Shift+O）";
+      emptyEl.textContent = shortcutLabel("尚未開啟資料夾（Cmd+Shift+O）");
       container.appendChild(emptyEl);
       return;
     }

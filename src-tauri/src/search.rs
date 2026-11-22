@@ -247,7 +247,7 @@ pub fn search_in_folder_impl(
     if root.trim().is_empty() {
         return Err(AppError::invalid_path("Path must not be empty"));
     }
-    let canonical_root = fs::canonicalize(root)
+    let canonical_root = crate::platform::canonicalize(root)
         .map_err(|_| AppError::not_found(format!("Directory does not exist: {root}")))?;
     if !canonical_root.is_dir() {
         return Err(AppError::invalid_path(format!("Path is not a directory: {root}")));
@@ -411,7 +411,7 @@ mod tests {
             paths,
             vec![
                 root.join("top.mdown").to_string_lossy().into_owned(),
-                root.join("sub/deep.markdown").to_string_lossy().into_owned(),
+                root.join("sub").join("deep.markdown").to_string_lossy().into_owned(),
             ]
         );
     }

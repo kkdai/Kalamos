@@ -753,8 +753,12 @@ export function resolveRelativeMarkdownPath(
   const lastSlash = normalizedCurrent.lastIndexOf("/");
   const baseDir =
     lastSlash >= 0 ? normalizedCurrent.slice(0, lastSlash) : "";
-  const isAbsolute = normalizedCurrent.startsWith("/");
-  const segments = baseDir.split("/").filter((s) => s.length > 0);
+  const drive = /^[A-Za-z]:\//.exec(normalizedCurrent);
+  const root = drive ? drive[0] : normalizedCurrent.startsWith("/") ? "/" : "";
+  const segments = baseDir
+    .slice(root.length)
+    .split("/")
+    .filter((s) => s.length > 0);
 
   for (const part of decodedRel.split("/")) {
     if (!part || part === ".") continue;
@@ -765,5 +769,5 @@ export function resolveRelativeMarkdownPath(
     }
   }
 
-  return `${isAbsolute ? "/" : ""}${segments.join("/")}`;
+  return `${root}${segments.join("/")}`;
 }

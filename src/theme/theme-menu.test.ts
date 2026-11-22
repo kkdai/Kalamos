@@ -68,6 +68,9 @@ describe("Theme Menu & Custom CSS (TH-01)", () => {
     const options = Array.from(
       menuEl.querySelectorAll<HTMLButtonElement>('[data-testid="theme-option"]'),
     );
+    // Menu option buttons must not carry `data-theme`, which would trigger
+    // `[data-theme="papyros"|"melan"]` CSS variable overrides on the button itself.
+    expect(options.every((o) => !o.hasAttribute("data-theme"))).toBe(true);
     expect(
       options.map(
         (o) => `${o.dataset.themeId}:${o.textContent?.replace("✓", "").trim()}`,

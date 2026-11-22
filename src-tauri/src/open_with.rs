@@ -59,7 +59,7 @@ pub fn markdown_path_from_url(url: &Url) -> Option<PathBuf> {
     if !has_markdown_extension(&path) {
         return None;
     }
-    let canonical = path.canonicalize().ok()?;
+    let canonical = crate::platform::canonicalize(&path).ok()?;
     // canonicalize follows symlinks: re-check the real target.
     if !has_markdown_extension(&canonical) || !canonical.is_file() {
         return None;
@@ -136,7 +136,77 @@ impl PendingOpenFiles {
 
 /// Handle a `RunEvent::Opened`: filter, then queue or emit.
 pub fn handle_opened_urls<R: tauri::Runtime>(app: &tauri::AppHandle<R>, urls: &[Url]) {
-    let req = filter_urls(urls);
+    deliver(app, filter_urls(urls));
+}
+
+/// Windows / Linux: files handed to Kalamos on the command line (Explorer
+/// double-click / "Open with", or forwarded from a second instance).
+///
+/// `args` starts with `argv[0]` (the executable); flags (`-...`) are skipped
+/// and relative paths are resolved against `cwd`.
+pub fn filter_cli_args(args: &[String], cwd: Option<&Path>) -> OpenFilesRequest {
+    let mut urls = Vec::new();
+    let mut req = OpenFilesRequest::default();
+    let mut after_double_dash = false;
+    for raw in args.iter().skip(1) {
+        let trimmed = raw.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        if !after_double_dash {
+            if trimmed == "--" {
+                after_double_dash = true;
+                continue;
+            }
+            if trimmed.starts_with('-') {
+                continue;
+            }
+        }
+        if let Ok(u) = Url::parse(trimmed) {
+            if u.scheme() == "file" {
+                urls.push(u);
+                continue;
+            }
+            // A Windows drive letter (`C:\...`) parses as scheme `c`: fall through.
+            if u.scheme().len() > 1 {
+                req.rejected.push(trimmed.to_string());
+                continue;
+            }
+        }
+        let p = Path::new(trimmed);
+        let full = if p.is_absolute() {
+            p.to_path_buf()
+        } else if let Some(base) = cwd {
+            base.join(p)
+        } else {
+            std::env::current_dir()
+                .map(|c| c.join(p))
+                .unwrap_or_else(|_| p.to_path_buf())
+        };
+        match Url::from_file_path(&full) {
+            Ok(u) => urls.push(u),
+            Err(()) => req.rejected.push(
+                p.file_name()
+                    .map(|n| n.to_string_lossy().into_owned())
+                    .unwrap_or_else(|| trimmed.to_string()),
+            ),
+        }
+    }
+    let mut from_urls = filter_urls(&urls);
+    from_urls.append(req);
+    from_urls
+}
+
+/// Handle command-line arguments (cold launch or single-instance callback).
+pub fn handle_cli_args<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+    args: &[String],
+    cwd: Option<&Path>,
+) {
+    deliver(app, filter_cli_args(args, cwd));
+}
+
+fn deliver<R: tauri::Runtime>(app: &tauri::AppHandle<R>, req: OpenFilesRequest) {
     let state = app.state::<PendingOpenFiles>();
     if let Some(ready) = state.offer(req) {
         if let Some(window) = app.get_webview_window("main") {
@@ -144,6 +214,9 @@ pub fn handle_opened_urls<R: tauri::Runtime>(app: &tauri::AppHandle<R>, urls: &[
             let _ = window.set_focus();
         }
         let _ = app.emit(OPEN_FILES_EVENT, ready);
+    } else if let Some(window) = app.get_webview_window("main") {
+        let _ = window.unminimize();
+        let _ = window.set_focus();
     }
 }
 
@@ -184,7 +257,7 @@ mod tests {
         let req = filter_urls(&urls);
         assert_eq!(req.paths.len(), 8);
         assert!(req.rejected.is_empty());
-        let canonical_dir = dir.path().canonicalize().unwrap();
+        let canonical_dir = crate::platform::canonicalize(dir.path()).unwrap();
         assert!(req
             .paths
             .iter()
@@ -227,7 +300,7 @@ mod tests {
         let req = filter_urls(&[file_url(&p), file_url(&dotted)]);
         assert_eq!(
             req.paths,
-            vec![p.canonicalize().unwrap().to_string_lossy().into_owned()]
+            vec![crate::platform::canonicalize(&p).unwrap().to_string_lossy().into_owned()]
         );
     }
 
@@ -274,5 +347,27 @@ mod tests {
         assert_eq!(q.offer(later.clone()), Some(later));
         assert!(q.take().is_empty());
         assert_eq!(q.offer(OpenFilesRequest::default()), None);
+    }
+
+    #[test]
+    fn cli_args_accept_paths_and_file_urls_and_skip_flags() {
+        let dir = tempdir().unwrap();
+        let md = dir.path().join("note.md");
+        let txt = dir.path().join("other.txt");
+        fs::write(&md, "# hi").unwrap();
+        fs::write(&txt, "x").unwrap();
+        let args = vec![
+            "kalamos.exe".to_string(),
+            "--some-flag".to_string(),
+            "note.md".to_string(),
+            txt.to_string_lossy().into_owned(),
+            file_url(&md).to_string(),
+        ];
+        let req = filter_cli_args(&args, Some(dir.path()));
+        assert_eq!(
+            req.paths,
+            vec![crate::platform::canonicalize(&md).unwrap().to_string_lossy().into_owned()]
+        );
+        assert_eq!(req.rejected, vec!["other.txt".to_string()]);
     }
 }
