@@ -188,6 +188,18 @@ The built installers will be generated under `src-tauri/target/release/bundle/` 
 
 ---
 
+## Releases
+
+1. For a change to the app, run `npm ci` and `npm run changeset`. Select a version bump, write a short summary for users, and include the new file from `.changeset/` in your pull request.
+2. When changesets reach `main`, the [Changesets workflow](.github/workflows/changesets.yml) opens or updates a release pull request. It updates the changelog and keeps the npm, Tauri, and Cargo versions in sync.
+3. Merge the release pull request. The [Release workflow](.github/workflows/release.yml) builds the Apple Silicon macOS `.dmg`, creates the `vX.Y.Z` tag, and publishes the installer and changelog entry to GitHub Releases. It does not publish to npm.
+
+Enable **Settings → Actions → General → Allow GitHub Actions to create and approve pull requests** in the release repository. If GitHub asks for approval to run CI on the release pull request, approve the run before merging.
+
+If the release workflow fails, fix the problem and rerun it. If it reports an existing draft, inspect or remove that draft before retrying.
+
+---
+
 ## Development & Testing
 
 ```bash
