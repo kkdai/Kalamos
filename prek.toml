@@ -1,0 +1,45 @@
+#:schema https://www.schemastore.org/prek.json
+
+[[repos]]
+repo = "builtin"
+hooks = [
+    { id = "check-merge-conflict" },
+    { id = "check-json" },
+    { id = "check-toml" },
+    { id = "check-yaml" },
+    { id = "end-of-file-fixer" },
+    { id = "trailing-whitespace", args = ["--markdown-linebreak-ext=md"] },
+]
+
+[[repos]]
+repo = "https://github.com/zizmorcore/zizmor-pre-commit"
+rev = "0eb9e4a60caf04df64b499ed1e8bef55f4440eae" # v1.33.0
+hooks = [{ id = "zizmor" }]
+
+[[repos]]
+repo = "local"
+
+[[repos.hooks]]
+id = "biome"
+name = "Biome format and lint check"
+entry = "npx biome check --no-errors-on-unmatched"
+language = "system"
+files = '\.(js|mjs|cjs|ts|json|jsonc|css)$'
+exclude = '^(site|src-tauri/icons)/'
+
+[[repos.hooks]]
+id = "tsc"
+name = "TypeScript type check"
+entry = "npx tsc --noEmit"
+language = "system"
+files = '^(src/.*\.[cm]?tsx?|tsconfig\.json|package(-lock)?\.json)$'
+pass_filenames = false
+
+[[repos.hooks]]
+id = "clippy"
+name = "Rust lint (Clippy)"
+entry = "cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings"
+language = "system"
+files = '^src-tauri/(.*\.rs|Cargo\.(toml|lock)|tauri\.conf\.json|capabilities/.*\.json)$'
+pass_filenames = false
+stages = ["pre-push"]
