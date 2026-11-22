@@ -25,7 +25,7 @@ import {
   setImageDocPathEffect,
   setImageRootSettingEffect,
 } from "./images";
-import { createFileKeymap, type FileCommandHandlers } from "./keymaps";
+import { createFileKeymap, type FileCommandHandlers, trackKeydownExtension } from "./keymaps";
 import {
   type RelativeLinkHandler,
   relativeLinkHandlerFacet,
@@ -269,6 +269,7 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
       }),
       sourceModeController.stateExtension(),
       kalamosSearchExtension,
+      trackKeydownExtension,
       keymap.of([
         ...kalamosSearchKeymap,
         ...createFileKeymap(combinedHandlers),

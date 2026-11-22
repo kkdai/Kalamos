@@ -19,6 +19,7 @@
  */
 import "./search.css";
 import { shortcutLabel } from "../platform";
+import { unshifted } from "./keymaps";
 
 import {
   SearchQuery,
@@ -398,10 +399,16 @@ export function closeFind(view: EditorView): boolean {
 }
 
 export const kalamosSearchKeymap: readonly KeyBinding[] = [
-  { key: "Mod-f", preventDefault: true, run: (view) => openFind(view) },
+  { key: "Mod-f", run: unshifted((view) => openFind(view)) },
   { key: "Mod-Alt-f", preventDefault: true, run: (view) => openFind(view, { replace: true }) },
-  { key: "Mod-g", preventDefault: true, run: findNextMatch, shift: findPreviousMatch },
-  { key: "Mod-e", preventDefault: true, run: useSelectionForFind },
+  { key: "Mod-g", run: unshifted(findNextMatch), shift: findPreviousMatch },
+  {
+    key: "Mod-e",
+    run: unshifted((view) => {
+      useSelectionForFind(view);
+      return true;
+    }),
+  },
   { key: "Escape", run: closeFind },
 ];
 

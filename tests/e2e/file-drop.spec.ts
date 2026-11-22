@@ -111,3 +111,34 @@ test("#88 UI: top-left floating quick buttons show only on Windows and Preferenc
     await winCtx.close();
   }
 });
+
+test("#88 Windows shortcuts: Control+Shift+o opens folder even with lowercase key (Caps Lock / synthetic)", async ({ browser }) => {
+  const winCtx = await browser.newContext({
+    userAgent:
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+  });
+  try {
+    const winPage = await winCtx.newPage();
+    await winPage.addInitScript(() => {
+      Object.defineProperty(navigator, "platform", { get: () => "Win32" });
+    });
+    await boot(winPage);
+    await runWithApp(
+      winPage,
+      "ipc.setMockDialogHandlers({ openFolder: () => '/demo', open: () => '/demo/welcome.md', save: () => '/demo/copy.md' });",
+    );
+    await winPage.getByTestId("editor").click();
+    await winPage.keyboard.press("Control+Shift+o");
+    await expect(winPage.getByTestId("sidebar-folder-title")).toContainText("demo");
+    await expect(winPage.locator("#sidebar")).toHaveAttribute("data-visible", "true");
+
+    // Control+o still opens a file, and Control+Shift+s on a saved file still triggers Save As.
+    await winPage.getByTestId("editor").click();
+    await winPage.keyboard.press("Control+o");
+    await expect.poll(() => runWithApp<string | null>(winPage, "return app.getCurrentPath();")).toBe("/demo/welcome.md");
+    await winPage.keyboard.press("Control+Shift+s");
+    await expect.poll(() => runWithApp<string | null>(winPage, "return app.getCurrentPath();")).toBe("/demo/copy.md");
+  } finally {
+    await winCtx.close();
+  }
+});
