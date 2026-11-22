@@ -45,9 +45,20 @@ test.describe("#74 preferences window", () => {
     for (const tab of ["general", "editor", "appearance", "images"]) {
       await expect(page.getByTestId(`pref-tab-${tab}`)).toBeVisible();
     }
-    await expect(page.getByTestId("pref-panel-general")).toBeVisible();
+    const tabs = ["general", "editor", "appearance", "images"];
+    const onlyVisible = async (shown: string) => {
+      for (const tab of tabs) {
+        const panel = page.getByTestId(`pref-panel-${tab}`);
+        if (tab === shown) await expect(panel).toBeVisible();
+        else await expect(panel).toBeHidden();
+      }
+    };
+    await onlyVisible("general");
+    for (const tab of ["editor", "appearance", "images", "general"]) {
+      await page.getByTestId(`pref-tab-${tab}`).click();
+      await onlyVisible(tab);
+    }
     await page.getByTestId("pref-tab-images").click();
-    await expect(page.getByTestId("pref-panel-images")).toBeVisible();
     await expect(page.getByTestId("pref-upload-command")).toHaveText("未設定");
     await page.keyboard.press("Escape");
     await expect(dialog).toHaveCount(0);

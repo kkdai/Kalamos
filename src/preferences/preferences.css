@@ -104,6 +104,11 @@
   flex-direction: column;
 }
 
+/* `display: flex` above would otherwise override the [hidden] attribute. */
+.k-pref-panel[hidden] {
+  display: none;
+}
+
 .k-pref-row {
   display: grid;
   grid-template-columns: 110px 1fr;
