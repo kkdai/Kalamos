@@ -57,7 +57,7 @@ export function menuActions(spec: MenuNode[] = MENU_SPEC): MenuActionNode[] {
 export interface KeyMatcher {
   code?: string;
   key?: string;
-  /** CmdOrCtrl: exactly one of Cmd / Ctrl (no accelerator in the spec uses a bare Ctrl). */
+  /** CmdOrCtrl: exactly one of Cmd / Ctrl. A bare Ctrl (⌃⇥) needs Ctrl without Cmd. */
   cmdOrCtrl: boolean;
   meta: boolean;
   ctrl: boolean;
@@ -104,6 +104,7 @@ export function parseAccelerator(accel: string): KeyMatcher {
   else if (/^[0-9]$/.test(keyToken)) m.code = `Digit${keyToken}`;
   else if (/^F([1-9]|1[0-9]|2[0-4])$/i.test(keyToken)) m.key = keyToken.toUpperCase();
   else if (SYMBOL_CODES[keyToken]) m.code = SYMBOL_CODES[keyToken];
+  else if (keyToken.toLowerCase() === "tab") m.code = "Tab";
   else throw new Error(`Unknown accelerator key "${keyToken}" in ${accel}`);
   return m;
 }

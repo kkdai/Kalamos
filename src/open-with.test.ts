@@ -60,14 +60,25 @@ describe("#67 open with Kalamos (Finder / Dock / open -a)", () => {
     expect(app.editor.getContent()).toBe("# B\n");
   });
 
-  it("several files: opens the first and reports the rest in the status bar", async () => {
+  it("#81 B several files: each opens in its own tab, in order", async () => {
     app = createKalamosApp(document);
     await app.init();
     await triggerMockOpenFiles({
       paths: ["/tmp/kalamos-test/a.md", "/tmp/kalamos-test/b.md"],
     });
+    // The blank untitled tab was reused for the first file.
+    expect(app.getTabs().map((t) => t.path)).toEqual(["/tmp/kalamos-test/a.md", "/tmp/kalamos-test/b.md"]);
+    expect(app.getCurrentPath()).toBe("/tmp/kalamos-test/b.md");
+    expect(app.getStatusText()).toBe("");
+  });
+
+  it("#81 B a file that is already open is switched to, not opened twice", async () => {
+    app = createKalamosApp(document);
+    await app.init();
+    await triggerMockOpenFiles({ paths: ["/tmp/kalamos-test/a.md", "/tmp/kalamos-test/b.md"] });
+    await triggerMockOpenFiles({ paths: ["/tmp/kalamos-test/a.md"] });
+    expect(app.getTabs()).toHaveLength(2);
     expect(app.getCurrentPath()).toBe("/tmp/kalamos-test/a.md");
-    expect(app.getStatusText()).toContain("另有 1 個檔案未開啟");
   });
 
   it("refused files only: keeps the current document and shows an error", async () => {
@@ -79,7 +90,7 @@ describe("#67 open with Kalamos (Finder / Dock / open -a)", () => {
     expect(document.getElementById("status")!.dataset.error).toBe("true");
   });
 
-  it("unsaved untitled changes: asks first, and cancelling keeps the text", async () => {
+  it("#81 B unsaved untitled changes: no prompt — the file opens in a new tab and the draft stays", async () => {
     const ask = vi.fn(() => false);
     setMockDialogHandlers({ ask });
     app = createKalamosApp(document);
@@ -87,32 +98,25 @@ describe("#67 open with Kalamos (Finder / Dock / open -a)", () => {
     userTypeText(app, "還沒存檔的草稿");
 
     await triggerMockOpenFiles({ paths: ["/tmp/kalamos-test/a.md"] });
-    expect(ask).toHaveBeenCalledTimes(1);
-    expect(app.getCurrentPath()).toBeNull();
-    expect(app.editor.getContent()).toBe("還沒存檔的草稿");
-
-    ask.mockImplementation(() => true);
-    await triggerMockOpenFiles({ paths: ["/tmp/kalamos-test/a.md"] });
-    expect(ask).toHaveBeenCalledTimes(2);
+    expect(ask).not.toHaveBeenCalled();
     expect(app.getCurrentPath()).toBe("/tmp/kalamos-test/a.md");
+    expect(app.getTabs()).toHaveLength(2);
+    app.cycleTab(1);
+    expect(app.editor.getContent()).toBe("還沒存檔的草稿");
   });
 
-  it("unsaved changes on cold launch: the queued file still goes through the prompt", async () => {
-    const ask = vi.fn(() => false);
-    setMockDialogHandlers({ ask });
+  it("unsaved changes on cold launch: the queued file opens beside the draft", async () => {
     app = createKalamosApp(document);
     userTypeText(app, "draft");
     await triggerMockOpenFiles({ paths: ["/tmp/kalamos-test/a.md"] });
     await app.init();
-    expect(ask).toHaveBeenCalledTimes(1);
-    expect(app.getCurrentPath()).toBeNull();
-    expect(app.editor.getContent()).toBe("draft");
+    expect(app.getTabs().map((t) => t.path)).toEqual([null, "/tmp/kalamos-test/a.md"]);
   });
 
-  it("status message combines extra and refused files", () => {
-    expect(openWithStatusMessage("/tmp/kalamos-test/a.md", 2, ["x.txt", "y.pdf"])).toBe(
-      "已開啟 a.md；另有 2 個檔案未開啟（Kalamos 一次開啟一個檔案）；無法開啟：x.txt、y.pdf（只支援一般的 Markdown 檔案）",
+  it("status message lists refused files", () => {
+    expect(openWithStatusMessage(["x.txt", "y.pdf"])).toBe(
+      "無法開啟：x.txt、y.pdf（只支援一般的 Markdown 檔案）",
     );
-    expect(openWithStatusMessage("/tmp/kalamos-test/a.md", 0, [])).toBe("");
+    expect(openWithStatusMessage([])).toBe("");
   });
 });

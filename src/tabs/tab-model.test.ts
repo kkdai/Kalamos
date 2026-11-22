@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   activeIndexAfterClose,
+  isMarkdownPath,
+  resolveOpenTarget,
+  unsavedChangesMessage,
   cycleIndex,
   moveItem,
   nextUntitledNumber,
@@ -84,5 +87,47 @@ describe("#81 tab navigation", () => {
     expect(moveItem(["a", "b", "c"], 0, 2)).toEqual(["b", "c", "a"]);
     expect(moveItem(["a", "b", "c"], 2, 0)).toEqual(["c", "a", "b"]);
     expect(moveItem(["a", "b", "c"], 1, 1)).toEqual(["a", "b", "c"]);
+  });
+});
+
+describe("#81 B open rules", () => {
+  const tabs = [
+    { id: "a", path: "/n/a.md", dirty: false, pristine: false },
+    { id: "u", path: null, dirty: false, pristine: true },
+    { id: "d", path: null, dirty: true, pristine: false },
+  ];
+
+  it("an already open file is switched to, whatever the mode", () => {
+    for (const mode of ["tab", "current", "newTab"] as const) {
+      expect(resolveOpenTarget(tabs, "u", "/n/a.md", mode)).toEqual({ kind: "existing", id: "a" });
+    }
+  });
+
+  it("a blank untitled tab is reused (not for Cmd+click)", () => {
+    expect(resolveOpenTarget(tabs, "u", "/n/b.md", "tab")).toEqual({ kind: "replace" });
+    expect(resolveOpenTarget(tabs, "u", "/n/b.md", "current")).toEqual({ kind: "replace" });
+    expect(resolveOpenTarget(tabs, "u", "/n/b.md", "newTab")).toEqual({ kind: "new" });
+  });
+
+  it("Cmd+O / Finder / drop / search open a new tab", () => {
+    expect(resolveOpenTarget(tabs, "a", "/n/b.md", "tab")).toEqual({ kind: "new" });
+  });
+
+  it("a sidebar click uses the current tab unless it has unsaved changes", () => {
+    expect(resolveOpenTarget(tabs, "a", "/n/b.md", "current")).toEqual({ kind: "replace" });
+    expect(resolveOpenTarget(tabs, "d", "/n/b.md", "current")).toEqual({ kind: "new" });
+  });
+
+  it("recognises Markdown files", () => {
+    expect(isMarkdownPath("/x/Notes.MD")).toBe(true);
+    expect(isMarkdownPath("/x/a.markdown")).toBe(true);
+    expect(isMarkdownPath("/x/a.png")).toBe(false);
+    expect(isMarkdownPath("/x/.md")).toBe(false);
+  });
+
+  it("lists the unsaved documents", () => {
+    expect(unsavedChangesMessage(["a.md", "未命名 2"])).toBe(
+      "以下 2 份文件有未儲存的變更：\n・a.md\n・未命名 2\n\n要在關閉前儲存嗎？",
+    );
   });
 });

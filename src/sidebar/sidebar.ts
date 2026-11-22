@@ -35,7 +35,8 @@ export interface SidebarTabDescriptor {
 export interface CreateSidebarOptions {
   element: HTMLElement;
   editorView?: EditorView | null;
-  onSelectFile: (path: string) => void | Promise<void>;
+  /** #81 B: `newTab` = Cmd+click in the file tree / list. */
+  onSelectFile: (path: string, options?: { newTab: boolean }) => void | Promise<void>;
   onPathRenamed?: (fromPath: string, toPath: string) => void | Promise<void>;
   onPathTrashed?: (trashedPath: string) => void | Promise<void>;
   /** #73 B: a folder-search hit was clicked. */
@@ -227,8 +228,8 @@ export function createSidebar(options: CreateSidebarOptions): SidebarController 
 
   const fileTree = createFileTree({
     container: bodyEl,
-    onSelectFile: async (path) => {
-      await onSelectFile(path);
+    onSelectFile: async (path, selectOptions) => {
+      await onSelectFile(path, selectOptions);
     },
     onContextMenu: (e, target) => {
       openContextMenu(e, target);
@@ -237,8 +238,8 @@ export function createSidebar(options: CreateSidebarOptions): SidebarController 
 
   const fileList = createFileList({
     container: bodyEl,
-    onSelectFile: async (path) => {
-      await onSelectFile(path);
+    onSelectFile: async (path, selectOptions) => {
+      await onSelectFile(path, selectOptions);
     },
     onContextMenu: (e, target) => {
       openContextMenu(e, target);

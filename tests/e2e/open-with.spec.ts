@@ -27,19 +27,18 @@ test("#67 opened event loads the file in the current window and syncs the sideba
   ).toHaveAttribute("data-active", "true");
 });
 
-test("#67 several files open the first and report the rest; refused files show an error", async ({ page }) => {
+test("#67 / #81 B several files each open in a tab; refused files show an error", async ({ page }) => {
   await withIpc(
     page,
     "ipc.seedMockFile('/tmp/kalamos-test/a.md', '# A'); ipc.seedMockFile('/tmp/kalamos-test/b.md', '# B');" +
       "await ipc.triggerMockOpenFiles({ paths: ['/tmp/kalamos-test/a.md', '/tmp/kalamos-test/b.md'], rejected: ['c.txt'] });",
   );
-  await expect.poll(() => getDoc(page)).toBe("# A");
-  const status = page.getByTestId("status");
-  await expect(status).toContainText("另有 1 個檔案未開啟");
-  await expect(status).toContainText("無法開啟：c.txt");
+  await expect.poll(() => getDoc(page)).toBe("# B");
+  await expect(page.getByTestId("tab")).toHaveText(["a.md", "b.md"]);
+  await expect(page.getByTestId("status")).toContainText("無法開啟：c.txt");
 });
 
-test("#67 unsaved untitled changes are confirmed before the opened file replaces them", async ({ page }) => {
+test("#81 B unsaved untitled changes stay in their tab; the opened file gets a new one, without a prompt", async ({ page }) => {
   await withIpc(
     page,
     "ipc.seedMockFile('/tmp/kalamos-test/a.md', '# A'); window.__askCount = 0;" +
@@ -48,10 +47,13 @@ test("#67 unsaved untitled changes are confirmed before the opened file replaces
   await page.getByTestId("editor").click();
   await page.keyboard.type("草稿");
   await withIpc(page, "await ipc.triggerMockOpenFiles({ paths: ['/tmp/kalamos-test/a.md'] });");
-  expect(await page.evaluate(() => (window as unknown as { __askCount: number }).__askCount)).toBe(1);
-  expect(await getDoc(page)).toBe("草稿");
-
-  await withIpc(page, "ipc.setMockDialogHandlers({ ask: () => true });");
-  await withIpc(page, "await ipc.triggerMockOpenFiles({ paths: ['/tmp/kalamos-test/a.md'] });");
   await expect.poll(() => getDoc(page)).toBe("# A");
+  expect(await page.evaluate(() => (window as unknown as { __askCount: number }).__askCount)).toBe(0);
+  await expect(page.getByTestId("tab")).toHaveText(["未命名", "a.md"]);
+
+  // Opening it again switches to its tab.
+  await page.getByTestId("tab").first().click();
+  await withIpc(page, "await ipc.triggerMockOpenFiles({ paths: ['/tmp/kalamos-test/a.md'] });");
+  await expect(page.getByTestId("tab")).toHaveCount(2);
+  await expect(page.getByTestId("tab").nth(1)).toHaveAttribute("data-active", "true");
 });

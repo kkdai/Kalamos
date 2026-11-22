@@ -2,6 +2,7 @@ import { undo } from "@codemirror/commands";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   emitMockMenuAction,
+  getMockQuitCount,
   getMockSaveChangesPrompts,
   getMockWindowTitle,
   listRecovery,
@@ -11,6 +12,7 @@ import {
   seedMockSettings,
   setMockDialogHandlers,
   triggerMockCloseRequested,
+  triggerMockFileDrop,
 } from "../ipc";
 import {
   createKalamosApp,
@@ -282,16 +284,99 @@ describe("#81 A document tabs", () => {
     expect(entries.map((e) => e.docId).sort()).toEqual([...docIds].sort());
   });
 
-  it("window close flushes background tabs too", async () => {
+  it("#81 B window close lists every unsaved tab, background ones included", async () => {
     seedMockFile("/n/c.md", "c");
     await app.openDocument("/n/c.md");
     type(app, "+");
     app.newTab();
     type(app, "untitled bg");
     app.newTab();
-    await triggerMockCloseRequested();
+    type(app, "untitled fg");
+    app.newTab();
+    setMockDialogHandlers({ saveChanges: () => "cancel" });
+    expect(await triggerMockCloseRequested()).toBe(false);
+    // The named file was written (autosave on); the two drafts are listed.
     expect(readMockFile("/n/c.md")).toBe("c+");
-    expect((await listRecovery()).map((e) => e.content)).toEqual(["untitled bg"]);
+    expect(getMockSaveChangesPrompts()).toEqual([
+      "以下 2 份文件有未儲存的變更：\n・未命名\n・未命名 2\n\n要在關閉前儲存嗎？",
+    ]);
+    expect(app.getTabs()).toHaveLength(4);
+  });
+
+  it("#81 B 全部儲存 saves each draft (asking for its path); a cancelled save dialog keeps the window", async () => {
+    type(app, "one");
+    app.newTab();
+    type(app, "two");
+    const paths = ["/n/one.md", null];
+    setMockDialogHandlers({ saveChanges: () => "save", save: () => paths.shift() ?? null });
+    expect(await triggerMockCloseRequested()).toBe(false);
+    expect(readMockFile("/n/one.md")).toBe("one");
+    expect(app.getTabs()[0].dirty).toBe(false);
+    expect(app.getTabs()[1].dirty).toBe(true);
+
+    setMockDialogHandlers({ saveChanges: () => "save", save: () => "/n/two.md" });
+    expect(await triggerMockCloseRequested()).toBe(true);
+    expect(readMockFile("/n/two.md")).toBe("two");
+  });
+
+  it("#81 B with autosave off, named files are listed too; ⌘Q quits only when settled", async () => {
+    app.destroy();
+    resetMockState();
+    setupDom();
+    seedMockSettings({ autoSave: false });
+    app = createKalamosApp(document);
+    await app.init();
+    seedMockFile("/n/q.md", "q");
+    await app.openDocument("/n/q.md");
+    type(app, "!");
+    setMockDialogHandlers({ saveChanges: () => "cancel" });
+    await emitMockMenuAction("app.quit");
+    await vi.advanceTimersByTimeAsync(0);
+    expect(getMockQuitCount()).toBe(0);
+    expect(getMockSaveChangesPrompts()[0]).toContain("・q.md");
+
+    setMockDialogHandlers({ saveChanges: () => "save" });
+    await emitMockMenuAction("app.quit");
+    await vi.advanceTimersByTimeAsync(0);
+    expect(readMockFile("/n/q.md")).toBe("q!");
+    expect(getMockQuitCount()).toBe(1);
+  });
+
+  it("#81 B 視窗 > 顯示下一個 / 上一個分頁", async () => {
+    app.newTab();
+    app.newTab();
+    const ids = app.getTabs().map((t) => t.id);
+    await emitMockMenuAction("window.nextTab");
+    expect(app.getActiveTabId()).toBe(ids[0]);
+    await emitMockMenuAction("window.previousTab");
+    expect(app.getActiveTabId()).toBe(ids[2]);
+  });
+
+  it("#81 B dropped Markdown files open in tabs", async () => {
+    seedMockFile("/n/d1.md", "d1");
+    seedMockFile("/n/d2.markdown", "d2");
+    await triggerMockFileDrop({ paths: ["/n/d1.md", "/n/d2.markdown", "/n/x.txt"] });
+    expect(app.getTabs().map((t) => t.path)).toEqual(["/n/d1.md", "/n/d2.markdown"]);
+  });
+
+  it("#81 B Cmd+click in the file list opens a new tab", async () => {
+    seedMockFile("/n/s1.md", "s1");
+    seedMockFile("/n/s2.md", "s2");
+    await app.openFolder("/n");
+    await app.sidebar.setTab("list");
+    const item = (name: string) =>
+      Array.from(document.querySelectorAll<HTMLElement>('[data-testid="file-item"]')).find((el) =>
+        el.textContent?.includes(name),
+      )!;
+    item("s1.md").click();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(app.getTabs().map((t) => t.path)).toEqual(["/n/s1.md"]);
+    item("s2.md").click();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(app.getTabs().map((t) => t.path)).toEqual(["/n/s2.md"]);
+    item("s1.md").dispatchEvent(new MouseEvent("click", { bubbles: true, metaKey: true }));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(app.getTabs().map((t) => t.path)).toEqual(["/n/s2.md", "/n/s1.md"]);
   });
 
   it("dirty tabs are marked in the tab bar", () => {

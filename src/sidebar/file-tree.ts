@@ -7,7 +7,8 @@ export interface FileTreeContextTarget {
 
 export interface FileTreeOptions {
   container: HTMLElement;
-  onSelectFile: (path: string) => void | Promise<void>;
+  /** #81 B: `newTab` = Cmd+click (always open in a new tab). */
+  onSelectFile: (path: string, options?: { newTab: boolean }) => void | Promise<void>;
   onContextMenu?: (event: MouseEvent, target: FileTreeContextTarget) => void;
 }
 
@@ -110,7 +111,7 @@ export function createFileTree(options: FileTreeOptions): FileTreeView {
 
         fileRow.addEventListener("click", (e) => {
           e.stopPropagation();
-          void onSelectFile(node.path);
+          void onSelectFile(node.path, { newTab: e.metaKey || e.ctrlKey });
         });
 
         fileRow.addEventListener("contextmenu", (e) => {
