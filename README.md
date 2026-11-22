@@ -220,6 +220,35 @@ cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 npm run bench
 ```
 
+### Development Tools (Biome & prek)
+
+#### Formatting & Linting (Biome)
+
+[Biome](https://biomejs.dev/) is pinned in `devDependencies` (installed by `npm ci`) and configured in [biome.json](biome.json):
+
+```bash
+# Check formatting and lint diagnostics
+npm run lint
+
+# Apply formatting and safe lint fixes
+npm run format
+```
+
+#### Git Hooks (`prek`)
+
+Install [prek](https://prek.j178.dev/installation/), run `npm ci` so the local `biome` and `tsc` hooks can resolve project binaries, and then run:
+
+```bash
+prek install                         # Install pre-commit hooks
+prek install --hook-type pre-push    # Optional: install pre-push hooks (cargo clippy)
+prek run                             # Check staged files now
+prek run --all-files                 # Check all tracked files
+```
+
+[prek.toml](prek.toml) configures built-in file hygiene checks, [zizmor](https://docs.zizmor.sh/) for GitHub Actions security checks, local Biome checks (`npx biome check`), local TypeScript type checking (`npx tsc --noEmit`), and Rust Clippy on `pre-push`.
+
+> **Existing hooks & git worktrees**: When `prek install` finds an existing `.git/hooks/pre-commit` hook (for example, a local privacy-scanning hook), it is expected to preserve the existing hook as `.git/hooks/pre-commit.legacy` and chain it alongside prek's hooks. **Do not pass `--overwrite` (or `-f`)**, which would delete the existing hook instead of chaining it. Note also that all `git worktree` checkouts share the same `.git/hooks` directory, so installing hooks in one worktree affects the main repository and every other worktree.
+
 ---
 
 ## Known Limitations
