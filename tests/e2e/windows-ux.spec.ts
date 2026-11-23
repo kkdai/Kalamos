@@ -257,6 +257,39 @@ test("#89 Windows shortcuts: headings, quote, code/math blocks, strike, outline,
   }
 });
 
+test("Ctrl+wheel zooms the interface without scrolling the editor", async ({
+  browser,
+}) => {
+  const { ctx, page } = await openWindowsPage(browser);
+  try {
+    await setDoc(
+      page,
+      "A paragraph to make the editor scrollable.\n\n".repeat(100),
+    );
+    const scroller = page.locator(".cm-scroller");
+    const scrollTop = () => scroller.evaluate((el) => el.scrollTop);
+    await scroller.hover();
+    expect(await scrollTop()).toBe(0);
+
+    const zoom = () => runWithApp<number>(page, "return ipc.getMockZoom();");
+    await page.keyboard.down("Control");
+    await page.mouse.wheel(0, 100);
+    await expect.poll(zoom).toBe(0.9);
+    await nextFrames(page);
+    expect(await scrollTop()).toBe(0);
+    await page.mouse.wheel(0, -100);
+    await expect.poll(zoom).toBe(1);
+    await page.keyboard.up("Control");
+    expect(await scrollTop()).toBe(0);
+
+    await page.mouse.wheel(0, 100);
+    await expect.poll(scrollTop).toBeGreaterThan(0);
+    expect(await zoom()).toBe(1);
+  } finally {
+    await ctx.close();
+  }
+});
+
 test("#89 Windows close & quit checks all tabs' unsaved changes for Ctrl+Q, Alt+F4, and close button", async ({
   browser,
 }) => {
