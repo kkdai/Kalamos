@@ -227,6 +227,21 @@ export const ZOOM_LEVELS = [
   0.5, 0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3,
 ];
 
+export const WHEEL_ZOOM_THRESHOLD_PX = 100;
+export const WHEEL_DELTA_LINE_PX = 40;
+export const WHEEL_DELTA_PAGE_PX = 800;
+export const WHEEL_ZOOM_RESET_MS = 300;
+
+export function normalizeWheelDeltaY(event: WheelEvent): number {
+  if (event.deltaMode === WheelEvent.DOM_DELTA_LINE) {
+    return event.deltaY * WHEEL_DELTA_LINE_PX;
+  }
+  if (event.deltaMode === WheelEvent.DOM_DELTA_PAGE) {
+    return event.deltaY * WHEEL_DELTA_PAGE_PX;
+  }
+  return event.deltaY;
+}
+
 /** #74 檢視 > 放大 / 縮小: the next zoom level in `direction` (+1 / -1). */
 export function nextZoomLevel(current: number, direction: 1 | -1): number {
   if (direction > 0) {
@@ -1062,12 +1077,23 @@ export function createKalamosApp(
   }
 
   let zoom = 1;
+  let wheelZoomDelta = 0;
+  let lastZoomWheelAt = Number.NEGATIVE_INFINITY;
   function setZoom(next: number): void {
     zoom = next;
+    wheelZoomDelta = 0;
     void setWebviewZoom(next).catch(() => null);
     setStatus(`縮放 ${Math.round(next * 100)}%`, false);
   }
 
+  // #107: Both macOS and Windows intentionally use Ctrl (never Cmd on macOS)
+  // for wheel zoom. On macOS, trackpad pinch emits WebKit gesture* events
+  // rather than synthetic ctrl+wheel, so pinch is unaffected here. On Windows,
+  // precision touchpad pinch synthesizes dense, small-delta ctrl+wheel events
+  // in Chromium/WebView2 (and trackpads / high-resolution mice emit many small
+  // wheel events per gesture), so we normalize deltaMode to pixels and
+  // accumulate until WHEEL_ZOOM_THRESHOLD_PX (~1 notched mouse wheel click)
+  // before stepping one zoom level.
   function onZoomWheel(event: Event): void {
     if (
       !(event instanceof WheelEvent) ||
@@ -1082,7 +1108,28 @@ export function createKalamosApp(
       return;
     }
     event.preventDefault();
-    const next = nextZoomLevel(zoom, event.deltaY < 0 ? 1 : -1);
+
+    const now = Date.now();
+    if (now - lastZoomWheelAt >= WHEEL_ZOOM_RESET_MS) {
+      wheelZoomDelta = 0;
+    }
+    lastZoomWheelAt = now;
+
+    const delta = normalizeWheelDeltaY(event);
+    if (
+      wheelZoomDelta !== 0 &&
+      Math.sign(delta) !== Math.sign(wheelZoomDelta)
+    ) {
+      wheelZoomDelta = 0;
+    }
+    wheelZoomDelta += delta;
+
+    if (Math.abs(wheelZoomDelta) < WHEEL_ZOOM_THRESHOLD_PX) {
+      return;
+    }
+    const direction: 1 | -1 = wheelZoomDelta < 0 ? 1 : -1;
+    wheelZoomDelta = 0;
+    const next = nextZoomLevel(zoom, direction);
     if (next !== zoom) setZoom(next);
   }
   root.addEventListener("wheel", onZoomWheel, { passive: false });

@@ -119,6 +119,7 @@
 | | Ataraxia Focus Mode | `F8` | `F8` |
 | | Stichos Typewriter Mode | `F9` | `F9` |
 | | Zoom in / out / actual size | `Cmd+Shift+=` / `-` / `0` | `Ctrl+Shift+=` / `-` / `0` |
+| | Zoom with mouse wheel | `Ctrl` + wheel | `Ctrl` + wheel |
 | **Formatting** | Heading 1–6 / Paragraph | `Cmd+1`–`6` / `Cmd+0` | `Ctrl+1`–`6` / `Ctrl+0` |
 | | Bold / Italic / Strikethrough | `Cmd+B` / `Cmd+I` / `Cmd+Shift+D` | `Ctrl+B` / `Ctrl+I` / `Ctrl+Shift+D` |
 | | Inline code | `Cmd+Shift+`` ` `` | `Ctrl+Shift+`` ` `` |
@@ -145,7 +146,7 @@
 
 > **Inside Quick Open**: use `↑` / `↓` (or `Ctrl+N` / `Ctrl+P` on macOS) to navigate, `Enter` to open, `Cmd+Enter` / `Ctrl+Enter` to always open in a new tab, and `Esc` to close.
 
-**Interface zoom:** On macOS and Windows, hold `Ctrl` and roll the mouse wheel up to zoom in or down to zoom out. Reset to 100% with **檢視 → 實際大小** (View → Actual Size), `Cmd+Shift+0` on macOS, or `Ctrl+Shift+0` on Windows.
+> **macOS wheel zoom note**: if **Accessibility → Zoom → Use scroll gesture with modifier keys to zoom** is enabled (the default modifier is `Control`), macOS will intercept `Ctrl` + wheel before it reaches Kalamos.
 
 ---
 

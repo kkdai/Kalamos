@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   emitMockMenuAction,
   getMockMenuState,
@@ -15,6 +15,7 @@ import {
   createKalamosApp,
   type KalamosApp,
   nextZoomLevel,
+  WHEEL_ZOOM_RESET_MS,
   ZOOM_LEVELS,
 } from "../main";
 import { MENU_THEN_KEY_WINDOW_MS, menuActions } from "./menu-dispatch";
@@ -177,17 +178,96 @@ describe("#74 native menu → app handlers", () => {
 
   it("consumes Ctrl+wheel at the existing zoom limits", () => {
     const scroller = app!.editor.view.scrollDOM;
-    for (const _ of ZOOM_LEVELS) dispatchWheel(scroller);
+    for (let i = 0; i < ZOOM_LEVELS.length; i++) dispatchWheel(scroller);
     expect(getMockZoom()).toBe(3);
     expect(dispatchWheel(scroller).defaultPrevented).toBe(true);
     expect(getMockZoom()).toBe(3);
 
-    for (const _ of ZOOM_LEVELS) dispatchWheel(scroller, { deltaY: 100 });
+    for (let i = 0; i < ZOOM_LEVELS.length; i++) {
+      dispatchWheel(scroller, { deltaY: 100 });
+    }
     expect(getMockZoom()).toBe(0.5);
     expect(dispatchWheel(scroller, { deltaY: 100 }).defaultPrevented).toBe(
       true,
     );
     expect(getMockZoom()).toBe(0.5);
+  });
+
+  it("accumulates small wheel deltas before stepping and still prevents default", () => {
+    const scroller = app!.editor.view.scrollDOM;
+    for (let i = 0; i < 9; i++) {
+      expect(dispatchWheel(scroller, { deltaY: -10 }).defaultPrevented).toBe(
+        true,
+      );
+      expect(app!.getZoom()).toBe(1);
+    }
+    expect(dispatchWheel(scroller, { deltaY: -10 }).defaultPrevented).toBe(
+      true,
+    );
+    expect(app!.getZoom()).toBe(1.1);
+    expect(getMockZoom()).toBe(1.1);
+  });
+
+  it("steps one level for a single deltaY of -100", () => {
+    const scroller = app!.editor.view.scrollDOM;
+    expect(dispatchWheel(scroller, { deltaY: -100 }).defaultPrevented).toBe(
+      true,
+    );
+    expect(app!.getZoom()).toBe(1.1);
+    expect(getMockZoom()).toBe(1.1);
+  });
+
+  it("resets accumulated wheel delta on direction reversal and idle timeout", () => {
+    const scroller = app!.editor.view.scrollDOM;
+    let now = 10_000;
+    const nowSpy = vi.spyOn(Date, "now").mockImplementation(() => now);
+    try {
+      for (let i = 0; i < 8; i++) dispatchWheel(scroller, { deltaY: -10 });
+      expect(app!.getZoom()).toBe(1);
+
+      for (let i = 0; i < 9; i++) dispatchWheel(scroller, { deltaY: 10 });
+      expect(app!.getZoom()).toBe(1);
+      dispatchWheel(scroller, { deltaY: 10 });
+      expect(app!.getZoom()).toBe(0.9);
+      expect(getMockZoom()).toBe(0.9);
+
+      for (let i = 0; i < 8; i++) dispatchWheel(scroller, { deltaY: -10 });
+      expect(app!.getZoom()).toBe(0.9);
+      now += WHEEL_ZOOM_RESET_MS;
+      for (let i = 0; i < 5; i++) dispatchWheel(scroller, { deltaY: -10 });
+      expect(app!.getZoom()).toBe(0.9);
+      for (let i = 0; i < 5; i++) dispatchWheel(scroller, { deltaY: -10 });
+      expect(app!.getZoom()).toBe(1);
+      expect(getMockZoom()).toBe(1);
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
+  it("normalizes LINE and PAGE wheel delta modes", () => {
+    const scroller = app!.editor.view.scrollDOM;
+    dispatchWheel(scroller, {
+      deltaY: -1,
+      deltaMode: WheelEvent.DOM_DELTA_LINE,
+    });
+    dispatchWheel(scroller, {
+      deltaY: -1,
+      deltaMode: WheelEvent.DOM_DELTA_LINE,
+    });
+    expect(app!.getZoom()).toBe(1);
+    dispatchWheel(scroller, {
+      deltaY: -1,
+      deltaMode: WheelEvent.DOM_DELTA_LINE,
+    });
+    expect(app!.getZoom()).toBe(1.1);
+    expect(getMockZoom()).toBe(1.1);
+
+    dispatchWheel(scroller, {
+      deltaY: 1,
+      deltaMode: WheelEvent.DOM_DELTA_PAGE,
+    });
+    expect(app!.getZoom()).toBe(1);
+    expect(getMockZoom()).toBe(1);
   });
 
   it("ignores unrelated, non-cancelable, or already handled wheel events", () => {

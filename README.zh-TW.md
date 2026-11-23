@@ -119,6 +119,7 @@
 | | Ataraxia 專注模式 | `F8` | `F8` |
 | | Stichos 打字機模式 | `F9` | `F9` |
 | | 放大 / 縮小 / 實際大小 | `Cmd+Shift+=` / `-` / `0` | `Ctrl+Shift+=` / `-` / `0` |
+| | 滾輪縮放 | `Ctrl` + 滾輪 | `Ctrl` + 滾輪 |
 | **行內與清單** | 標題 1–6 / 內文段落 | `Cmd+1`–`6` / `Cmd+0` | `Ctrl+1`–`6` / `Ctrl+0` |
 | | 粗體 / 斜體 / 刪除線 | `Cmd+B` / `Cmd+I` / `Cmd+Shift+D` | `Ctrl+B` / `Ctrl+I` / `Ctrl+Shift+D` |
 | | 行內程式碼 | `Cmd+Shift+`` ` `` | `Ctrl+Shift+`` ` `` |
@@ -145,7 +146,7 @@
 
 > **快速開檔面板內操作**：以 `↑` / `↓`（macOS 亦支援 `Ctrl+N` / `Ctrl+P`）移動選取、`Enter` 開啟、`Cmd+Enter` / `Ctrl+Enter` 一律開在新分頁、`Esc` 關閉並回到原本編輯位置。
 
-**介面縮放**：在 macOS 和 Windows 上，按住 `Ctrl`，將滑鼠滾輪向上轉可放大、向下轉可縮小。選擇 **檢視 → 實際大小**，或按 macOS 的 `Cmd+Shift+0`／Windows 的 `Ctrl+Shift+0`，可重設為 100%。
+> **macOS 滾輪縮放提醒**：若已開啟 macOS 的 **輔助使用 → 縮放 → 使用捲動手勢與修飾鍵縮放**（預設修飾鍵為 `Control`），該手勢會先被系統攔截。
 
 ---
 

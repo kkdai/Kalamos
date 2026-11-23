@@ -102,7 +102,7 @@ git push origin v0.5.0
    codesign --verify --deep --strict --verbose=2 /Applications/Kalamos.app
    ```
 3. 若有 Windows 實機，下載 `-setup.exe` / `.msi` 確認安裝、開啟 `.md` 檔案關聯與啟動正常。
-4. 在 macOS 和 Windows 桌面版，用滑鼠在編輯器及側欄試轉 `Ctrl` + 滾輪：向上放大、向下縮小，快速轉動時不超過 50%–300%，畫面和狀態列的比例一致且不會雙重縮放。放開 `Ctrl` 後確認捲動正常，再用「檢視 → 實際大小」和既有快捷鍵確認能重設及切換縮放。若 macOS 的輔助使用縮放已接管此手勢，先確認 Kalamos 不會覆寫系統行為。未在該平台實測前，不宣稱已驗證其原生操作。
+4. 本版新增的輸入行為請在 macOS 與 Windows 實機確認。
 5. 檢查 Draft Release 內文的更新摘要（若已從 `CHANGELOG.md` 自動帶入，確認措辭即可；若該版尚未寫入 `CHANGELOG.md`，請將 `<!-- 發布前請在此補充... -->` 替換為本版本的更新摘要）。
 
 ### 5. Publish Release

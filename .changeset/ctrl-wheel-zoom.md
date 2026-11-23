@@ -2,4 +2,4 @@
 "kalamos": minor
 ---
 
-Hold Ctrl and roll the mouse wheel to zoom the Kalamos interface using the same zoom levels as the View menu.
+**Ctrl + 滾輪縮放**：按住 Ctrl 滾動滑鼠滾輪即可放大或縮小介面，與「檢視 > 放大 / 縮小 / 實際大小」共用縮放比例（#112）。
