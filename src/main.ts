@@ -1068,6 +1068,25 @@ export function createKalamosApp(
     setStatus(`縮放 ${Math.round(next * 100)}%`, false);
   }
 
+  function onZoomWheel(event: Event): void {
+    if (
+      !(event instanceof WheelEvent) ||
+      !event.cancelable ||
+      event.defaultPrevented ||
+      !event.ctrlKey ||
+      event.altKey ||
+      event.metaKey ||
+      event.shiftKey ||
+      event.deltaY === 0
+    ) {
+      return;
+    }
+    event.preventDefault();
+    const next = nextZoomLevel(zoom, event.deltaY < 0 ? 1 : -1);
+    if (next !== zoom) setZoom(next);
+  }
+  root.addEventListener("wheel", onZoomWheel, { passive: false });
+
   const preferences = createPreferences({
     getValues: () => ({
       startupBehavior: currentSettings.startupBehavior ?? "restoreFolder",
@@ -2161,6 +2180,7 @@ export function createKalamosApp(
     window.removeEventListener("keydown", onQuickOpenKeydown);
     window.removeEventListener("keydown", onPreferencesKeydown);
     window.removeEventListener("keydown", onMenuShortcutKeydown);
+    root.removeEventListener("wheel", onZoomWheel);
     clearInterval(recoveryInterval);
     unbindShortcuts();
     window.removeEventListener("keydown", onSidebarKeydown);

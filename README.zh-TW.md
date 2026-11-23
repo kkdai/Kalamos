@@ -124,6 +124,8 @@
 
 > **Windows 快捷鍵對照**：上表所有 `Cmd` 對應 `Ctrl`、`Opt` 對應 `Alt`（例如 `Cmd+Opt+T` 在 Windows 為 `Ctrl+Alt+T`）。
 
+**介面縮放**：在 macOS 和 Windows 上，按住 `Ctrl`，將滑鼠滾輪向上轉可放大、向下轉可縮小。選擇 **檢視 → 實際大小**，或按 macOS 的 `Cmd+Shift+0`／Windows 的 `Ctrl+Shift+0`，可重設為 100%。
+
 ---
 
 ## 系統需求

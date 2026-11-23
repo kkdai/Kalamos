@@ -124,6 +124,8 @@
 
 > **Windows shortcuts**: every `Cmd` above maps to `Ctrl` and `Opt` maps to `Alt` (e.g. `Cmd+Opt+T` is `Ctrl+Alt+T`).
 
+**Interface zoom:** On macOS and Windows, hold `Ctrl` and roll the mouse wheel up to zoom in or down to zoom out. Reset to 100% with **檢視 → 實際大小** (View → Actual Size), `Cmd+Shift+0` on macOS, or `Ctrl+Shift+0` on Windows.
+
 ---
 
 ## System Requirements
