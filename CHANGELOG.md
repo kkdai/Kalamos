@@ -1,5 +1,16 @@
 # kalamos
 
+## 0.5.0
+
+### Minor Changes
+
+- **Cmd+P 快速開檔**：模糊搜尋目前資料夾的 Markdown 檔並標亮命中字元；輸入框空白時列出最近開啟的檔案，並新增「檔案 > 打開最近使用」子選單（#104）。
+
+### Patch Changes
+
+- **支持 Kalamos**：產品頁、README 與 GitHub 加入 Buy Me a Coffee 連結（#105）。
+- **開發流程**：Workflow 權限強化、Biome 格式化與 CI 檢查、以 Changesets 管理版本與 CHANGELOG（#99、#100、#101）。
+
 ## 0.4.0
 
 ### Minor Changes
