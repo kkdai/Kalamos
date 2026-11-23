@@ -119,6 +119,7 @@
 | | Ataraxia 집중 모드 | `F8` | `F8` |
 | | Stichos 타자기 모드 | `F9` | `F9` |
 | | 확대 / 축소 / 실제 크기 | `Cmd+Shift+=` / `-` / `0` | `Ctrl+Shift+=` / `-` / `0` |
+| | 마우스 휠로 확대 / 축소 | `Ctrl` + 휠 | `Ctrl` + 휠 |
 | **서식 및 목록** | 제목 1–6 / 본문 문단 | `Cmd+1`–`6` / `Cmd+0` | `Ctrl+1`–`6` / `Ctrl+0` |
 | | 굵게 / 기울임 / 취소선 | `Cmd+B` / `Cmd+I` / `Cmd+Shift+D` | `Ctrl+B` / `Ctrl+I` / `Ctrl+Shift+D` |
 | | 인라인 코드 | `Cmd+Shift+`` ` `` | `Ctrl+Shift+`` ` `` |
@@ -144,6 +145,8 @@
 | | Pandoc 가져오기 | `Cmd+Opt+I` | `Ctrl+Alt+I` |
 
 > **빠른 열기 패널 내 조작**: `↑` / `↓`(macOS에서는 `Ctrl+N` / `Ctrl+P`도 지원)로 항목을 이동하고, `Enter`로 열기, `Cmd+Enter` / `Ctrl+Enter`로 항상 새 탭에서 열기, `Esc`로 닫고 원래 커서 위치로 돌아갑니다.
+
+> **macOS 휠 확대/축소 참고**: macOS에서 **손쉬운 사용 → 확대/축소 → 보조 키와 함께 스크롤 제스처를 사용하여 확대/축소**(기본 보조 키는 `Control`)가 켜져 있으면 `Ctrl` + 휠 제스처가 시스템에 먼저 가로채집니다.
 
 ---
 
