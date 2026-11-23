@@ -50,7 +50,7 @@
 ### 수식, 다이어그램, 코드 블록
 - **코드 블록**(`BL-02`): `@codemirror/language-data` 기반 100여 개 언어 구문 강조와 저채도 테마 배색을 제공하며 `Cmd+Opt+L`로 줄 번호를 켜고 끌 수 있습니다.
 - **수학 수식**(`BL-03`): 오프라인 MathJax 3 SVG로 인라인 `$...$` 및 블록 `$$...$$` 수식을 렌더링합니다. `ams`, `mhchem`(화학식), `bbox`, `newcommand` 확장을 포함하며, 뷰포트에 보이는 수식만 지연 렌더링하고 편집 중인 블록 아래에 실시간 미리보기를 표시합니다. `Cmd+Opt+N`으로 AMS 자동 번호 매기기를 전환할 수 있습니다.
-- **다이어그램**(`BL-04`): `mermaid`, `flow`(flowchart.js 문법), `sequence`(js-sequence-diagrams 문법)를 현재 테마 색상에 맞춘 안전한 SVG로 오프라인 렌더링하며, 디바운스 미리보기와 줄 번호가 포함된 구문 오류 메시지를 제공합니다.
+- **다이어그램**(`BL-04`): `mermaid`, `flow`(flowchart.js 문법), `sequence`(js-sequence-diagrams 문법)를 현재 테마 색상에 맞춘 안전한 SVG로 오프라인 렌더링하며, 디바운스 미리보기와 줄 번호가 포함된 구문 오류 메시지를 제공합니다. 너비가 큰 다이어그램은 레이블 크기를 유지하며 편집기에서 가로로 스크롤할 수 있습니다.
 
 <p align="center">
   <img src="site/assets/screenshots/math-diagrams.png" alt="MathJax 수식과 Mermaid 다이어그램 렌더링" width="760" />

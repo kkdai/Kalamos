@@ -50,7 +50,7 @@
 ### 數學公式、圖表與程式碼區塊
 - **程式碼區塊**（`BL-02`）：內建 100 種以上程式語言語法高亮（`@codemirror/language-data`），搭配低飽和度主題配色，並可隨時切換行號顯示（`Cmd+Opt+L`）。
 - **數學公式**（`BL-03`）：離線 MathJax 3 SVG 渲染行內 `$...$` 與區塊 `$$...$$` 公式，內建 `ams`、`mhchem`（化學式）、`bbox` 與 `newcommand` 擴充；僅渲染視口內可見公式；編輯區塊公式時於下方即時預覽；可切換 AMS 自動連續編號（`Cmd+Opt+N`）。
-- **圖表渲染**（`BL-04`）：支援 `mermaid`、`flow`（flowchart.js 語法）與 `sequence`（js-sequence-diagrams 語法），離線渲染為與主題色票一致的淨化 SVG，並提供即時預覽與附帶行號的語法錯誤提示。
+- **圖表渲染**（`BL-04`）：支援 `mermaid`、`flow`（flowchart.js 語法）與 `sequence`（js-sequence-diagrams 語法），離線渲染為與主題色票一致的淨化 SVG，並提供即時預覽與附帶行號的語法錯誤提示。較寬的圖表保留標籤大小，可在編輯器內左右捲動。
 
 <p align="center">
   <img src="site/assets/screenshots/math-diagrams.png" alt="Kalamos 渲染 MathJax 公式與 Mermaid 圖表" width="760" />

@@ -50,7 +50,7 @@
 ### 数式・ダイアグラム・コードブロック
 - **コードブロック**（`BL-02`）：`@codemirror/language-data` により 100 言語以上のシンタックスハイライトに対応。目に優しい低彩度カラーで、`Cmd+Opt+L` により行番号の表示を切り替えられます。
 - **数式**（`BL-03`）：オフラインの MathJax 3 SVG エンジンでインライン `$...$` とディスプレイ `$$...$$` 数式を描画。`ams`、`mhchem`（化学式）、`bbox`、`newcommand` パッケージを内蔵し、ビューポート内のみ遅延描画・編集中ブロック下部のライブプレビュー・AMS 自動番号付け（`Cmd+Opt+N`）に対応します。
-- **ダイアグラム**（`BL-04`）：`mermaid`、`flow`（flowchart.js 構文）、`sequence`（js-sequence-diagrams 構文）を現在のテーマ配色に合わせた安全な SVG としてオフライン描画。編集中はデバウンス付きプレビューと行番号付きの構文エラー表示を行います。
+- **ダイアグラム**（`BL-04`）：`mermaid`、`flow`（flowchart.js 構文）、`sequence`（js-sequence-diagrams 構文）を現在のテーマ配色に合わせた安全な SVG としてオフライン描画。編集中はデバウンス付きプレビューと行番号付きの構文エラー表示を行います。幅の広い図はラベルの大きさを保ち、エディター内で横にスクロールできます。
 
 <p align="center">
   <img src="site/assets/screenshots/math-diagrams.png" alt="MathJax 数式と Mermaid ダイアグラムの表示" width="760" />

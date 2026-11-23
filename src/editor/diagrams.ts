@@ -718,6 +718,16 @@ function showResult(dom: HTMLElement, result: DiagramRenderResult): void {
   const wrap = document.createElement("div");
   wrap.className = "k-diagram-svg";
   wrap.innerHTML = result.svg;
+  const svg = wrap.querySelector("svg");
+  const width = svg?.viewBox?.baseVal.width;
+  if (svg && width && Number.isFinite(width) && width > 0) {
+    // A percentage width in a flex item can resolve to SVG's 300px fallback.
+    svg.style.width = `${width}px`;
+    svg.style.maxWidth = "none";
+    wrap.tabIndex = 0;
+    wrap.setAttribute("role", "group");
+    wrap.setAttribute("aria-label", "圖表預覽");
+  }
   dom.appendChild(wrap);
 }
 
@@ -804,6 +814,15 @@ export class DiagramWidget extends WidgetType {
 
     if (!this.isPreview) {
       dom.addEventListener("mousedown", (e) => {
+        // Let the native horizontal scrollbar work without entering source mode.
+        const scroller = e.target;
+        if (
+          scroller instanceof HTMLElement &&
+          scroller.classList.contains("k-diagram-svg") &&
+          scroller.scrollWidth > scroller.clientWidth
+        ) {
+          return;
+        }
         e.preventDefault();
         e.stopPropagation();
         let pos: number;

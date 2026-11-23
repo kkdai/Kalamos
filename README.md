@@ -50,7 +50,7 @@
 ### Math, Diagrams & Code Blocks
 - **Code Blocks** (`BL-02`): Syntax highlighting for 100+ languages via `@codemirror/language-data` with low-saturation theme-matched colors and toggleable line numbers (`Cmd+Opt+L`).
 - **Math Formulas** (`BL-03`): Offline MathJax 3 SVG rendering for inline `$...$` and display `$$...$$` equations with `ams`, `mhchem` (chemistry), `bbox`, and `newcommand` packages; lazy viewport-only rendering; live preview below the active block; optional AMS auto-numbering (`Cmd+Opt+N`).
-- **Diagrams** (`BL-04`): Offline SVG rendering for `mermaid`, `flow` (flowchart.js syntax), and `sequence` (js-sequence-diagrams syntax) styled to match the active theme, with debounced live preview and line-numbered syntax error messages.
+- **Diagrams** (`BL-04`): Offline SVG rendering for `mermaid`, `flow` (flowchart.js syntax), and `sequence` (js-sequence-diagrams syntax) styled to match the active theme, with debounced live preview and line-numbered syntax error messages. Wide diagrams keep their label size and scroll horizontally in the editor.
 
 <p align="center">
   <img src="site/assets/screenshots/math-diagrams.png" alt="Kalamos rendering MathJax formulas and Mermaid diagrams" width="760" />

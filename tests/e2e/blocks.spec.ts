@@ -654,6 +654,54 @@ test.describe("#11 diagrams", () => {
     expect(external).toEqual([]);
   });
 
+  test("wide Mermaid diagrams keep their scale, scroll locally, and still enter source preview", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1200, height: 900 });
+    const src =
+      "```mermaid\nflowchart LR\n A[輸入資料] --> B[訓練時套用 dropout mask] --> C[可學習權重產生候選回應] --> D[按候選維度取最大值] --> E[輸出符合條件的回應]\n```\n\nend";
+    await setDoc(page, src, src.length);
+    const diagram = page.getByTestId("diagram");
+    const scroller = diagram.getByRole("group", { name: "圖表預覽" });
+    const svg = scroller.locator("svg");
+    await expect(svg).toBeVisible({ timeout: 20_000 });
+    const measure = () =>
+      svg.evaluate((graphic) => ({
+        rendered: graphic.getBoundingClientRect().width,
+        natural: (graphic as SVGSVGElement).viewBox.baseVal.width,
+        clientWidth: graphic.parentElement?.clientWidth ?? 0,
+        scrollWidth: graphic.parentElement?.scrollWidth ?? 0,
+      }));
+    const wide = await measure();
+    expect(wide.rendered).toBeCloseTo(wide.natural, 0);
+    expect(wide.rendered).toBeGreaterThan(600);
+    expect(wide.scrollWidth).toBeGreaterThan(wide.clientWidth);
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    const narrow = await measure();
+    expect(narrow.rendered).toBeCloseTo(wide.rendered, 0);
+    expect(narrow.clientWidth).toBeLessThan(wide.clientWidth);
+    const editorOverflow = await page
+      .locator(".cm-scroller")
+      .evaluate((node) => node.scrollWidth > node.clientWidth);
+    expect(editorOverflow).toBe(false);
+    await scroller.focus();
+    await page.keyboard.press("ArrowRight");
+    await expect
+      .poll(() => scroller.evaluate((node) => node.scrollLeft))
+      .toBeGreaterThan(0);
+    await scroller.evaluate((node) => {
+      node.scrollLeft = 0;
+    });
+    await svg.getByText("輸入資料", { exact: true }).click();
+    const preview = page.getByTestId("diagram-preview");
+    await expect(preview.locator("svg")).toBeVisible();
+    const previewWidth = await preview
+      .locator("svg")
+      .evaluate((graphic) => graphic.getBoundingClientRect().width);
+    expect(previewWidth).toBeCloseTo(narrow.rendered, 0);
+  });
+
   test("#11 AC: a syntax error shows a red message with a line number, not a blank", async ({
     page,
   }) => {
