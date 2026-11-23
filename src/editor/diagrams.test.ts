@@ -215,36 +215,48 @@ describe("decorations", () => {
 describe("rendering", () => {
   it("mounting a diagram loads Mermaid with strict security and shows sanitised SVG", async () => {
     const view = mount(FLOW_DOC);
-    await settle();
-    expect(isDiagramEngineLoaded()).toBe(true);
-    const cfg = mermaidMock.initialize.mock.calls[0][0];
-    expect(cfg).toMatchObject({
-      startOnLoad: false,
-      securityLevel: "strict",
-      htmlLabels: false,
-    });
-    const el = view.dom.querySelector<HTMLElement>("[data-testid=diagram]");
-    expect(el?.dataset.state).toBe("rendered");
-    const svg = el!.querySelector("svg");
-    expect(svg).not.toBeNull();
-    expect(el!.querySelector("script")).toBeNull();
-    expect(svg!.getAttribute("onload")).toBeNull();
-    view.destroy();
+    try {
+      const el = await vi.waitFor(() => {
+        const widget = view.dom.querySelector<HTMLElement>(
+          "[data-testid=diagram]",
+        );
+        expect(widget?.dataset.state).toBe("rendered");
+        return widget!;
+      });
+      expect(isDiagramEngineLoaded()).toBe(true);
+      const cfg = mermaidMock.initialize.mock.calls[0][0];
+      expect(cfg).toMatchObject({
+        startOnLoad: false,
+        securityLevel: "strict",
+        htmlLabels: false,
+      });
+      const svg = el.querySelector("svg");
+      expect(svg).not.toBeNull();
+      expect(el.querySelector("script")).toBeNull();
+      expect(svg!.getAttribute("onload")).toBeNull();
+    } finally {
+      view.destroy();
+    }
   });
 
   it("syntax errors show a message with the line number instead of a blank", async () => {
     const doc = "```mermaid\nflowchart TD\n  A --> BAD\n```\n\nend";
     const view = mount(doc);
-    await settle();
-    const err = view.dom.querySelector<HTMLElement>(
-      "[data-testid=diagram-error]",
-    );
-    expect(err).not.toBeNull();
-    expect(err!.dataset.line).toBe("2");
-    expect(err!.textContent).toContain("第 2 行");
-    expect(view.dom.querySelector(".k-diagram svg")).toBeNull();
-    expect(mermaidMock.render).not.toHaveBeenCalled();
-    view.destroy();
+    try {
+      const err = await vi.waitFor(() => {
+        const message = view.dom.querySelector<HTMLElement>(
+          "[data-testid=diagram-error]",
+        );
+        expect(message).not.toBeNull();
+        return message!;
+      });
+      expect(err.dataset.line).toBe("2");
+      expect(err.textContent).toContain("第 2 行");
+      expect(view.dom.querySelector(".k-diagram svg")).toBeNull();
+      expect(mermaidMock.render).not.toHaveBeenCalled();
+    } finally {
+      view.destroy();
+    }
   });
 
   it("empty diagrams show an error, not a blank", async () => {
