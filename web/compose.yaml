@@ -1,0 +1,44 @@
+name: kalamos-web-dev
+
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: web/Dockerfile
+    init: true
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://kalamos:kalamos_dev@db:5432/kalamos
+      KALAMOS_WEB_HOST: 0.0.0.0
+      KALAMOS_WEB_ALLOWED_HOSTS: "127.0.0.1:${KALAMOS_WEB_PUBLISHED_PORT:-4173},localhost:${KALAMOS_WEB_PUBLISHED_PORT:-4173}"
+      KALAMOS_CHROMIUM: /usr/bin/chromium
+    ports:
+      - "127.0.0.1:${KALAMOS_WEB_PUBLISHED_PORT:-4173}:4173"
+    shm_size: 256m
+    security_opt:
+      - seccomp=./chromium-seccomp.json
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4173/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: kalamos
+      POSTGRES_USER: kalamos
+      POSTGRES_PASSWORD: kalamos_dev
+    ports:
+      - "127.0.0.1:${KALAMOS_DB_PUBLISHED_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "kalamos", "-d", "kalamos"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+volumes:
+  postgres-data:

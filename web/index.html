@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Kalamos Web</title>
+  </head>
+  <body>
+    <div class="workspace-layout">
+      <aside id="workspace-sidebar" aria-label="工作區" class="workspace-sidebar">
+        <header class="workspace-sidebar-heading">
+          <strong>Kalamos</strong>
+          <button id="import-markdown" type="button" title="匯入 Markdown" aria-label="匯入 Markdown">開啟</button>
+        </header>
+        <div id="workspace-view" role="group" aria-label="工作區檢視">
+          <button type="button" data-view="tree" aria-pressed="true">檔案樹</button>
+          <button type="button" data-view="list" aria-pressed="false">檔案列表</button>
+          <button type="button" data-view="outline" aria-pressed="false">大綱</button>
+          <button type="button" data-view="trash" aria-pressed="false">垃圾桶</button>
+        </div>
+        <div class="workspace-search-field">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="5.5"/><path d="m15 15 5 5"/></svg>
+          <input id="workspace-search" type="search" aria-label="搜尋工作區" placeholder="搜尋工作區" />
+        </div>
+        <div id="workspace-documents"></div>
+      </aside>
+      <div class="workspace-pane">
+        <header class="workspace-header">
+          <div class="workspace-actions" role="group" aria-label="編輯工具">
+            <button id="toggle-sidebar" type="button" aria-label="側欄" title="側欄" aria-controls="workspace-sidebar" aria-expanded="true">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M10 5v14"/></svg>
+            </button>
+            <button id="new-document" type="button" aria-label="新建" title="新建">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h8l4 4v12H6zM14 4v5h4m-6 3v5m-2.5-2.5h5"/></svg>
+            </button>
+            <button id="save-document" type="button" data-document aria-label="儲存" title="儲存">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h11l3 3v13H5zm3 0v6h8V4M8 20v-6h8v6"/></svg>
+            </button>
+          </div>
+          <nav id="open-documents" aria-label="已開啟文件"></nav>
+          <div class="workspace-actions" role="group" aria-label="檢視與文件操作">
+            <button id="source-mode" type="button" aria-label="原始碼" title="原始碼" aria-pressed="false">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 7-5 5 5 5m8-10 5 5-5 5m-3-12-2 14"/></svg>
+            </button>
+            <button id="quick-open" type="button" aria-label="快速開啟" title="快速開啟">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="5.5"/><path d="m15 15 5 5"/></svg>
+            </button>
+            <button id="file-actions-trigger" type="button" aria-label="文件操作" title="文件操作" popovertarget="file-actions">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg>
+            </button>
+            <div id="file-actions" popover="auto" role="group" aria-label="文件操作">
+              <button id="import-markdown-menu" type="button">匯入 Markdown</button>
+              <button id="import-folder" type="button">匯入資料夾</button>
+              <button id="import-converted" type="button">匯入其他格式</button>
+              <hr />
+              <button id="download-document" type="button" data-document>下載 Markdown</button>
+              <button id="convert-document" type="button" data-document>匯出其他格式</button>
+              <button id="import-attachment" type="button" data-document>匯入圖片附件</button>
+              <button id="insert-image" type="button" data-document>插入圖片</button>
+              <button id="upload-image" type="button" data-document>上傳圖片到圖床</button>
+              <hr />
+              <button id="rename-document" type="button" data-document>重新命名或移動</button>
+              <button id="trash-document" type="button" data-document>移到垃圾桶</button>
+            </div>
+            <button id="open-preferences" type="button" aria-label="偏好設定" title="偏好設定">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14M5 12h14M5 18h14m-9-14v4m5 2v4m-5 2v4"/></svg>
+            </button>
+          </div>
+        </header>
+        <main class="workspace-main">
+          <p id="empty-workspace">從本機匯入 Markdown，或建立新文件。</p>
+          <div id="editor-container" hidden></div>
+        </main>
+        <footer class="workspace-footer">
+          <span id="workspace-status" role="status">連線中…</span>
+          <div id="workspace-counter" hidden></div>
+        </footer>
+      </div>
+    </div>
+
+    <input id="markdown-files" type="file" accept=".md,.markdown,.mdown,.mkd,.mkdn,.mdwn" multiple hidden />
+    <input id="folder-files" type="file" webkitdirectory multiple hidden />
+    <input id="attachment-file" type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/avif,image/bmp,image/x-icon" hidden />
+    <input id="conversion-file" type="file" accept=".docx,.odt,.epub,.tex,.latex,.html,.htm,.wiki,.mediawiki" hidden />
+
+    <dialog id="path-dialog" aria-labelledby="path-heading">
+      <form method="dialog">
+        <h2 id="path-heading">文件路徑</h2>
+        <label for="document-path">工作區相對路徑</label>
+        <input id="document-path" required maxlength="512" autofocus />
+        <div class="dialog-actions">
+          <button value="cancel" formnovalidate>取消</button>
+          <button value="ok">確認</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="decision-dialog" aria-labelledby="decision-heading">
+      <form method="dialog">
+        <h2 id="decision-heading">確認操作</h2>
+        <p id="decision-message"></p>
+        <div class="dialog-actions">
+          <button value="cancel" autofocus>取消</button>
+          <button id="decision-confirm" value="ok">確認</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="quick-dialog" aria-labelledby="quick-heading">
+      <h2 id="quick-heading">快速開啟</h2>
+      <label for="quick-search">文件名稱或路徑</label>
+      <input id="quick-search" type="search" autofocus />
+      <ul id="quick-results"></ul>
+      <form method="dialog"><button>關閉</button></form>
+    </dialog>
+
+    <dialog id="export-dialog" aria-labelledby="export-heading">
+      <form method="dialog">
+        <h2 id="export-heading">匯出其他格式</h2>
+        <label for="export-format">格式</label>
+        <select id="export-format" autofocus>
+          <option value="pdf">PDF</option>
+          <option value="docx">DOCX</option>
+          <option value="odt">ODT</option>
+          <option value="latex">LaTeX</option>
+          <option value="mediawiki">MediaWiki</option>
+          <option value="epub">EPUB</option>
+        </select>
+        <div class="dialog-actions">
+          <button value="cancel">取消</button>
+          <button value="ok">匯出</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="preferences-dialog" aria-labelledby="preferences-heading">
+      <form id="preferences-form" method="dialog">
+        <h2 id="preferences-heading">偏好設定</h2>
+        <label>主題 <select name="theme"><option value="system">跟隨系統</option><option value="papyros">Papyros</option><option value="melan">Melan</option></select></label>
+        <label>自訂主題 CSS <input id="theme-file" type="file" accept=".css,text/css" /></label>
+        <button id="remove-theme" type="button">移除自訂主題</button>
+        <label>字體大小 <input name="fontSize" type="number" min="12" max="36" required /></label>
+        <label>內容寬度 <input name="contentWidth" type="number" min="320" max="1440" required /></label>
+        <label>圖片根路徑 <input name="imageRoot" placeholder="例：/blog" /></label>
+        <label><input name="autosave" type="checkbox" /> 自動儲存</label>
+        <label><input name="focus" type="checkbox" /> Ataraxia 專注模式</label>
+        <label><input name="typewriter" type="checkbox" /> Stichos 打字機模式</label>
+        <label><input name="lineNumbers" type="checkbox" /> 程式碼行號</label>
+        <label><input name="mathNumbers" type="checkbox" /> 公式自動編號</label>
+        <label><input name="pairBrackets" type="checkbox" /> 自動配對括號及引號</label>
+        <label><input name="pairMarkdown" type="checkbox" /> 自動配對 Markdown 符號</label>
+        <div class="dialog-actions">
+          <button value="cancel" formnovalidate>取消</button>
+          <button value="ok">套用</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script type="module" src="/client/main.ts"></script>
+  </body>
+</html>

@@ -468,6 +468,32 @@ function widgetPos(view: EditorView, dom: HTMLElement): number | null {
   }
 }
 
+export function createInlineMathPreview(
+  tex: string,
+  fallback = tex,
+): HTMLElement {
+  const span = document.createElement("span");
+  span.className = "k-math-inline";
+  span.dataset.testid = "math-inline";
+  span.dataset.tex = tex;
+
+  const result = renderTeXSync(tex, false);
+  if (!result) {
+    span.textContent = fallback;
+  } else if (result.error) {
+    const errEl = document.createElement("span");
+    errEl.className = "k-math-error";
+    errEl.dataset.testid = "math-error";
+    errEl.setAttribute("role", "alert");
+    errEl.textContent = result.error;
+    span.appendChild(errEl);
+  } else {
+    // Only the shared MathJax engine's SVG output, never raw TeX.
+    span.innerHTML = result.svgHtml;
+  }
+  return span;
+}
+
 /**
  * Inline `$...$` widget. Typesetting happens lazily in `toDOM`, so only
  * formulas CodeMirror actually draws (the viewport) are ever rendered.
@@ -485,25 +511,7 @@ class InlineMathWidget extends WidgetType {
   }
 
   toDOM(view: EditorView): HTMLElement {
-    const span = document.createElement("span");
-    span.className = "k-math-inline";
-    span.dataset.testid = "math-inline";
-    span.dataset.tex = this.tex;
-
-    const result = renderTeXSync(this.tex, false, false, 1);
-    if (!result) {
-      span.textContent = this.tex;
-    } else if (result.error) {
-      const errEl = document.createElement("span");
-      errEl.className = "k-math-error";
-      errEl.dataset.testid = "math-error";
-      errEl.setAttribute("role", "alert");
-      errEl.textContent = result.error;
-      span.appendChild(errEl);
-    } else {
-      span.innerHTML = result.svgHtml;
-    }
-
+    const span = createInlineMathPreview(this.tex);
     span.addEventListener("mousedown", (e) => {
       e.preventDefault();
       e.stopPropagation();

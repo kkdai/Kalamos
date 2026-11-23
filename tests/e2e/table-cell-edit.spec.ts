@@ -85,6 +85,91 @@ test("#59 insert 3×3 → type cells with Tab → source mode shows the correct 
   await expect(cell(page, 1, 2)).toHaveText("a|b");
 });
 
+test("table cells preview inline LaTeX and show raw Markdown when edited", async ({
+  page,
+}) => {
+  const header = "參數 $d,m,k$";
+  const body = "空間 $\\mathbb R^d$、$W_{\\cdot ij}$ 和 $1\\ldots m$";
+  const src = [
+    `| ${header} | 說明 |`,
+    "| --- | --- |",
+    `| ${body} | \\$cash\\$ 和 \`$x$\` |`,
+    "",
+    "段落 $y$。",
+    "",
+    "結尾",
+  ].join("\n");
+  await setDoc(page, src, src.length);
+  await expect(
+    page.locator('.cm-line [data-testid="math-inline"] svg'),
+  ).toHaveCount(1);
+  await expect(cell(page, 0, 0).locator(".k-math-inline svg")).toHaveCount(1);
+  await expect(cell(page, 1, 0).locator(".k-math-inline svg")).toHaveCount(3);
+  await expect(cell(page, 1, 0)).toHaveText("空間 、 和 ");
+  await expect(cell(page, 1, 1)).toHaveText("$cash$ 和 $x$");
+  await expect(cell(page, 1, 1).locator("code")).toHaveText("$x$");
+  await expect(cell(page, 1, 1).locator("svg")).toHaveCount(0);
+  expect(await getSelection(page)).toEqual({
+    anchor: src.length,
+    head: src.length,
+  });
+
+  await cell(page, 1, 0).locator(".k-math-inline svg").last().click();
+  await expect(cell(page, 1, 0)).toBeFocused();
+  await expect(cell(page, 1, 0)).toHaveText(body);
+  await expect(cell(page, 0, 0).locator(".k-math-inline svg")).toHaveCount(1);
+
+  await page.keyboard.press(`${MOD}+/`);
+  await expect(page.getByTestId("table-widget")).toHaveCount(0);
+  await expect(page.locator(".cm-line").nth(2)).toHaveText(src.split("\n")[2]);
+  expect(await getDoc(page)).toBe(src);
+});
+
+test("table-only math loads lazily without replacing a focused cell or losing edits", async ({
+  page,
+}) => {
+  const mathModule =
+    /\/mathjax-full(?:\/js\/mathjax\.js|_js_mathjax__js\.js)\b/;
+  let releaseMath = () => {};
+  const waitForRelease = new Promise<void>((resolve) => {
+    releaseMath = resolve;
+  });
+  await page.route(mathModule, async (route) => {
+    await waitForRelease;
+    await route.continue();
+  });
+  const src = "| 原值 $x$ | 鄰格 $y$ |\n| --- | --- |\n\n結尾";
+  const editing = cell(page, 0, 0);
+  const neighbor = cell(page, 0, 1);
+
+  try {
+    const requested = page.waitForRequest(mathModule);
+    await setDoc(page, src, src.length);
+    await requested;
+    await expect(neighbor).toHaveText("鄰格 $y$");
+    await expect(neighbor.locator("svg")).toHaveCount(0);
+
+    await editing.click();
+    await page.keyboard.press("End");
+    await page.keyboard.press("ArrowLeft");
+    await page.keyboard.insertText("1");
+    await expect(editing).toHaveText("原值 $x1$");
+
+    releaseMath();
+    await expect(neighbor.locator(".k-math-inline svg")).toHaveCount(1);
+    await expect(editing).toBeFocused();
+    await expect(editing).toHaveText("原值 $x1$");
+    await page.keyboard.insertText("2");
+    expect(await getDoc(page)).toContain("原值 $x12$");
+
+    await setCursor(page, (await getDoc(page)).length);
+    await expect(editing.locator('[data-tex="x12"] svg')).toHaveCount(1);
+    expect(await getDoc(page)).toContain("原值 $x12$");
+  } finally {
+    releaseMath();
+  }
+});
+
 test("#59 typing in a cell keeps the grid, the same cell DOM, and focus", async ({
   page,
 }) => {

@@ -19,6 +19,7 @@ import {
 } from "./auto-pair";
 import { cjkEmphasisExtension } from "./cjk-emphasis";
 import { codeLineNumbersFacet } from "./code-blocks";
+import { type EditorHost, editorHostFacet } from "./editor-host";
 import { emojiExtension } from "./emoji";
 import { footnoteExtension } from "./footnotes";
 import { frontMatterExtension } from "./front-matter";
@@ -29,6 +30,7 @@ import {
   imageRootSettingField,
   imageRootTooBroadHandlerFacet,
   type PasteImagesHandler,
+  refreshImagesEffect,
   setImageDocPathEffect,
   setImageRootSettingEffect,
 } from "./images";
@@ -46,6 +48,8 @@ import { kalamosSearchExtension, kalamosSearchKeymap } from "./search";
 import { createSourceModeController } from "./source-mode";
 import { focusModeExtension, typewriterModeExtension } from "./writing-modes";
 
+export type { EditorHost } from "./editor-host";
+
 const ExternalLoadAnnotation = Annotation.define<boolean>();
 
 export interface KalamosTestApi {
@@ -62,6 +66,8 @@ declare global {
 
 export interface CreateEditorOptions {
   parent: HTMLElement;
+  /** Optional live-preview services; defaults to native desktop behavior. */
+  host?: EditorHost;
   initialContent?: string;
   initialSourceMode?: boolean;
   initialCodeLineNumbers?: boolean;
@@ -153,6 +159,8 @@ export interface KalamosEditor {
   markSessionDirty: (session: DocSession) => void;
   /** Path of the current document (null = untitled); used to resolve relative image paths. */
   setDocumentPath: (path: string | null) => void;
+  /** Resolve local images again after a change to the host's attachment catalog. */
+  refreshImages: () => void;
   /** IM-04: image root folder setting (null = none). */
   setImageRootDir: (path: string | null) => void;
   getImageRootDir: () => string | null;
@@ -273,6 +281,7 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
       return null;
     }),
     emojiExtension,
+    ...(options.host ? [editorHostFacet.of(options.host)] : []),
     ...(options.onOpenRelativeLink
       ? [relativeLinkHandlerFacet.of(options.onOpenRelativeLink)]
       : []),
@@ -677,6 +686,8 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
     markSessionClean,
     markSessionDirty,
     setDocumentPath,
+    refreshImages: () =>
+      view.dispatch({ effects: refreshImagesEffect.of(null) }),
     setImageRootDir,
     getImageRootDir,
     destroy,

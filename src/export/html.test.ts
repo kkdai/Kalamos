@@ -51,6 +51,23 @@ describe("EX-01 export HTML", () => {
     );
   });
 
+  it("renders inline math in PDF table headers and cells, but not escaped dollars or code", async () => {
+    const { html } = await render(
+      [
+        "| 參數 $d,m,k$ | 說明 |",
+        "| --- | --- |",
+        "| 空間 $\\mathbb R^d$、$W_{\\cdot ij}$ 和 $1\\ldots m$ | \\$cash\\$ 和 `$x$` |",
+      ].join("\n"),
+    );
+    const body = bodyOf(html);
+    expect(
+      body.match(/<span class="k-math-inline"><mjx-container[^>]*><svg/g),
+    ).toHaveLength(4);
+    expect(body).toContain('<th>參數 <span class="k-math-inline">');
+    expect(body).toContain('<td>空間 <span class="k-math-inline">');
+    expect(body).toContain("<td>$cash$ 和 <code>$x$</code></td>");
+  }, 30_000);
+
   it("renders bullet, ordered and task lists", async () => {
     const { html } = await render(
       "- a\n- b\n\n3. x\n4. y\n\n- [x] done\n- [ ] todo\n",

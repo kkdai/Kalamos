@@ -17,13 +17,14 @@ import {
   type ViewUpdate,
   WidgetType,
 } from "@codemirror/view";
-import {
-  allowAssetDir,
-  allowAssetFile,
-  isAssetDirTooBroadError,
-  localFileUrl,
-} from "../ipc";
 import { IS_WINDOWS, isDrivePath, pathRoot } from "../platform";
+import { defaultEditorHost } from "./desktop-editor-host";
+import {
+  type EditorHost,
+  editorHostFacet,
+  type ImageAssetAccess,
+  type LocalImageResolver,
+} from "./editor-host";
 import {
   findTyporaRootUrl,
   hasImageSize,
@@ -137,7 +138,7 @@ export type ResolvedImageSrc =
   | { kind: "data"; url: string }
   | { kind: "local"; path: string; url: string }
   | { kind: "needs-save" }
-  | { kind: "invalid"; reason: string };
+  | { kind: "invalid"; reason: string; path?: string };
 
 function safeDecode(text: string): string {
   try {
@@ -206,7 +207,7 @@ export function unwrapImageDestination(raw: string): string {
 export function resolveImageSrc(
   rawSrc: string,
   docPath: string | null,
-  toUrl: (path: string) => string = localFileUrl,
+  toUrl: LocalImageResolver = defaultEditorHost.resolveLocalImage,
   root: string | null = null,
 ): ResolvedImageSrc {
   const src = unwrapImageDestination(rawSrc);
@@ -250,7 +251,10 @@ export function resolveImageSrc(
       localPath = joinPath(dirname(docPath), decoded);
     }
   }
-  return { kind: "local", path: localPath, url: toUrl(localPath) };
+  const url = toUrl(localPath);
+  return url === null
+    ? { kind: "invalid", reason: "local image unavailable", path: localPath }
+    : { kind: "local", path: localPath, url };
 }
 
 // ---------------------------------------------------------------------------
@@ -277,37 +281,24 @@ export function needsAssetFileAllow(
   return true;
 }
 
-const allowedAssetFiles = new Set<string>();
-const pendingAssetFiles = new Map<string, Promise<boolean>>();
-
 export function isAssetFileAllowed(path: string): boolean {
-  return allowedAssetFiles.has(path);
+  return defaultEditorHost.assetAccess?.isFileAllowed(path) ?? false;
 }
 
 /**
- * Asks the backend to allow this one image file (once; successes are cached,
- * concurrent requests share one call, failures may be retried later).
+ * Asks the native backend to allow this one image file (once; successes are
+ * cached, concurrent requests share one call, failures may be retried later).
  */
 export function ensureAssetFileAllowed(path: string): Promise<boolean> {
-  if (allowedAssetFiles.has(path)) return Promise.resolve(true);
-  const pending = pendingAssetFiles.get(path);
-  if (pending) return pending;
-  const request = allowAssetFile(path).then(
-    () => {
-      allowedAssetFiles.add(path);
-      return true;
-    },
-    () => false,
+  return (
+    defaultEditorHost.assetAccess?.ensureFileAllowed(path) ??
+    Promise.resolve(false)
   );
-  pendingAssetFiles.set(path, request);
-  void request.finally(() => pendingAssetFiles.delete(path));
-  return request;
 }
 
 /** Test helper: forget every allowed file. */
 export function resetAssetFileAllowCache(): void {
-  allowedAssetFiles.clear();
-  pendingAssetFiles.clear();
+  defaultEditorHost.assetAccess?.resetFileCache();
 }
 
 // ---------------------------------------------------------------------------
@@ -507,15 +498,20 @@ export class ImageWidget extends WidgetType {
     readonly editOffset = 2,
     /** #69: a local file outside the allowed folders; allow it before loading. */
     readonly needsAllow = false,
+    readonly assetAccess: ImageAssetAccess | null = defaultEditorHost.assetAccess ??
+      null,
+    readonly refreshVersion = 0,
   ) {
     super();
   }
 
   private key(): string {
     const r = this.resolved;
-    if (r.kind === "invalid") return `invalid:${r.reason}`;
+    if (r.kind === "invalid") return `invalid:${r.reason}:${r.path ?? ""}`;
     if (r.kind === "needs-save") return "needs-save";
-    return `${r.kind}:${r.url}`;
+    return r.kind === "local"
+      ? `local:${r.path}:${r.url}`
+      : `${r.kind}:${r.url}`;
   }
 
   eq(other: ImageWidget): boolean {
@@ -525,7 +521,9 @@ export class ImageWidget extends WidgetType {
       other.key() === this.key() &&
       imageSizeKey(other.size) === imageSizeKey(this.size) &&
       other.editOffset === this.editOffset &&
-      other.needsAllow === this.needsAllow
+      other.needsAllow === this.needsAllow &&
+      other.assetAccess === this.assetAccess &&
+      other.refreshVersion === this.refreshVersion
     );
   }
 
@@ -548,12 +546,18 @@ export class ImageWidget extends WidgetType {
         : UNSAVED_RELATIVE_IMAGE_HINT;
       wrapper.append(hint);
     } else if (r.kind === "invalid") {
-      renderImageFallback(wrapper, this.alt, "無法顯示圖片");
+      if (r.path) wrapper.dataset.path = r.path;
+      renderImageFallback(
+        wrapper,
+        this.alt,
+        r.path ? `找不到圖片：${r.path}` : "無法顯示圖片",
+      );
     } else {
       wrapper.dataset.state = "loading";
       // Resolved local path (debugging aid; survives the broken-image fallback).
       if (r.kind === "local") wrapper.dataset.path = r.path;
       const localPath = r.kind === "local" ? r.path : null;
+      const assetAccess = this.assetAccess;
       let retried = false;
       const markAllowed = (): void => {
         wrapper.dataset.assetScope = "file";
@@ -573,9 +577,14 @@ export class ImageWidget extends WidgetType {
         });
         img.addEventListener("error", () => {
           // #69: scope may not cover this file yet; allow it once and reload.
-          if (localPath && !retried && !isAssetFileAllowed(localPath)) {
+          if (
+            assetAccess &&
+            localPath &&
+            !retried &&
+            !assetAccess.isFileAllowed(localPath)
+          ) {
             retried = true;
-            void ensureAssetFileAllowed(localPath).then((ok) => {
+            void assetAccess.ensureFileAllowed(localPath).then((ok) => {
               if (ok) {
                 markAllowed();
                 wrapper.dataset.state = "loading";
@@ -587,21 +596,32 @@ export class ImageWidget extends WidgetType {
             });
             return;
           }
-          renderImageFallback(wrapper, this.alt, "圖片載入失敗");
+          renderImageFallback(
+            wrapper,
+            this.alt,
+            localPath && !assetAccess
+              ? `圖片載入失敗：${localPath}`
+              : "圖片載入失敗",
+          );
           view.requestMeasure();
         });
         img.src = r.url;
         wrapper.replaceChildren(img);
       };
-      if (localPath && this.needsAllow && !isAssetFileAllowed(localPath)) {
+      if (
+        assetAccess &&
+        localPath &&
+        this.needsAllow &&
+        !assetAccess.isFileAllowed(localPath)
+      ) {
         retried = true;
-        void ensureAssetFileAllowed(localPath).then((ok) => {
+        void assetAccess.ensureFileAllowed(localPath).then((ok) => {
           if (ok) markAllowed();
           // Load either way: a refusal ends in the broken-image fallback.
           showImage();
         });
       } else {
-        if (localPath && isAssetFileAllowed(localPath)) markAllowed();
+        if (localPath && assetAccess?.isFileAllowed(localPath)) markAllowed();
         showImage();
       }
     }
@@ -630,9 +650,14 @@ export class ImageWidget extends WidgetType {
 
 export function buildImageDecorations(
   view: EditorView,
-  toUrl: (path: string) => string = localFileUrl,
+  toUrl?: LocalImageResolver,
+  refreshVersion = 0,
 ): DecorationSet {
   const state = view.state;
+  const host = state.facet(editorHostFacet)[0];
+  const resolveUrl =
+    toUrl ?? ((path) => (host ?? defaultEditorHost).resolveLocalImage(path));
+  const assetAccess = host ? null : (defaultEditorHost.assetAccess ?? null);
   const docPath = state.field(imageDocPathField, false) ?? null;
   const root = effectiveImageRoot(state);
   const ranges =
@@ -641,15 +666,18 @@ export function buildImageDecorations(
   for (const spec of collectImageSpecs(state, ranges)) {
     // #54: source only with the cursor inside `![…](…)` (or expanded by Backspace).
     if (isInlineSpanActive(state, spec.from, spec.to)) continue;
-    const resolved = resolveImageSrc(spec.src, docPath, toUrl, root);
+    const resolved = resolveImageSrc(spec.src, docPath, resolveUrl, root);
     const widget = new ImageWidget(
       spec.alt,
       spec.title,
       resolved,
       spec.size,
       spec.html ? 1 : 2,
-      resolved.kind === "local" &&
+      Boolean(assetAccess) &&
+        resolved.kind === "local" &&
         needsAssetFileAllow(resolved.path, docPath, root),
+      assetAccess,
+      resolved.kind === "local" ? refreshVersion : 0,
     );
     decorations.push(Decoration.replace({ widget }).range(spec.from, spec.to));
   }
@@ -664,19 +692,12 @@ function hasDocPathChange(update: ViewUpdate): boolean {
   );
 }
 
-const allowedRoots = new Set<string>();
+export const refreshImagesEffect = StateEffect.define<null>();
 
-/**
- * Lets the asset protocol load files under `root` (once per root). A root
- * that is too broad (`/`, home or an ancestor) is refused by the backend;
- * images then show their broken-image fallback and the handler is told.
- */
+/** The native defaults permit files under the effective image root. */
 function allowImageRoot(root: string | null, view: EditorView): void {
-  if (!root || allowedRoots.has(root)) return;
-  allowedRoots.add(root);
-  void allowAssetDir(root).catch((err: unknown) => {
-    allowedRoots.delete(root);
-    if (!isAssetDirTooBroadError(err)) return;
+  if (!root || view.state.facet(editorHostFacet).length > 0) return;
+  defaultEditorHost.assetAccess?.allowRoot(root, () => {
     for (const handler of view.state.facet(imageRootTooBroadHandlerFacet)) {
       try {
         handler(root);
@@ -692,14 +713,27 @@ export const imagePreviewPlugin = ViewPlugin.fromClass(
     decorations: DecorationSet;
 
     private root: string | null;
+    private host: EditorHost | undefined;
+    private refreshVersion = 0;
+    private refreshPending = false;
 
     constructor(view: EditorView) {
       this.decorations = buildImageDecorations(view);
       this.root = effectiveImageRoot(view.state);
+      this.host = view.state.facet(editorHostFacet)[0];
       allowImageRoot(this.root, view);
     }
 
     update(update: ViewUpdate): void {
+      if (
+        update.transactions.some((tr) =>
+          tr.effects.some((effect) => effect.is(refreshImagesEffect)),
+        )
+      ) {
+        this.refreshVersion++;
+        this.refreshPending = true;
+      }
+      if (hasDocPathChange(update)) this.refreshPending = true;
       if (update.view.composing) {
         if (update.docChanged) {
           this.decorations = this.decorations.map(update.changes);
@@ -710,16 +744,23 @@ export const imagePreviewPlugin = ViewPlugin.fromClass(
         update.docChanged ||
         update.selectionSet ||
         update.viewportChanged ||
-        hasDocPathChange(update) ||
+        this.refreshPending ||
         syntaxTree(update.startState) !== syntaxTree(update.state) ||
         update.startState.field(expandedSpanField, false) !==
           update.state.field(expandedSpanField, false) ||
         update.transactions.some((tr) => tr.reconfigured)
       ) {
-        this.decorations = buildImageDecorations(update.view);
+        this.refreshPending = false;
+        this.decorations = buildImageDecorations(
+          update.view,
+          undefined,
+          this.refreshVersion,
+        );
         const root = effectiveImageRoot(update.state);
-        if (root !== this.root) {
+        const host = update.state.facet(editorHostFacet)[0];
+        if (root !== this.root || host !== this.host) {
           this.root = root;
+          this.host = host;
           allowImageRoot(root, update.view);
         }
       }

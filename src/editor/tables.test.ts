@@ -2,6 +2,7 @@ import { undo } from "@codemirror/commands";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resetMockState } from "../ipc";
 import { createKalamosApp, type KalamosApp } from "../main";
+import { ensureMathJaxLoaded } from "./math";
 import {
   clearTableColumnWidths,
   formatMarkdownTable,
@@ -11,6 +12,7 @@ import {
   handleTableShiftTab,
   handleTableTab,
   parseTableInRange,
+  renderCellInlineMarkdownToFragment,
   reorderTableBodyRow,
   splitTableCellsWithRanges,
   tableCellMatrix,
@@ -113,6 +115,22 @@ describe("Tables (BL-01) — block widget, alignment, CJK width, Tab navigation,
     // Blur renders it again.
     content.blur();
     expect(content.textContent).toBe("*跳脫* a | b");
+  });
+
+  it("renders math within CJK emphasis using inline-only rules for a cell", async () => {
+    await ensureMathJaxLoaded();
+    const cell = renderCellInlineMarkdownToFragment(
+      "前**「$x$與$y$」**後 \\$money\\$ `$code$`",
+    );
+    const strong = cell.querySelector(".k-strong");
+    expect(strong?.textContent).toBe("「與」");
+    expect(strong?.querySelectorAll(".k-math-inline svg")).toHaveLength(2);
+    expect(cell.textContent).toBe("前「與」後 $money$ $code$");
+    expect(cell.querySelector("code")?.textContent).toBe("$code$");
+
+    const displayMath = renderCellInlineMarkdownToFragment("$$x$$");
+    expect(displayMath.textContent).toBe("$$x$$");
+    expect(displayMath.querySelector(".k-math-inline")).toBeNull();
   });
 
   it("renders table links as <span class='k-link' data-href> without <a href>, blocks javascript: on Cmd+Click, and allows https: / #slug on Cmd+Click", async () => {

@@ -21,6 +21,12 @@ import type { SyntaxNode } from "@lezer/common";
 import type { MarkdownParser } from "@lezer/markdown";
 import { cjkEmphasisExtension } from "./cjk-emphasis";
 import { isSelectionTouchingRange, navigateMarkdownLink } from "./live-preview";
+import {
+  createInlineMathPreview,
+  ensureMathJaxLoaded,
+  isMathEngineLoaded,
+  mathMarkdownExtension,
+} from "./math";
 import { clampPos, mapPosClamped } from "./positions";
 
 export type TableAlign = "left" | "center" | "right";
@@ -810,6 +816,9 @@ function renderLezerChildrenToDom(
           ? source.slice(child.from + 1, child.to)
           : source.slice(childFrom, childTo);
       targetDom.appendChild(document.createTextNode(escapedChar));
+    } else if (child.name === "InlineMath") {
+      const raw = source.slice(childFrom, childTo);
+      targetDom.appendChild(createInlineMathPreview(raw.slice(1, -1), raw));
     } else if (child.name === "InlineCode") {
       const codeEl = document.createElement("code");
       codeEl.className = "k-code";
@@ -907,9 +916,10 @@ function decodeEntity(entity: string): string {
 
 let cellParser: MarkdownParser | null = null;
 
-/** Parser for table cell contents; shares the editor's CJK emphasis rule. */
+/** Parser for table cell contents; shares the editor's inline math and CJK rules. */
 function cellInlineParser(): MarkdownParser {
   cellParser ??= (markdownLanguage.parser as MarkdownParser).configure([
+    { ...mathMarkdownExtension, parseBlock: [] },
     cjkEmphasisExtension,
   ]);
   return cellParser;
@@ -1256,9 +1266,30 @@ function syncSelectionToCell(view: EditorView, el: HTMLElement): void {
   });
 }
 
-function renderCellContent(el: HTMLElement, raw: string): void {
+function renderCellContent(
+  view: EditorView,
+  el: HTMLElement,
+  raw: string,
+): void {
   el.dataset.raw = raw;
-  el.replaceChildren(renderCellInlineMarkdownToFragment(raw));
+  const fragment = renderCellInlineMarkdownToFragment(raw);
+  const pending = isMathEngineLoaded()
+    ? null
+    : fragment.querySelector(".k-math-inline");
+  el.replaceChildren(fragment);
+  if (!pending) return;
+
+  void ensureMathJaxLoaded().then(
+    () => {
+      // Only refresh this preview if it survived edits, blur, or a rebuild.
+      if (el.dataset.editing === "1" || !el.contains(pending)) return;
+      renderCellContent(view, el, raw);
+      if (view.contentDOM.contains(el)) view.requestMeasure();
+    },
+    () => {
+      // Leave the raw formula visible if the engine could not load.
+    },
+  );
 }
 
 function focusCellElement(el: HTMLElement, start: number, end: number): void {
@@ -1635,13 +1666,16 @@ function setupCellContent(
     // (Tab moves between cells instead).
     el.tabIndex = -1;
   }
-  renderCellContent(el, raw);
+  renderCellContent(view, el, raw);
 
   el.addEventListener("focus", () => {
     focusedCellEl = el;
     el.dataset.editing = "1";
     const display = cellRawToDisplay(el.dataset.raw ?? "");
-    if (readCellText(el).replace(/\n$/, "") !== display) {
+    if (
+      el.querySelector(".k-math-inline") ||
+      readCellText(el).replace(/\n$/, "") !== display
+    ) {
       setCellText(el, display);
       setCellSelection(el, display.length, display.length);
     }
@@ -1656,7 +1690,7 @@ function setupCellContent(
     if (el.isConnected && focusedCellEl === el) focusedCellEl = null;
     delete el.dataset.editing;
     delete el.dataset.composing;
-    if (el.isConnected) renderCellContent(el, el.dataset.raw ?? "");
+    if (el.isConnected) renderCellContent(view, el, el.dataset.raw ?? "");
   });
   el.addEventListener("compositionstart", () => {
     el.dataset.composing = "1";
@@ -1730,7 +1764,7 @@ function syncCellContent(
   if (el.dataset.raw === raw) return;
   el.dataset.raw = raw;
   if (el.dataset.editing !== "1") {
-    renderCellContent(el, raw);
+    renderCellContent(view, el, raw);
     return;
   }
   if (el.dataset.composing === "1") return;

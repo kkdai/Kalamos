@@ -14,8 +14,8 @@ import {
   ViewPlugin,
   type ViewUpdate,
 } from "@codemirror/view";
-import { openUrl } from "@tauri-apps/plugin-opener";
-import { isTauri } from "../ipc";
+import { defaultEditorHost } from "./desktop-editor-host";
+import { editorHostFacet } from "./editor-host";
 import {
   BulletMarkerWidget,
   jumpToHeadingSlug,
@@ -108,14 +108,8 @@ export function navigateMarkdownLink(
 
   // 3. External `http:` / `https:` / `mailto:` link
   if (!isAllowedExternalUrl(url)) return false;
-  if (isTauri()) {
-    void openUrl(url).catch(() => null);
-  } else if (
-    typeof window !== "undefined" &&
-    typeof window.open === "function"
-  ) {
-    window.open(url, "_blank", "noopener,noreferrer");
-  }
+  const host = view.state.facet(editorHostFacet)[0] ?? defaultEditorHost;
+  void host.openExternalLink(url)?.catch(() => null);
   return true;
 }
 
