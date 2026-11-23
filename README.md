@@ -145,6 +145,8 @@
 
 > **Inside Quick Open**: use `↑` / `↓` (or `Ctrl+N` / `Ctrl+P` on macOS) to navigate, `Enter` to open, `Cmd+Enter` / `Ctrl+Enter` to always open in a new tab, and `Esc` to close.
 
+**Interface zoom:** On macOS and Windows, hold `Ctrl` and roll the mouse wheel up to zoom in or down to zoom out. Reset to 100% with **檢視 → 實際大小** (View → Actual Size), `Cmd+Shift+0` on macOS, or `Ctrl+Shift+0` on Windows.
+
 ---
 
 ## System Requirements

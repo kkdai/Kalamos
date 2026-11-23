@@ -11,7 +11,12 @@ import {
   seedMockSettings,
   setMockDialogHandlers,
 } from "../ipc";
-import { createKalamosApp, type KalamosApp, nextZoomLevel } from "../main";
+import {
+  createKalamosApp,
+  type KalamosApp,
+  nextZoomLevel,
+  ZOOM_LEVELS,
+} from "../main";
 import { MENU_THEN_KEY_WINDOW_MS, menuActions } from "./menu-dispatch";
 
 function setupDom(): void {
@@ -22,6 +27,18 @@ function setupDom(): void {
       <div id="status" data-testid="status" role="status"></div>
     </div>
   `;
+}
+
+function dispatchWheel(target: EventTarget, init?: WheelEventInit): WheelEvent {
+  const event = new WheelEvent("wheel", {
+    bubbles: true,
+    cancelable: true,
+    ctrlKey: true,
+    deltaY: -100,
+    ...init,
+  });
+  target.dispatchEvent(event);
+  return event;
 }
 
 async function settle(): Promise<void> {
@@ -128,6 +145,80 @@ describe("#74 native menu → app handlers", () => {
     expect(getMockZoom()).toBe(1);
     expect(nextZoomLevel(3, 1)).toBe(3);
     expect(nextZoomLevel(0.5, -1)).toBe(0.5);
+  });
+
+  it("Ctrl+wheel shares zoom with the menu and keyboard", async () => {
+    const scroller = app!.editor.view.scrollDOM;
+    expect(dispatchWheel(scroller).defaultPrevented).toBe(true);
+    expect(getMockZoom()).toBe(1.1);
+    expect(dispatchWheel(scroller, { deltaY: 100 }).defaultPrevented).toBe(
+      true,
+    );
+    expect(getMockZoom()).toBe(1);
+    dispatchWheel(scroller, { deltaY: 100 });
+    expect(getMockZoom()).toBe(0.9);
+    expect(app!.getStatusText()).toBe("縮放 90%");
+
+    await emitMockMenuAction("view.zoomIn");
+    expect(getMockZoom()).toBe(1);
+    dispatchWheel(document.querySelector("#sidebar")!);
+    expect(getMockZoom()).toBe(1.1);
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        code: "Digit0",
+        ctrlKey: true,
+        shiftKey: true,
+        cancelable: true,
+      }),
+    );
+    expect(getMockZoom()).toBe(1);
+    expect(app!.getStatusText()).toBe("縮放 100%");
+  });
+
+  it("consumes Ctrl+wheel at the existing zoom limits", () => {
+    const scroller = app!.editor.view.scrollDOM;
+    for (const _ of ZOOM_LEVELS) dispatchWheel(scroller);
+    expect(getMockZoom()).toBe(3);
+    expect(dispatchWheel(scroller).defaultPrevented).toBe(true);
+    expect(getMockZoom()).toBe(3);
+
+    for (const _ of ZOOM_LEVELS) dispatchWheel(scroller, { deltaY: 100 });
+    expect(getMockZoom()).toBe(0.5);
+    expect(dispatchWheel(scroller, { deltaY: 100 }).defaultPrevented).toBe(
+      true,
+    );
+    expect(getMockZoom()).toBe(0.5);
+  });
+
+  it("ignores unrelated, non-cancelable, or already handled wheel events", () => {
+    const scroller = app!.editor.view.scrollDOM;
+    for (const init of [
+      { ctrlKey: false },
+      { altKey: true },
+      { metaKey: true },
+      { shiftKey: true },
+      { deltaX: 100, deltaY: 0 },
+      { cancelable: false },
+    ]) {
+      expect(dispatchWheel(scroller, init).defaultPrevented).toBe(false);
+      expect(app!.getZoom()).toBe(1);
+    }
+    scroller.addEventListener("wheel", (event) => event.preventDefault(), {
+      once: true,
+      passive: false,
+    });
+    expect(dispatchWheel(scroller).defaultPrevented).toBe(true);
+    expect(app!.getZoom()).toBe(1);
+  });
+
+  it("stops handling Ctrl+wheel when the app is destroyed", () => {
+    const sidebar = document.querySelector("#sidebar")!;
+    const destroyedApp = app!;
+    destroyedApp.destroy();
+    app = null;
+
+    expect(dispatchWheel(sidebar).defaultPrevented).toBe(false);
+    expect(destroyedApp.getZoom()).toBe(1);
   });
 
   it("偏好設定 opens the modal; editing items are ignored while it is open", async () => {

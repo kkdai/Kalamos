@@ -145,6 +145,8 @@
 
 > **快速開檔面板內操作**：以 `↑` / `↓`（macOS 亦支援 `Ctrl+N` / `Ctrl+P`）移動選取、`Enter` 開啟、`Cmd+Enter` / `Ctrl+Enter` 一律開在新分頁、`Esc` 關閉並回到原本編輯位置。
 
+**介面縮放**：在 macOS 和 Windows 上，按住 `Ctrl`，將滑鼠滾輪向上轉可放大、向下轉可縮小。選擇 **檢視 → 實際大小**，或按 macOS 的 `Cmd+Shift+0`／Windows 的 `Ctrl+Shift+0`，可重設為 100%。
+
 ---
 
 ## 系統需求
