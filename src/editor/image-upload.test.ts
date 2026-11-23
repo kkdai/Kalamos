@@ -1,6 +1,5 @@
 import { history, undo } from "@codemirror/commands";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
-import { ensureSyntaxTree } from "@codemirror/language";
 import { EditorSelection, EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -40,7 +39,7 @@ function stateOf(
   doc: string,
   selection: EditorSelection | number = 0,
 ): EditorState {
-  let state = EditorState.create({
+  const state = EditorState.create({
     doc,
     selection:
       typeof selection === "number"
@@ -62,9 +61,7 @@ function stateOf(
       history(),
     ],
   });
-  state = state.update({ effects: setImageDocPathEffect.of(DOC_PATH) }).state;
-  ensureSyntaxTree(state, state.doc.length, 5000);
-  return state;
+  return state.update({ effects: setImageDocPathEffect.of(DOC_PATH) }).state;
 }
 
 const DOC = [
@@ -93,6 +90,16 @@ describe("IM-05 collecting upload targets", () => {
       "/tmp/kalamos-test/pics/abs.jpg",
     ]);
     expect(targets[1].html).toBe(true);
+  });
+
+  it("finds Markdown images beyond the initial viewport parse", () => {
+    const state = stateOf(
+      `${"A line of writing.\n\n".repeat(2000)}![last](assets/last.png)`,
+    );
+    const { targets } = collectUploadTargets(state);
+    expect(
+      targets.map((target) => state.sliceDoc(target.destFrom, target.destTo)),
+    ).toEqual(["assets/last.png"]);
   });
 
   it("only the images under the cursor or selection when there are some", () => {

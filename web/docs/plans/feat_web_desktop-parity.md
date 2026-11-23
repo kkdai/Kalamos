@@ -27,7 +27,7 @@ Updated: 2026-11-23
 
 ## Plan
 
-**本機驗收版。** 見[草稿 PR #114](https://github.com/kkdai/Kalamos/pull/114)及[功能對照表](../desktop-parity.md)。桌面平台人工驗收不算自動化通過；Web 改用瀏覽器與資料庫對應原生操作。
+**本機實作與驗收完成。** 39 項 Web 瀏覽器案例（含 1 項獨立圖床替身）、8 項 API、4 項轉檔及資料還原已驗證。結果與人工檢查移交至[功能對照表](../desktop-parity.md)，交付見[草稿 PR #114](https://github.com/kkdai/Kalamos/pull/114)。桌面平台人工驗收不算自動化通過；Web 改用瀏覽器與資料庫對應原生操作。
 
 ### 1. 盤點與驗證高風險功能
 

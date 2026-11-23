@@ -12,7 +12,7 @@
  *   destination changes, alt / title / other `<img>` attributes stay.
  */
 import { isolateHistory } from "@codemirror/commands";
-import { syntaxTree } from "@codemirror/language";
+import { ensureSyntaxTree, syntaxTree } from "@codemirror/language";
 import {
   ChangeSet,
   type EditorState,
@@ -20,6 +20,7 @@ import {
   StateField,
 } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
+import type { Tree } from "@lezer/common";
 import {
   collectImageSpecs,
   effectiveImageRoot,
@@ -47,10 +48,10 @@ export interface UploadTarget {
 
 /** Destination range of a Markdown image: its URL node. */
 function markdownDestination(
-  state: EditorState,
+  tree: Tree,
   spec: ImageSpec,
 ): { from: number; to: number } | null {
-  let node = syntaxTree(state).resolveInner(spec.from + 1, 1);
+  let node = tree.resolveInner(spec.from + 1, 1);
   while (node.name !== "Image" && node.parent) node = node.parent;
   if (node.name !== "Image") return null;
   const url = node.getChild("URL");
@@ -70,7 +71,11 @@ export function imgSrcValueRange(
   return { from: end - value.length, to: end };
 }
 
-function targetFor(state: EditorState, spec: ImageSpec): UploadTarget | null {
+function targetFor(
+  state: EditorState,
+  tree: Tree,
+  spec: ImageSpec,
+): UploadTarget | null {
   const resolved = resolveImageSrc(
     spec.src,
     state.field(imageDocPathField, false) ?? null,
@@ -84,7 +89,7 @@ function targetFor(state: EditorState, spec: ImageSpec): UploadTarget | null {
     const r = imgSrcValueRange(text);
     dest = r ? { from: spec.from + r.from, to: spec.from + r.to } : null;
   } else {
-    dest = markdownDestination(state, spec);
+    dest = markdownDestination(tree, spec);
   }
   if (!dest) return null;
   return {
@@ -104,9 +109,10 @@ export function collectUploadTargetsInRange(
   from = 0,
   to = state.doc.length,
 ): UploadTarget[] {
-  return collectImageSpecs(state, [{ from, to }])
+  const tree = ensureSyntaxTree(state, to, 300) ?? syntaxTree(state);
+  return collectImageSpecs(state, [{ from, to }], tree)
     .filter((s) => s.to >= from && s.from <= to)
-    .map((s) => targetFor(state, s))
+    .map((s) => targetFor(state, tree, s))
     .filter((t): t is UploadTarget => t !== null)
     .sort((a, b) => a.from - b.from);
 }

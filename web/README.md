@@ -44,4 +44,4 @@ docker compose -f web/compose.yaml up --build -d --wait
 
 - [Web 版 PRD](./PRD.md)
 - [ADR 0002：透過本機 API 存入自管資料庫](./docs/decisions/0002-self-managed-database.md)
-- [實作計畫](./docs/plans/feat_web_desktop-parity.md)
+- [功能對照與平台人工驗收](./docs/desktop-parity.md)

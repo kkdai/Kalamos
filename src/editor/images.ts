@@ -369,8 +369,8 @@ export function collectImageSpecs(
   ranges: readonly { from: number; to: number }[] = [
     { from: 0, to: state.doc.length },
   ],
+  tree = syntaxTree(state),
 ): ImageSpec[] {
-  const tree = syntaxTree(state);
   const specs: ImageSpec[] = [];
   const seen = new Set<number>();
   for (const range of ranges) {

@@ -1,6 +1,6 @@
 # Web 與桌面版功能對照
 
-依 [Web PRD](../PRD.md)、[實作計畫](plans/feat_web_desktop-parity.md)、[桌面 PRD](../../docs/PRD.md)與[桌面 README](../../README.zh-TW.md)整理。桌面端對端測試多用 [IPC 記憶體替身](../../playwright.config.ts)；它們可作為行為基準，但不能證明 Web 資料已寫入 PostgreSQL，也不能代替原生平台驗收。
+依 [Web PRD](../PRD.md)、[桌面 PRD](../../docs/PRD.md)與[桌面 README](../../README.zh-TW.md)整理。桌面端對端測試多用 [IPC 記憶體替身](../../playwright.config.ts)；它們可作為行為基準，但不能證明 Web 資料已寫入 PostgreSQL，也不能代替原生平台驗收。
 
 - **已驗證**：只指下表列明的案例在真實服務通過，不代表整個需求或平台已通過。
 - **待驗證**：尚無獨立執行證據，包含每列「另測」事項。
