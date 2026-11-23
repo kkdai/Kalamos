@@ -1,0 +1,54 @@
+#diagram-reader {
+  inline-size: max-content;
+  max-inline-size: none;
+  max-block-size: none;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+}
+
+#diagram-reader:modal,
+#diagram-reader::backdrop {
+  overscroll-behavior: contain;
+}
+
+#diagram-reader::backdrop {
+  overflow: hidden;
+  background: rgb(0 0 0 / 56%);
+}
+
+#editor-container .k-diagram[data-kind="mermaid"] .k-diagram-svg,
+#diagram-reader-stage {
+  scrollbar-width: none;
+}
+
+#diagram-reader-stage {
+  inline-size: max-content;
+  max-inline-size: min(84rem, calc(100dvw - 1rem));
+  max-block-size: min(52rem, calc(100dvh - 1rem));
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+@supports not (scrollbar-width: none) {
+  #editor-container
+    .k-diagram[data-kind="mermaid"]
+    .k-diagram-svg::-webkit-scrollbar,
+  #diagram-reader-stage::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+#diagram-reader-image {
+  display: block;
+  inline-size: max-content;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: zoom-out;
+}
+
+#diagram-reader-image img {
+  display: block;
+  max-inline-size: none;
+}

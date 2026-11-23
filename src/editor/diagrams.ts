@@ -34,6 +34,7 @@ import {
   ViewPlugin,
   WidgetType,
 } from "@codemirror/view";
+import { type EditorHost, editorHostFacet } from "./editor-host";
 import { isSelectionTouchingRange } from "./live-preview";
 import { mapPosClamped } from "./positions";
 
@@ -692,7 +693,17 @@ interface MountState {
 
 const mountStates = new WeakMap<HTMLElement, MountState>();
 
-function showResult(dom: HTMLElement, result: DiagramRenderResult): void {
+function diagramOpener(view: EditorView, kind: DiagramKind) {
+  return kind === "mermaid"
+    ? view.state.facet(editorHostFacet)[0]?.openDiagram
+    : undefined;
+}
+
+function showResult(
+  dom: HTMLElement,
+  result: DiagramRenderResult,
+  openDiagram?: EditorHost["openDiagram"],
+): void {
   dom.replaceChildren();
   if (result.error) {
     dom.dataset.state = "error";
@@ -724,6 +735,23 @@ function showResult(dom: HTMLElement, result: DiagramRenderResult): void {
     // A percentage width in a flex item can resolve to SVG's 300px fallback.
     svg.style.width = `${width}px`;
     svg.style.maxWidth = "none";
+    if (openDiagram) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "k-diagram-open";
+      button.setAttribute("aria-label", "放大圖表");
+      button.setAttribute("aria-haspopup", "dialog");
+      button.title = "點一下放大圖表";
+      const graphic = document.createElement("span");
+      graphic.inert = true;
+      graphic.append(svg);
+      button.append(graphic);
+      button.addEventListener("click", () => {
+        button.focus({ preventScroll: true });
+        openDiagram(svg);
+      });
+      wrap.append(button);
+    }
     wrap.tabIndex = 0;
     wrap.setAttribute("role", "group");
     wrap.setAttribute("aria-label", "圖表預覽");
@@ -757,10 +785,11 @@ function scheduleRender(
   const key = cacheKey(widget.kind, widget.source, widget.theme);
   st.key = key;
   dom.dataset.source = widget.source;
+  const openDiagram = diagramOpener(view, widget.kind);
 
   const cached = getCached(key);
   if (cached) {
-    showResult(dom, cached);
+    showResult(dom, cached, openDiagram);
     return;
   }
   if (!dom.firstChild) showPending(dom);
@@ -771,7 +800,7 @@ function scheduleRender(
     void renderDiagram(widget.kind, widget.source, widget.theme).then(
       (result) => {
         if (state.key !== key) return; // superseded by a newer source
-        showResult(dom, result);
+        showResult(dom, result, openDiagram);
         if (dom.isConnected) view.requestMeasure();
       },
     );
@@ -812,7 +841,7 @@ export class DiagramWidget extends WidgetType {
     dom.dataset.preview = String(this.isPreview);
     scheduleRender(dom, this, view, 0);
 
-    if (!this.isPreview) {
+    if (!this.isPreview && !diagramOpener(view, this.kind)) {
       dom.addEventListener("mousedown", (e) => {
         // Let the native horizontal scrollbar work without entering source mode.
         const scroller = e.target;

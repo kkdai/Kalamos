@@ -89,6 +89,14 @@
     <input id="attachment-file" type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/avif,image/bmp,image/x-icon" hidden />
     <input id="conversion-file" type="file" accept=".docx,.odt,.epub,.tex,.latex,.html,.htm,.wiki,.mediawiki" hidden />
 
+    <dialog id="diagram-reader" aria-label="放大圖表" closedby="any">
+      <div id="diagram-reader-stage" role="group" aria-label="可捲動的圖表" tabindex="0">
+        <button id="diagram-reader-image" type="button" aria-label="關閉放大圖表" autofocus>
+          <img alt="" draggable="false" />
+        </button>
+      </div>
+    </dialog>
+
     <dialog id="path-dialog" aria-labelledby="path-heading">
       <form method="dialog">
         <h2 id="path-heading">文件路徑</h2>

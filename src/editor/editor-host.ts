@@ -8,6 +8,8 @@ export interface EditorHost {
   resolveLocalImage: LocalImageResolver;
   /** Receives only allowed external URLs (HTTP, HTTPS, and mailto). */
   openExternalLink: (url: string) => void | Promise<void>;
+  /** Opens a read-only view of a rendered, sanitized diagram. */
+  openDiagram?: (svg: SVGSVGElement) => void;
 }
 
 export const editorHostFacet = Facet.define<EditorHost>();

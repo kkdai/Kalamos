@@ -39,6 +39,7 @@ import {
   readMarkdown,
   type StoredDocument,
 } from "./api";
+import { createDiagramReader } from "./diagram-reader";
 import { pandocExport, pandocImport, pdfExport, uploadImage } from "./export";
 import {
   createDocument,
@@ -147,6 +148,9 @@ const editor = createEditor({
   host: {
     resolveLocalImage: assetUrl,
     openExternalLink: openBrowserExternalLink,
+    openDiagram: createDiagramReader(
+      element<HTMLDialogElement>("diagram-reader"),
+    ),
   },
   handlers: {
     onOpenFile: () => element("markdown-files").click(),
