@@ -41,6 +41,7 @@ import {
 } from "./api";
 import { createDiagramReader } from "./diagram-reader";
 import { pandocExport, pandocImport, pdfExport, uploadImage } from "./export";
+import { frontMatterPreview } from "./front-matter-preview";
 import {
   createDocument,
   discardDraft,
@@ -145,6 +146,7 @@ document.head.append(customStyle);
 
 const editor = createEditor({
   parent: container,
+  previewExtensions: frontMatterPreview,
   host: {
     resolveLocalImage: assetUrl,
     openExternalLink: openBrowserExternalLink,

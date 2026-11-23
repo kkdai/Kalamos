@@ -22,6 +22,8 @@ docker compose -f web/compose.yaml up --build -d --wait
 4. 從側欄「搜尋」依內容找跨文件命中；可切換大小寫、全字與正規表示式。點命中可跳到已儲存版本，不會改動尚未儲存的編輯。從「文件操作 → 在文件中尋找」可搜尋目前文件。
 5. 從「文件操作」下載 Markdown 或匯出 PDF／DOCX。PDF 渲染不擷取遠端圖片；如需在 PDF 中顯示圖片，請先匯入為工作區附件。
 
+文件開頭以 `---` 包住的 YAML Front Matter 會在即時預覽顯示為文件資訊，支援清單和巢狀欄位。點文件資訊即可就地編輯 YAML，點到區塊外就回到預覽。也可切換到「原始碼」編輯整份文件；無法解析的 YAML 會保留原文。預覽不改變檔案內容或匯出行為。
+
 工作區功能、平台差異和測試證據見[功能對照](./docs/desktop-parity.md)。目前自動化以 Chromium 為準，不代表已手動驗證各系統的 Chrome／Edge 選檔器、輸入法和快捷鍵。附件支援 PNG、JPEG、GIF、WebP、AVIF、BMP、ICO，不接受 SVG。ODT 的公式匯入受 Pandoc 限制；LaTeX 與 MediaWiki 匯出保留圖片參照，不打包圖片。
 
 ## 開發與備份

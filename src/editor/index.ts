@@ -68,6 +68,8 @@ export interface CreateEditorOptions {
   parent: HTMLElement;
   /** Optional live-preview services; defaults to native desktop behavior. */
   host?: EditorHost;
+  /** Extra editor extensions active only in live preview. */
+  previewExtensions?: Extension;
   initialContent?: string;
   initialSourceMode?: boolean;
   initialCodeLineNumbers?: boolean;
@@ -230,6 +232,7 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
   const appendedExtensions: Extension[] = [];
 
   const sourceModeController = createSourceModeController({
+    previewExtensions: options.previewExtensions,
     initialSourceMode: options.initialSourceMode,
     onSourceModeChange: options.onSourceModeChange,
   });

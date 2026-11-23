@@ -86,10 +86,10 @@ test("WEB-02: preview CJK italic, YAML front matter, footnotes and a live TOC", 
   const content = editor(page);
   await expect(content.locator(".k-em")).toHaveText("斜體");
   await expect(content.locator(".k-em")).toHaveCSS("font-style", "italic");
-  await expect(content.locator(".k-frontmatter-line")).toHaveCount(4);
-  await expect(content.locator(".k-frontmatter-line").nth(1)).toHaveText(
-    "title: 部落格文章",
-  );
+  const metadata = content.getByTestId("front-matter-preview");
+  await expect(metadata.locator("dt")).toHaveText(["title", "tags"]);
+  await expect(metadata.locator("dd").first()).toHaveText("部落格文章");
+  await expect(metadata.locator("li")).toHaveText("a");
   await expect(content.locator(".k-hr")).toHaveCount(0);
 
   const reference = content.locator(".k-footnote-ref");

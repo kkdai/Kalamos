@@ -39,11 +39,16 @@ export interface SourceModeController {
 const NO_PREVIEW: Extension = [];
 
 export function createSourceModeController(options?: {
+  previewExtensions?: Extension;
   initialSourceMode?: boolean;
   onSourceModeChange?: (sourceMode: boolean) => void;
 }): SourceModeController {
   const compartment = new Compartment();
+  const preview = options?.previewExtensions
+    ? [richPreviewExtensions, options.previewExtensions]
+    : richPreviewExtensions;
   let sourceMode = Boolean(options?.initialSourceMode);
+  const currentExtension = (): Extension => (sourceMode ? NO_PREVIEW : preview);
 
   function setSourceMode(
     view: EditorView,
@@ -52,9 +57,7 @@ export function createSourceModeController(options?: {
   ): void {
     sourceMode = enabled;
     view.dispatch({
-      effects: compartment.reconfigure(
-        enabled ? NO_PREVIEW : richPreviewExtensions,
-      ),
+      effects: compartment.reconfigure(currentExtension()),
     });
     if (notify) {
       options?.onSourceModeChange?.(sourceMode);
@@ -65,9 +68,6 @@ export function createSourceModeController(options?: {
     setSourceMode(view, !sourceMode, true);
     return sourceMode;
   }
-
-  const currentExtension = (): Extension =>
-    sourceMode ? NO_PREVIEW : richPreviewExtensions;
 
   return {
     extension: compartment.of(currentExtension()),
