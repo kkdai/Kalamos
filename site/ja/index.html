@@ -123,6 +123,10 @@
               <p>左右分割プレビューは不要です。閉じ記号を打った瞬間に描画され、カーソルが離れると記号が静かに消えます。<kbd>Cmd+/</kbd> でいつでもソースモードに切り替えられます。</p>
             </div>
             <div class="pillar">
+              <h3><kbd>Cmd+P</kbd> クイックオープン</h3>
+              <p>開いているフォルダ内の Markdown ファイルをあいまい検索し、一致文字をハイライト表示。未入力時は最近開いたファイルを表示し、「<strong>ファイル &gt; 最近使った項目を開く</strong>」にも対応します。</p>
+            </div>
+            <div class="pillar">
               <h3>CJK と IME に心地よい設計</h3>
               <p>全角句読点に隣接する太字・斜体も正しく解釈。IME 変換中は装飾の更新を一時停止するため、日本語や中国語の入力中に画面が揺れません。</p>
             </div>
@@ -251,11 +255,51 @@
         <div class="container">
           <div class="showcase-header">
             <span class="eyebrow">下書きから公開・提出まで</span>
-            <h2 class="section-title">画像、ファイル管理、多形式エクスポートを一か所に</h2>
-            <p class="section-desc">技術記事の執筆からドキュメント納品まで、外部ツールを行き来せずに完結できます。</p>
+            <h2 class="section-title">クイックオープン、タブ編集、多形式エクスポートを一か所に</h2>
+            <p class="section-desc"><kbd>Cmd+P</kbd> で記事やメモを瞬時に呼び出し、複数タブで下書きを並行執筆。外部ツールを行き来せずに公開・納品まで完結できます。</p>
+          </div>
+
+          <div class="showcase-media">
+            <div class="window-frame">
+              <div class="window-bar" aria-hidden="true">
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-title">blog — Kalamos</span>
+              </div>
+              <img
+                src="../assets/screenshots/quick-open.png"
+                alt="あいまい検索の一致ハイライト、相対サブフォルダパス、最近使ったファイルのバッジと上部のタブバーを表示する Kalamos の Cmd+P クイックオープン画面"
+                width="1920"
+                height="1400"
+                loading="lazy"
+              />
+            </div>
           </div>
 
           <div class="feature-grid">
+            <article class="feature-card">
+              <h3>クイックオープンと最近使ったファイル</h3>
+              <p><kbd>Cmd+P</kbd>（Windows は <kbd>Ctrl+P</kbd>）で開いているフォルダ内の Markdown をあいまい検索し、一致文字をハイライト表示。未入力時はフォルダを問わず最近開いた最大 20 件を一覧でき、<kbd>Cmd+Enter</kbd> で新規タブ起動や「<strong>ファイル &gt; 最近使った項目を開く</strong>」にも対応します。</p>
+              <ul class="feature-tags">
+                <li>Cmd+P / Ctrl+P</li>
+                <li>あいまい検索ハイライト</li>
+                <li>最近使った項目</li>
+                <li>新規タブで開く</li>
+              </ul>
+            </article>
+
+            <article class="feature-card">
+              <h3>複数ドキュメントタブと全文検索</h3>
+              <p>1 つのウィンドウで複数文書を編集可能（<kbd>Cmd+T</kbd> / <kbd>Cmd+W</kbd> / <kbd>Ctrl+Tab</kbd>）。ドラッグ並び替えとタブごとの Undo 履歴に対応し、文書内の検索・置換（<kbd>Cmd+F</kbd>）、フォルダ横断検索（<kbd>Cmd+Shift+F</kbd>）、環境設定（<kbd>Cmd+,</kbd>）も備えています。</p>
+              <ul class="feature-tags">
+                <li>マルチタブ編集</li>
+                <li>検索と置換</li>
+                <li>フォルダ内検索</li>
+                <li>環境設定</li>
+              </ul>
+            </article>
+
             <article class="feature-card">
               <h3>画像プレビューとカスタムアップロード</h3>
               <p>ドラッグ＆ドロップや貼り付けで画像を自動的に <code>assets/</code> へ保存し相対リンクを挿入。<code>&lt;img&gt;</code> のサイズ／<code>zoom</code> 指定、静的サイト向けルートフォルダ（<code>typora-root-url</code>・<kbd>Cmd+Opt+R</kbd>）、<code>settings.json</code> による安全な CLI アップローダ連携を備えています。</p>
@@ -365,10 +409,26 @@
           <div class="showcase-header">
             <span class="eyebrow">キーボードファースト</span>
             <h2 class="section-title">主要ショートカット一覧</h2>
-            <p class="section-desc">ホームポジションから手を離さず、主要な操作をすべて完結できます。Windows では <code>Cmd</code> を <code>Ctrl</code>、<code>Opt</code> を <code>Alt</code> に読み替えてください。</p>
+            <p class="section-desc">ホームポジションから手を離さず、主要な操作をすべて完結できます。Windows では <code>Cmd</code> を <code>Ctrl</code>、<code>Opt</code> を <code>Alt</code> に読み替えてください（<code>Ctrl+Tab</code> は両 OS 共通）。</p>
           </div>
 
           <div class="shortcuts-grid">
+            <div class="shortcut-row">
+              <span class="shortcut-label">クイックオープン（あいまい検索・履歴）</span>
+              <kbd>Cmd+P</kbd>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">新規 / 閉じる / タブ切り替え</span>
+              <span><kbd>Cmd+T</kbd> · <kbd>Cmd+W</kbd> · <kbd>Ctrl+Tab</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">文書内検索 / フォルダ内検索</span>
+              <span><kbd>Cmd+F</kbd> / <kbd>Cmd+Shift+F</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">環境設定</span>
+              <kbd>Cmd+,</kbd>
+            </div>
             <div class="shortcut-row">
               <span class="shortcut-label">ソースモード切り替え</span>
               <kbd>Cmd+/</kbd>

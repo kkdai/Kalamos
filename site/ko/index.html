@@ -123,6 +123,10 @@
               <p>좌우 분할 창을 번갈아 볼 필요가 없습니다. 닫는 기호를 입력하는 즉시 렌더링되고 커서가 벗어나면 문법 기호가 숨겨집니다. 언제든 <kbd>Cmd+/</kbd>로 소스 모드를 열 수 있습니다.</p>
             </div>
             <div class="pillar">
+              <h3><kbd>Cmd+P</kbd> 빠른 열기</h3>
+              <p>열려 있는 폴더의 Markdown 파일을 퍼지 검색해 일치 문자를 강조 표시합니다. 입력창이 비어 있을 때는 최근 연 파일을 보여주며, <strong>파일 &gt; 최근 항목 열기</strong> 메뉴도 제공합니다.</p>
+            </div>
+            <div class="pillar">
               <h3>CJK 및 IME 친화적 입력</h3>
               <p>전각 문장부호 옆의 강조 구문을 정확히 처리하며, 한글·한자 등 IME 조합 중에는 장식 갱신을 멈춰 입력 화면이 흔들리지 않습니다.</p>
             </div>
@@ -251,11 +255,51 @@
         <div class="container">
           <div class="showcase-header">
             <span class="eyebrow">초안에서 배포까지</span>
-            <h2 class="section-title">이미지, 파일 관리, 다중 형식 변환을 한 곳에서</h2>
-            <p class="section-desc">기술 블로그 글쓰기부터 문서 전달까지 에디터를 벗어나지 않고 자연스럽게 이어집니다.</p>
+            <h2 class="section-title">빠른 열기, 멀티 탭, 다중 형식 변환을 한 곳에서</h2>
+            <p class="section-desc"><kbd>Cmd+P</kbd>로 문서 사이를 빠르게 오가고 여러 초안을 탭으로 열어 두세요. 에디터를 벗어나지 않고 글쓰기부터 내보내기까지 자연스럽게 이어집니다.</p>
+          </div>
+
+          <div class="showcase-media">
+            <div class="window-frame">
+              <div class="window-bar" aria-hidden="true">
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-title">blog — Kalamos</span>
+              </div>
+              <img
+                src="../assets/screenshots/quick-open.png"
+                alt="퍼지 검색 강조 표시, 하위 폴더 상대 경로, 최근 파일 배지와 상단 다중 문서 탭이 표시된 Kalamos Cmd+P 빠른 열기 화면"
+                width="1920"
+                height="1400"
+                loading="lazy"
+              />
+            </div>
           </div>
 
           <div class="feature-grid">
+            <article class="feature-card">
+              <h3>빠른 열기 및 최근 파일</h3>
+              <p><kbd>Cmd+P</kbd>(Windows는 <kbd>Ctrl+P</kbd>)로 열려 있는 폴더의 Markdown 파일을 퍼지 검색하고 일치 문자를 강조 표시합니다. 비어 있을 때는 폴더에 관계없이 최근 연 파일 20개를 보여주며, <kbd>Cmd+Enter</kbd> 새 탭 열기와 <strong>파일 &gt; 최근 항목 열기</strong>를 지원합니다.</p>
+              <ul class="feature-tags">
+                <li>Cmd+P / Ctrl+P</li>
+                <li>퍼지 검색 강조</li>
+                <li>최근 파일 목록</li>
+                <li>새 탭으로 열기</li>
+              </ul>
+            </article>
+
+            <article class="feature-card">
+              <h3>다중 문서 탭과 전체 검색</h3>
+              <p>한 창에서 여러 문서를 탭으로 관리하세요(<kbd>Cmd+T</kbd> / <kbd>Cmd+W</kbd> / <kbd>Ctrl+Tab</kbd>). 드래그 순서 변경과 독립된 실행 취소 기록을 지원하며, 문서 내 찾기·바꾸기(<kbd>Cmd+F</kbd>), 폴더 검색(<kbd>Cmd+Shift+F</kbd>), 환경설정(<kbd>Cmd+,</kbd>)을 함께 제공합니다.</p>
+              <ul class="feature-tags">
+                <li>다중 문서 탭</li>
+                <li>찾기 및 바꾸기</li>
+                <li>폴더 전체 검색</li>
+                <li>환경설정</li>
+              </ul>
+            </article>
+
             <article class="feature-card">
               <h3>이미지와 커스텀 업로더</h3>
               <p>이미지를 끌어다 놓거나 붙여넣으면 문서 옆 <code>assets/</code> 폴더에 저장하고 상대 경로를 삽입합니다. <code>&lt;img&gt;</code> 크기·<code>zoom</code> 조절, 정적 블로그 루트 폴더(<code>typora-root-url</code> 또는 <kbd>Cmd+Opt+R</kbd>), <code>settings.json</code> 기반 CLI 업로더 연동을 지원합니다.</p>
@@ -365,10 +409,26 @@
           <div class="showcase-header">
             <span class="eyebrow">키보드 우선</span>
             <h2 class="section-title">핵심 단축키 요약</h2>
-            <p class="section-desc">키보드에서 손을 떼지 않고 모든 주요 기능을 실행할 수 있습니다. Windows에서는 <code>Cmd</code>가 <code>Ctrl</code>, <code>Opt</code>가 <code>Alt</code>에 대응됩니다.</p>
+            <p class="section-desc">키보드에서 손을 떼지 않고 모든 주요 기능을 실행할 수 있습니다. Windows에서는 <code>Cmd</code>가 <code>Ctrl</code>, <code>Opt</code>가 <code>Alt</code>에 대응됩니다(<code>Ctrl+Tab</code>은 양쪽 동일).</p>
           </div>
 
           <div class="shortcuts-grid">
+            <div class="shortcut-row">
+              <span class="shortcut-label">빠른 열기(퍼지 검색 / 최근 파일)</span>
+              <kbd>Cmd+P</kbd>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">새 탭 / 탭 닫기 / 탭 전환</span>
+              <span><kbd>Cmd+T</kbd> · <kbd>Cmd+W</kbd> · <kbd>Ctrl+Tab</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">문서 찾기 / 폴더 검색</span>
+              <span><kbd>Cmd+F</kbd> / <kbd>Cmd+Shift+F</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">환경설정</span>
+              <kbd>Cmd+,</kbd>
+            </div>
             <div class="shortcut-row">
               <span class="shortcut-label">소스 모드 전환</span>
               <kbd>Cmd+/</kbd>

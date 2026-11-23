@@ -123,6 +123,10 @@
               <p>告別雙欄對照與反覆切換。打完結尾符號即刻渲染，游標離開後自動隱去語法標記；隨時按 <kbd>Cmd+/</kbd> 切換原始碼檢視。</p>
             </div>
             <div class="pillar">
+              <h3><kbd>Cmd+P</kbd> 快速開檔</h3>
+              <p>模糊搜尋目前資料夾內的 Markdown 檔並標亮命中字元；輸入框空白時列出最近開啟的文件，並整合「<strong>檔案 &gt; 打開最近使用</strong>」。</p>
+            </div>
+            <div class="pillar">
               <h3>中英混排與輸入法友善</h3>
               <p>全形標點旁的粗體與斜體自然生效，CJK 輸入法組字期間凍結裝飾更新，打字流暢不跳動。</p>
             </div>
@@ -251,11 +255,51 @@
         <div class="container">
           <div class="showcase-header">
             <span class="eyebrow">從草稿到交付</span>
-            <h2 class="section-title">圖片、側欄與多格式匯出一氣呵成</h2>
-            <p class="section-desc">無論撰寫技術部落格、規格文件還是長篇文章，從資料夾整理到轉檔交付都在同一個視窗內完成。</p>
+            <h2 class="section-title">快速開檔、多分頁與多格式匯出一氣呵成</h2>
+            <p class="section-desc">按 <kbd>Cmd+P</kbd> 在筆記與部落格間快速跳轉，以多分頁同時處理草稿，從資料夾整理到轉檔交付都在同一個視窗內完成。</p>
+          </div>
+
+          <div class="showcase-media">
+            <div class="window-frame">
+              <div class="window-bar" aria-hidden="true">
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-title">blog — Kalamos</span>
+              </div>
+              <img
+                src="../assets/screenshots/quick-open.png"
+                alt="Kalamos Cmd+P 快速開檔面板，顯示模糊搜尋命中字元標亮、相對子資料夾路徑、最近開啟標籤與上方多文件分頁列"
+                width="1920"
+                height="1400"
+                loading="lazy"
+              />
+            </div>
           </div>
 
           <div class="feature-grid">
+            <article class="feature-card">
+              <h3>快速開檔與最近開啟</h3>
+              <p>按 <kbd>Cmd+P</kbd>（Windows 為 <kbd>Ctrl+P</kbd>）模糊搜尋目前資料夾內的 Markdown 檔並標亮命中字元。空白時顯示最近開啟的 20 筆檔案（不限資料夾），支援 <kbd>Cmd+Enter</kbd> 開新分頁與原生選單「<strong>檔案 &gt; 打開最近使用</strong>」。</p>
+              <ul class="feature-tags">
+                <li>Cmd+P / Ctrl+P</li>
+                <li>模糊搜尋標亮</li>
+                <li>最近開啟清單</li>
+                <li>快速開新分頁</li>
+              </ul>
+            </article>
+
+            <article class="feature-card">
+              <h3>多文件分頁與全文搜尋</h3>
+              <p>在同一視窗開啟多份文件（<kbd>Cmd+T</kbd> / <kbd>Cmd+W</kbd> / <kbd>Ctrl+Tab</kbd>），支援拖曳排序與各自獨立的復原紀錄。搭配文件內尋找取代（<kbd>Cmd+F</kbd>）、資料夾跨檔搜尋（<kbd>Cmd+Shift+F</kbd>）與偏好設定（<kbd>Cmd+,</kbd>）。</p>
+              <ul class="feature-tags">
+                <li>多文件分頁</li>
+                <li>尋找與取代</li>
+                <li>資料夾搜尋</li>
+                <li>偏好設定視窗</li>
+              </ul>
+            </article>
+
             <article class="feature-card">
               <h3>圖片管理與圖床上傳</h3>
               <p>拖放或貼上圖片時自動存入文件旁的 <code>assets/</code> 資料夾並插入相對路徑。支援 <code>&lt;img&gt;</code> 尺寸與 <code>zoom</code> 縮放、靜態部落格根目錄（<code>typora-root-url</code> 或 <kbd>Cmd+Opt+R</kbd>），以及透過 <code>settings.json</code> 串接自訂 CLI 圖床上傳程式。</p>
@@ -365,10 +409,26 @@
           <div class="showcase-header">
             <span class="eyebrow">鍵盤優先</span>
             <h2 class="section-title">常用快捷鍵一覽</h2>
-            <p class="section-desc">雙手無須離開鍵盤，所有核心操作皆可一鍵完成。在 Windows 上請將 <code>Cmd</code> 對應為 <code>Ctrl</code>、<code>Opt</code> 對應為 <code>Alt</code>。</p>
+            <p class="section-desc">雙手無須離開鍵盤，所有核心操作皆可一鍵完成。在 Windows 上請將 <code>Cmd</code> 對應為 <code>Ctrl</code>、<code>Opt</code> 對應為 <code>Alt</code>（<code>Ctrl+Tab</code> 雙平台相同）。</p>
           </div>
 
           <div class="shortcuts-grid">
+            <div class="shortcut-row">
+              <span class="shortcut-label">快速開檔（模糊搜尋 / 最近開啟）</span>
+              <kbd>Cmd+P</kbd>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">新增 / 關閉 / 切換分頁</span>
+              <span><kbd>Cmd+T</kbd> · <kbd>Cmd+W</kbd> · <kbd>Ctrl+Tab</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">文件內尋找 / 資料夾搜尋</span>
+              <span><kbd>Cmd+F</kbd> / <kbd>Cmd+Shift+F</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">偏好設定</span>
+              <kbd>Cmd+,</kbd>
+            </div>
             <div class="shortcut-row">
               <span class="shortcut-label">切換原始碼模式</span>
               <kbd>Cmd+/</kbd>

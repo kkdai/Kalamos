@@ -80,49 +80,70 @@
   <img src="site/assets/screenshots/dark-theme-melan.png" alt="Kalamos Melan 다크 테마 화면" width="760" />
 </p>
 
-### 파일 관리, 사이드바, 안정성
-- **사이드바**(`NV-01`, `NV-02`): `Cmd+Shift+L`로 토글하고 `Cmd+Shift+O`로 폴더를 엽니다. **파일 트리**, **파일 목록**(미리보기 발췌 포함), **개요**(제목 이동) 탭을 제공하며 파일 생성·이름 변경·휴지통 이동과 외부 파일 변경 실시간 감지(iCloud Drive / Dropbox 폴더 호환)를 지원합니다.
+### 빠른 열기, 탭, 검색 및 파일 관리
+- **빠른 열기 및 최근 파일**(`Cmd+P` / `Ctrl+P`): 열려 있는 폴더의 Markdown 파일을 퍼지 검색하고 일치한 문자를 강조 표시합니다(파일명·접두사·연속 일치 우선). 입력창이 비어 있을 때는 폴더에 관계없이 최근에 연 파일 최대 20개를 보여주며, `Enter`로 탭 규칙에 따라 열거나 `Cmd+Enter` / `Ctrl+Enter`로 항상 새 탭에서 열 수 있습니다. macOS와 Windows 네이티브 메뉴의 **파일 > 최근 항목 열기**(목록 지우기 포함)에서도 바로 열 수 있습니다.
+- **다중 문서 탭**: 한 창에서 여러 문서를 동시에 편집합니다(`Cmd+T` / `Ctrl+T` 새 탭, `Cmd+W` / `Ctrl+W` 탭 닫기, `Ctrl+Tab` / `Ctrl+Shift+Tab` 탭 전환, 드래그로 순서 변경). 각 탭이 독립적인 실행 취소 기록·커서·스크롤 위치를 유지하며, 창을 닫거나 종료하기 전 저장되지 않은 변경 사항을 안내합니다.
+- **찾기·바꾸기 및 폴더 검색**: 현재 문서 내 찾기(`Cmd+F` / `Ctrl+F`)와 찾기 및 바꾸기(`Cmd+Opt+F` / `Ctrl+Alt+F`), 사이드바에서 열려 있는 폴더 전체의 Markdown 파일을 검색하는 폴더 검색(`Cmd+Shift+F` / `Ctrl+Shift+F`)을 지원합니다.
+- **네이티브 메뉴 막대와 환경설정**: macOS와 Windows 모두 네이티브 메뉴 막대를 제공하며, `Cmd+,` / `Ctrl+,`로 환경설정 창을 열어 일반·에디터·테마·이미지 옵션을 조정할 수 있습니다.
+- **사이드바**(`NV-01`, `NV-02`): `Cmd+Shift+L` / `Ctrl+Shift+L`로 토글하고 `Cmd+Shift+O` / `Ctrl+Shift+O`로 폴더를 엽니다. **파일 트리**, **파일 목록**(미리보기 발췌 포함), **개요**(`Cmd+Shift+1` / `Ctrl+Shift+1`), **폴더 검색** 탭을 제공하며 파일 생성·이름 변경·휴지통 이동과 외부 파일 변경 실시간 감지(iCloud Drive / Dropbox 폴더 호환)를 지원합니다.
 - **글자 수·단어 수 통계**(`NV-03`): 상태 표시줄에서 마크업을 제외한 실제 단어 수(CJK + 영문), 글자 수, 줄 수, 예상 읽기 시간을 실시간으로 보여주며 텍스트 선택 시 선택 영역 통계를 표시합니다.
 - **안전한 저장과 충돌 복구**: 임시 파일 작성 후 원자적 이름 바꾸기 저장, 저장된 파일의 1초 디바운스 자동 저장, 제목 없는 초안의 5초 간격 복구 스냅샷 및 재실행 시 원클릭 복원 배너를 지원합니다.
+
+<p align="center">
+  <img src="site/assets/screenshots/quick-open.png" alt="퍼지 검색 강조 표시와 최근 파일 배지가 보이는 Kalamos Cmd+P 빠른 열기 패널" width="760" />
+</p>
 
 ---
 
 ## 단축키 목록
 
-| 분류 | 기능 | 단축키 |
-| --- | --- | --- |
-| **파일** | 새 문서 | `Cmd+N` |
-| | 파일 열기 | `Cmd+O` |
-| | 저장 / 다른 이름으로 저장 | `Cmd+S` / `Cmd+Shift+S` |
-| | 사이드바에서 폴더 열기 | `Cmd+Shift+O` |
-| **보기 및 모드** | 소스 모드 전환 | `Cmd+/` |
-| | 사이드바 표시/숨기기 | `Cmd+Shift+L` |
-| | 테마 순환 전환 | `Cmd+Shift+T` |
-| | Ataraxia 집중 모드 | `F8` |
-| | Stichos 타자기 모드 | `F9` |
-| **서식 및 목록** | 굵게 / 기울임 | `Cmd+B` / `Cmd+I` |
-| | 인라인 코드 | `Cmd+Shift+`` ` `` |
-| | 링크 삽입/해제 | `Cmd+K` |
-| | 번호 / 글머리 / 할 일 목록 | `Cmd+Shift+[` / `Cmd+Shift+]` / `Cmd+Shift+X` |
-| | 목록 들여쓰기 / 내어쓰기 | `Tab` / `Shift+Tab` |
-| | 제목 북마크 링크 복사 | `Cmd+Shift+C` |
-| **블록 및 입력** | 코드 줄 번호 전환 | `Cmd+Opt+L` |
-| | 수식 자동 번호 매기기 전환 | `Cmd+Opt+N` |
-| | 괄호 / Markdown 기호 자동 짝 전환 | `Cmd+Opt+P` / `Cmd+Opt+Shift+P` |
-| **표** | 표 삽입 대화상자 | `Cmd+Opt+T` |
-| | 다음 / 이전 셀 이동 | `Tab` / `Shift+Tab` |
-| | 표 밖으로 나가기 | `Cmd+Enter` |
-| | 위 / 아래에 행 추가 | `Cmd+Opt+↑` / `Cmd+Opt+↓` |
-| | 왼쪽 / 오른쪽에 열 추가 | `Cmd+Opt+←` / `Cmd+Opt+→` |
-| | 행 / 열 삭제 | `Cmd+Shift+Backspace` / `Cmd+Opt+Backspace` |
-| | 열 왼쪽 / 가운데 / 오른쪽 정렬 | `Cmd+Opt+Shift+←` / `↑` / `→` |
-| **이미지** | 이미지 루트 폴더 설정 / 해제 | `Cmd+Opt+R` / `Cmd+Opt+Shift+R` |
-| | 로컬 이미지 업로드 | `Cmd+Opt+U` |
-| **내보내기/가져오기** | PDF 내보내기(북마크 포함) | `Cmd+Shift+E` |
-| | Pandoc 내보내기(DOCX/ODT/LaTeX/Wiki/EPUB) | `Cmd+Opt+E` |
-| | Pandoc 가져오기 | `Cmd+Opt+I` |
+| 분류 | 기능 | macOS | Windows |
+| --- | --- | --- | --- |
+| **파일 및 탭** | 새 문서 | `Cmd+N` | `Ctrl+N` |
+| | 새 탭 | `Cmd+T` | `Ctrl+T` |
+| | 파일 열기 | `Cmd+O` | `Ctrl+O` |
+| | 빠른 열기(퍼지 검색 및 최근 파일) | `Cmd+P` | `Ctrl+P` |
+| | 사이드바에서 폴더 열기 | `Cmd+Shift+O` | `Ctrl+Shift+O` |
+| | 저장 / 다른 이름으로 저장 | `Cmd+S` / `Cmd+Shift+S` | `Ctrl+S` / `Ctrl+Shift+S` |
+| | 탭 닫기 | `Cmd+W` | `Ctrl+W` |
+| | 다음 / 이전 탭 전환 | `Ctrl+Tab` / `Ctrl+Shift+Tab` | `Ctrl+Tab` / `Ctrl+Shift+Tab` |
+| | 환경설정 | `Cmd+,` | `Ctrl+,` |
+| **검색** | 문서에서 찾기 | `Cmd+F` | `Ctrl+F` |
+| | 찾기 및 바꾸기 | `Cmd+Opt+F` | `Ctrl+Alt+F` |
+| | 다음 / 이전 찾기 | `Cmd+G` / `Cmd+Shift+G` | `Ctrl+G` / `Ctrl+Shift+G` |
+| | 폴더에서 찾기 | `Cmd+Shift+F` | `Ctrl+Shift+F` |
+| **보기 및 모드** | 소스 모드 전환 | `Cmd+/` | `Ctrl+/` |
+| | 사이드바 표시/숨기기 | `Cmd+Shift+L` | `Ctrl+Shift+L` |
+| | 개요 표시/숨기기 | `Cmd+Shift+1` | `Ctrl+Shift+1` |
+| | 테마 순환 전환 | `Cmd+Shift+T` | `Ctrl+Shift+T` |
+| | Ataraxia 집중 모드 | `F8` | `F8` |
+| | Stichos 타자기 모드 | `F9` | `F9` |
+| | 확대 / 축소 / 실제 크기 | `Cmd+Shift+=` / `-` / `0` | `Ctrl+Shift+=` / `-` / `0` |
+| **서식 및 목록** | 제목 1–6 / 본문 문단 | `Cmd+1`–`6` / `Cmd+0` | `Ctrl+1`–`6` / `Ctrl+0` |
+| | 굵게 / 기울임 / 취소선 | `Cmd+B` / `Cmd+I` / `Cmd+Shift+D` | `Ctrl+B` / `Ctrl+I` / `Ctrl+Shift+D` |
+| | 인라인 코드 | `Cmd+Shift+`` ` `` | `Ctrl+Shift+`` ` `` |
+| | 링크 삽입/해제 | `Cmd+K` | `Ctrl+K` |
+| | 번호 / 글머리 / 할 일 목록 | `Cmd+Shift+[` / `Cmd+Shift+]` / `Cmd+Shift+X` | `Ctrl+Shift+[` / `Ctrl+Shift+]` / `Ctrl+Shift+X` |
+| | 목록 들여쓰기 / 내어쓰기 | `Tab` / `Shift+Tab` | `Tab` / `Shift+Tab` |
+| | 제목 북마크 링크 복사 | `Cmd+Shift+C` | `Ctrl+Shift+C` |
+| **블록 및 입력** | 코드 블록 / 수식 블록 / 인용문 | `Cmd+Opt+C` / `B` / `Q` | `Ctrl+Alt+C` / `B` / `Q` |
+| | 코드 줄 번호 전환 | `Cmd+Opt+L` | `Ctrl+Alt+L` |
+| | 수식 자동 번호 매기기 전환 | `Cmd+Opt+N` | `Ctrl+Alt+N` |
+| | 괄호 / Markdown 기호 자동 짝 전환 | `Cmd+Opt+P` / `Cmd+Opt+Shift+P` | `Ctrl+Alt+P` / `Ctrl+Alt+Shift+P` |
+| **표** | 표 삽입 대화상자 | `Cmd+Opt+T` | `Ctrl+Alt+T` |
+| | 다음 / 이전 셀 이동 | `Tab` / `Shift+Tab` | `Tab` / `Shift+Tab` |
+| | 표 밖으로 나가기 | `Cmd+Enter` | `Ctrl+Enter` |
+| | 위 / 아래에 행 추가 | `Cmd+Opt+↑` / `Cmd+Opt+↓` | `Ctrl+Alt+↑` / `Ctrl+Alt+↓` |
+| | 왼쪽 / 오른쪽에 열 추가 | `Cmd+Opt+←` / `Cmd+Opt+→` | `Ctrl+Alt+←` / `Ctrl+Alt+→` |
+| | 행 / 열 삭제 | `Cmd+Shift+Backspace` / `Cmd+Opt+Backspace` | `Ctrl+Shift+Backspace` / `Ctrl+Alt+Backspace` |
+| | 열 왼쪽 / 가운데 / 오른쪽 정렬 | `Cmd+Opt+Shift+←` / `↑` / `→` | `Ctrl+Alt+Shift+←` / `↑` / `→` |
+| **이미지** | 이미지 루트 폴더 설정 / 해제 | `Cmd+Opt+R` / `Cmd+Opt+Shift+R` | `Ctrl+Alt+R` / `Ctrl+Alt+Shift+R` |
+| | 로컬 이미지 업로드 | `Cmd+Opt+U` | `Ctrl+Alt+U` |
+| **내보내기/가져오기** | PDF 내보내기(북마크 포함) | `Cmd+Shift+E` | `Ctrl+Shift+E` |
+| | Pandoc 내보내기(DOCX/ODT/LaTeX/Wiki/EPUB) | `Cmd+Opt+E` | `Ctrl+Alt+E` |
+| | Pandoc 가져오기 | `Cmd+Opt+I` | `Ctrl+Alt+I` |
 
-> **Windows 단축키**: 위 표의 모든 `Cmd`는 `Ctrl`로, `Opt`는 `Alt`로 대응됩니다(예: `Cmd+Opt+T` → `Ctrl+Alt+T`).
+> **빠른 열기 패널 내 조작**: `↑` / `↓`(macOS에서는 `Ctrl+N` / `Ctrl+P`도 지원)로 항목을 이동하고, `Enter`로 열기, `Cmd+Enter` / `Ctrl+Enter`로 항상 새 탭에서 열기, `Esc`로 닫고 원래 커서 위치로 돌아갑니다.
 
 ---
 
