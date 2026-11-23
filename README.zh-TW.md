@@ -80,49 +80,70 @@
   <img src="site/assets/screenshots/dark-theme-melan.png" alt="Kalamos Melan 深色主題畫面" width="760" />
 </p>
 
-### 檔案管理、側欄與資料安全
-- **側欄導覽**（`NV-01`、`NV-02`）：`Cmd+Shift+L` 切換側欄、`Cmd+Shift+O` 開啟資料夾，內建**檔案樹**、**檔案列表**（含摘要）與**大綱**三種分頁；支援新增、重新命名與移至垃圾桶，並監聽外部檔案變更（相容 iCloud Drive 與 Dropbox 資料夾）。
+### 快速開檔、多分頁、搜尋與檔案管理
+- **快速開檔與最近開啟**（`Cmd+P` / `Ctrl+P`）：模糊搜尋目前開啟資料夾內的 Markdown 檔並標亮命中字元（優先排序檔名、字首與連續命中）。輸入框為空時列出最多 20 筆最近開啟的檔案（不限資料夾）；按 `Enter` 依分頁規則開啟、`Cmd+Enter` / `Ctrl+Enter` 一律開在新分頁，原生選單列亦提供「**檔案 > 打開最近使用**」（含清除清單）。
+- **多文件分頁**：在同一視窗同時開啟多份文件（`Cmd+T` / `Ctrl+T` 開新分頁、`Cmd+W` / `Ctrl+W` 關閉分頁、`Ctrl+Tab` / `Ctrl+Shift+Tab` 切換分頁、支援拖曳排序），各分頁獨立保留復原紀錄、游標與捲動位置，關閉視窗或結束前會檢查所有未儲存變更。
+- **文件內尋找取代與資料夾搜尋**：支援目前文件內尋找（`Cmd+F` / `Ctrl+F`）、尋找與取代（`Cmd+Opt+F` / `Ctrl+Alt+F`），以及在側欄對整個資料夾進行跨檔全文搜尋（`Cmd+Shift+F` / `Ctrl+Shift+F`）。
+- **原生選單列與偏好設定**：macOS 與 Windows 皆提供原生系統選單列，並可按 `Cmd+,` / `Ctrl+,` 開啟偏好設定視窗調整一般、編輯器、外觀與圖片設定。
+- **側欄導覽**（`NV-01`、`NV-02`）：`Cmd+Shift+L` / `Ctrl+Shift+L` 切換側欄、`Cmd+Shift+O` / `Ctrl+Shift+O` 開啟資料夾，內建**檔案樹**、**檔案列表**（含摘要）、**大綱**（`Cmd+Shift+1` / `Ctrl+Shift+1`）與**資料夾搜尋**；支援新增、重新命名與移至垃圾桶，並監聽外部檔案變更（相容 iCloud Drive 與 Dropbox 資料夾）。
 - **即時字數統計**（`NV-03`）：狀態列顯示讀者可見字數（CJK 字元 + 英文單字）、字元數、行數與預估閱讀時間，框選文字時即時切換為選取範圍統計。
 - **安全存檔與異常救回**：採用暫存檔原子更名寫入；已命名文件停止輸入 1 秒後自動存檔；未命名草稿每 5 秒寫入救回快照，異常關閉重開後可一鍵還原。
+
+<p align="center">
+  <img src="site/assets/screenshots/quick-open.png" alt="Kalamos Cmd+P 快速開檔面板，顯示模糊搜尋字元標亮與最近開啟標籤" width="760" />
+</p>
 
 ---
 
 ## 快捷鍵一覽
 
-| 分類 | 功能 | 快捷鍵 |
-| --- | --- | --- |
-| **檔案** | 新增文件 | `Cmd+N` |
-| | 開啟檔案 | `Cmd+O` |
-| | 儲存 / 另存新檔 | `Cmd+S` / `Cmd+Shift+S` |
-| | 開啟資料夾至側欄 | `Cmd+Shift+O` |
-| **檢視與模式** | 切換原始碼模式 | `Cmd+/` |
-| | 顯示 / 隱藏側欄 | `Cmd+Shift+L` |
-| | 循環切換主題 | `Cmd+Shift+T` |
-| | Ataraxia 專注模式 | `F8` |
-| | Stichos 打字機模式 | `F9` |
-| **行內與清單** | 粗體 / 斜體 | `Cmd+B` / `Cmd+I` |
-| | 行內程式碼 | `Cmd+Shift+`` ` `` |
-| | 插入 / 切換超連結 | `Cmd+K` |
-| | 編號 / 項目符號 / 任務清單 | `Cmd+Shift+[` / `Cmd+Shift+]` / `Cmd+Shift+X` |
-| | 列表縮排 / 反縮排 | `Tab` / `Shift+Tab` |
-| | 複製標題書籤連結 | `Cmd+Shift+C` |
-| **區塊與輸入** | 切換程式碼行號 | `Cmd+Opt+L` |
-| | 切換公式自動編號 | `Cmd+Opt+N` |
-| | 切換括號 / Markdown 符號自動配對 | `Cmd+Opt+P` / `Cmd+Opt+Shift+P` |
-| **表格** | 開啟插入表格對話框 | `Cmd+Opt+T` |
-| | 移至下一格 / 上一格 | `Tab` / `Shift+Tab` |
-| | 跳出表格 | `Cmd+Enter` |
-| | 上方 / 下方插入列 | `Cmd+Opt+↑` / `Cmd+Opt+↓` |
-| | 左側 / 右側插入欄 | `Cmd+Opt+←` / `Cmd+Opt+→` |
-| | 刪除列 / 刪除欄 | `Cmd+Shift+Backspace` / `Cmd+Opt+Backspace` |
-| | 欄靠左 / 置中 / 靠右對齊 | `Cmd+Opt+Shift+←` / `↑` / `→` |
-| **圖片** | 設定 / 清除圖片根目錄 | `Cmd+Opt+R` / `Cmd+Opt+Shift+R` |
-| | 上傳本機圖片至圖床 | `Cmd+Opt+U` |
-| **匯出與匯入** | 匯出 PDF（含書籤） | `Cmd+Shift+E` |
-| | 透過 Pandoc 匯出（DOCX/ODT/LaTeX/Wiki/EPUB） | `Cmd+Opt+E` |
-| | 透過 Pandoc 匯入文件 | `Cmd+Opt+I` |
+| 分類 | 功能 | macOS | Windows |
+| --- | --- | --- | --- |
+| **檔案與分頁** | 新增文件 | `Cmd+N` | `Ctrl+N` |
+| | 新增分頁 | `Cmd+T` | `Ctrl+T` |
+| | 開啟檔案 | `Cmd+O` | `Ctrl+O` |
+| | 快速開檔（模糊搜尋與最近開啟） | `Cmd+P` | `Ctrl+P` |
+| | 開啟資料夾至側欄 | `Cmd+Shift+O` | `Ctrl+Shift+O` |
+| | 儲存 / 另存新檔 | `Cmd+S` / `Cmd+Shift+S` | `Ctrl+S` / `Ctrl+Shift+S` |
+| | 關閉分頁 | `Cmd+W` | `Ctrl+W` |
+| | 下一個 / 上一個分頁 | `Ctrl+Tab` / `Ctrl+Shift+Tab` | `Ctrl+Tab` / `Ctrl+Shift+Tab` |
+| | 偏好設定 | `Cmd+,` | `Ctrl+,` |
+| **搜尋** | 在目前文件中尋找 | `Cmd+F` | `Ctrl+F` |
+| | 尋找與取代 | `Cmd+Opt+F` | `Ctrl+Alt+F` |
+| | 找下一個 / 找上一個 | `Cmd+G` / `Cmd+Shift+G` | `Ctrl+G` / `Ctrl+Shift+G` |
+| | 在資料夾中搜尋 | `Cmd+Shift+F` | `Ctrl+Shift+F` |
+| **檢視與模式** | 切換原始碼模式 | `Cmd+/` | `Ctrl+/` |
+| | 顯示 / 隱藏側欄 | `Cmd+Shift+L` | `Ctrl+Shift+L` |
+| | 顯示 / 隱藏大綱 | `Cmd+Shift+1` | `Ctrl+Shift+1` |
+| | 循環切換主題 | `Cmd+Shift+T` | `Ctrl+Shift+T` |
+| | Ataraxia 專注模式 | `F8` | `F8` |
+| | Stichos 打字機模式 | `F9` | `F9` |
+| | 放大 / 縮小 / 實際大小 | `Cmd+Shift+=` / `-` / `0` | `Ctrl+Shift+=` / `-` / `0` |
+| **行內與清單** | 標題 1–6 / 內文段落 | `Cmd+1`–`6` / `Cmd+0` | `Ctrl+1`–`6` / `Ctrl+0` |
+| | 粗體 / 斜體 / 刪除線 | `Cmd+B` / `Cmd+I` / `Cmd+Shift+D` | `Ctrl+B` / `Ctrl+I` / `Ctrl+Shift+D` |
+| | 行內程式碼 | `Cmd+Shift+`` ` `` | `Ctrl+Shift+`` ` `` |
+| | 插入 / 切換超連結 | `Cmd+K` | `Ctrl+K` |
+| | 編號 / 項目符號 / 任務清單 | `Cmd+Shift+[` / `Cmd+Shift+]` / `Cmd+Shift+X` | `Ctrl+Shift+[` / `Ctrl+Shift+]` / `Ctrl+Shift+X` |
+| | 列表縮排 / 反縮排 | `Tab` / `Shift+Tab` | `Tab` / `Shift+Tab` |
+| | 複製標題書籤連結 | `Cmd+Shift+C` | `Ctrl+Shift+C` |
+| **區塊與輸入** | 程式碼區塊 / 數學區塊 / 引用 | `Cmd+Opt+C` / `B` / `Q` | `Ctrl+Alt+C` / `B` / `Q` |
+| | 切換程式碼行號 | `Cmd+Opt+L` | `Ctrl+Alt+L` |
+| | 切換公式自動編號 | `Cmd+Opt+N` | `Ctrl+Alt+N` |
+| | 切換括號 / Markdown 符號自動配對 | `Cmd+Opt+P` / `Cmd+Opt+Shift+P` | `Ctrl+Alt+P` / `Ctrl+Alt+Shift+P` |
+| **表格** | 開啟插入表格對話框 | `Cmd+Opt+T` | `Ctrl+Alt+T` |
+| | 移至下一格 / 上一格 | `Tab` / `Shift+Tab` | `Tab` / `Shift+Tab` |
+| | 跳出表格 | `Cmd+Enter` | `Ctrl+Enter` |
+| | 上方 / 下方插入列 | `Cmd+Opt+↑` / `Cmd+Opt+↓` | `Ctrl+Alt+↑` / `Ctrl+Alt+↓` |
+| | 左側 / 右側插入欄 | `Cmd+Opt+←` / `Cmd+Opt+→` | `Ctrl+Alt+←` / `Ctrl+Alt+→` |
+| | 刪除列 / 刪除欄 | `Cmd+Shift+Backspace` / `Cmd+Opt+Backspace` | `Ctrl+Shift+Backspace` / `Ctrl+Alt+Backspace` |
+| | 欄靠左 / 置中 / 靠右對齊 | `Cmd+Opt+Shift+←` / `↑` / `→` | `Ctrl+Alt+Shift+←` / `↑` / `→` |
+| **圖片** | 設定 / 清除圖片根目錄 | `Cmd+Opt+R` / `Cmd+Opt+Shift+R` | `Ctrl+Alt+R` / `Ctrl+Alt+Shift+R` |
+| | 上傳本機圖片至圖床 | `Cmd+Opt+U` | `Ctrl+Alt+U` |
+| **匯出與匯入** | 匯出 PDF（含書籤） | `Cmd+Shift+E` | `Ctrl+Shift+E` |
+| | 透過 Pandoc 匯出（DOCX/ODT/LaTeX/Wiki/EPUB） | `Cmd+Opt+E` | `Ctrl+Alt+E` |
+| | 透過 Pandoc 匯入文件 | `Cmd+Opt+I` | `Ctrl+Alt+I` |
 
-> **Windows 快捷鍵對照**：上表所有 `Cmd` 對應 `Ctrl`、`Opt` 對應 `Alt`（例如 `Cmd+Opt+T` 在 Windows 為 `Ctrl+Alt+T`）。
+> **快速開檔面板內操作**：以 `↑` / `↓`（macOS 亦支援 `Ctrl+N` / `Ctrl+P`）移動選取、`Enter` 開啟、`Cmd+Enter` / `Ctrl+Enter` 一律開在新分頁、`Esc` 關閉並回到原本編輯位置。
 
 ---
 

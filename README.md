@@ -80,49 +80,70 @@
   <img src="site/assets/screenshots/dark-theme-melan.png" alt="Kalamos Melan dark theme" width="760" />
 </p>
 
-### Files, Sidebar & Reliability
-- **Sidebar** (`NV-01`, `NV-02`): Toggle with `Cmd+Shift+L` and open folders with `Cmd+Shift+O`. Switch between **File Tree**, **File List** (with excerpts), and **Outline** (heading navigation). Create, rename, and move files to Trash; watches external filesystem changes (compatible with iCloud Drive and Dropbox folders).
+### Quick Open, Tabs, Search & Files
+- **Quick Open & Recent Files** (`Cmd+P` / `Ctrl+P`): Fuzzy-search Markdown files across the open folder with highlighted match characters (prioritizing filename, prefix, and consecutive hits). With an empty input, lists up to 20 recently opened files across folders; press `Enter` to open following tab rules or `Cmd+Enter` / `Ctrl+Enter` to always open in a new tab. Also available under **File > Open Recent** (with **Clear Recent**) on macOS and Windows.
+- **Multi-Document Tabs**: Work on multiple files in one window (`Cmd+T` / `Ctrl+T` new tab, `Cmd+W` / `Ctrl+W` close tab, `Ctrl+Tab` / `Ctrl+Shift+Tab` switch tabs, drag to reorder), each preserving independent undo history, cursor, and scroll position, with unsaved-change prompts before closing.
+- **Find, Replace & Folder Search**: Search within the active document (`Cmd+F` / `Ctrl+F`), find and replace (`Cmd+Opt+F` / `Ctrl+Alt+F`), or search across every Markdown file in the open folder (`Cmd+Shift+F` / `Ctrl+Shift+F`) directly from the sidebar.
+- **Native Menu Bar & Preferences**: Native application menu bar on both macOS and Windows, plus a Preferences window (`Cmd+,` / `Ctrl+,`) for general, editor, appearance, and image settings.
+- **Sidebar** (`NV-01`, `NV-02`): Toggle with `Cmd+Shift+L` / `Ctrl+Shift+L` and open folders with `Cmd+Shift+O` / `Ctrl+Shift+O`. Switch between **File Tree**, **File List** (with excerpts), **Outline** (`Cmd+Shift+1` / `Ctrl+Shift+1`), and **Folder Search**. Create, rename, and move files to Trash; watches external filesystem changes (compatible with iCloud Drive and Dropbox folders).
 - **Word Count** (`NV-03`): Live status-bar count of reader-visible words (CJK + Latin), grapheme characters, lines, and estimated reading time, with automatic selection stats when text is highlighted.
 - **Safe Saving & Crash Recovery**: Atomic temp-file + rename writes, 1-second debounced autosave for saved files, and 5-second crash-recovery snapshots for untitled drafts with a one-click restore banner on relaunch.
+
+<p align="center">
+  <img src="site/assets/screenshots/quick-open.png" alt="Kalamos Cmd+P Quick Open with fuzzy search highlights and recent file badges" width="760" />
+</p>
 
 ---
 
 ## Keyboard Shortcuts
 
-| Category | Action | Shortcut |
-| --- | --- | --- |
-| **File** | New document | `Cmd+N` |
-| | Open file | `Cmd+O` |
-| | Save / Save As | `Cmd+S` / `Cmd+Shift+S` |
-| | Open folder in sidebar | `Cmd+Shift+O` |
-| **View & Modes** | Toggle Source Mode | `Cmd+/` |
-| | Toggle Sidebar | `Cmd+Shift+L` |
-| | Cycle Theme | `Cmd+Shift+T` |
-| | Ataraxia Focus Mode | `F8` |
-| | Stichos Typewriter Mode | `F9` |
-| **Formatting** | Bold / Italic | `Cmd+B` / `Cmd+I` |
-| | Inline code | `Cmd+Shift+`` ` `` |
-| | Insert / toggle link | `Cmd+K` |
-| | Ordered / Bullet / Task list | `Cmd+Shift+[` / `Cmd+Shift+]` / `Cmd+Shift+X` |
-| | Indent / Outdent list item | `Tab` / `Shift+Tab` |
-| | Copy heading bookmark link | `Cmd+Shift+C` |
-| **Blocks & Code** | Toggle code line numbers | `Cmd+Opt+L` |
-| | Toggle math auto-numbering | `Cmd+Opt+N` |
-| | Toggle bracket / Markdown auto-pairing | `Cmd+Opt+P` / `Cmd+Opt+Shift+P` |
-| **Tables** | Insert table dialog | `Cmd+Opt+T` |
-| | Next / previous cell | `Tab` / `Shift+Tab` |
-| | Leave table | `Cmd+Enter` |
-| | Insert row above / below | `Cmd+Opt+↑` / `Cmd+Opt+↓` |
-| | Insert column left / right | `Cmd+Opt+←` / `Cmd+Opt+→` |
-| | Delete row / column | `Cmd+Shift+Backspace` / `Cmd+Opt+Backspace` |
-| | Align column left / center / right | `Cmd+Opt+Shift+←` / `↑` / `→` |
-| **Images** | Set / clear image root folder | `Cmd+Opt+R` / `Cmd+Opt+Shift+R` |
-| | Upload local images | `Cmd+Opt+U` |
-| **Export & Import** | Export PDF (with bookmarks) | `Cmd+Shift+E` |
-| | Export via Pandoc (DOCX/ODT/LaTeX/Wiki/EPUB) | `Cmd+Opt+E` |
-| | Import via Pandoc | `Cmd+Opt+I` |
+| Category | Action | macOS | Windows |
+| --- | --- | --- | --- |
+| **File & Tabs** | New document | `Cmd+N` | `Ctrl+N` |
+| | New tab | `Cmd+T` | `Ctrl+T` |
+| | Open file | `Cmd+O` | `Ctrl+O` |
+| | Quick Open (fuzzy search & recent files) | `Cmd+P` | `Ctrl+P` |
+| | Open folder in sidebar | `Cmd+Shift+O` | `Ctrl+Shift+O` |
+| | Save / Save As | `Cmd+S` / `Cmd+Shift+S` | `Ctrl+S` / `Ctrl+Shift+S` |
+| | Close tab | `Cmd+W` | `Ctrl+W` |
+| | Next / previous tab | `Ctrl+Tab` / `Ctrl+Shift+Tab` | `Ctrl+Tab` / `Ctrl+Shift+Tab` |
+| | Preferences | `Cmd+,` | `Ctrl+,` |
+| **Search** | Find in document | `Cmd+F` | `Ctrl+F` |
+| | Find and replace | `Cmd+Opt+F` | `Ctrl+Alt+F` |
+| | Find next / previous | `Cmd+G` / `Cmd+Shift+G` | `Ctrl+G` / `Ctrl+Shift+G` |
+| | Find in folder | `Cmd+Shift+F` | `Ctrl+Shift+F` |
+| **View & Modes** | Toggle Source Mode | `Cmd+/` | `Ctrl+/` |
+| | Toggle Sidebar | `Cmd+Shift+L` | `Ctrl+Shift+L` |
+| | Toggle Outline | `Cmd+Shift+1` | `Ctrl+Shift+1` |
+| | Cycle Theme | `Cmd+Shift+T` | `Ctrl+Shift+T` |
+| | Ataraxia Focus Mode | `F8` | `F8` |
+| | Stichos Typewriter Mode | `F9` | `F9` |
+| | Zoom in / out / actual size | `Cmd+Shift+=` / `-` / `0` | `Ctrl+Shift+=` / `-` / `0` |
+| **Formatting** | Heading 1–6 / Paragraph | `Cmd+1`–`6` / `Cmd+0` | `Ctrl+1`–`6` / `Ctrl+0` |
+| | Bold / Italic / Strikethrough | `Cmd+B` / `Cmd+I` / `Cmd+Shift+D` | `Ctrl+B` / `Ctrl+I` / `Ctrl+Shift+D` |
+| | Inline code | `Cmd+Shift+`` ` `` | `Ctrl+Shift+`` ` `` |
+| | Insert / toggle link | `Cmd+K` | `Ctrl+K` |
+| | Ordered / Bullet / Task list | `Cmd+Shift+[` / `Cmd+Shift+]` / `Cmd+Shift+X` | `Ctrl+Shift+[` / `Ctrl+Shift+]` / `Ctrl+Shift+X` |
+| | Indent / Outdent list item | `Tab` / `Shift+Tab` | `Tab` / `Shift+Tab` |
+| | Copy heading bookmark link | `Cmd+Shift+C` | `Ctrl+Shift+C` |
+| **Blocks & Code** | Code block / Math block / Blockquote | `Cmd+Opt+C` / `B` / `Q` | `Ctrl+Alt+C` / `B` / `Q` |
+| | Toggle code line numbers | `Cmd+Opt+L` | `Ctrl+Alt+L` |
+| | Toggle math auto-numbering | `Cmd+Opt+N` | `Ctrl+Alt+N` |
+| | Toggle bracket / Markdown auto-pairing | `Cmd+Opt+P` / `Cmd+Opt+Shift+P` | `Ctrl+Alt+P` / `Ctrl+Alt+Shift+P` |
+| **Tables** | Insert table dialog | `Cmd+Opt+T` | `Ctrl+Alt+T` |
+| | Next / previous cell | `Tab` / `Shift+Tab` | `Tab` / `Shift+Tab` |
+| | Leave table | `Cmd+Enter` | `Ctrl+Enter` |
+| | Insert row above / below | `Cmd+Opt+↑` / `Cmd+Opt+↓` | `Ctrl+Alt+↑` / `Ctrl+Alt+↓` |
+| | Insert column left / right | `Cmd+Opt+←` / `Cmd+Opt+→` | `Ctrl+Alt+←` / `Ctrl+Alt+→` |
+| | Delete row / column | `Cmd+Shift+Backspace` / `Cmd+Opt+Backspace` | `Ctrl+Shift+Backspace` / `Ctrl+Alt+Backspace` |
+| | Align column left / center / right | `Cmd+Opt+Shift+←` / `↑` / `→` | `Ctrl+Alt+Shift+←` / `↑` / `→` |
+| **Images** | Set / clear image root folder | `Cmd+Opt+R` / `Cmd+Opt+Shift+R` | `Ctrl+Alt+R` / `Ctrl+Alt+Shift+R` |
+| | Upload local images | `Cmd+Opt+U` | `Ctrl+Alt+U` |
+| **Export & Import** | Export PDF (with bookmarks) | `Cmd+Shift+E` | `Ctrl+Shift+E` |
+| | Export via Pandoc (DOCX/ODT/LaTeX/Wiki/EPUB) | `Cmd+Opt+E` | `Ctrl+Alt+E` |
+| | Import via Pandoc | `Cmd+Opt+I` | `Ctrl+Alt+I` |
 
-> **Windows shortcuts**: every `Cmd` above maps to `Ctrl` and `Opt` maps to `Alt` (e.g. `Cmd+Opt+T` is `Ctrl+Alt+T`).
+> **Inside Quick Open**: use `↑` / `↓` (or `Ctrl+N` / `Ctrl+P` on macOS) to navigate, `Enter` to open, `Cmd+Enter` / `Ctrl+Enter` to always open in a new tab, and `Esc` to close.
 
 ---
 

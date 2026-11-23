@@ -136,6 +136,13 @@
               </p>
             </div>
             <div class="pillar">
+              <h3>Quick Open (<kbd>Cmd+P</kbd>)</h3>
+              <p>
+                Fuzzy-search Markdown files across the open folder with highlighted match characters. Leave the box
+                empty to jump back to recently opened files, or use <strong>File &gt; Open Recent</strong>.
+              </p>
+            </div>
+            <div class="pillar">
               <h3>Native CJK &amp; IME Care</h3>
               <p>
                 Bold and italic work cleanly beside full-width punctuation, and decorations pause during IME composition
@@ -276,19 +283,67 @@
         </div>
       </section>
 
-      <!-- Showcase 4: Workflow (Images, Export, Sidebar, Recovery) -->
+      <!-- Showcase 4: Workflow (Quick Open, Tabs, Images, Export, Sidebar, Recovery) -->
       <section class="showcase" id="workflow">
         <div class="container">
           <div class="showcase-header">
             <span class="eyebrow">From Draft to Delivery</span>
-            <h2 class="section-title">Images, files, and multi-format export built in</h2>
+            <h2 class="section-title">Quick open, tabs, images, and export built in</h2>
             <p class="section-desc">
-              Everything you need to move a technical article from local folder to finished document — without leaving
-              the editor.
+              Jump across notes with <kbd>Cmd+P</kbd>, keep multiple drafts open in tabs, and move a technical article
+              from local folder to finished document — without leaving the editor.
             </p>
           </div>
 
+          <div class="showcase-media">
+            <div class="window-frame">
+              <div class="window-bar" aria-hidden="true">
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-title">blog — Kalamos</span>
+              </div>
+              <img
+                src="assets/screenshots/quick-open.png"
+                alt="Kalamos Cmd+P Quick Open overlay showing fuzzy search match highlights, relative subfolder paths, recent file badges, and multi-document tabs"
+                width="1920"
+                height="1400"
+                loading="lazy"
+              />
+            </div>
+          </div>
+
           <div class="feature-grid">
+            <article class="feature-card">
+              <h3>Quick Open &amp; Recent Files</h3>
+              <p>
+                Press <kbd>Cmd+P</kbd> (<kbd>Ctrl+P</kbd> on Windows) to fuzzy-search Markdown files across the open
+                folder with highlighted matches. With an empty query, browse up to 20 recently opened files across
+                folders, press <kbd>Cmd+Enter</kbd> to open in a new tab, or pick from <strong>File &gt; Open Recent</strong>.
+              </p>
+              <ul class="feature-tags">
+                <li>Cmd+P / Ctrl+P</li>
+                <li>Fuzzy Highlights</li>
+                <li>Recent Files</li>
+                <li>Open in New Tab</li>
+              </ul>
+            </article>
+
+            <article class="feature-card">
+              <h3>Multi-Document Tabs &amp; Search</h3>
+              <p>
+                Keep multiple drafts open in one window (<kbd>Cmd+T</kbd> / <kbd>Cmd+W</kbd> / <kbd>Ctrl+Tab</kbd>)
+                with drag-to-reorder and independent undo history. Search and replace inside a file (<kbd>Cmd+F</kbd>)
+                or across the whole folder (<kbd>Cmd+Shift+F</kbd>), and tune settings in Preferences (<kbd>Cmd+,</kbd>).
+              </p>
+              <ul class="feature-tags">
+                <li>Multi-Tab Editing</li>
+                <li>Find &amp; Replace</li>
+                <li>Folder Search</li>
+                <li>Preferences</li>
+              </ul>
+            </article>
+
             <article class="feature-card">
               <h3>Images &amp; Custom Upload</h3>
               <p>
@@ -425,11 +480,28 @@
             <h2 class="section-title">Essential shortcuts at your fingertips</h2>
             <p class="section-desc">
               Every core action is reachable without leaving the keyboard. On Windows, <code>Cmd</code> maps to
-              <code>Ctrl</code> and <code>Opt</code> maps to <code>Alt</code>.
+              <code>Ctrl</code> and <code>Opt</code> maps to <code>Alt</code> (<code>Ctrl+Tab</code> is the same on
+              both platforms).
             </p>
           </div>
 
           <div class="shortcuts-grid">
+            <div class="shortcut-row">
+              <span class="shortcut-label">Quick Open (Fuzzy Search / Recent)</span>
+              <kbd>Cmd+P</kbd>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">New / Close / Switch Tab</span>
+              <span><kbd>Cmd+T</kbd> · <kbd>Cmd+W</kbd> · <kbd>Ctrl+Tab</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">Find / Find in Folder</span>
+              <span><kbd>Cmd+F</kbd> / <kbd>Cmd+Shift+F</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">Preferences</span>
+              <kbd>Cmd+,</kbd>
+            </div>
             <div class="shortcut-row">
               <span class="shortcut-label">Toggle Source Mode</span>
               <kbd>Cmd+/</kbd>

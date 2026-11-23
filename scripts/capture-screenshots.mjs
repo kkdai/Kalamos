@@ -121,15 +121,17 @@ function parseArgs(argv) {
   let lang = "all";
   let heroOnly = false;
   let sharedOnly = false;
+  let quickOpenOnly = false;
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === "--hero-only") heroOnly = true;
     else if (arg === "--shared-only") sharedOnly = true;
+    else if (arg === "--quick-open-only") quickOpenOnly = true;
     else if (arg === "--lang" && argv[i + 1]) lang = argv[++i];
     else if (arg.startsWith("--lang=")) lang = arg.slice("--lang=".length);
     else if (arg === "-h" || arg === "--help") {
       console.log(
-        "Usage: node scripts/capture-screenshots.mjs [--lang en|zh-TW|ja|ko|all] [--hero-only|--shared-only]",
+        "Usage: node scripts/capture-screenshots.mjs [--lang en|zh-TW|ja|ko|all] [--hero-only|--shared-only|--quick-open-only]",
       );
       process.exit(0);
     } else {
@@ -142,13 +144,16 @@ function parseArgs(argv) {
       `Invalid --lang "${lang}". Expected one of: all, ${validLangs.join(", ")}`,
     );
   }
-  if (heroOnly && sharedOnly) {
-    throw new Error("Cannot combine --hero-only and --shared-only");
+  if (Number(heroOnly) + Number(sharedOnly) + Number(quickOpenOnly) > 1) {
+    throw new Error(
+      "Cannot combine --hero-only, --shared-only, and --quick-open-only",
+    );
   }
   return {
     langs: lang === "all" ? validLangs : [lang],
-    captureHeroes: !sharedOnly,
-    captureShared: !heroOnly,
+    captureHeroes: !sharedOnly && !quickOpenOnly,
+    captureShared: !heroOnly && !quickOpenOnly,
+    captureQuickOpen: !heroOnly,
   };
 }
 
@@ -437,6 +442,132 @@ async function captureAll() {
       await page.waitForTimeout(250);
       await page.screenshot({ path: path.join(OUT_DIR, "writing-modes.png") });
       console.log("Captured writing-modes.png");
+    }
+
+    if (opts.captureQuickOpen) {
+      // 7. Quick Open (Cmd+P) with fuzzy match highlights & recent badge
+      const blogRoot = "/tmp/kalamos-test/blog";
+      const blogFiles = [
+        [
+          `${blogRoot}/posts/2026-11-23-kalamos-v050-快速開檔.md`,
+          [
+            "# Kalamos v0.5.0 — Cmd+P 快速開檔",
+            "",
+            "在筆記或部落格資料夾裡有幾十篇文章時，翻側欄找檔案往往會打斷寫作節奏。現在按下 `Cmd+P`（Windows 為 `Ctrl+P`），輸入幾個字母就能用**模糊搜尋**直接跳轉。",
+            "",
+            "> 雙手不用離開鍵盤，就能在整個資料夾與最近開啟的檔案間自由穿梭。",
+            "",
+            "## 這次加入的功能",
+            "",
+            "- **模糊搜尋與字元標亮**：比對檔名與相對路徑，優先顯示字首與連續命中",
+            "- **最近開啟清單**：輸入框空白時列出最近 20 份文件，跨資料夾也能快速回去",
+            "- **分頁規則整合**：`Enter` 依分頁規則開啟，`Cmd+Enter` 一律開在新分頁",
+            "",
+          ].join("\n"),
+        ],
+        [
+          `${blogRoot}/posts/2026-11-21-kalamos-launch.md`,
+          "# Kalamos 正式發佈記錄\n\n整理首發版本的核心設計與使用體驗。\n",
+        ],
+        [
+          `${blogRoot}/posts/2026-11-15-tauri-markdown-architecture.md`,
+          "# Tauri 2 + CodeMirror 6 架構筆記\n\n單一視窗所見即所得的實作取捨。\n",
+        ],
+        [
+          `${blogRoot}/posts/2026-10-28-靜態部落格寫作流程.md`,
+          "# 靜態部落格寫作流程\n\n本地 Markdown 編輯、圖片根目錄與發佈檢查。\n",
+        ],
+        [
+          `${blogRoot}/drafts/kalamos-shortcuts-cheatsheet.md`,
+          "# Kalamos 快捷鍵速查\n\n整理 macOS 與 Windows 常用組合鍵。\n",
+        ],
+        [
+          `${blogRoot}/drafts/kalamos-部落格工作流.md`,
+          "# 用 Kalamos 管理部落格草稿\n\n分頁、大綱與資料夾搜尋搭配方式。\n",
+        ],
+        [
+          `${blogRoot}/drafts/herdr-review-queue.md`,
+          "# Review Queue Notes\n\n待檢視的 PR 與文件更新項目。\n",
+        ],
+        [
+          `${blogRoot}/drafts/2026-11-開發筆記-模糊搜尋評分.md`,
+          "# 模糊搜尋評分設計\n\n檔名命中加權與最近開啟檔案排序。\n",
+        ],
+        [
+          `${blogRoot}/notes/meeting-2026-11.md`,
+          "# 2026-11 產品進度會議\n\n確認 v0.5.0 發佈時程與文件清單。\n",
+        ],
+        [
+          `${blogRoot}/notes/kalamos-theme-tokens.md`,
+          "# Kalamos 主題色彩變數\n\nPapyros 與 Melan 的 `--k-*` 設計規範。\n",
+        ],
+        [
+          `${blogRoot}/notes/產品發佈檢查清單.md`,
+          "# 產品發佈檢查清單\n\n版本號、CHANGELOG、README 與截圖。\n",
+        ],
+        [
+          `${blogRoot}/notes/markdown-table-alignment.md`,
+          "# Markdown 表格全形對齊\n\n中文字寬計算規則。\n",
+        ],
+        [
+          `${blogRoot}/guides/kalamos-quick-open-tips.md`,
+          "# Quick Open 使用技巧\n\n善用字首縮寫與 `Cmd+Enter` 新分頁。\n",
+        ],
+        [
+          `${blogRoot}/guides/pandoc-export-setup.md`,
+          "# Pandoc 多格式匯出設定\n\nDOCX、EPUB 與 LaTeX 匯出備忘。\n",
+        ],
+        [
+          `${blogRoot}/guides/windows-install-notes.md`,
+          "# Windows 安裝說明\n\nNSIS / MSI 與 WebView2 注意事項。\n",
+        ],
+        [`${blogRoot}/README.md`, "# Blog Workspace\n\n文章與筆記目錄。\n"],
+      ];
+
+      await resetApp(page, { theme: "papyros", sidebar: false });
+      await page.evaluate(
+        async ({ root, files }) => {
+          const ipc = await import("/src/ipc.ts");
+          const main = await import("/src/main.ts");
+          ipc.resetMockState();
+          ipc.seedMockDir(root);
+          for (const [filePath, body] of files) {
+            ipc.seedMockFile(filePath, body);
+          }
+          const app = main.getActiveApp();
+          await app.openFolder(root);
+          await app.sidebar.setVisible(false, false);
+          await app.openPath(
+            `${root}/drafts/kalamos-shortcuts-cheatsheet.md`,
+            "tab",
+          );
+          await app.openPath(
+            `${root}/posts/2026-11-21-kalamos-launch.md`,
+            "tab",
+          );
+          await app.openPath(`${root}/drafts/herdr-review-queue.md`, "tab");
+          await app.openPath(
+            `${root}/posts/2026-11-23-kalamos-v050-快速開檔.md`,
+            "tab",
+          );
+          app.editor.view.scrollDOM.scrollTop = 0;
+        },
+        { root: blogRoot, files: blogFiles },
+      );
+      await nextFrames(page, 6);
+      await page.evaluate(async () => {
+        const main = await import("/src/main.ts");
+        main.getActiveApp().quickOpen.open();
+      });
+      await page.waitForSelector('[data-testid="quick-open-input"]', {
+        state: "visible",
+        timeout: 5000,
+      });
+      await page.keyboard.type("klm");
+      await nextFrames(page, 6);
+      await page.waitForTimeout(250);
+      await page.screenshot({ path: path.join(OUT_DIR, "quick-open.png") });
+      console.log("Captured quick-open.png");
     }
   } finally {
     if (browser) await browser.close();

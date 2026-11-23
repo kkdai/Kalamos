@@ -80,49 +80,70 @@
   <img src="site/assets/screenshots/dark-theme-melan.png" alt="Kalamos Melan ダークテーマ" width="760" />
 </p>
 
-### ファイル管理・サイドバー・信頼性
-- **サイドバー**（`NV-01`、`NV-02`）：`Cmd+Shift+L` で表示切り替え、`Cmd+Shift+O` でフォルダを開けます。**ファイルツリー**、**ファイル一覧**（抜粋付き）、**アウトライン**（見出しジャンプ）を切り替え可能。新規作成・リネーム・ゴミ箱移動および外部変更の自動監視（iCloud Drive / Dropbox フォルダ対応）を備えています。
+### クイックオープン・タブ・検索・ファイル管理
+- **クイックオープンと最近使ったファイル**（`Cmd+P` / `Ctrl+P`）：開いているフォルダ内の Markdown ファイルをあいまい検索し、一致文字をハイライト表示します（ファイル名・先頭・連続一致を優先）。入力欄が空のときはフォルダを問わず最近開いた最大 20 件を表示し、`Enter` でタブ規則に従って開くほか、`Cmd+Enter` / `Ctrl+Enter` で常に新しいタブで開けます。macOS・Windows のネイティブメニューにも「**ファイル > 最近使った項目を開く**」（履歴クリア付き）を備えています。
+- **複数ドキュメントのタブ管理**：1 つのウィンドウで複数ファイルを同時に編集可能（`Cmd+T` / `Ctrl+T` 新規タブ、`Cmd+W` / `Ctrl+W` タブを閉じる、`Ctrl+Tab` / `Ctrl+Shift+Tab` タブ切り替え、ドラッグで並び替え）。各タブが Undo 履歴・カーソル・スクロール位置を個別に保持し、ウィンドウ終了前に未保存の変更をまとめて確認します。
+- **検索・置換とフォルダ内検索**：現在の文書内での検索（`Cmd+F` / `Ctrl+F`）・検索と置換（`Cmd+Opt+F` / `Ctrl+Alt+F`）に加え、サイドバーからフォルダ内の全 Markdown ファイルを横断検索できます（`Cmd+Shift+F` / `Ctrl+Shift+F`）。
+- **ネイティブメニューバーと環境設定**：macOS・Windows 双方でネイティブメニューバーを提供。`Cmd+,` / `Ctrl+,` で環境設定ウィンドウを開き、一般・エディタ・外観・画像の設定を変更できます。
+- **サイドバー**（`NV-01`、`NV-02`）：`Cmd+Shift+L` / `Ctrl+Shift+L` で表示切り替え、`Cmd+Shift+O` / `Ctrl+Shift+O` でフォルダを開けます。**ファイルツリー**、**ファイル一覧**（抜粋付き）、**アウトライン**（`Cmd+Shift+1` / `Ctrl+Shift+1`）、**フォルダ検索**を切り替え可能。新規作成・リネーム・ゴミ箱移動および外部変更の自動監視（iCloud Drive / Dropbox フォルダ対応）を備えています。
 - **文字数・単語数カウント**（`NV-03`）：ステータスバーに読者視点の単語数（CJK 文字 + 英単語）、書記素文字数、行数、推定読了時間をリアルタイム表示。範囲選択中は選択部分の統計に切り替わります。
 - **安全な保存とクラッシュリカバリ**：一時ファイル経由の原子的リネーム保存、保存済みファイルの 1 秒デバウンス自動保存、無題ドラフトの 5 秒間隔リカバリスナップショットと次回起動時のワンクリック復元バナーを実装しています。
+
+<p align="center">
+  <img src="site/assets/screenshots/quick-open.png" alt="あいまい検索ハイライトと最近使ったファイルのバッジを表示する Kalamos の Cmd+P クイックオープン" width="760" />
+</p>
 
 ---
 
 ## キーボードショートカット
 
-| カテゴリ | 操作 | ショートカット |
-| --- | --- | --- |
-| **ファイル** | 新規ドキュメント | `Cmd+N` |
-| | ファイルを開く | `Cmd+O` |
-| | 保存 / 名前を付けて保存 | `Cmd+S` / `Cmd+Shift+S` |
-| | フォルダを開く | `Cmd+Shift+O` |
-| **表示・モード** | ソースモード切り替え | `Cmd+/` |
-| | サイドバー切り替え | `Cmd+Shift+L` |
-| | テーマを順番に切り替え | `Cmd+Shift+T` |
-| | Ataraxia フォーカスモード | `F8` |
-| | Stichos タイプライターモード | `F9` |
-| **書式・リスト** | 太字 / 斜体 | `Cmd+B` / `Cmd+I` |
-| | インラインコード | `Cmd+Shift+`` ` `` |
-| | リンクの挿入・解除 | `Cmd+K` |
-| | 番号付き / 箇条書き / タスクリスト | `Cmd+Shift+[` / `Cmd+Shift+]` / `Cmd+Shift+X` |
-| | リストのインデント / インデント解除 | `Tab` / `Shift+Tab` |
-| | 見出しブックマークリンクをコピー | `Cmd+Shift+C` |
-| **ブロック・入力** | コード行番号の表示切り替え | `Cmd+Opt+L` |
-| | 数式の自動番号付け切り替え | `Cmd+Opt+N` |
-| | 括弧 / Markdown 記号の自動ペア切り替え | `Cmd+Opt+P` / `Cmd+Opt+Shift+P` |
-| **テーブル** | テーブル挿入ダイアログ | `Cmd+Opt+T` |
-| | 次 / 前のセルへ移動 | `Tab` / `Shift+Tab` |
-| | テーブルを抜ける | `Cmd+Enter` |
-| | 上 / 下に行を挿入 | `Cmd+Opt+↑` / `Cmd+Opt+↓` |
-| | 左 / 右に列を挿入 | `Cmd+Opt+←` / `Cmd+Opt+→` |
-| | 行 / 列を削除 | `Cmd+Shift+Backspace` / `Cmd+Opt+Backspace` |
-| | 列を左揃え / 中央揃え / 右揃え | `Cmd+Opt+Shift+←` / `↑` / `→` |
-| **画像** | 画像ルートフォルダを設定 / 解除 | `Cmd+Opt+R` / `Cmd+Opt+Shift+R` |
-| | ローカル画像をアップロード | `Cmd+Opt+U` |
-| **入出力** | PDF エクスポート（しおり付き） | `Cmd+Shift+E` |
-| | Pandoc エクスポート（DOCX/ODT/LaTeX/Wiki/EPUB） | `Cmd+Opt+E` |
-| | Pandoc インポート | `Cmd+Opt+I` |
+| カテゴリ | 操作 | macOS | Windows |
+| --- | --- | --- | --- |
+| **ファイル・タブ** | 新規ドキュメント | `Cmd+N` | `Ctrl+N` |
+| | 新規タブ | `Cmd+T` | `Ctrl+T` |
+| | ファイルを開く | `Cmd+O` | `Ctrl+O` |
+| | クイックオープン（あいまい検索・最近使った項目） | `Cmd+P` | `Ctrl+P` |
+| | フォルダを開く | `Cmd+Shift+O` | `Ctrl+Shift+O` |
+| | 保存 / 名前を付けて保存 | `Cmd+S` / `Cmd+Shift+S` | `Ctrl+S` / `Ctrl+Shift+S` |
+| | タブを閉じる | `Cmd+W` | `Ctrl+W` |
+| | 次 / 前のタブへ移動 | `Ctrl+Tab` / `Ctrl+Shift+Tab` | `Ctrl+Tab` / `Ctrl+Shift+Tab` |
+| | 環境設定 | `Cmd+,` | `Ctrl+,` |
+| **検索** | 文書内を検索 | `Cmd+F` | `Ctrl+F` |
+| | 検索と置換 | `Cmd+Opt+F` | `Ctrl+Alt+F` |
+| | 次 / 前を検索 | `Cmd+G` / `Cmd+Shift+G` | `Ctrl+G` / `Ctrl+Shift+G` |
+| | フォルダ内を検索 | `Cmd+Shift+F` | `Ctrl+Shift+F` |
+| **表示・モード** | ソースモード切り替え | `Cmd+/` | `Ctrl+/` |
+| | サイドバー切り替え | `Cmd+Shift+L` | `Ctrl+Shift+L` |
+| | アウトライン切り替え | `Cmd+Shift+1` | `Ctrl+Shift+1` |
+| | テーマを順番に切り替え | `Cmd+Shift+T` | `Ctrl+Shift+T` |
+| | Ataraxia フォーカスモード | `F8` | `F8` |
+| | Stichos タイプライターモード | `F9` | `F9` |
+| | 拡大 / 縮小 / 実際のサイズ | `Cmd+Shift+=` / `-` / `0` | `Ctrl+Shift+=` / `-` / `0` |
+| **書式・リスト** | 見出し 1–6 / 本文段落 | `Cmd+1`–`6` / `Cmd+0` | `Ctrl+1`–`6` / `Ctrl+0` |
+| | 太字 / 斜体 / 取り消し線 | `Cmd+B` / `Cmd+I` / `Cmd+Shift+D` | `Ctrl+B` / `Ctrl+I` / `Ctrl+Shift+D` |
+| | インラインコード | `Cmd+Shift+`` ` `` | `Ctrl+Shift+`` ` `` |
+| | リンクの挿入・解除 | `Cmd+K` | `Ctrl+K` |
+| | 番号付き / 箇条書き / タスクリスト | `Cmd+Shift+[` / `Cmd+Shift+]` / `Cmd+Shift+X` | `Ctrl+Shift+[` / `Ctrl+Shift+]` / `Ctrl+Shift+X` |
+| | リストのインデント / インデント解除 | `Tab` / `Shift+Tab` | `Tab` / `Shift+Tab` |
+| | 見出しブックマークリンクをコピー | `Cmd+Shift+C` | `Ctrl+Shift+C` |
+| **ブロック・入力** | コードブロック / 数式ブロック / 引用 | `Cmd+Opt+C` / `B` / `Q` | `Ctrl+Alt+C` / `B` / `Q` |
+| | コード行番号の表示切り替え | `Cmd+Opt+L` | `Ctrl+Alt+L` |
+| | 数式の自動番号付け切り替え | `Cmd+Opt+N` | `Ctrl+Alt+N` |
+| | 括弧 / Markdown 記号の自動ペア切り替え | `Cmd+Opt+P` / `Cmd+Opt+Shift+P` | `Ctrl+Alt+P` / `Ctrl+Alt+Shift+P` |
+| **テーブル** | テーブル挿入ダイアログ | `Cmd+Opt+T` | `Ctrl+Alt+T` |
+| | 次 / 前のセルへ移動 | `Tab` / `Shift+Tab` | `Tab` / `Shift+Tab` |
+| | テーブルを抜ける | `Cmd+Enter` | `Ctrl+Enter` |
+| | 上 / 下に行を挿入 | `Cmd+Opt+↑` / `Cmd+Opt+↓` | `Ctrl+Alt+↑` / `Ctrl+Alt+↓` |
+| | 左 / 右に列を挿入 | `Cmd+Opt+←` / `Cmd+Opt+→` | `Ctrl+Alt+←` / `Ctrl+Alt+→` |
+| | 行 / 列を削除 | `Cmd+Shift+Backspace` / `Cmd+Opt+Backspace` | `Ctrl+Shift+Backspace` / `Ctrl+Alt+Backspace` |
+| | 列を左揃え / 中央揃え / 右揃え | `Cmd+Opt+Shift+←` / `↑` / `→` | `Ctrl+Alt+Shift+←` / `↑` / `→` |
+| **画像** | 画像ルートフォルダを設定 / 解除 | `Cmd+Opt+R` / `Cmd+Opt+Shift+R` | `Ctrl+Alt+R` / `Ctrl+Alt+Shift+R` |
+| | ローカル画像をアップロード | `Cmd+Opt+U` | `Ctrl+Alt+U` |
+| **入出力** | PDF エクスポート（しおり付き） | `Cmd+Shift+E` | `Ctrl+Shift+E` |
+| | Pandoc エクスポート（DOCX/ODT/LaTeX/Wiki/EPUB） | `Cmd+Opt+E` | `Ctrl+Alt+E` |
+| | Pandoc インポート | `Cmd+Opt+I` | `Ctrl+Alt+I` |
 
-> **Windows でのショートカット**：上表の `Cmd` は `Ctrl` に、`Opt` は `Alt` に置き換えてください（例：`Cmd+Opt+T` → `Ctrl+Alt+T`）。
+> **クイックオープンパネル内の操作**：`↑` / `↓`（macOS では `Ctrl+N` / `Ctrl+P` も可）で選択移動、`Enter` で開く、`Cmd+Enter` / `Ctrl+Enter` で必ず新規タブで開く、`Esc` で閉じて元の編集位置へ戻ります。
 
 ---
 
