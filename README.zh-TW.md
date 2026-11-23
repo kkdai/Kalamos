@@ -236,6 +236,14 @@ npm run bench
 
 ---
 
+## 支持
+
+Kalamos 是免費、開源的產品。如果你喜歡它，歡迎請我喝杯咖啡，支持我繼續開發免費的產品。
+
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://www.buymeacoffee.com/evanlin)
+
+---
+
 ## 授權
 
 以 [MIT 授權](LICENSE) 釋出。
