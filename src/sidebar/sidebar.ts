@@ -48,6 +48,10 @@ export interface CreateSidebarOptions {
   onError?: (prefix: string, err: unknown) => void;
   /** #74: visibility or tab changed (keeps the native menu check marks in sync). */
   onLayoutChange?: () => void;
+  /** #104: called when a folder is opened (or restored at startup). */
+  onFolderChange?: (folder: string | null) => void;
+  /** #104: called when files inside the folder are created / renamed / trashed via sidebar. */
+  onFolderMutated?: (folder: string) => void;
 }
 
 export interface SidebarInitOptions {
@@ -420,6 +424,7 @@ export function createSidebar(
     try {
       await loadFolderData(targetPath);
       await watchFolder(targetPath);
+      options.onFolderChange?.(targetPath);
       if (persist) {
         await persistSettingsPatch({ lastFolder: targetPath });
         // User-initiated open (Cmd+Shift+O / button): reveal the result on the
@@ -460,6 +465,7 @@ export function createSidebar(
       await createFile(fullPath);
       fileTree.expandDir(parentDir);
       await refresh();
+      if (currentFolder) options.onFolderMutated?.(currentFolder);
       await onSelectFile(fullPath);
       return fullPath;
     } catch (err) {
@@ -498,6 +504,7 @@ export function createSidebar(
       }
       await onPathRenamed?.(fromPath, toPath);
       await refresh();
+      if (currentFolder) options.onFolderMutated?.(currentFolder);
       return true;
     } catch (err) {
       onError?.("重新命名失敗", err);
@@ -516,6 +523,7 @@ export function createSidebar(
       }
       await onPathTrashed?.(targetPath);
       await refresh();
+      if (currentFolder) options.onFolderMutated?.(currentFolder);
       return true;
     } catch (err) {
       onError?.("移到垃圾桶失敗", err);

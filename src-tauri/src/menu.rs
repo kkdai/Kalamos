@@ -27,6 +27,12 @@ pub const MENU_ACTION_EVENT: &str = "menu-action";
 /// Prefix of the ids of the generated theme items (`theme:custom:night`).
 pub const THEME_ITEM_PREFIX: &str = "theme:";
 pub const SET_THEME_ACTION: &str = "view.setTheme";
+/// #104: prefix of the ids of the generated recent-file items (`recent:/path/to/file.md`).
+pub const RECENT_ITEM_PREFIX: &str = "recent:";
+pub const OPEN_RECENT_ACTION: &str = "file.openRecent";
+const CLEAR_RECENT_ACTION: &str = "file.clearRecent";
+const RECENT_EMPTY_ID: &str = "recent-empty";
+const RECENT_EMPTY_LABEL: &str = "沒有最近開啟的檔案";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -80,6 +86,14 @@ pub enum MenuNode {
         platforms: Option<Vec<MenuPlatform>>,
         items: Vec<MenuNode>,
     },
+    /// #104: The 打開最近使用 submenu: recent files (filled by `sync_menu_state`),
+    /// then a separator and `items` (清除最近使用).
+    RecentFiles {
+        label: String,
+        #[serde(default)]
+        platforms: Option<Vec<MenuPlatform>>,
+        items: Vec<MenuNode>,
+    },
     Action {
         id: String,
         label: String,
@@ -111,6 +125,7 @@ impl MenuNode {
         match self {
             MenuNode::Submenu { platforms, .. }
             | MenuNode::Themes { platforms, .. }
+            | MenuNode::RecentFiles { platforms, .. }
             | MenuNode::Action { platforms, .. }
             | MenuNode::Predefined { platforms, .. }
             | MenuNode::Link { platforms, .. } => platforms.as_deref(),
@@ -152,6 +167,13 @@ pub fn filter_menu_spec(nodes: &[MenuNode], platform: MenuPlatform) -> Vec<MenuN
                     items: filter_menu_spec(items, platform),
                 });
             }
+            MenuNode::RecentFiles { label, platforms, items } => {
+                out.push(MenuNode::RecentFiles {
+                    label: label.clone(),
+                    platforms: platforms.clone(),
+                    items: filter_menu_spec(items, platform),
+                });
+            }
             other => out.push(other.clone()),
         }
     }
@@ -170,7 +192,9 @@ fn walk<'a>(nodes: &'a [MenuNode], out: &mut Vec<&'a MenuNode>) {
     for node in nodes {
         out.push(node);
         match node {
-            MenuNode::Submenu { items, .. } | MenuNode::Themes { items, .. } => walk(items, out),
+            MenuNode::Submenu { items, .. }
+            | MenuNode::Themes { items, .. }
+            | MenuNode::RecentFiles { items, .. } => walk(items, out),
             _ => {}
         }
     }
@@ -208,6 +232,12 @@ pub fn dispatch_for(spec: &[MenuNode], id: &str) -> MenuDispatch {
             arg: Some(theme.to_string()),
         });
     }
+    if let Some(path) = id.strip_prefix(RECENT_ITEM_PREFIX) {
+        return MenuDispatch::Emit(MenuActionPayload {
+            action: OPEN_RECENT_ACTION.to_string(),
+            arg: Some(path.to_string()),
+        });
+    }
     for node in all_nodes(spec) {
         match node {
             MenuNode::Action { id: node_id, .. } if node_id == id => {
@@ -232,6 +262,13 @@ pub struct ThemeEntry {
     pub label: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RecentFileEntry {
+    pub path: String,
+    pub label: String,
+}
+
 /// Sent by the frontend whenever a checkable state changes.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -242,6 +279,8 @@ pub struct MenuSyncState {
     pub theme: String,
     #[serde(default)]
     pub themes: Vec<ThemeEntry>,
+    #[serde(default)]
+    pub recent_files: Vec<RecentFileEntry>,
 }
 
 /// Handles to the items whose state follows the app.
@@ -250,6 +289,11 @@ pub struct MenuHandles<R: Runtime> {
     theme_submenu: Option<Submenu<R>>,
     theme_items: Vec<(String, CheckMenuItem<R>)>,
     theme_list: Vec<ThemeEntry>,
+    recent_submenu: Option<Submenu<R>>,
+    recent_items: Vec<MenuItem<R>>,
+    clear_recent_item: Option<MenuItem<R>>,
+    recent_list: Vec<RecentFileEntry>,
+    recent_synced: bool,
 }
 
 pub struct MenuStateStore<R: Runtime>(pub Mutex<Option<MenuHandles<R>>>);
@@ -328,6 +372,35 @@ fn build_items<R: Runtime>(
                 handles.theme_submenu = Some(submenu.clone());
                 out.push(MenuItemKind::Submenu(submenu));
             }
+            MenuNode::RecentFiles { label, items, .. } => {
+                let empty_item = MenuItem::with_id(
+                    app,
+                    RECENT_EMPTY_ID,
+                    RECENT_EMPTY_LABEL,
+                    false,
+                    None::<&str>,
+                )?;
+                let mut children = vec![
+                    MenuItemKind::MenuItem(empty_item.clone()),
+                    MenuItemKind::Predefined(PredefinedMenuItem::separator(app)?),
+                ];
+                let trailing = build_items(app, items, handles)?;
+                for child in &trailing {
+                    if let MenuItemKind::MenuItem(mi) = child {
+                        if mi.id().as_ref() == CLEAR_RECENT_ACTION {
+                            let _ = mi.set_enabled(false);
+                            handles.clear_recent_item = Some(mi.clone());
+                        }
+                    }
+                }
+                children.extend(trailing);
+                let refs: Vec<&dyn IsMenuItem<R>> =
+                    children.iter().map(|c| c as &dyn IsMenuItem<R>).collect();
+                let submenu = Submenu::with_items(app, label, true, &refs)?;
+                handles.recent_submenu = Some(submenu.clone());
+                handles.recent_items.push(empty_item);
+                out.push(MenuItemKind::Submenu(submenu));
+            }
             MenuNode::Action { id, label, accel, check, .. } => {
                 if *check {
                     let item = CheckMenuItem::with_id(
@@ -366,6 +439,11 @@ pub fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> 
         theme_submenu: None,
         theme_items: Vec::new(),
         theme_list: Vec::new(),
+        recent_submenu: None,
+        recent_items: Vec::new(),
+        clear_recent_item: None,
+        recent_list: Vec::new(),
+        recent_synced: false,
     };
     let top = build_items(app, &menu_spec(), &mut handles)?;
     let refs: Vec<&dyn IsMenuItem<R>> = top.iter().map(|c| c as &dyn IsMenuItem<R>).collect();
@@ -428,6 +506,41 @@ fn apply_sync_state<R: Runtime>(
             item.set_checked(*id == state.theme)?;
         }
     }
+    if let Some(submenu) = handles.recent_submenu.clone() {
+        if !handles.recent_synced || state.recent_files != handles.recent_list {
+            for item in handles.recent_items.drain(..) {
+                submenu.remove(&item)?;
+            }
+            if state.recent_files.is_empty() {
+                let empty_item = MenuItem::with_id(
+                    app,
+                    RECENT_EMPTY_ID,
+                    RECENT_EMPTY_LABEL,
+                    false,
+                    None::<&str>,
+                )?;
+                submenu.insert(&empty_item, 0)?;
+                handles.recent_items.push(empty_item);
+            } else {
+                for (pos, entry) in state.recent_files.iter().enumerate() {
+                    let item = MenuItem::with_id(
+                        app,
+                        format!("{RECENT_ITEM_PREFIX}{}", entry.path),
+                        &entry.label,
+                        true,
+                        None::<&str>,
+                    )?;
+                    submenu.insert(&item, pos)?;
+                    handles.recent_items.push(item);
+                }
+            }
+            if let Some(clear_item) = &handles.clear_recent_item {
+                clear_item.set_enabled(!state.recent_files.is_empty())?;
+            }
+            handles.recent_list = state.recent_files.clone();
+            handles.recent_synced = true;
+        }
+    }
     Ok(())
 }
 
@@ -467,7 +580,9 @@ mod tests {
             assert!(!(is_sep && prev_sep), "leading or consecutive separator at index {i}");
             prev_sep = is_sep;
             match node {
-                MenuNode::Submenu { items, .. } | MenuNode::Themes { items, .. } => {
+                MenuNode::Submenu { items, .. }
+                | MenuNode::Themes { items, .. }
+                | MenuNode::RecentFiles { items, .. } => {
                     assert_clean_separators(items);
                 }
                 _ => {}
@@ -492,6 +607,7 @@ mod tests {
                 };
                 assert!(seen.insert(id.clone()), "duplicate menu id {id} on {platform:?}");
                 assert!(!id.starts_with(THEME_ITEM_PREFIX));
+                assert!(!id.starts_with(RECENT_ITEM_PREFIX));
             }
             assert!(seen.len() > 30);
         }
@@ -533,6 +649,7 @@ mod tests {
             })
         };
         assert_eq!(accel_of("app.preferences").as_deref(), Some("CmdOrCtrl+,"));
+        assert_eq!(accel_of("file.quickOpen").as_deref(), Some("CmdOrCtrl+P"));
         assert_eq!(accel_of("edit.find").as_deref(), Some("CmdOrCtrl+F"));
         assert_eq!(accel_of("edit.findInFolder").as_deref(), Some("CmdOrCtrl+Shift+F"));
         assert_eq!(accel_of("view.focusMode").as_deref(), Some("F8"));
@@ -636,6 +753,7 @@ mod tests {
             assert!(checks.contains(id), "{id} should be checkable");
         }
         assert!(all_nodes(&spec).iter().any(|n| matches!(n, MenuNode::Themes { .. })));
+        assert!(all_nodes(&spec).iter().any(|n| matches!(n, MenuNode::RecentFiles { .. })));
     }
 
     #[test]
@@ -646,10 +764,25 @@ mod tests {
             MenuDispatch::Emit(MenuActionPayload { action: "file.save".into(), arg: None })
         );
         assert_eq!(
+            dispatch_for(&spec, "file.quickOpen"),
+            MenuDispatch::Emit(MenuActionPayload { action: "file.quickOpen".into(), arg: None })
+        );
+        assert_eq!(
+            dispatch_for(&spec, "file.clearRecent"),
+            MenuDispatch::Emit(MenuActionPayload { action: "file.clearRecent".into(), arg: None })
+        );
+        assert_eq!(
             dispatch_for(&spec, "theme:custom:night"),
             MenuDispatch::Emit(MenuActionPayload {
                 action: SET_THEME_ACTION.into(),
                 arg: Some("custom:night".into())
+            })
+        );
+        assert_eq!(
+            dispatch_for(&spec, "recent:/tmp/kalamos-test/a.md"),
+            MenuDispatch::Emit(MenuActionPayload {
+                action: OPEN_RECENT_ACTION.into(),
+                arg: Some("/tmp/kalamos-test/a.md".into())
             })
         );
         assert_eq!(
@@ -669,12 +802,15 @@ mod tests {
     fn sync_state_deserializes_camel_case_with_defaults() {
         let s: MenuSyncState = serde_json::from_str(
             r#"{ "checks": { "view.focusMode": true }, "theme": "melan",
-                 "themes": [{ "id": "melan", "label": "Melan" }] }"#,
+                 "themes": [{ "id": "melan", "label": "Melan" }],
+                 "recentFiles": [{ "path": "/tmp/kalamos-test/a.md", "label": "a.md" }] }"#,
         )
         .unwrap();
         assert_eq!(s.checks.get("view.focusMode"), Some(&true));
         assert_eq!(s.themes[0].label, "Melan");
+        assert_eq!(s.recent_files.len(), 1);
+        assert_eq!(s.recent_files[0].path, "/tmp/kalamos-test/a.md");
         let empty: MenuSyncState = serde_json::from_str("{}").unwrap();
-        assert!(empty.checks.is_empty() && empty.themes.is_empty());
+        assert!(empty.checks.is_empty() && empty.themes.is_empty() && empty.recent_files.is_empty());
     }
 }

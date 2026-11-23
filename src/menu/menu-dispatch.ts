@@ -34,6 +34,12 @@ export type MenuNode =
       items: MenuNode[];
     }
   | {
+      type: "recentFiles";
+      label: string;
+      platforms?: MenuPlatform[];
+      items: MenuNode[];
+    }
+  | {
       type: "action";
       id: string;
       label: string;
@@ -74,6 +80,8 @@ export function filterMenuSpec(
     if (node.type === "submenu") {
       out.push({ ...node, items: filterMenuSpec(node.items, platform) });
     } else if (node.type === "themes") {
+      out.push({ ...node, items: filterMenuSpec(node.items, platform) });
+    } else if (node.type === "recentFiles") {
       out.push({ ...node, items: filterMenuSpec(node.items, platform) });
     } else {
       out.push(node);
@@ -136,6 +144,8 @@ export function formatAccelerator(
 
 /** Generated per theme by the Rust side; carries the theme id as `arg`. */
 export const SET_THEME_ACTION = "view.setTheme";
+/** #104: generated per recent file by the Rust side; carries the file path as `arg`. */
+export const OPEN_RECENT_ACTION = "file.openRecent";
 /** A menu event this soon after a handled keydown of the same shortcut is that key press. */
 export const DUPLICATE_WINDOW_MS = 500;
 /**
@@ -160,7 +170,11 @@ export function menuActions(
   const walk = (nodes: MenuNode[]) => {
     for (const node of nodes) {
       if (node.type === "action") out.push(node);
-      else if (node.type === "submenu" || node.type === "themes")
+      else if (
+        node.type === "submenu" ||
+        node.type === "themes" ||
+        node.type === "recentFiles"
+      )
         walk(node.items);
     }
   };

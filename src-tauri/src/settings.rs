@@ -66,6 +66,8 @@ pub struct Settings {
     pub font_size: u32,
     /// #74 preferences: content column width in px (`--k-max-width`).
     pub content_width: u32,
+    /// #104: recently opened / saved file paths (newest first, up to 20).
+    pub recent_files: Vec<String>,
 }
 
 impl Default for Settings {
@@ -90,6 +92,7 @@ impl Default for Settings {
             auto_save: true,
             font_size: DEFAULT_FONT_SIZE,
             content_width: DEFAULT_CONTENT_WIDTH,
+            recent_files: Vec::new(),
         }
     }
 }
@@ -191,6 +194,7 @@ mod tests {
         assert_eq!(v["autoSave"], true);
         assert_eq!(v["fontSize"], 17);
         assert_eq!(v["contentWidth"], 720);
+        assert_eq!(v["recentFiles"], serde_json::json!([]));
     }
 
     #[test]
@@ -217,6 +221,10 @@ mod tests {
             auto_save: false,
             font_size: 20,
             content_width: 960,
+            recent_files: vec![
+                "/tmp/kalamos-test/Notes/a.md".to_string(),
+                "/tmp/kalamos-test/Notes/b.md".to_string(),
+            ],
         };
         set_settings_in(dir.path(), &updated).expect("set_settings");
         let loaded = get_settings_in(dir.path()).expect("get_settings");
@@ -449,5 +457,32 @@ mod tests {
 
         let loaded = get_settings_in(dir.path()).expect("fallback to defaults");
         assert_eq!(loaded, Settings::default());
+    }
+
+    #[test]
+    fn reads_settings_without_recent_files_and_roundtrips_them() {
+        let dir = tempdir().expect("tempdir");
+        let settings_path = dir.path().join("settings.json");
+        fs::write(
+            &settings_path,
+            r#"{ "theme": "papyros", "fontSize": 18, "contentWidth": 800 }"#,
+        )
+        .expect("write settings without recentFiles");
+
+        let mut loaded = get_settings_in(dir.path()).expect("load settings");
+        assert!(loaded.recent_files.is_empty());
+
+        loaded.recent_files = vec![
+            "/tmp/kalamos-test/a.md".to_string(),
+            "/tmp/kalamos-test/sub/b.md".to_string(),
+        ];
+        set_settings_in(dir.path(), &loaded).expect("save settings");
+        let raw: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(&settings_path).unwrap()).unwrap();
+        assert_eq!(
+            raw["recentFiles"],
+            serde_json::json!(["/tmp/kalamos-test/a.md", "/tmp/kalamos-test/sub/b.md"])
+        );
+        assert_eq!(get_settings_in(dir.path()).unwrap(), loaded);
     }
 }

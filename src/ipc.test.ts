@@ -7,6 +7,7 @@ import {
   type FsChangedPayload,
   getSettings,
   listFiles,
+  listMarkdownPaths,
   listRecovery,
   listThemes,
   onFsChanged,
@@ -109,12 +110,29 @@ describe("ipc in-memory mock (api.yaml contract)", () => {
       autoSave: true,
       fontSize: 17,
       contentWidth: 720,
+      recentFiles: [],
     });
 
     await setSettings({ ...updated, focusMode: true, typewriterMode: true });
     expect(await getSettings()).toMatchObject({
       focusMode: true,
       typewriterMode: true,
+    });
+
+    // #104: listMarkdownPaths lists only Markdown files and skips hidden/node_modules.
+    seedMockDir("/tmp/kalamos-test/qo");
+    seedMockFile("/tmp/kalamos-test/qo/a.md", "# A");
+    seedMockFile("/tmp/kalamos-test/qo/sub/b.markdown", "# B");
+    seedMockFile("/tmp/kalamos-test/qo/.hidden/c.md", "# Hidden");
+    seedMockFile("/tmp/kalamos-test/qo/node_modules/pkg/d.md", "# Pkg");
+    seedMockFile("/tmp/kalamos-test/qo/notes.txt", "txt");
+    const listed = await listMarkdownPaths("/tmp/kalamos-test/qo");
+    expect(listed).toEqual({
+      paths: [
+        "/tmp/kalamos-test/qo/a.md",
+        "/tmp/kalamos-test/qo/sub/b.markdown",
+      ],
+      truncated: false,
     });
 
     // IM-05: the app can never set the upload command / args (only the file can)…
