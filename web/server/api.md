@@ -19,6 +19,7 @@ The service has no user authentication. Do not expose it off the local machine. 
 | --- | --- |
 | `GET /api/health` | Returns `{ "ok": true }` when the API can query PostgreSQL. |
 | `GET /api/documents?trash=1&q=…` | Array of `{id,path,revision,deleted,updatedAt}`. Omit `trash=1` for active documents. `q` is a case-insensitive literal substring of the path or body. |
+| `GET /api/search?q=…&case=1&word=1&regex=1` | `{hits,truncated}`. Searches saved document contents line by line, excluding trash. The three options are independent and are off by default. See details below. |
 | `POST /api/documents` | `{path,content,attachments?:[{path,mime,data}]}`. Returns the created document, including `content`. Creation and attachment writes commit together or not at all. |
 | `GET /api/documents/:id` | Returns a document including its `content`, even in trash. |
 | `PATCH /api/documents/:id` | `{revision,content?,path?,deleted?}`. Supply at least one change. Returns the updated document with its new revision. A stale revision or a path used by another active document returns 409. Trash releases the active path; restoration needs a free path. |
@@ -30,5 +31,9 @@ The service has no user authentication. Do not expose it off the local machine. 
 | `POST /api/convert/export` | `{format,content,path}` → binary download. A null or omitted path means no current document path. |
 | `POST /api/convert/import` | `{name,data}` → `{content,attachments}`. Convert first, then use `POST /api/documents` to save the result. |
 | `POST /api/convert/upload` | `{path}` → `{url}` when the operator configured an uploader. |
+
+Workspace content search accepts at most 1,024 UTF-8 bytes of query text. Search is literal and case-insensitive by default. Whole-word mode excludes matches continued by adjacent alphanumeric characters or underscores. Regex mode uses PostgreSQL advanced regular expressions, not the desktop Rust regex dialect. It ignores zero-length matches; for example, `^` alone gives no hits. Invalid patterns return 422. The search statement has a one-second deadline (408 on timeout).
+
+The API returns up to 1,000 hits. `truncated` is true only if more hits matched. Each hit contains `{id,path,revision,line,column,length,before,match,after}`. Line and column start at 1; columns and lengths count UTF-16 code units so the editor can select the match. `before`, `match`, and `after` are bounded snippets, not full lines. Use the returned revision to check that the editor still shows the searched version.
 
 Errors return `{error}` with an HTTP status. If the connection drops while PostgreSQL commits a save, the server may not know whether it committed. Check the current revision before retrying. Workspace paths are not file system paths. Use relative, slash-separated names with no empty, `.` or `..` segments. Paths are case-sensitive. Attachment and conversion input `data` is padded base64, not a data URL. The server checks image signatures and supports PNG, JPEG, GIF, WebP, AVIF, BMP and ICO. It rejects SVG. Request JSON is limited to 32 MiB, Markdown to 8 MiB, each image to 10 MiB, and settings to 256 KiB.

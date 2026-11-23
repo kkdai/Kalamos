@@ -21,6 +21,7 @@ import {
   jumpToHeadingSlug,
   resolveRelativeMarkdownPath,
 } from "../../src/editor/lists";
+import { openFind } from "../../src/editor/search";
 import { createWordCounter } from "../../src/editor/word-count-view";
 import { prepareCandidates, searchQuickOpen } from "../../src/quick-open/fuzzy";
 import {
@@ -34,6 +35,7 @@ import {
   type DocumentSummary,
   download,
   json,
+  RequestError,
   readMarkdown,
   type StoredDocument,
 } from "./api";
@@ -51,6 +53,7 @@ import {
   bindWorkspaceControls,
   type WorkspaceView,
 } from "./workspace-controls";
+import { bindWorkspaceSearch } from "./workspace-search";
 
 function element<T extends HTMLElement = HTMLElement>(id: string): T {
   const node = document.getElementById(id);
@@ -189,6 +192,7 @@ const editor = createEditor({
       report(error);
     }
   },
+  acceptsPastedImage: (file) => Boolean(imageType(file)),
   onPasteImages: (files, view) => {
     void insertImages(files, view.state.selection.main.head).catch(report);
   },
@@ -315,8 +319,8 @@ async function openDocument(id: string, supplied?: StoredDocument) {
   };
   tabs.set(id, doc);
   activate(doc);
-  const draft = readDraft(id);
-  if (draft && draft.content !== record.content) {
+  const draft = readDraft(record);
+  if (draft) {
     const message =
       draft.revision === record.revision
         ? "有一份尚未寫入資料庫的草稿。要救回嗎？"
@@ -326,6 +330,8 @@ async function openDocument(id: string, supplied?: StoredDocument) {
         if (active !== doc) return;
         editor.setContent(draft.content, { dirty: true });
         doc.session = editor.getSession();
+        doc.recoveredDraft = draft;
+        persistDraft(doc, editor);
         wordCounter.flush();
         status("已救回草稿；尚未儲存");
         renderTabs();
@@ -336,7 +342,7 @@ async function openDocument(id: string, supplied?: StoredDocument) {
         );
         if (path) {
           const restored = await createDocument(path, draft.content);
-          discardDraft(id);
+          discardDraft(draft.key, draft.snapshot);
           await openDocument(restored.id, restored);
           await refreshDocuments();
         }
@@ -374,15 +380,24 @@ async function save(doc: OpenDocument) {
       status(`尚未儲存：${error instanceof Error ? error.message : error}`);
   }
   renderTabs();
+  if (viewMode === "search") workspaceSearch.refresh();
 }
 
 async function closeTab(doc: OpenDocument) {
   if (uploadTab === doc) return status("請等待圖片上傳完成");
-  if (
-    editor.isSessionDirty(doc.session) &&
-    !(await decide("文件尚未儲存。關閉分頁但保留瀏覽器中的草稿？", "關閉分頁"))
-  )
-    return;
+  if (editor.isSessionDirty(doc.session)) {
+    if (!persistDraft(doc, editor)) {
+      status("瀏覽器無法保存草稿；請先儲存或下載目前內容。");
+      return;
+    }
+    if (
+      !(await decide(
+        "文件尚未儲存。關閉分頁但保留瀏覽器中的草稿？",
+        "關閉分頁",
+      ))
+    )
+      return;
+  }
   window.clearTimeout(doc.timer);
   tabs.delete(doc.record.id);
   if (active === doc) activate(Array.from(tabs.values()).at(-1) ?? null);
@@ -456,16 +471,20 @@ function renderOutline() {
 async function refreshDocuments() {
   const sequence = ++pendingList;
   const mode = viewMode;
-  const query = new URLSearchParams({ q: search.value });
+  if (mode === "search") workspaceSearch.refresh();
+  const query = new URLSearchParams({
+    q: mode === "search" ? "" : search.value,
+  });
   if (mode === "trash") query.set("trash", "1");
   const [all, match] = await Promise.all([
     json<DocumentSummary[]>("documents"),
-    mode === "trash" || search.value
+    mode === "trash" || (mode !== "search" && search.value)
       ? json<DocumentSummary[]>(`documents?${query}`)
       : null,
   ]);
   if (sequence !== pendingList) return;
   catalog = all;
+  if (mode === "search") return;
   if (mode === "outline" && !search.value) return renderOutline();
   const list = document.createElement("ul");
   const branches = new Map<string, HTMLUListElement>([["", list]]);
@@ -513,12 +532,12 @@ async function restore(record: DocumentSummary) {
   status("已還原");
 }
 
+const markdownName = /\.(md|markdown|mdown|mkd|mkdn|mdwn)$/i;
+
 async function importFiles(files: File[], folder = false) {
   const entryPath = (file: File) =>
     folder ? file.webkitRelativePath || file.name : file.name;
-  const markdown = files.filter((file) =>
-    /\.(md|markdown|mdown|mkd|mkdn|mdwn)$/i.test(file.name),
-  );
+  const markdown = files.filter((file) => markdownName.test(file.name));
   if (!markdown.length) return status("沒有可匯入的 Markdown 檔");
   const attachments = folder
     ? await Promise.all(
@@ -528,6 +547,7 @@ async function importFiles(files: File[], folder = false) {
       )
     : [];
   let imported = 0;
+  let lastImportedId: string | undefined;
   try {
     for (const file of markdown) {
       const record = await createDocument(
@@ -536,6 +556,7 @@ async function importFiles(files: File[], folder = false) {
         imported === 0 ? attachments : [],
       );
       imported++;
+      lastImportedId = record.id;
       await openDocument(record.id, record);
     }
   } catch (error) {
@@ -547,6 +568,7 @@ async function importFiles(files: File[], folder = false) {
     if (imported) await refreshDocuments();
   }
   status(`已匯入 ${imported} 份 Markdown`);
+  return lastImportedId;
 }
 
 const imageTypes: Record<string, string> = {
@@ -581,10 +603,8 @@ async function insertImages(files: File[], position: number) {
   for (const file of files) {
     const name = file.name || `image.${file.type.split("/").at(-1)}`;
     const relative = `assets/${crypto.randomUUID().slice(0, 8)}-${name}`;
-    const path = resolveRelativeMarkdownPath(
-      `/${doc.record.path}`,
-      relative,
-    ).slice(1);
+    const base = doc.record.path.slice(0, doc.record.path.lastIndexOf("/") + 1);
+    const path = `${base}${relative}`;
     await json("assets", "POST", await attachment(file, path));
     const encoded = relative.split("/").map(encodeURIComponent).join("/");
     paths.push(encoded.replaceAll("(", "%28").replaceAll(")", "%29"));
@@ -607,6 +627,58 @@ function fileInput(id: string, read: (files: File[]) => Promise<unknown>) {
 
 fileInput("markdown-files", (files) => importFiles(files));
 fileInput("folder-files", (files) => importFiles(files, true));
+let reimportTarget: OpenDocument | null = null;
+fileInput("reimport-file", async ([file]) => {
+  const doc = reimportTarget;
+  if (!doc || active !== doc) return;
+  const content = await readMarkdown(file);
+  if (content === doc.record.content && !editor.isSessionDirty(doc.session)) {
+    status("本機文件與已儲存內容相同");
+    return;
+  }
+  const revision = doc.record.revision;
+  const original = editor.getSessionContent(doc.session);
+  if (
+    !(await decide(
+      `用 ${file.name} 的內容取代工作區中的 ${doc.record.path}？本機原檔不會變更。`,
+      "重新匯入",
+    ))
+  )
+    return;
+  await updateDocument(
+    doc,
+    () => {
+      if (
+        tabs.get(doc.record.id) !== doc ||
+        doc.record.revision !== revision ||
+        editor.isSessionDirty(doc.session)
+      ) {
+        throw new Error(
+          "文件狀態已變更；請先儲存或另存編輯中的內容，再重新匯入。",
+        );
+      }
+      return { content };
+    },
+    editor,
+    (record) => {
+      if (editor.getSessionContent(doc.session) !== original) return;
+      if (active === doc) {
+        editor.setContent(record.content);
+        wordCounter.flush();
+        if (viewMode === "outline" && !search.value) renderOutline();
+      } else {
+        doc.session = editor.createSession(record.content);
+      }
+    },
+  );
+  renderTabs();
+  await refreshDocuments();
+  status(
+    editor.isSessionDirty(doc.session)
+      ? "已重新匯入；較新的編輯尚未儲存"
+      : "已重新匯入",
+  );
+});
 fileInput("attachment-file", async ([file]) => {
   const doc = active;
   if (!doc) return;
@@ -614,10 +686,7 @@ fileInput("attachment-file", async ([file]) => {
     return insertImages([file], editor.view.state.selection.main.head);
   const path = await askPath(
     "匯入圖片附件",
-    resolveRelativeMarkdownPath(
-      `/${doc.record.path}`,
-      `assets/${file.name}`,
-    ).slice(1),
+    `${doc.record.path.slice(0, doc.record.path.lastIndexOf("/") + 1)}assets/${file.name}`,
   );
   if (!path) return;
   await json("assets", "POST", await attachment(file, path));
@@ -636,23 +705,53 @@ fileInput("conversion-file", async ([file]) => {
 });
 let insertAttachment = false;
 
-container.addEventListener("dragover", (event) => {
-  if (active && event.dataTransfer?.types.includes("Files"))
+const editorPane = element("empty-workspace").parentElement;
+editorPane?.addEventListener("dragover", (event) => {
+  if (event.dataTransfer?.types.includes("Files")) event.preventDefault();
+});
+editorPane?.addEventListener(
+  "drop",
+  (event) => {
+    const files = Array.from(event.dataTransfer?.files ?? []);
+    if (!files.length) return;
+    // File drops belong to the workspace, not CodeMirror's text-file reader.
+    event.stopPropagation();
     event.preventDefault();
-});
-container.addEventListener("drop", (event) => {
-  const files = Array.from(event.dataTransfer?.files ?? []);
-  if (!files.length) return;
-  event.preventDefault();
-  if (files.some(imageType)) {
-    const position =
-      editor.view.posAtCoords({ x: event.clientX, y: event.clientY }) ??
-      editor.view.state.selection.main.head;
-    void insertImages(files.filter(imageType), position).catch(report);
-  } else {
-    void importFiles(files).catch(report);
-  }
-});
+    const images = files.filter(imageType);
+    const markdown = files.filter((file) => markdownName.test(file.name));
+    const target = active;
+    const position = target
+      ? (editor.view.posAtCoords({ x: event.clientX, y: event.clientY }) ??
+        editor.view.state.selection.main.head)
+      : 0;
+    if (markdown.length) {
+      void (async () => {
+        let imageError: unknown;
+        if (target && images.length) {
+          try {
+            await insertImages(images, position);
+          } catch (error) {
+            imageError = error;
+          }
+        }
+        const id = await importFiles(markdown);
+        if (!target && images.length && id && active?.record.id === id) {
+          await insertImages(images, editor.view.state.selection.main.head);
+        }
+        if (imageError) report(imageError);
+      })().catch(report);
+    } else if (images.length && target) {
+      void insertImages(images, position).catch(report);
+    } else {
+      status(
+        images.length
+          ? "請先新建或開啟文件，再插入圖片"
+          : "沒有可匯入的 Markdown 或圖片檔",
+      );
+    }
+  },
+  { capture: true },
+);
 
 search.addEventListener("input", () => {
   window.clearTimeout(searchTimer);
@@ -661,8 +760,24 @@ search.addEventListener("input", () => {
     150,
   );
 });
+const workspaceSearch = bindWorkspaceSearch({
+  parent: element("workspace-content-search"),
+  editor: editor.view,
+  openDocument: async (id) => {
+    await openDocument(id);
+    return active?.record.id === id && !editor.isSessionDirty(active.session)
+      ? active.record.revision
+      : null;
+  },
+  onError: report,
+});
 bindWorkspaceControls((mode) => {
   viewMode = mode;
+  const searching = mode === "search";
+  element("workspace-filter").hidden = searching;
+  element("workspace-documents").hidden = searching;
+  element("workspace-content-search").hidden = !searching;
+  if (searching) workspaceSearch.focusInput();
   void refreshDocuments().catch(report);
 });
 editor.view.dispatch({
@@ -682,6 +797,29 @@ onClick("import-folder", () => element("folder-files").click());
 onClick("save-document", () => active && save(active));
 onClick("source-mode", () => editor.toggleSourceMode());
 onClick("download-document", downloadCurrent);
+onClick("find-document", () => active && openFind(editor.view));
+onClick("save-copy", async () => {
+  const doc = active;
+  if (!doc) return;
+  const suggested = doc.record.path.replace(/(?:\.\w+)?$/, "-copy.md");
+  const path = await askPath("另存新文件", suggested);
+  if (!path) return;
+  const copy = await createDocument(
+    path,
+    editor.getSessionContent(doc.session),
+  );
+  await openDocument(copy.id, copy);
+  await refreshDocuments();
+});
+onClick("reimport-document", () => {
+  if (!active) return;
+  if (editor.isSessionDirty(active.session)) {
+    status("請先儲存目前編輯，再重新匯入。");
+    return;
+  }
+  reimportTarget = active;
+  element("reimport-file").click();
+});
 onClick("rename-document", async () => {
   const doc = active;
   if (!doc) return;
@@ -731,7 +869,7 @@ onClick("upload-image", async () => {
     !doc ||
     uploadTab ||
     !(await decide(
-      "將游標附近的本機圖片傳給已設定的圖床？若未選取圖片，將上傳文件中所有本機圖片。",
+      "將游標附近的本機圖片傳給管理者設定的圖床？若未選取圖片，將上傳文件中所有本機圖片。",
       "上傳",
     ))
   )
@@ -745,7 +883,22 @@ onClick("upload-image", async () => {
       notConfiguredMessage: "未設定圖床",
       upload: async (paths) => ({
         urls: await Promise.all(
-          paths.map((path) => uploadImage(path.replace(/^\//, ""))),
+          paths.map(async (path) => {
+            try {
+              return await uploadImage(path.replace(/^\//, ""));
+            } catch (error) {
+              if (
+                error instanceof RequestError &&
+                error.status === 503 &&
+                error.message.startsWith("Image upload is not configured")
+              ) {
+                throw new Error(
+                  "尚未設定圖床；請由管理者在 API 設定 KALAMOS_UPLOAD_COMMAND。",
+                );
+              }
+              throw error;
+            }
+          }),
         ),
       }),
       setStatus: status,
@@ -882,6 +1035,14 @@ window.addEventListener("keydown", (event) => {
     return;
   const mod = event.ctrlKey || event.metaKey;
   const key = event.key.toLowerCase();
+  if (mod && event.shiftKey && key === "f") {
+    event.preventDefault();
+    if (element("workspace-sidebar").hidden) element("toggle-sidebar").click();
+    document
+      .querySelector<HTMLButtonElement>('#workspace-view [data-view="search"]')
+      ?.click();
+    return;
+  }
   const trigger =
     mod && key === "s"
       ? event.shiftKey
@@ -903,6 +1064,13 @@ window.addEventListener("keydown", (event) => {
   if (trigger === "focus") editor.toggleFocusMode();
   else if (trigger === "typewriter") editor.toggleTypewriterMode();
   else element(trigger).click();
+});
+
+window.addEventListener("beforeunload", (event) => {
+  const needsWarning = Array.from(tabs.values()).some(
+    (tab) => editor.isSessionDirty(tab.session) && !persistDraft(tab, editor),
+  );
+  if (needsWarning) event.preventDefault();
 });
 
 async function init() {

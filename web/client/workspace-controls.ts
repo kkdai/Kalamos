@@ -1,4 +1,4 @@
-export type WorkspaceView = "tree" | "list" | "outline" | "trash";
+export type WorkspaceView = "tree" | "list" | "outline" | "search" | "trash";
 
 export function bindWorkspaceControls(
   onViewChange: (view: WorkspaceView) => void,
@@ -31,6 +31,7 @@ export function bindWorkspaceControls(
         view !== "tree" &&
         view !== "list" &&
         view !== "outline" &&
+        view !== "search" &&
         view !== "trash"
       )
         return;

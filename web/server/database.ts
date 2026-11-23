@@ -7,6 +7,7 @@ import type {
   WorkspaceDocument,
 } from "../shared/api.ts";
 import { type Asset, HttpError, isObject } from "./input.ts";
+import { type SearchOptions, searchDocumentContents } from "./search.ts";
 
 const migrations = new URL("./migrations/", import.meta.url);
 const summary = 'id, path, revision, deleted, updated_at AS "updatedAt"';
@@ -127,6 +128,10 @@ export function workspace(pool: Pool) {
     query(() => transaction(pool, work));
   return {
     health: () => query(() => pool.query("SELECT 1")),
+    search: (options: SearchOptions) =>
+      query(() =>
+        transaction(pool, (client) => searchDocumentContents(client, options)),
+      ),
     list: (trash: boolean, search: string) =>
       query(async () => {
         const { rows } = await pool.query<DatabaseRow<DocumentSummary>>(

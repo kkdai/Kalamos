@@ -861,7 +861,11 @@ export type PasteImagesHandler = (
 ) => void | Promise<void>;
 
 /** Intercepts pastes that carry image files and hands them to `handler`. */
-export function imagePasteHandler(handler: PasteImagesHandler): Extension {
+export function imagePasteHandler(
+  handler: PasteImagesHandler,
+  accepts: (file: File) => boolean = (file) =>
+    Boolean(imageExtFromMime(file.type)),
+): Extension {
   return EditorView.domEventHandlers({
     paste(event, view) {
       const data = event.clipboardData;
@@ -870,11 +874,11 @@ export function imagePasteHandler(handler: PasteImagesHandler): Extension {
       for (const item of Array.from(data.items ?? [])) {
         if (item.kind !== "file") continue;
         const file = item.getAsFile();
-        if (file && imageExtFromMime(file.type)) files.push(file);
+        if (file && accepts(file)) files.push(file);
       }
       if (files.length === 0) {
         for (const file of Array.from(data.files ?? [])) {
-          if (imageExtFromMime(file.type)) files.push(file);
+          if (accepts(file)) files.push(file);
         }
       }
       if (files.length === 0) return false;

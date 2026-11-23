@@ -17,6 +17,7 @@ import {
   text,
   workspacePath,
 } from "./input.ts";
+import { searchOptions } from "./search.ts";
 import { sendStatic } from "./static.ts";
 
 const dist = fileURLToPath(new URL("../dist", import.meta.url));
@@ -123,6 +124,14 @@ export function createHttpServer(
         allowMethods(request, response, "GET");
         await db.health();
         return sendJson(response, 200, { ok: true });
+      }
+      case "/api/search": {
+        allowMethods(request, response, "GET");
+        return sendJson(
+          response,
+          200,
+          await db.search(searchOptions(url.searchParams)),
+        );
       }
       case "/api/documents": {
         allowMethods(request, response, "GET", "POST");

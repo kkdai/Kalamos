@@ -16,12 +16,14 @@
           <button type="button" data-view="tree" aria-pressed="true">檔案樹</button>
           <button type="button" data-view="list" aria-pressed="false">檔案列表</button>
           <button type="button" data-view="outline" aria-pressed="false">大綱</button>
+          <button type="button" data-view="search" aria-pressed="false">搜尋</button>
           <button type="button" data-view="trash" aria-pressed="false">垃圾桶</button>
         </div>
-        <div class="workspace-search-field">
+        <div id="workspace-filter" class="workspace-search-field">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="5.5"/><path d="m15 15 5 5"/></svg>
           <input id="workspace-search" type="search" aria-label="搜尋工作區" placeholder="搜尋工作區" />
         </div>
+        <div id="workspace-content-search" hidden></div>
         <div id="workspace-documents"></div>
       </aside>
       <div class="workspace-pane">
@@ -54,6 +56,9 @@
               <button id="import-converted" type="button">匯入其他格式</button>
               <hr />
               <button id="download-document" type="button" data-document>下載 Markdown</button>
+              <button id="save-copy" type="button" data-document>另存新文件</button>
+              <button id="find-document" type="button" data-document>在文件中尋找</button>
+              <button id="reimport-document" type="button" data-document>從本機重新匯入</button>
               <button id="convert-document" type="button" data-document>匯出其他格式</button>
               <button id="import-attachment" type="button" data-document>匯入圖片附件</button>
               <button id="insert-image" type="button" data-document>插入圖片</button>
@@ -80,6 +85,7 @@
 
     <input id="markdown-files" type="file" accept=".md,.markdown,.mdown,.mkd,.mkdn,.mdwn" multiple hidden />
     <input id="folder-files" type="file" webkitdirectory multiple hidden />
+    <input id="reimport-file" type="file" accept=".md,.markdown,.mdown,.mkd,.mkdn,.mdwn" hidden />
     <input id="attachment-file" type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/avif,image/bmp,image/x-icon" hidden />
     <input id="conversion-file" type="file" accept=".docx,.odt,.epub,.tex,.latex,.html,.htm,.wiki,.mediawiki" hidden />
 

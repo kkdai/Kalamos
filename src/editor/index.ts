@@ -89,6 +89,7 @@ export interface CreateEditorOptions {
   onAutoPairMarkdownChange?: (enabled: boolean) => void;
   onOpenRelativeLink?: RelativeLinkHandler;
   onPasteImages?: PasteImagesHandler;
+  acceptsPastedImage?: (file: File) => boolean;
   /** IM-04: the image root (setting or front matter) was refused as too broad. */
   onImageRootTooBroad?: ImageRootTooBroadHandler;
 }
@@ -291,7 +292,7 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
       ? [imageRootTooBroadHandlerFacet.of(options.onImageRootTooBroad)]
       : []),
     ...(options.onPasteImages
-      ? [imagePasteHandler(options.onPasteImages)]
+      ? [imagePasteHandler(options.onPasteImages, options.acceptsPastedImage)]
       : []),
     history(),
     EditorView.lineWrapping,

@@ -88,7 +88,7 @@ body {
 
 #workspace-view {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   padding-inline: 0.4rem;
   border-block-end: 1px solid var(--k-divider);
 }
@@ -146,11 +146,103 @@ body {
   color: var(--k-text-muted);
 }
 
-#workspace-documents {
+#workspace-filter[hidden] {
+  display: none;
+}
+
+#workspace-documents,
+#workspace-content-search {
   overflow: auto;
   padding-block: 0.25rem 0.75rem;
   overscroll-behavior: contain;
   scrollbar-width: thin;
+}
+
+#workspace-content-search {
+  padding-inline: 0.6rem;
+}
+
+#workspace-content-search label {
+  font: inherit;
+}
+
+.workspace-content-search-field {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.workspace-content-search-query {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.25rem;
+}
+
+.workspace-content-search-query input {
+  min-inline-size: 0;
+  min-block-size: 28px;
+}
+
+:where(.workspace-content-search-query, .workspace-content-search-options)
+  button {
+  min-block-size: 24px;
+  padding: 0.2rem 0.4rem;
+  border: 1px solid var(--k-divider);
+  border-radius: 4px;
+  background: var(--k-bg);
+}
+
+.workspace-content-search-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem;
+  margin-block-start: 0.35rem;
+}
+
+.workspace-content-search-options button[aria-pressed="true"] {
+  border-color: var(--k-accent);
+  font-weight: 600;
+}
+
+.workspace-content-search-status {
+  color: var(--k-text-muted);
+}
+
+.workspace-content-search-file {
+  overflow-wrap: anywhere;
+  font-weight: 600;
+}
+
+.workspace-content-search-hits {
+  margin: 0 0 0.45rem;
+  padding: 0;
+  list-style: none;
+}
+
+.workspace-content-search-hit {
+  display: flex;
+  gap: 0.35rem;
+  inline-size: 100%;
+  padding: 0.23rem;
+  border: 0;
+  background: transparent;
+  text-align: start;
+}
+
+.workspace-content-search-position {
+  color: var(--k-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.workspace-content-search-snippet {
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: pre;
+}
+
+.workspace-content-search-snippet mark {
+  background: var(--k-selection-bg);
+  color: var(--k-text);
 }
 
 #workspace-documents ul {
@@ -353,6 +445,9 @@ body {
 
 #editor-container .cm-editor .cm-scroller .cm-content {
   min-inline-size: 0;
+}
+
+#editor-container .cm-editor:not(.k-typewriter-mode) .cm-scroller .cm-content {
   padding-block-start: clamp(1.25rem, 3vh, 2.5rem);
 }
 
