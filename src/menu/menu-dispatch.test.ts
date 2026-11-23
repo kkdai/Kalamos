@@ -265,7 +265,11 @@ function collectPredefined(nodes: MenuNode[]): string[] {
   const out: string[] = [];
   for (const node of nodes) {
     if (node.type === "predefined") out.push(node.item);
-    else if (node.type === "submenu" || node.type === "themes")
+    else if (
+      node.type === "submenu" ||
+      node.type === "themes" ||
+      node.type === "recentFiles"
+    )
       out.push(...collectPredefined(node.items));
   }
   return out;
@@ -277,7 +281,11 @@ function assertCleanSeparators(nodes: MenuNode[]): void {
     const isSep = node.type === "predefined" && node.item === "separator";
     expect(isSep && prevSep).toBe(false);
     prevSep = isSep;
-    if (node.type === "submenu" || node.type === "themes") {
+    if (
+      node.type === "submenu" ||
+      node.type === "themes" ||
+      node.type === "recentFiles"
+    ) {
       assertCleanSeparators(node.items);
     }
   }

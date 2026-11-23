@@ -64,6 +64,14 @@ export interface FileEntry {
   excerpt: string;
 }
 
+/** #104: lightweight path listing for Quick Open (Rust `list_markdown_paths`). */
+export interface MarkdownPathsResult {
+  paths: string[];
+  truncated: boolean;
+}
+
+export const MAX_QUICK_OPEN_PATHS = 20_000;
+
 export interface FsChangedPayload {
   root: string;
   paths: string[];
@@ -116,6 +124,8 @@ export interface Settings {
   fontSize?: number;
   /** #74: content column width in px (--k-max-width). */
   contentWidth?: number;
+  /** #104: recently opened / saved file paths (newest first, up to 20). */
+  recentFiles?: string[];
 }
 
 export type StartupBehavior = "restoreFolder" | "blank";
@@ -140,6 +150,7 @@ export const DEFAULT_SETTINGS: Settings = {
   autoSave: true,
   fontSize: 17,
   contentWidth: 720,
+  recentFiles: [],
 };
 
 export const MAX_EXCERPT_CHARS = 120;
@@ -153,8 +164,9 @@ const mockFiles = new Map<string, MockFileRecord>();
 const mockDirs = new Set<string>();
 const mockRecovery = new Map<string, RecoveryEntry>();
 const mockCustomThemes = new Map<string, string>();
-let mockSettings: Settings = { ...DEFAULT_SETTINGS };
+let mockSettings: Settings = { ...DEFAULT_SETTINGS, recentFiles: [] };
 let mockWatchedFolder: string | null = null;
+let mockListMarkdownPathsCalls = 0;
 const mockAssetFiles = new Set<string>();
 const mockAllowedAssetDirs = new Set<string>();
 const mockAllowedAssetFiles = new Set<string>();
@@ -338,8 +350,9 @@ export function resetMockState(): void {
   mockDirs.clear();
   mockRecovery.clear();
   mockCustomThemes.clear();
-  mockSettings = { ...DEFAULT_SETTINGS };
+  mockSettings = { ...DEFAULT_SETTINGS, recentFiles: [] };
   mockWatchedFolder = null;
+  mockListMarkdownPathsCalls = 0;
   lastMockTimestampMs = 0;
   mockOpenDialogHandler = null;
   mockOpenFolderDialogHandler = null;
@@ -634,6 +647,54 @@ export async function listFiles(path: string): Promise<FileEntry[]> {
   });
 
   return entries;
+}
+
+/** #104: lightweight list of Markdown file paths under `root` (Rust: list_markdown_paths). */
+export async function listMarkdownPaths(
+  root: string,
+): Promise<MarkdownPathsResult> {
+  if (isTauri()) {
+    const res = await invoke<MarkdownPathsResult>("list_markdown_paths", {
+      root,
+    });
+    return {
+      paths: res.paths.map((p) => toSlashPath(p)),
+      truncated: res.truncated,
+    };
+  }
+  mockListMarkdownPathsCalls += 1;
+  const norm = assertValidMockDir(root);
+  const prefix = norm === "/" ? "/" : `${norm}/`;
+  const all = [...mockFiles.keys()]
+    .filter((p) => {
+      if (!p.startsWith(prefix)) return false;
+      const segs = p.slice(prefix.length).split("/");
+      return !segs.some(isIgnoredName) && isMarkdownName(segs[segs.length - 1]);
+    })
+    .sort((a, b) => {
+      const sa = a.slice(prefix.length).split("/");
+      const sb = b.slice(prefix.length).split("/");
+      for (let i = 0; ; i++) {
+        const aFile = i === sa.length - 1;
+        const bFile = i === sb.length - 1;
+        if (aFile !== bFile) return aFile ? -1 : 1;
+        if (sa[i] !== sb[i]) return sa[i] < sb[i] ? -1 : 1;
+        if (aFile) return 0;
+      }
+    });
+  const truncated = all.length > MAX_QUICK_OPEN_PATHS;
+  return {
+    paths: truncated ? all.slice(0, MAX_QUICK_OPEN_PATHS) : all,
+    truncated,
+  };
+}
+
+export function getMockListMarkdownPathsCallCount(): number {
+  return mockListMarkdownPathsCalls;
+}
+
+export function resetMockListMarkdownPathsCallCount(): void {
+  mockListMarkdownPathsCalls = 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -1027,9 +1088,13 @@ export async function getSettings(): Promise<Settings> {
       ...s,
       lastFolder: toSlashPath(s.lastFolder),
       imageRootDir: toSlashPath(s.imageRootDir),
+      recentFiles: (s.recentFiles ?? []).map((p) => toSlashPath(p)),
     };
   }
-  return { ...mockSettings };
+  return {
+    ...mockSettings,
+    recentFiles: [...(mockSettings.recentFiles ?? [])],
+  };
 }
 
 export async function setSettings(settings: Settings): Promise<null> {
@@ -1064,6 +1129,9 @@ export async function setSettings(settings: Settings): Promise<null> {
     autoSave: settings.autoSave ?? DEFAULT_SETTINGS.autoSave,
     fontSize: settings.fontSize ?? DEFAULT_SETTINGS.fontSize,
     contentWidth: settings.contentWidth ?? DEFAULT_SETTINGS.contentWidth,
+    recentFiles: [
+      ...(settings.recentFiles ?? DEFAULT_SETTINGS.recentFiles ?? []),
+    ],
   };
   return null;
 }
@@ -1977,10 +2045,16 @@ export interface MenuActionPayload {
   arg?: string | null;
 }
 
+export interface RecentMenuEntry {
+  path: string;
+  label: string;
+}
+
 export interface MenuSyncState {
   checks: Record<string, boolean>;
   theme: string;
   themes: Array<{ id: string; label: string }>;
+  recentFiles?: RecentMenuEntry[];
 }
 
 type MenuActionListener = (payload: MenuActionPayload) => void | Promise<void>;

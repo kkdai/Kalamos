@@ -54,6 +54,7 @@ pub fn run() {
             files::save_file,
             tree::read_tree,
             tree::list_files,
+            tree::list_markdown_paths,
             watch::watch_folder,
             fsops::create_file,
             fsops::rename_path,

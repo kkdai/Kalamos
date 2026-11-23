@@ -52,9 +52,26 @@
       },
       {
         "type": "action",
+        "id": "file.quickOpen",
+        "label": "快速開啟…",
+        "accel": "CmdOrCtrl+P"
+      },
+      {
+        "type": "action",
         "id": "file.openFolder",
         "label": "開啟資料夾…",
         "accel": "CmdOrCtrl+Shift+O"
+      },
+      {
+        "type": "recentFiles",
+        "label": "打開最近使用",
+        "items": [
+          {
+            "type": "action",
+            "id": "file.clearRecent",
+            "label": "清除最近使用"
+          }
+        ]
       },
       { "type": "predefined", "item": "separator" },
       {

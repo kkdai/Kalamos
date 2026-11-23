@@ -94,10 +94,12 @@ import {
   importImageBytes,
   importPandoc,
   isAssetDirTooBroadError,
+  listMarkdownPaths,
   listRecovery,
   type MenuSyncState,
   type OpenFilesRequest,
   onFileDrop,
+  onFsChanged,
   onMenuAction,
   onOpenFilesRequested,
   onWindowCloseRequested,
@@ -137,6 +139,17 @@ import {
   type PreferencesController,
   type PreferencesPatch,
 } from "./preferences/preferences";
+import {
+  createQuickOpen,
+  type QuickOpenController,
+} from "./quick-open/quick-open";
+import {
+  addRecentFile,
+  recentMenuEntries,
+  removeRecentFile,
+  renameRecentFiles,
+  sanitizeRecentFiles,
+} from "./quick-open/recent-files";
 import { createSidebar, type SidebarController } from "./sidebar/sidebar";
 import { createTabBar, type TabBar } from "./tabs/tab-bar";
 import {
@@ -267,6 +280,12 @@ export interface KalamosApp {
   moveTab: (id: string, toIndex: number) => boolean;
   /** #74: Cmd+, preferences modal. */
   preferences: PreferencesController;
+  /** #104: Cmd+P Quick Open overlay. */
+  quickOpen: QuickOpenController;
+  /** #104: recently opened / saved files (newest first, up to 20). */
+  getRecentFiles: () => string[];
+  /** #104: clear recently opened files list. */
+  clearRecentFiles: () => Promise<void>;
   /** #74: native menu action dispatcher (menu-action events land here). */
   menu: MenuDispatcher;
   getZoom: () => number;
@@ -353,8 +372,14 @@ export function createKalamosApp(
 
   let pendingRecovery: RecoveryEntry | null = null;
   let unlistenClose: (() => void) | null = null;
+  let unlistenQuickOpenFs: (() => void) | null = null;
   let statusText = "";
-  let currentSettings: Settings = { ...DEFAULT_SETTINGS };
+  let currentSettings: Settings = { ...DEFAULT_SETTINGS, recentFiles: [] };
+  let recentFiles: string[] = [];
+  let cachedFolderRoot: string | null = null;
+  let cachedFolderPaths: string[] = [];
+  let cachedFolderTruncated = false;
+  let quickOpenCacheSeq = 0;
 
   function setStatus(message: string, isError = false): void {
     statusText = message;
@@ -395,6 +420,7 @@ export function createKalamosApp(
     contentToSave: string,
   ): Promise<boolean> {
     try {
+      const previousPath = tab.path;
       await saveFile(targetPath, contentToSave);
       setStatus("", false);
       if (tabs.includes(tab)) {
@@ -409,6 +435,18 @@ export function createKalamosApp(
           tab.path !== null
         ) {
           scheduleNamedAutosave(tab);
+        }
+      }
+      if (previousPath !== targetPath) {
+        recordRecentFile(targetPath);
+        if (
+          cachedFolderRoot &&
+          targetPath.startsWith(
+            cachedFolderRoot === "/" ? "/" : `${cachedFolderRoot}/`,
+          ) &&
+          !cachedFolderPaths.includes(targetPath)
+        ) {
+          void refreshQuickOpenFolderCache(cachedFolderRoot);
         }
       }
       return true;
@@ -469,10 +507,70 @@ export function createKalamosApp(
       typewriterMode: editor.isTypewriterMode(),
       autoPairBrackets: editor.isAutoPairBrackets(),
       autoPairMarkdown: editor.isAutoPairMarkdown(),
+      recentFiles: [...recentFiles],
       ...patch,
     };
     scheduleMenuSync();
     await setSettings(currentSettings).catch(() => null);
+  }
+
+  async function applyRecentFiles(
+    next: string[],
+    persist = true,
+  ): Promise<void> {
+    recentFiles = sanitizeRecentFiles(next);
+    currentSettings = { ...currentSettings, recentFiles: [...recentFiles] };
+    quickOpen.setRecentFiles(recentFiles);
+    scheduleMenuSync();
+    if (persist) {
+      const existing = await getSettings().catch(() => null);
+      await setSettings({
+        ...(existing ?? currentSettings),
+        recentFiles: [...recentFiles],
+      }).catch(() => null);
+    }
+  }
+
+  function recordRecentFile(path: string): void {
+    const next = addRecentFile(recentFiles, path);
+    if (
+      next.length === recentFiles.length &&
+      next.every((p, i) => p === recentFiles[i])
+    ) {
+      return;
+    }
+    void applyRecentFiles(next, true);
+  }
+
+  async function clearRecentFiles(): Promise<void> {
+    await applyRecentFiles([], true);
+  }
+
+  async function refreshQuickOpenFolderCache(
+    folder: string | null,
+  ): Promise<void> {
+    const seq = ++quickOpenCacheSeq;
+    if (!folder) {
+      cachedFolderRoot = null;
+      cachedFolderPaths = [];
+      cachedFolderTruncated = false;
+      quickOpen.setFolderPaths(null, [], false);
+      return;
+    }
+    try {
+      const result = await listMarkdownPaths(folder);
+      if (destroyed || seq !== quickOpenCacheSeq) return;
+      cachedFolderRoot = folder;
+      cachedFolderPaths = result.paths;
+      cachedFolderTruncated = result.truncated;
+      quickOpen.setFolderPaths(folder, result.paths, result.truncated);
+    } catch {
+      if (destroyed || seq !== quickOpenCacheSeq) return;
+      cachedFolderRoot = folder;
+      cachedFolderPaths = [];
+      cachedFolderTruncated = false;
+      quickOpen.setFolderPaths(folder, [], false);
+    }
   }
 
   const handlers = {
@@ -636,7 +734,7 @@ export function createKalamosApp(
     wordCounter.flush();
     renderTabs();
     scheduleMenuSync();
-    if (!preferences.isOpen()) view.focus();
+    if (!preferences.isOpen() && !quickOpen.isOpen()) view.focus();
   }
 
   function activateTab(id: string): boolean {
@@ -775,7 +873,8 @@ export function createKalamosApp(
 
   // Cmd+T new tab, Cmd+W close tab, Ctrl+Tab / Ctrl+Shift+Tab next / previous tab.
   const onTabKeydown = (event: KeyboardEvent) => {
-    if (event.defaultPrevented || preferences.isOpen()) return;
+    if (event.defaultPrevented || preferences.isOpen() || quickOpen.isOpen())
+      return;
     if (
       event.key === "Tab" &&
       event.ctrlKey &&
@@ -833,8 +932,25 @@ export function createKalamosApp(
       document.body,
   });
 
+  const quickOpen = createQuickOpen({
+    parent: editorContainer.parentElement ?? document.body,
+    onOpenFile: (path, mode) => openPath(path, mode),
+    onRestoreFocus: (prev) => {
+      if (
+        prev &&
+        prev.isConnected &&
+        prev.classList.contains("k-table-cell-content") &&
+        editor.view.contentDOM.contains(prev)
+      ) {
+        prev.focus();
+      } else {
+        editor.view.focus();
+      }
+    },
+  });
+
   const unbindShortcuts = bindWindowShortcuts(window, windowHandlers, () =>
-    preferences.isOpen() ? null : editor.view,
+    preferences.isOpen() || quickOpen.isOpen() ? null : editor.view,
   );
 
   const sidebar = createSidebar({
@@ -873,6 +989,13 @@ export function createKalamosApp(
           scheduleNamedAutosave(tab);
         }
       }
+      const renamedRecent = renameRecentFiles(recentFiles, from, to);
+      if (
+        renamedRecent.length !== recentFiles.length ||
+        renamedRecent.some((p, i) => p !== recentFiles[i])
+      ) {
+        void applyRecentFiles(renamedRecent, true);
+      }
       renderTabs();
     },
     onPathTrashed: (trashedPath) => {
@@ -890,12 +1013,22 @@ export function createKalamosApp(
           setStatus("檔案已移到垃圾桶，內容保留為未命名文件", false);
         }
       }
+      const prunedRecent = removeRecentFile(recentFiles, trashedPath);
+      if (prunedRecent.length !== recentFiles.length) {
+        void applyRecentFiles(prunedRecent, true);
+      }
       renderTabs();
     },
     onError: (prefix, err) => {
       setStatus(formatErrorMessage(prefix, err), true);
     },
     onLayoutChange: () => scheduleMenuSync(),
+    onFolderChange: (folder) => {
+      void refreshQuickOpenFolderCache(folder);
+    },
+    onFolderMutated: (folder) => {
+      void refreshQuickOpenFolderCache(folder);
+    },
   });
 
   const themeMenu = createThemeMenu({
@@ -1024,6 +1157,7 @@ export function createKalamosApp(
       themes: themeMenu
         .getAvailableOptions()
         .map((o) => ({ id: o.id, label: o.label })),
+      recentFiles: recentMenuEntries(recentFiles),
     };
   }
 
@@ -1066,7 +1200,10 @@ export function createKalamosApp(
 
   // Same handlers as the keyboard shortcuts (keymaps.ts / the keydown listeners below).
   const menuCommands: Record<string, MenuCommand> = {
-    "app.preferences": () => preferences.open(),
+    "app.preferences": () => {
+      quickOpen.close(false);
+      return preferences.open();
+    },
     "file.new": () => newDocument(),
     "file.newTab": () => newTab(),
     "file.closeTab": () => closeTab(),
@@ -1074,6 +1211,11 @@ export function createKalamosApp(
     "window.previousTab": () => cycleTab(-1),
     "app.quit": () => quit(),
     "file.open": () => openDocument(),
+    "file.quickOpen": () => {
+      if (!preferences.isOpen()) quickOpen.toggle();
+    },
+    "file.openRecent": (path) => (path ? openPath(path, "tab") : false),
+    "file.clearRecent": () => clearRecentFiles(),
     "file.openFolder": () => sidebar.openFolder(),
     "file.save": () => saveDocument(),
     "file.saveAs": () => saveDocumentAs(),
@@ -1122,11 +1264,26 @@ export function createKalamosApp(
   const menu = createMenuDispatcher({
     commands: menuCommands,
     target: window,
-    // While the preferences modal is open, editing commands would act on the hidden document.
+    // While preferences or Quick Open is open, editing commands would act on the hidden document.
     canRun: (action) =>
-      !(preferences.isOpen() && /^(edit|para|fmt)\./.test(action)),
+      !(
+        (preferences.isOpen() || quickOpen.isOpen()) &&
+        /^(edit|para|fmt)\./.test(action)
+      ),
     afterRun: () => scheduleMenuSync(true),
   });
+
+  // #104: Cmd+P / Ctrl+P toggles Quick Open (also offered by 檔案 > 快速開啟…).
+  const onQuickOpenKeydown = (event: KeyboardEvent) => {
+    if (event.defaultPrevented || preferences.isOpen()) return;
+    if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey)
+      return;
+    if (event.metaKey && event.ctrlKey) return;
+    if (event.code !== "KeyP" && event.key.toLowerCase() !== "p") return;
+    event.preventDefault();
+    quickOpen.toggle();
+  };
+  window.addEventListener("keydown", onQuickOpenKeydown);
 
   // Cmd+, opens the preferences (also offered by the native menu; see menu-dispatch.ts).
   const onPreferencesKeydown = (event: KeyboardEvent) => {
@@ -1135,6 +1292,7 @@ export function createKalamosApp(
       return;
     if (event.code !== "Comma" && event.key !== ",") return;
     event.preventDefault();
+    quickOpen.close(false);
     void preferences.open();
   };
   window.addEventListener("keydown", onPreferencesKeydown);
@@ -1223,7 +1381,7 @@ export function createKalamosApp(
         return;
       }
     }
-    if (preferences.isOpen()) return;
+    if (preferences.isOpen() || quickOpen.isOpen()) return;
     if (event.code === "KeyF" && !event.shiftKey) {
       event.preventDefault();
       openFind(editor.view, { replace: event.altKey });
@@ -1613,6 +1771,7 @@ export function createKalamosApp(
     const already = resolveOpenTarget(openTabStates(), active.id, path, mode);
     if (already.kind === "existing") {
       activateTab(already.id);
+      recordRecentFile(path);
       setStatus("", false);
       return true;
     }
@@ -1620,6 +1779,28 @@ export function createKalamosApp(
     try {
       content = await openFile(path);
     } catch (err) {
+      const kind = (err as { kind?: string } | null)?.kind;
+      if (kind === "NotFound") {
+        const wasRecent = recentFiles.includes(path);
+        if (wasRecent) {
+          void applyRecentFiles(removeRecentFile(recentFiles, path), true);
+        }
+        if (cachedFolderRoot && cachedFolderPaths.includes(path)) {
+          cachedFolderPaths = cachedFolderPaths.filter((p) => p !== path);
+          quickOpen.setFolderPaths(
+            cachedFolderRoot,
+            cachedFolderPaths,
+            cachedFolderTruncated,
+          );
+        }
+        if (wasRecent) {
+          setStatus(
+            `找不到檔案「${toNativePath(path)}」，已從最近開啟移除`,
+            true,
+          );
+          return false;
+        }
+      }
       setStatus(formatErrorMessage("開檔失敗", err), true);
       return false;
     }
@@ -1636,6 +1817,7 @@ export function createKalamosApp(
         showTab(tab);
       }
     }
+    recordRecentFile(path);
     setStatus("", false);
     return true;
   }
@@ -1906,10 +2088,23 @@ export function createKalamosApp(
       editor.setTypewriterMode(Boolean(settings.typewriterMode), false);
       editor.setAutoPairBrackets(settings.autoPairBrackets ?? true, false);
       editor.setAutoPairMarkdown(Boolean(settings.autoPairMarkdown), false);
+      recentFiles = sanitizeRecentFiles(settings.recentFiles);
+      quickOpen.setRecentFiles(recentFiles);
     }
     applyLayoutSettings();
     renderTabs();
     await themeMenu.init();
+    const unlistenFs = await onFsChanged(async () => {
+      const folder = sidebar.getCurrentFolder();
+      if (folder) {
+        await refreshQuickOpenFolderCache(folder);
+      }
+    }).catch(() => null);
+    if (destroyed) {
+      unlistenFs?.();
+    } else {
+      unlistenQuickOpenFs = unlistenFs;
+    }
     await sidebar.init({
       restoreFolder: settings?.startupBehavior !== "blank",
     });
@@ -1957,9 +2152,13 @@ export function createKalamosApp(
     unlistenOpenFiles = null;
     unlistenMenu?.();
     unlistenMenu = null;
+    unlistenQuickOpenFs?.();
+    unlistenQuickOpenFs = null;
     if (menuSyncTimer !== null) clearTimeout(menuSyncTimer);
     menu.destroy();
+    quickOpen.destroy();
     preferences.destroy();
+    window.removeEventListener("keydown", onQuickOpenKeydown);
     window.removeEventListener("keydown", onPreferencesKeydown);
     window.removeEventListener("keydown", onMenuShortcutKeydown);
     clearInterval(recoveryInterval);
@@ -2001,6 +2200,9 @@ export function createKalamosApp(
     cycleTab,
     moveTab,
     preferences,
+    quickOpen,
+    getRecentFiles: () => [...recentFiles],
+    clearRecentFiles,
     menu,
     getZoom: () => zoom,
     sidebar,
