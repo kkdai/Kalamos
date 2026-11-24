@@ -55,6 +55,8 @@
   "editor.diagram.unknownNode": "未知的節點類型「{{type}}」",
   "editor.dialog.cancel": "取消",
   "editor.footnote.empty": "（空白註腳）",
+  "editor.frontMatter.edit": "編輯文件資訊",
+  "editor.frontMatter.label": "文件資訊",
   "editor.image.loadFailed": "圖片載入失敗",
   "editor.image.readFailed": "無法讀取圖片",
   "editor.image.unavailable": "無法顯示圖片",

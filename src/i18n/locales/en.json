@@ -55,6 +55,8 @@
   "editor.diagram.unknownNode": "Unknown node type “{{type}}”",
   "editor.dialog.cancel": "Cancel",
   "editor.footnote.empty": "(Empty footnote)",
+  "editor.frontMatter.edit": "Edit document info",
+  "editor.frontMatter.label": "Document info",
   "editor.image.loadFailed": "Could not load image",
   "editor.image.readFailed": "Could not read image",
   "editor.image.unavailable": "Cannot display image",
