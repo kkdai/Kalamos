@@ -19,6 +19,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -34,6 +36,8 @@ jobs:
   build:
     name: Build (${{ matrix.target }})
     needs: check-version
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    environment: release
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -43,17 +47,22 @@ jobs:
             target: aarch64-apple-darwin
             artifact_name: installer-macos-aarch64
             bundles: app,dmg
+            arch_label: aarch64
           - os: macos-latest
             target: x86_64-apple-darwin
             artifact_name: installer-macos-x64
             bundles: app,dmg
+            arch_label: x64
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             artifact_name: installer-windows-x64
             bundles: nsis,msi
+            arch_label: x64
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -75,18 +84,214 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Build Tauri installers
+      # Build step runs WITHOUT TAURI_SIGNING_PRIVATE_KEY so Vite / npm / Cargo
+      # build-time dependencies can never read the signing private key.
+      - name: Build Tauri installers (unsigned)
         shell: bash
-        run: npx tauri build --target "${{ matrix.target }}" --bundles "${{ matrix.bundles }}"
+        run: npx tauri build --target "${TARGET}" --bundles "${BUNDLES}" --config '{"bundle":{"createUpdaterArtifacts":false}}'
         env:
           CI: "true"
+          TARGET: ${{ matrix.target }}
+          BUNDLES: ${{ matrix.bundles }}
 
       - name: Verify macOS code signature and DMG layout
         if: runner.os == 'macOS'
         shell: bash
+        env:
+          TARGET: ${{ matrix.target }}
         run: |
           set -euo pipefail
-          bundle_dir="src-tauri/target/${{ matrix.target }}/release/bundle"
+          bundle_dir="src-tauri/target/${TARGET}/release/bundle"
+          app_path="${bundle_dir}/macos/Kalamos.app"
+          dmg_path="$(find "${bundle_dir}/dmg" -maxdepth 1 -name '*.dmg' | head -n 1)"
+
+          test -d "$app_path"
+          test -f "$dmg_path"
+
+          echo "Verifying .app ad-hoc signature..."
+          codesign --verify --deep --strict --verbose=2 "$app_path"
+
+          echo "Verifying .dmg contains Applications symlink and valid signed .app..."
+          mount_dir="$(mktemp -d /tmp/kalamos-dmg.XXXXXX)"
+          cleanup() {
+            hdiutil detach "$mount_dir" -quiet || hdiutil detach "$mount_dir" -force -quiet || true
+            rmdir "$mount_dir" || true
+          }
+          trap cleanup EXIT
+
+          hdiutil attach -nobrowse -readonly -mountpoint "$mount_dir" "$dmg_path"
+          test -L "$mount_dir/Applications"
+          test -d "$mount_dir/Kalamos.app"
+          codesign --verify --deep --strict --verbose=2 "$mount_dir/Kalamos.app"
+
+      - name: Stage macOS installers and package updater tarball
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          TARGET: ${{ matrix.target }}
+          ARCH_LABEL: ${{ matrix.arch_label }}
+          RELEASE_VERSION: ${{ needs.check-version.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p release-artifacts
+          bundle_dir="src-tauri/target/${TARGET}/release/bundle"
+          cp "${bundle_dir}/dmg/"*.dmg release-artifacts/
+
+          # tauri-plugin-updater 2.x extracts by stripping the top-level entry
+          # (`Kalamos.app/...` -> `Contents/...`), so tar must NOT prefix `./`.
+          tarball="release-artifacts/Kalamos_${RELEASE_VERSION}_${ARCH_LABEL}.app.tar.gz"
+          COPYFILE_DISABLE=1 tar -czf "$tarball" -C "${bundle_dir}/macos" Kalamos.app
+          test -s "$tarball"
+
+          first_entry="$(tar -tzf "$tarball" | head -n 1)"
+          case "$first_entry" in
+            Kalamos.app/* | Kalamos.app) ;;
+            *)
+              echo "Unexpected tarball root entry: $first_entry" >&2
+              exit 1
+              ;;
+          esac
+
+      - name: Stage Windows installers
+        if: runner.os == 'Windows'
+        shell: bash
+        env:
+          TARGET: ${{ matrix.target }}
+          RELEASE_VERSION: ${{ needs.check-version.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p release-artifacts
+          bundle_dir="src-tauri/target/${TARGET}/release/bundle"
+          nsis_exe="${bundle_dir}/nsis/Kalamos_${RELEASE_VERSION}_x64-setup.exe"
+          test -s "$nsis_exe"
+          cp "$nsis_exe" release-artifacts/
+          cp "${bundle_dir}/msi/"*.msi release-artifacts/
+
+      # Isolated signing step: ONLY invokes the compiled tauri CLI signer binary
+      # directly (no npm scripts, no vite/cargo build).
+      - name: Sign macOS updater tarball
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          ARCH_LABEL: ${{ matrix.arch_label }}
+          RELEASE_VERSION: ${{ needs.check-version.outputs.version }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          tarball="release-artifacts/Kalamos_${RELEASE_VERSION}_${ARCH_LABEL}.app.tar.gz"
+          node node_modules/@tauri-apps/cli/tauri.js signer sign \
+            --app-version "${RELEASE_VERSION}" \
+            "$tarball"
+
+      - name: Sign Windows NSIS updater installer
+        if: runner.os == 'Windows'
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ needs.check-version.outputs.version }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          nsis_exe="release-artifacts/Kalamos_${RELEASE_VERSION}_x64-setup.exe"
+          node node_modules/@tauri-apps/cli/tauri.js signer sign \
+            --app-version "${RELEASE_VERSION}" \
+            "$nsis_exe"
+
+      - name: Verify updater signature against public key
+        shell: bash
+        env:
+          ARCH_LABEL: ${{ matrix.arch_label }}
+          RELEASE_VERSION: ${{ needs.check-version.outputs.version }}
+          RUNNER_OS: ${{ runner.os }}
+        run: |
+          set -euo pipefail
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            target_file="release-artifacts/Kalamos_${RELEASE_VERSION}_${ARCH_LABEL}.app.tar.gz"
+          else
+            target_file="release-artifacts/Kalamos_${RELEASE_VERSION}_x64-setup.exe"
+          fi
+          sig_file="${target_file}.sig"
+          test -s "$sig_file"
+          node scripts/verify-updater-signature.mjs \
+            --file "$target_file" \
+            --sig "$sig_file" \
+            --tauri-conf "src-tauri/tauri.conf.json" \
+            --version "${RELEASE_VERSION}" \
+            --require-signed-version
+          ls -lh release-artifacts/
+
+      - name: Upload installer artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: release-artifacts/*
+          if-no-files-found: error
+          retention-days: 14
+
+  build-dry-run:
+    name: Build dry-run (${{ matrix.target }})
+    needs: check-version
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            artifact_name: installer-macos-aarch64
+            bundles: app,dmg
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            artifact_name: installer-macos-x64
+            bundles: app,dmg
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact_name: installer-windows-x64
+            bundles: nsis,msi
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: "src-tauri -> target"
+          key: ${{ matrix.target }}
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build Tauri installers (dry-run without updater artifacts)
+        shell: bash
+        run: npx tauri build --target "${TARGET}" --bundles "${BUNDLES}" --config '{"bundle":{"createUpdaterArtifacts":false}}'
+        env:
+          CI: "true"
+          TARGET: ${{ matrix.target }}
+          BUNDLES: ${{ matrix.bundles }}
+
+      - name: Verify macOS code signature and DMG layout
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          bundle_dir="src-tauri/target/${TARGET}/release/bundle"
           app_path="${bundle_dir}/macos/Kalamos.app"
           dmg_path="$(find "${bundle_dir}/dmg" -maxdepth 1 -name '*.dmg' | head -n 1)"
 
@@ -112,20 +317,24 @@ jobs:
       - name: Stage macOS installers
         if: runner.os == 'macOS'
         shell: bash
+        env:
+          TARGET: ${{ matrix.target }}
         run: |
           set -euo pipefail
           mkdir -p release-artifacts
-          cp "src-tauri/target/${{ matrix.target }}/release/bundle/dmg/"*.dmg release-artifacts/
+          cp "src-tauri/target/${TARGET}/release/bundle/dmg/"*.dmg release-artifacts/
           ls -lh release-artifacts/
 
       - name: Stage Windows installers
         if: runner.os == 'Windows'
         shell: bash
+        env:
+          TARGET: ${{ matrix.target }}
         run: |
           set -euo pipefail
           mkdir -p release-artifacts
-          cp "src-tauri/target/${{ matrix.target }}/release/bundle/nsis/"*-setup.exe release-artifacts/
-          cp "src-tauri/target/${{ matrix.target }}/release/bundle/msi/"*.msi release-artifacts/
+          cp "src-tauri/target/${TARGET}/release/bundle/nsis/"*-setup.exe release-artifacts/
+          cp "src-tauri/target/${TARGET}/release/bundle/msi/"*.msi release-artifacts/
           ls -lh release-artifacts/
 
       - name: Upload installer artifacts
@@ -137,16 +346,52 @@ jobs:
           retention-days: 14
 
   checksums:
-    name: Generate SHA256SUMS
-    needs: [check-version, build]
+    name: Generate updater manifest and SHA256SUMS
+    needs: [check-version, build, build-dry-run]
+    if: always() && !failure() && !cancelled() && needs.check-version.result == 'success' && (needs.build.result == 'success' || needs.build-dry-run.result == 'success')
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+
       - name: Download installer artifacts
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           pattern: installer-*
           path: dist-artifacts
           merge-multiple: true
+
+      - name: Generate and cryptographically validate updater latest.json
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+        env:
+          RELEASE_VERSION: ${{ needs.check-version.outputs.version }}
+          RELEASE_TAG: ${{ needs.check-version.outputs.tag }}
+        run: |
+          set -euo pipefail
+          node scripts/generate-updater-manifest.mjs \
+            --version "${RELEASE_VERSION}" \
+            --tag "${RELEASE_TAG}" \
+            --artifacts-dir "dist-artifacts" \
+            --changelog "CHANGELOG.md" \
+            --tauri-conf "src-tauri/tauri.conf.json" \
+            --output "dist-artifacts/latest.json"
+          cat dist-artifacts/latest.json
+
+      - name: Upload updater manifest artifact
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: updater-manifest
+          path: dist-artifacts/latest.json
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Generate SHA256SUMS.txt
         run: |
@@ -173,6 +418,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -186,28 +433,50 @@ jobs:
           path: release-assets
           merge-multiple: true
 
+      - name: Download updater manifest
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: updater-manifest
+          path: release-assets
+
       - name: Download SHA256SUMS
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: sha256sums
           path: release-assets
 
+      - name: Validate updater manifest and cryptographic signatures
+        env:
+          RELEASE_VERSION: ${{ needs.check-version.outputs.version }}
+          RELEASE_TAG: ${{ needs.check-version.outputs.tag }}
+        run: |
+          set -euo pipefail
+          node scripts/generate-updater-manifest.mjs \
+            --validate-only \
+            --version "${RELEASE_VERSION}" \
+            --tag "${RELEASE_TAG}" \
+            --artifacts-dir "release-assets" \
+            --tauri-conf "src-tauri/tauri.conf.json" \
+            --manifest "release-assets/latest.json"
+
       - name: Generate release notes
+        env:
+          RELEASE_VERSION: ${{ needs.check-version.outputs.version }}
         run: |
           node scripts/generate-release-notes.mjs \
-            --version "${{ needs.check-version.outputs.version }}" \
+            --version "${RELEASE_VERSION}" \
             --checksums "release-assets/SHA256SUMS.txt" \
             --output "release-notes.md"
 
       - name: Create draft release
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.check-version.outputs.tag }}
+          RELEASE_VERSION: ${{ needs.check-version.outputs.version }}
         run: |
           set -euo pipefail
-          release_tag="${{ needs.check-version.outputs.tag }}"
-          release_version="${{ needs.check-version.outputs.version }}"
-          gh release create "$release_tag" \
+          gh release create "$RELEASE_TAG" \
             --draft \
-            --title "Kalamos v${release_version}" \
+            --title "Kalamos v${RELEASE_VERSION}" \
             --notes-file "release-notes.md" \
             release-assets/*

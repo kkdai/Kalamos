@@ -88,6 +88,7 @@ import { DEFAULT_UI_LOCALE, getUiLocale, initUiLocale, t } from "./i18n";
 import {
   allowAssetDir,
   askSaveChanges,
+  checkForUpdate,
   clearRecovery,
   DEFAULT_SETTINGS,
   exportPandoc,
@@ -175,9 +176,11 @@ import {
   createThemeMenu,
   type ThemeMenuController,
 } from "./theme/theme-menu";
+import { createUpdater, type UpdaterController } from "./updater/updater";
 
 export const NAMED_AUTOSAVE_DELAY_MS = 1000;
 export const UNTITLED_RECOVERY_INTERVAL_MS = 5000;
+export const STARTUP_UPDATE_CHECK_DELAY_MS = 3000;
 
 export function applyTheme(theme: string): void {
   if (typeof document === "undefined") return;
@@ -288,6 +291,10 @@ export interface KalamosApp {
   moveTab: (id: string, toIndex: number) => boolean;
   /** #74: Cmd+, preferences modal. */
   preferences: PreferencesController;
+  /** #91: in-app auto-updater modal & background check controller. */
+  updater: UpdaterController;
+  /** #91: check for app updates (manual shows up-to-date/error feedback). */
+  checkForUpdates: (options?: { manual?: boolean }) => Promise<void>;
   /** #104: Cmd+P Quick Open overlay. */
   quickOpen: QuickOpenController;
   /** #104: recently opened / saved files (newest first, up to 20). */
@@ -352,6 +359,8 @@ export interface KalamosApp {
 export interface CreateKalamosAppOptions {
   /** Override whether the Windows-only top-left quick controls are shown (defaults to `IS_WINDOWS`). */
   showQuickButtons?: boolean;
+  /** Override the background update check delay after startup (defaults to `STARTUP_UPDATE_CHECK_DELAY_MS`). */
+  startupUpdateCheckDelayMs?: number;
 }
 
 export function createKalamosApp(
@@ -748,7 +757,8 @@ export function createKalamosApp(
     wordCounter.flush();
     renderTabs();
     scheduleMenuSync();
-    if (!preferences.isOpen() && !quickOpen.isOpen()) view.focus();
+    if (!preferences.isOpen() && !quickOpen.isOpen() && !updater.isOpen())
+      view.focus();
   }
 
   function activateTab(id: string): boolean {
@@ -885,7 +895,12 @@ export function createKalamosApp(
 
   // Cmd+T new tab, Cmd+W close tab, Ctrl+Tab / Ctrl+Shift+Tab next / previous tab.
   const onTabKeydown = (event: KeyboardEvent) => {
-    if (event.defaultPrevented || preferences.isOpen() || quickOpen.isOpen())
+    if (
+      event.defaultPrevented ||
+      preferences.isOpen() ||
+      quickOpen.isOpen() ||
+      updater.isOpen()
+    )
       return;
     if (
       event.key === "Tab" &&
@@ -962,7 +977,9 @@ export function createKalamosApp(
   });
 
   const unbindShortcuts = bindWindowShortcuts(window, windowHandlers, () =>
-    preferences.isOpen() || quickOpen.isOpen() ? null : editor.view,
+    preferences.isOpen() || quickOpen.isOpen() || updater.isOpen()
+      ? null
+      : editor.view,
   );
 
   const sidebar = createSidebar({
@@ -1139,6 +1156,7 @@ export function createKalamosApp(
       uiLocale: currentSettings.uiLocale ?? getUiLocale(),
       startupBehavior: currentSettings.startupBehavior ?? "restoreFolder",
       autoSave: currentSettings.autoSave ?? true,
+      autoCheckUpdates: currentSettings.autoCheckUpdates ?? true,
       fontSize: clampFontSize(currentSettings.fontSize ?? 17),
       contentWidth: clampContentWidth(currentSettings.contentWidth ?? 720),
       autoPairBrackets: editor.isAutoPairBrackets(),
@@ -1180,6 +1198,17 @@ export function createKalamosApp(
     },
   });
 
+  const updater = createUpdater({
+    checkForUpdate,
+    prepareForRestart: async () => {
+      if (!(await requestCloseWindow())) return false;
+      for (const tab of tabs) clearAutosaveTimer(tab);
+      return true;
+    },
+    restartApp,
+    restoreRecoveryAfterFailedInstall: restoreDirtyRecoveries,
+  });
+
   async function applyPreferencesChange(
     patch: PreferencesPatch,
   ): Promise<void> {
@@ -1197,6 +1226,8 @@ export function createKalamosApp(
     if (patch.startupBehavior !== undefined)
       plain.startupBehavior = patch.startupBehavior;
     if (patch.autoSave !== undefined) plain.autoSave = patch.autoSave;
+    if (patch.autoCheckUpdates !== undefined)
+      plain.autoCheckUpdates = patch.autoCheckUpdates;
     if (patch.fontSize !== undefined)
       plain.fontSize = clampFontSize(patch.fontSize);
     if (patch.contentWidth !== undefined)
@@ -1275,6 +1306,10 @@ export function createKalamosApp(
 
   // Same handlers as the keyboard shortcuts (keymaps.ts / the keydown listeners below).
   const menuCommands: Record<string, MenuCommand> = {
+    "app.checkForUpdates": () => {
+      quickOpen.close(false);
+      return updater.checkForUpdates({ manual: true });
+    },
     "app.preferences": () => {
       quickOpen.close(false);
       return preferences.open();
@@ -1342,7 +1377,7 @@ export function createKalamosApp(
     // While preferences or Quick Open is open, editing commands would act on the hidden document.
     canRun: (action) =>
       !(
-        (preferences.isOpen() || quickOpen.isOpen()) &&
+        (preferences.isOpen() || quickOpen.isOpen() || updater.isOpen()) &&
         /^(edit|para|fmt)\./.test(action)
       ),
     afterRun: () => scheduleMenuSync(true),
@@ -1350,7 +1385,8 @@ export function createKalamosApp(
 
   // #104: Cmd+P / Ctrl+P toggles Quick Open (also offered by 檔案 > 快速開啟…).
   const onQuickOpenKeydown = (event: KeyboardEvent) => {
-    if (event.defaultPrevented || preferences.isOpen()) return;
+    if (event.defaultPrevented || preferences.isOpen() || updater.isOpen())
+      return;
     if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey)
       return;
     if (event.metaKey && event.ctrlKey) return;
@@ -1456,7 +1492,7 @@ export function createKalamosApp(
         return;
       }
     }
-    if (preferences.isOpen() || quickOpen.isOpen()) return;
+    if (preferences.isOpen() || quickOpen.isOpen() || updater.isOpen()) return;
     if (event.code === "KeyF" && !event.shiftKey) {
       event.preventDefault();
       openFind(editor.view, { replace: event.altKey });
@@ -1827,6 +1863,7 @@ export function createKalamosApp(
   let unlistenFileDrop: (() => void) | null = null;
   let unlistenOpenFiles: (() => void) | null = null;
   let unlistenMenu: (() => void) | null = null;
+  let startupUpdateTimer: ReturnType<typeof setTimeout> | null = null;
   let destroyed = false;
 
   function openTabStates() {
@@ -2113,21 +2150,25 @@ export function createKalamosApp(
     return true;
   }
 
+  async function restoreDirtyRecoveries(): Promise<void> {
+    // Restart/install failed while the app is still running: restore recovery copies
+    // for any still-dirty tabs whose recovery files were cleared on "Don't Save".
+    for (const tab of tabs) {
+      if (!editor.isSessionDirty(tab.doc)) continue;
+      const content = editor.getSessionContent(tab.doc);
+      if (tab.path !== null || content.length > 0) {
+        await writeRecovery(tab.docId, content, tab.path).catch(() => null);
+      }
+    }
+  }
+
   async function restartAfterLanguageChange(): Promise<void> {
     if (!(await requestCloseWindow())) return;
     for (const tab of tabs) clearAutosaveTimer(tab);
     try {
       await restartApp();
     } catch (err) {
-      // Restart failed while the app is still running: restore recovery copies
-      // for any still-dirty tabs whose recovery files were cleared on "Don't Save".
-      for (const tab of tabs) {
-        if (!editor.isSessionDirty(tab.doc)) continue;
-        const content = editor.getSessionContent(tab.doc);
-        if (tab.path !== null || content.length > 0) {
-          await writeRecovery(tab.docId, content, tab.path).catch(() => null);
-        }
-      }
+      await restoreDirtyRecoveries();
       throw err;
     }
   }
@@ -2234,10 +2275,25 @@ export function createKalamosApp(
     if (pendingOpen && !destroyed) {
       await openRequestedFiles(pendingOpen);
     }
+    if (!destroyed && currentSettings.autoCheckUpdates !== false) {
+      const delayMs =
+        options?.startupUpdateCheckDelayMs ?? STARTUP_UPDATE_CHECK_DELAY_MS;
+      startupUpdateTimer = setTimeout(() => {
+        startupUpdateTimer = null;
+        if (!destroyed && currentSettings.autoCheckUpdates !== false) {
+          void updater.checkForUpdates({ manual: false });
+        }
+      }, delayMs);
+    }
   }
 
   function destroy(): void {
     destroyed = true;
+    if (startupUpdateTimer !== null) {
+      clearTimeout(startupUpdateTimer);
+      startupUpdateTimer = null;
+    }
+    updater.destroy();
     for (const tab of tabs) clearAutosaveTimer(tab);
     window.removeEventListener("keydown", onTabKeydown);
     tabBar.destroy();
@@ -2296,6 +2352,8 @@ export function createKalamosApp(
     cycleTab,
     moveTab,
     preferences,
+    updater,
+    checkForUpdates: (opts) => updater.checkForUpdates(opts),
     quickOpen,
     getRecentFiles: () => [...recentFiles],
     clearRecentFiles,

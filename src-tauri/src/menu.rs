@@ -805,6 +805,10 @@ mod tests {
             MenuNode::Action { id, accel: Some(a), .. } if id == "app.quit" && a == "CmdOrCtrl+Q"
         )));
         let help_items = submenu_items("menu.help.title");
+        assert!(help_items.iter().any(|n| matches!(
+            n,
+            MenuNode::Action { id, accel: None, .. } if id == "app.checkForUpdates"
+        )));
         assert!(help_items.iter().any(|n| matches!(n, MenuNode::Predefined { item, .. } if item == "about")));
 
         // macOS and Windows expose the exact same set of custom action ids and accelerators.
