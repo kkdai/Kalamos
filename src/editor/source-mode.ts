@@ -8,6 +8,7 @@ import type { EditorView } from "@codemirror/view";
 import { blocksExtension } from "./blocks";
 import { codeBlocksExtension } from "./code-blocks";
 import { diagramsExtension } from "./diagrams";
+import { frontMatterPreviewExtension } from "./front-matter-preview";
 import { imagePreviewExtension } from "./images";
 import { livePreviewExtension } from "./live-preview";
 import { mathExtension } from "./math";
@@ -23,6 +24,7 @@ const richPreviewExtensions: Extension = [
   imagePreviewExtension,
   diagramsExtension,
   blocksExtension,
+  frontMatterPreviewExtension,
 ];
 
 export interface SourceModeController {

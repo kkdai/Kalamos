@@ -8,6 +8,7 @@ import {
   nextFrames,
   setCursor,
   setDoc,
+  withIpc,
 } from "./helpers";
 
 /**
@@ -841,19 +842,159 @@ test.describe("#12 blocks / TOC", () => {
     await expect(page.locator(".cm-content")).toContainText("***");
   });
 
-  test("#12 spec: front matter renders as a muted box, not a rule or heading", async ({
+  test("#122 renders front matter as document information, with no Markdown changes", async ({
     page,
   }) => {
-    const src = "---\ntitle: 部落格文章\ntags: [a]\n---\n\n# 正文\n";
-    await setDoc(page, src, src.length);
-    await expect(page.locator(".cm-content .k-frontmatter-line")).toHaveCount(
-      4,
-    );
-    await expect(page.locator(".cm-content .k-hr")).toHaveCount(0);
-    await expect(page.locator(".cm-content .k-h2")).toHaveCount(0);
+    const src = [
+      "---",
+      "# Keep this YAML comment",
+      'title: "<em>部落格文章</em>"',
+      "tags: [Markdown, YAML]",
+      "project:",
+      "  public: false",
+      "notes: &notes [*notes]",
+      "...",
+      "",
+      "# 正文",
+      "",
+      "***",
+    ].join("\n");
+    await setDoc(page, src);
+    const card = page.getByTestId("front-matter-preview");
+    await expect(card.getByText("文件資訊", { exact: true })).toBeVisible();
+    await expect(card.locator("dt")).toHaveText([
+      "title",
+      "tags",
+      "project",
+      "public",
+      "notes",
+    ]);
     await expect(
-      page.locator(".cm-content .k-frontmatter-line").nth(1),
-    ).toHaveText("title: 部落格文章");
+      card.getByText("<em>部落格文章</em>", { exact: true }),
+    ).toBeVisible();
+    await expect(card.locator("li")).toHaveText(["Markdown", "YAML", "*notes"]);
+    await expect(card.locator("dd dl dd")).toHaveText("false");
+    await expect(page.locator(".cm-content .k-frontmatter-line")).toHaveCount(
+      0,
+    );
+    await expect(page.locator(".cm-content .k-hr")).toHaveCount(1);
+    await expect(page.locator(".cm-content .k-h2")).toHaveCount(0);
+    expect(await getDoc(page)).toBe(src);
+
+    await page.keyboard.press(`${MOD}+/`);
+    await expect(card).toHaveCount(0);
+    await expect(line(page, 2)).toHaveText("# Keep this YAML comment");
+    await expect(line(page, 3)).toHaveText('title: "<em>部落格文章</em>"');
+    await page.keyboard.press(`${MOD}+/`);
+    await expect(card).toBeVisible();
+    expect(await getDoc(page)).toBe(src);
+  });
+
+  test("#122 edits the original YAML in place and saves only the typed change", async ({
+    page,
+  }) => {
+    const src =
+      "---\r\ntitle: 部落格文章 # 保留\r\ntags: [a]\r\n---\r\n\r\n# 正文\r\n\r\n最後一行";
+    const expected = src.replace("部落格文章", "新文章");
+    const path = "/demo/metadata.md";
+    await withIpc(
+      page,
+      "ipc.seedMockFile(arg.path, arg.src); ipc.setMockDialogHandlers({ open: () => arg.path });",
+      { path, src },
+    );
+    await page.getByTestId("editor").click();
+    await page.keyboard.press(`${MOD}+o`);
+
+    const card = page.getByTestId("front-matter-preview");
+    await expect(card).toBeVisible();
+    await card.click();
+    await expect(card).toHaveCount(0);
+    await expect(page.locator(".cm-content")).toBeFocused();
+    await expect(line(page, 2)).toHaveText("title: 部落格文章 # 保留");
+    expect(await getDoc(page)).toBe(src);
+    await page.keyboard.press("End");
+    await page.keyboard.press("Shift+Home");
+    await page.keyboard.insertText("title: 新文章 # 保留");
+    await page.getByText("最後一行", { exact: true }).click();
+    await expect(card.getByText("新文章", { exact: true })).toBeVisible();
+    await page.keyboard.press(`${MOD}+s`);
+    await expect
+      .poll(() => withIpc(page, "return ipc.readMockFile(arg);", path))
+      .toBe(expected);
+    expect(await getDoc(page)).toBe(expected);
+  });
+
+  test("#122 keyboard activation, sidebar click, and a tab switch preserve the preview", async ({
+    page,
+  }) => {
+    const src = "---\ntitle: 筆記\n---\n\n正文";
+    await page.evaluate(async () => {
+      const { getActiveApp } = await import("/src/main.ts" as string);
+      const app = getActiveApp();
+      if (!app.sidebar.isVisible()) await app.toggleSidebar();
+    });
+    await setDoc(page, src, src.length);
+    const card = page.getByTestId("front-matter-preview");
+    await expect(card).toBeVisible();
+    const edit = card.getByRole("button", { name: "編輯文件資訊" });
+    await page.keyboard.press("Tab");
+    await expect(edit).toBeFocused();
+    await page.keyboard.press("Space");
+    await expect(card).toHaveCount(0);
+
+    await page.getByTestId("sidebar-tab-outline").click();
+    await expect(card).toBeVisible();
+    await edit.press("Enter");
+    await expect(card).toHaveCount(0);
+    await page.keyboard.press(`${MOD}+t`);
+    await expect(page.getByTestId("tab")).toHaveCount(2);
+    await page.keyboard.press("Control+Tab");
+    await expect(card).toBeVisible();
+    expect(await getDoc(page)).toBe(src);
+  });
+
+  test("#122 malformed YAML stays editable and leaves the body readable", async ({
+    page,
+  }) => {
+    const src = "---\ntags: [broken\n---\n\n# 正文\n";
+    await setDoc(page, src, src.length);
+    const card = page.getByTestId("front-matter-preview");
+    await expect(card).toHaveCount(0);
+    const yaml = page.locator(".cm-line.k-frontmatter-line").nth(1);
+    await expect(yaml).toHaveText("tags: [broken");
+    await expect(page.getByText("正文", { exact: true })).toBeVisible();
+    await yaml.click();
+    await page.keyboard.press("End");
+    await page.keyboard.insertText("]");
+    await page.getByText("正文", { exact: true }).click();
+    await expect(card.locator("li")).toHaveText("broken");
+  });
+
+  test("#122 Backspace at line start after card enters edit without breaking the closing fence", async ({
+    page,
+  }) => {
+    const src = "---\ntitle: a\n---\n# H";
+    const bodyStart = src.indexOf("# H");
+    await setDoc(page, src, bodyStart);
+    const card = page.getByTestId("front-matter-preview");
+    await expect(card).toBeVisible();
+
+    await page.keyboard.press("Backspace");
+    await expect(card).toHaveCount(0);
+    expect(await getDoc(page)).toBe(src);
+    expect((await getSelection(page)).head).toBe(bodyStart - 1);
+    await expect(page.locator(".cm-line.k-frontmatter-last")).toHaveText("---");
+  });
+
+  test("#122 distinguishes YAML null from empty string in preview", async ({
+    page,
+  }) => {
+    const src = '---\nempty_null:\nempty_str: ""\n---\n\n正文';
+    await setDoc(page, src, src.length);
+    const card = page.getByTestId("front-matter-preview");
+    await expect(card).toBeVisible();
+    await expect(card.locator("dt")).toHaveText(["empty_null", "empty_str"]);
+    await expect(card.locator("dd")).toHaveText(["—", '""']);
   });
 
   test("#12 spec: blockquote markers hide and nested quotes get deeper borders", async ({
