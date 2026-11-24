@@ -33,7 +33,7 @@
 - **CJK & IME friendly**: CJK emphasis flanking works naturally next to full-width punctuation, and decorations freeze during IME composition to prevent layout jumps. Preserves original CRLF/LF line endings and UTF-8 BOM on unmodified saves.
 - **Lists & Task Lists** (`ED-04`): Bullet, ordered, and interactive GFM task lists (`- [ ]` / `- [x]`) with clickable checkboxes, `Tab` / `Shift+Tab` indent and outdent, smart `Enter` / `Backspace` continuation and exit, and keyboard toggles.
 - **Links & Heading Bookmarks** (`ED-05`): External URLs (`http://`, `https://`, `mailto:`), relative `.md` links, internal `#heading` anchor jumps, and `Cmd+Shift+C` to copy a heading bookmark link.
-- **Rich Blocks & Live `[TOC]`** (`ED-06`, `ED-07`): Blockquotes, horizontal rules, YAML Front Matter, footnotes with hover tooltips and click-to-jump navigation, and `[TOC]` auto-updating table of contents.
+- **Rich Blocks & Live `[TOC]`** (`ED-06`, `ED-07`): Blockquotes, horizontal rules, YAML front matter rendered as clickable document information for in-place editing, footnotes with hover tooltips and click-to-jump navigation, and `[TOC]` auto-updating table of contents.
 - **Emoji Autocomplete** (`ED-08`): Offline GitHub `gemoji` shortcode completion when typing `:name`, loaded lazily on first use.
 - **Auto-Pairing** (`ED-09`): Automatic pairing of ASCII and CJK full-width brackets and quotes (`() [] {} "" ''` and `「」『』（）【】《》“”‘’`, enabled by default, `Cmd+Opt+P`), plus optional Markdown symbol pairing `* _ ` ~` (`Cmd+Opt+Shift+P`).
 
