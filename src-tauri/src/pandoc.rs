@@ -42,12 +42,11 @@ pub const PANDOC_MISSING_MESSAGE: &str =
 pub const PANDOC_TOO_OLD_FOR_IMPORT_MESSAGE: &str = "Pandoc 版本過舊，匯入需要 2.15 以上";
 
 fn missing_pandoc() -> AppError {
-    let key = if cfg!(target_os = "windows") {
-        "export.pandoc.missingWindows"
+    if cfg!(target_os = "windows") {
+        AppError::not_found(PANDOC_MISSING_MESSAGE).with_message_key("export.pandoc.missingWindows")
     } else {
-        "export.pandoc.missingMac"
-    };
-    AppError::not_found(PANDOC_MISSING_MESSAGE).with_message_key(key)
+        AppError::not_found(PANDOC_MISSING_MESSAGE).with_message_key("export.pandoc.missingMac")
+    }
 }
 /// First pandoc release with `--sandbox` (imports run sandboxed).
 pub const MIN_SANDBOX_VERSION: (u32, u32, u32) = (2, 15, 0);

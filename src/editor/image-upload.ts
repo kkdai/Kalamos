@@ -320,7 +320,15 @@ export async function uploadImagesInEditor(
   // The same file referenced twice is uploaded once.
   const paths = [...new Set(targets.map((t) => t.path))];
   const tool = basename(uploader);
-  setStatus(t("editor.upload.starting", { count: paths.length, tool }), false);
+  setStatus(
+    t(
+      paths.length === 1
+        ? "editor.upload.startingOne"
+        : "editor.upload.starting",
+      { count: paths.length, tool },
+    ),
+    false,
+  );
 
   const trackingId = beginTracking(view);
   const urls = new Map<string, string>();
@@ -339,7 +347,12 @@ export async function uploadImagesInEditor(
       const url = result.urls[0];
       if (result.urls.length !== 1 || !url) {
         throw new Error(
-          t("editor.upload.unexpectedUrls", { count: result.urls.length }),
+          t(
+            result.urls.length === 1
+              ? "editor.upload.unexpectedUrlsOne"
+              : "editor.upload.unexpectedUrls",
+            { count: result.urls.length },
+          ),
         );
       }
       urls.set(path, url);
@@ -357,10 +370,22 @@ export async function uploadImagesInEditor(
     urls,
     changes,
   );
+  const uploadedText = t(
+    paths.length === 1 ? "editor.upload.doneOne" : "editor.upload.done",
+    { count: paths.length },
+  );
   setStatus(
     skipped > 0
-      ? t("editor.upload.doneWithSkipped", { count: paths.length, skipped })
-      : t("editor.upload.done", { count: paths.length }),
+      ? t("editor.upload.doneWithSkipped", {
+          uploaded: uploadedText,
+          skipped: t(
+            skipped === 1
+              ? "editor.upload.skippedOne"
+              : "editor.upload.skipped",
+            { count: skipped },
+          ),
+        })
+      : uploadedText,
     false,
   );
   return { uploaded: paths.length, replaced, skipped, error: null };

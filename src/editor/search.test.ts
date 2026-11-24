@@ -175,7 +175,7 @@ it("localizes the search panel and CodeMirror announcements in English", async (
       document.querySelector('[data-testid="replace-all"]')?.textContent,
     ).toBe("Replace all");
     expect(view.state.phrase("replaced $ matches", 6)).toBe(
-      "Replaced matches: 6",
+      "Replaced 6 matches",
     );
   } finally {
     app.destroy();

@@ -17,7 +17,7 @@ import {
   ViewPlugin,
   WidgetType,
 } from "@codemirror/view";
-import { t } from "../i18n";
+import { type MessageKey, t } from "../i18n";
 import { shortcutLabel } from "../platform";
 import {
   type ActiveTableCell,
@@ -328,7 +328,7 @@ function alignIcon(
   return svg;
 }
 
-const ACTION_LABELS: Record<TableAction, string> = {
+const ACTION_LABELS: Record<TableAction, MessageKey> = {
   rowAbove: "editor.table.rowAbove",
   rowBelow: "editor.table.rowBelow",
   colLeft: "editor.table.columnLeft",
@@ -345,7 +345,7 @@ const ACTION_LABELS: Record<TableAction, string> = {
 
 interface ButtonSpec {
   action: TableAction;
-  labelKey: string;
+  labelKey: MessageKey;
   shortcut?: string;
   icon?: "left" | "center" | "right";
 }

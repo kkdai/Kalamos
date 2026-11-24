@@ -21,7 +21,7 @@ import {
   trashPath,
   watchFolder,
 } from "../ipc";
-import { pathRoot, shortcutLabel, toNativePath } from "../platform";
+import { IS_WINDOWS, pathRoot, shortcutLabel, toNativePath } from "../platform";
 import { createFileList, type FileListView } from "./file-list";
 import { createFileTree, type FileTreeView } from "./file-tree";
 import { createFolderSearch, type FolderSearchView } from "./folder-search";
@@ -234,7 +234,9 @@ export function createSidebar(
   trashBtn.dataset.testid = "context-menu-trash";
   trashBtn.dataset.action = "trash";
   trashBtn.setAttribute("role", "menuitem");
-  trashBtn.textContent = t("sidebar.file.trash");
+  trashBtn.textContent = t(
+    IS_WINDOWS ? "sidebar.file.trashWindows" : "sidebar.file.trash",
+  );
 
   contextMenuEl.append(createBtn, renameBtn, trashBtn);
   element.append(headerEl, tabsEl, inlineSlotEl, bodyEl, contextMenuEl);
@@ -541,7 +543,10 @@ export function createSidebar(
       if (currentFolder) options.onFolderMutated?.(currentFolder);
       return true;
     } catch (err) {
-      onError?.(t("sidebar.error.trash"), err);
+      onError?.(
+        t(IS_WINDOWS ? "sidebar.error.trashWindows" : "sidebar.error.trash"),
+        err,
+      );
       return false;
     }
   }

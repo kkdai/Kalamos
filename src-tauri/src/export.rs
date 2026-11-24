@@ -477,22 +477,24 @@ mod imp {
                         let _ = child.kill();
                         let _ = child.wait();
                         let stderr_tail = read_stderr_tail(stderr_log);
-                        let (key, detail) = if stderr_tail.is_empty() {
-                            ("errors.pdf.browserTimeout", String::new())
+                        let error = if stderr_tail.is_empty() {
+                            AppError::new(
+                                ErrorKind::Io,
+                                format!("PDF 匯出逾時（超過 {} 秒）", timeout.as_secs()),
+                            )
+                            .with_message_key("errors.pdf.browserTimeout")
                         } else {
-                            ("errors.pdf.browserTimeoutWithDetail", format!("；stderr：{stderr_tail}"))
+                            AppError::new(
+                                ErrorKind::Io,
+                                format!(
+                                    "PDF 匯出逾時（超過 {} 秒）；stderr：{stderr_tail}",
+                                    timeout.as_secs()
+                                ),
+                            )
+                            .with_message_key("errors.pdf.browserTimeoutWithDetail")
+                            .with_message_arg("detail", stderr_tail)
                         };
-                        let error = AppError::new(
-                            ErrorKind::Io,
-                            format!("PDF 匯出逾時（超過 {} 秒）{detail}", timeout.as_secs()),
-                        )
-                        .with_message_key(key)
-                        .with_message_arg("seconds", timeout.as_secs());
-                        return Err(if stderr_tail.is_empty() {
-                            error
-                        } else {
-                            error.with_message_arg("detail", stderr_tail)
-                        });
+                        return Err(error.with_message_arg("seconds", timeout.as_secs()));
                     }
                     std::thread::sleep(Duration::from_millis(50));
                 }
@@ -505,22 +507,23 @@ mod imp {
                 .map(|c| c.to_string())
                 .unwrap_or_else(|| "unknown".to_string());
             let stderr_tail = read_stderr_tail(stderr_log);
-            let (key, detail) = if stderr_tail.is_empty() {
-                ("errors.pdf.browserNoOutput", String::new())
+            let error = if stderr_tail.is_empty() {
+                AppError::new(
+                    ErrorKind::Io,
+                    format!("PDF 匯出失敗：瀏覽器沒有產生 PDF（結束碼 {code}）"),
+                )
+                .with_message_key("errors.pdf.browserNoOutput")
             } else {
-                ("errors.pdf.browserNoOutputWithDetail", format!("；stderr：{stderr_tail}"))
+                AppError::new(
+                    ErrorKind::Io,
+                    format!(
+                        "PDF 匯出失敗：瀏覽器沒有產生 PDF（結束碼 {code}；stderr：{stderr_tail}）"
+                    ),
+                )
+                .with_message_key("errors.pdf.browserNoOutputWithDetail")
+                .with_message_arg("detail", stderr_tail)
             };
-            let error = AppError::new(
-                ErrorKind::Io,
-                format!("PDF 匯出失敗：瀏覽器沒有產生 PDF（結束碼 {code}{detail}）"),
-            )
-            .with_message_key(key)
-            .with_message_arg("code", code);
-            return Err(if stderr_tail.is_empty() {
-                error
-            } else {
-                error.with_message_arg("detail", stderr_tail)
-            });
+            return Err(error.with_message_arg("code", code));
         }
         Ok(())
     }

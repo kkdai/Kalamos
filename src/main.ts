@@ -84,7 +84,7 @@ import {
   exportingPdfMessage,
   pdfErrorMessage,
 } from "./export/pdf";
-import { DEFAULT_UI_LOCALE, initUiLocale, normalizeUiLocale, t } from "./i18n";
+import { DEFAULT_UI_LOCALE, getUiLocale, initUiLocale, t } from "./i18n";
 import {
   allowAssetDir,
   askSaveChanges,
@@ -1022,7 +1022,10 @@ export function createKalamosApp(
         if (tab === active) {
           syncDocumentPath();
           sidebar.setActiveFile(null);
-          setStatus(t("app.fileTrashed"), false);
+          setStatus(
+            t(IS_WINDOWS ? "app.fileTrashedWindows" : "app.fileTrashed"),
+            false,
+          );
         }
       }
       const prunedRecent = removeRecentFile(recentFiles, trashedPath);
@@ -1133,7 +1136,7 @@ export function createKalamosApp(
 
   const preferences = createPreferences({
     getValues: () => ({
-      uiLocale: normalizeUiLocale(currentSettings.uiLocale),
+      uiLocale: currentSettings.uiLocale ?? getUiLocale(),
       startupBehavior: currentSettings.startupBehavior ?? "restoreFolder",
       autoSave: currentSettings.autoSave ?? true,
       fontSize: clampFontSize(currentSettings.fontSize ?? 17),
@@ -2113,7 +2116,20 @@ export function createKalamosApp(
   async function restartAfterLanguageChange(): Promise<void> {
     if (!(await requestCloseWindow())) return;
     for (const tab of tabs) clearAutosaveTimer(tab);
-    await restartApp();
+    try {
+      await restartApp();
+    } catch (err) {
+      // Restart failed while the app is still running: restore recovery copies
+      // for any still-dirty tabs whose recovery files were cleared on "Don't Save".
+      for (const tab of tabs) {
+        if (!editor.isSessionDirty(tab.doc)) continue;
+        const content = editor.getSessionContent(tab.doc);
+        if (tab.path !== null || content.length > 0) {
+          await writeRecovery(tab.docId, content, tab.path).catch(() => null);
+        }
+      }
+      throw err;
+    }
   }
 
   const onRestoreClick = () => {

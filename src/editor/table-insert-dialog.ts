@@ -108,7 +108,18 @@ export function pickTableSize(
           Number(cell.dataset.cols) <= cols;
         cell.classList.toggle("is-selected", on);
       }
-      sizeLabel.textContent = t("editor.table.size", { rows, cols });
+      sizeLabel.textContent = t("editor.table.size", {
+        rows: t(
+          rows === 1 ? "editor.table.rowCountOne" : "editor.table.rowCount",
+          { count: rows },
+        ),
+        cols: t(
+          cols === 1
+            ? "editor.table.columnCountOne"
+            : "editor.table.columnCount",
+          { count: cols },
+        ),
+      });
     };
     const currentSize = (): TableSize => ({
       rows: clampInt(Number(rowsField.input.value), 1, MAX_TABLE_ROWS),

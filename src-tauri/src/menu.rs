@@ -23,7 +23,7 @@ use tauri::menu::{
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 
 use crate::error::{AppError, ErrorKind};
-use crate::settings::{snapshot_ui_locale, UiLocale};
+use crate::settings::{active_ui_locale, UiLocale};
 
 pub const MENU_SPEC_JSON: &str = include_str!("../../src/menu/menu-spec.json");
 pub const MENU_ACTION_EVENT: &str = "menu-action";
@@ -460,7 +460,7 @@ fn build_items<R: Runtime>(
 
 /// Builds the menu bar and registers the handles `sync_menu_state` updates.
 pub fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
-    let labels = MenuLabels::for_locale(snapshot_ui_locale(app));
+    let labels = MenuLabels::for_locale(active_ui_locale(app));
     let mut handles = MenuHandles {
         checks: HashMap::new(),
         theme_submenu: None,

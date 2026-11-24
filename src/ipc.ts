@@ -8,8 +8,16 @@ import {
   open as openDialog,
   save as saveDialog,
 } from "@tauri-apps/plugin-dialog";
-import { normalizeUiLocale, t, type UiLocale } from "./i18n";
 import {
+  defaultUiLocaleForTag,
+  hasMessageKey,
+  normalizeUiLocale,
+  parseUiLocale,
+  t,
+  type UiLocale,
+} from "./i18n";
+import {
+  IS_WINDOWS,
   isAbsolutePath,
   isMarkdownFilePath,
   MARKDOWN_EXTENSIONS as MARKDOWN_EXT_LIST,
@@ -45,12 +53,10 @@ export function appErrorDetail(error: unknown): string {
   if (error && typeof error === "object" && "message" in error) {
     const appError = error as Partial<AppError>;
     const message = String(error.message);
-    return appError.messageKey
-      ? t(appError.messageKey, {
-          ...appError.messageArgs,
-          defaultValue: message,
-        })
-      : message;
+    if (appError.messageKey && hasMessageKey(appError.messageKey)) {
+      return t(appError.messageKey, appError.messageArgs);
+    }
+    return message;
   }
   return String(error);
 }
@@ -153,7 +159,6 @@ export interface Settings {
 export type StartupBehavior = "restoreFolder" | "blank";
 
 export const DEFAULT_SETTINGS: Settings = {
-  uiLocale: normalizeUiLocale(undefined),
   theme: "system",
   lastFolder: null,
   sidebarVisible: false,
@@ -189,7 +194,9 @@ const mockRecovery = new Map<string, RecoveryEntry>();
 const mockCustomThemes = new Map<string, string>();
 let mockSettings: Settings = { ...DEFAULT_SETTINGS, recentFiles: [] };
 let mockActiveUiLocale: UiLocale | undefined;
+let mockSystemLocale: string | null = "zh-TW";
 let mockSettingsWriteError: Error | null = null;
+let mockRestartError: Error | null = null;
 let mockWatchedFolder: string | null = null;
 let mockListMarkdownPathsCalls = 0;
 const mockAssetFiles = new Set<string>();
@@ -384,7 +391,9 @@ export function resetMockState(): void {
   mockCustomThemes.clear();
   mockSettings = { ...DEFAULT_SETTINGS, recentFiles: [] };
   mockActiveUiLocale = undefined;
+  mockSystemLocale = "zh-TW";
   mockSettingsWriteError = null;
+  mockRestartError = null;
   mockWatchedFolder = null;
   mockListMarkdownPathsCalls = 0;
   lastMockTimestampMs = 0;
@@ -1120,7 +1129,9 @@ export async function getActiveUiLocale(): Promise<UiLocale> {
   if (isTauri()) {
     return normalizeUiLocale(await invoke<UiLocale>("get_active_ui_locale"));
   }
-  mockActiveUiLocale ??= normalizeUiLocale(mockSettings.uiLocale);
+  mockActiveUiLocale ??=
+    parseUiLocale(mockSettings.uiLocale) ??
+    defaultUiLocaleForTag(mockSystemLocale);
   return mockActiveUiLocale;
 }
 
@@ -1136,19 +1147,23 @@ export async function setUiLocale(locale: UiLocale): Promise<void> {
 export async function getSettings(): Promise<Settings> {
   if (isTauri()) {
     const s = await invoke<Settings>("get_settings");
+    const uiLocale = parseUiLocale(s.uiLocale);
     return {
       ...s,
-      uiLocale: normalizeUiLocale(s.uiLocale),
+      ...(uiLocale ? { uiLocale } : { uiLocale: undefined }),
       lastFolder: toSlashPath(s.lastFolder),
       imageRootDir: toSlashPath(s.imageRootDir),
       recentFiles: (s.recentFiles ?? []).map((p) => toSlashPath(p)),
     };
   }
-  return {
+  const uiLocale = parseUiLocale(mockSettings.uiLocale);
+  const out: Settings = {
     ...mockSettings,
-    uiLocale: normalizeUiLocale(mockSettings.uiLocale),
     recentFiles: [...(mockSettings.recentFiles ?? [])],
   };
+  if (uiLocale) out.uiLocale = uiLocale;
+  else delete out.uiLocale;
+  return out;
 }
 
 export async function setSettings(settings: Settings): Promise<null> {
@@ -1156,8 +1171,9 @@ export async function setSettings(settings: Settings): Promise<null> {
     return invoke<null>("set_settings", { settings });
   }
   if (mockSettingsWriteError) throw mockSettingsWriteError;
+  const uiLocale = parseUiLocale(mockSettings.uiLocale);
   mockSettings = {
-    uiLocale: normalizeUiLocale(mockSettings.uiLocale),
+    ...(uiLocale ? { uiLocale } : {}),
     theme: settings.theme ?? DEFAULT_SETTINGS.theme,
     lastFolder: settings.lastFolder ?? DEFAULT_SETTINGS.lastFolder,
     sidebarVisible: settings.sidebarVisible ?? DEFAULT_SETTINGS.sidebarVisible,
@@ -1199,6 +1215,15 @@ export function seedMockSettings(settings: Partial<Settings>): void {
 
 export function setMockSettingsWriteError(error: Error | null): void {
   mockSettingsWriteError = error;
+}
+
+export function setMockSystemLocale(tag: string | null): void {
+  mockSystemLocale = tag;
+  mockActiveUiLocale = undefined;
+}
+
+export function setMockRestartError(error: Error | null): void {
+  mockRestartError = error;
 }
 
 function isValidThemeStem(stem: string): boolean {
@@ -1430,6 +1455,7 @@ export async function restartApp(): Promise<void> {
     await invoke("restart_app");
     return;
   }
+  if (mockRestartError) throw mockRestartError;
   mockRestartCount++;
 }
 
@@ -1946,7 +1972,11 @@ export async function exportPandoc(
     return { ...meta, path: toSlashPath(meta.path) };
   }
   if (!mockPandocStatus.available)
-    throw createAppError("NotFound", PANDOC_MISSING);
+    throw createAppError(
+      "NotFound",
+      PANDOC_MISSING,
+      IS_WINDOWS ? "export.pandoc.missingWindows" : "export.pandoc.missingMac",
+    );
   if (!req.outPath || !req.outPath.trim()) {
     throw createAppError("InvalidPath", "Path must not be empty");
   }
@@ -1979,7 +2009,11 @@ export async function importPandoc(path: string): Promise<PandocImportResult> {
     throw createAppError("InvalidPath", `不支援匯入的檔案類型：.${ext}`);
   }
   if (!mockPandocStatus.available)
-    throw createAppError("NotFound", PANDOC_MISSING);
+    throw createAppError(
+      "NotFound",
+      PANDOC_MISSING,
+      IS_WINDOWS ? "export.pandoc.missingWindows" : "export.pandoc.missingMac",
+    );
   if (!mockSupportsSandbox(mockPandocStatus.version)) {
     throw createAppError(
       "Io",

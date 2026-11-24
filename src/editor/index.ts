@@ -261,6 +261,10 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
 
   const buildExtensions = (content: string): Extension => [
     EditorView.editorAttributes.of({ "data-testid": "editor" }),
+    // Keep document content independent of the UI <html lang> so CJK text
+    // (especially inside monospace code blocks) does not fall back to Simplified
+    // Chinese or Japanese glyphs when the interface is set to English.
+    EditorView.contentAttributes.of({ lang: "zh-Hant" }),
     EditorState.phrases.of({
       Completions: t("editor.codeMirror.completions"),
       "Selection deleted": t("editor.codeMirror.selectionDeleted"),

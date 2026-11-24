@@ -7,7 +7,7 @@ import { markdownLanguage } from "@codemirror/lang-markdown";
 import type { MarkdownParser } from "@lezer/markdown";
 import { findTyporaRootUrlInText, parseImgTag } from "../editor/image-attrs";
 import { resolveImageRoot, resolveImageSrc } from "../editor/images";
-import { t } from "../i18n";
+import { type MessageKey, t } from "../i18n";
 import { type AppError, appErrorDetail, formatErrorMessage } from "../ipc";
 import { IS_WINDOWS, toNativePath } from "../platform";
 import { documentTitle } from "./pdf";
@@ -18,7 +18,7 @@ export interface PandocFormatInfo {
   id: PandocFormat;
   label: string;
   ext: string;
-  descriptionKey: string;
+  descriptionKey: MessageKey;
 }
 
 export const PANDOC_FORMATS: readonly PandocFormatInfo[] = [
@@ -72,31 +72,17 @@ export function pandocMissingMessage(): string {
   );
 }
 
-// Legacy IPC errors and older mocks send only a raw message. Do not compare
-// against translated UI text; match the original message in either platform.
-const PANDOC_MISSING_MESSAGES = [
-  "找不到 Pandoc：請先安裝（brew install pandoc）",
-  "找不到 Pandoc：請先安裝（winget install JohnMacFarlane.Pandoc，或至 pandoc.org 下載安裝程式）",
-];
-
 export function pandocErrorMessage(
   action: "export" | "import",
   err: unknown,
 ): string {
   const e = err as Partial<AppError> | null;
-  if (e?.kind === "NotFound") {
-    if (
-      e.messageKey === "export.pandoc.missingWindows" ||
-      e.messageKey === "export.pandoc.missingMac"
-    ) {
-      return appErrorDetail(err);
-    }
-    if (
-      typeof e.message === "string" &&
-      PANDOC_MISSING_MESSAGES.includes(e.message)
-    ) {
-      return pandocMissingMessage();
-    }
+  if (
+    e?.kind === "NotFound" &&
+    (e.messageKey === "export.pandoc.missingWindows" ||
+      e.messageKey === "export.pandoc.missingMac")
+  ) {
+    return appErrorDetail(err);
   }
   return formatErrorMessage(
     t(

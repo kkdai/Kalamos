@@ -184,9 +184,10 @@ describe("EX-02 format picker", () => {
       expect(
         pandocErrorMessage("import", {
           kind: "NotFound",
-          message: "找不到 Pandoc：請先安裝（brew install pandoc）",
+          messageKey: "export.pandoc.missingMac",
+          message: "Unexpected raw message",
         }),
-      ).toMatch(/^Pandoc not found\. Install it with /);
+      ).toContain("brew install pandoc");
       expect(
         pandocErrorMessage("import", {
           kind: "NotFound",

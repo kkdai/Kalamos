@@ -1,6 +1,6 @@
 use std::fs;
 use std::path::Path;
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
 
 use serde::{Deserialize, Serialize};
 use tauri::Manager;
@@ -41,15 +41,58 @@ pub enum UiLocale {
     En,
 }
 
+impl UiLocale {
+    pub fn from_setting_str(raw: &str) -> Option<Self> {
+        match raw {
+            "zh-TW" => Some(Self::ZhTw),
+            "en" => Some(Self::En),
+            _ => None,
+        }
+    }
+}
+
 impl<'de> Deserialize<'de> for UiLocale {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         // An unsupported or malformed locale must not reset unrelated settings.
         let raw = serde_json::Value::deserialize(deserializer)?;
-        Ok(match raw.as_str() {
-            Some("en") => Self::En,
-            _ => Self::default(),
-        })
+        Ok(raw.as_str().and_then(Self::from_setting_str).unwrap_or_default())
     }
+}
+
+fn deserialize_optional_ui_locale<'de, D>(deserializer: D) -> Result<Option<UiLocale>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    // An unsupported or malformed locale falls back to system locale without
+    // resetting unrelated settings.
+    let raw = serde_json::Value::deserialize(deserializer)?;
+    Ok(raw.as_str().and_then(UiLocale::from_setting_str))
+}
+
+/// Maps a BCP-47 / POSIX system locale tag to the default UI locale:
+/// any `zh` locale uses Traditional Chinese (`zh-TW`); all others use English (`en`).
+pub fn default_ui_locale_for_tag(tag: Option<&str>) -> UiLocale {
+    let Some(raw) = tag else {
+        return UiLocale::En;
+    };
+    let lower = raw.trim().to_ascii_lowercase();
+    if lower == "zh"
+        || lower.starts_with("zh-")
+        || lower.starts_with("zh_")
+        || lower.starts_with("zh.")
+    {
+        UiLocale::ZhTw
+    } else {
+        UiLocale::En
+    }
+}
+
+pub fn resolve_ui_locale(stored: Option<UiLocale>, system_locale: Option<&str>) -> UiLocale {
+    stored.unwrap_or_else(|| default_ui_locale_for_tag(system_locale))
+}
+
+pub fn current_system_locale() -> Option<String> {
+    sys_locale::get_locale()
 }
 
 pub const DEFAULT_FONT_SIZE: u32 = 17;
@@ -59,8 +102,13 @@ pub const DEFAULT_CONTENT_WIDTH: u32 = 720;
 #[serde(rename_all = "camelCase", default)]
 pub struct Settings {
     pub theme: String,
-    /// The UI language to use the next time the app starts.
-    pub ui_locale: UiLocale,
+    /// The UI language to use the next time the app starts (`None` = follow system language).
+    #[serde(
+        default,
+        deserialize_with = "deserialize_optional_ui_locale",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub ui_locale: Option<UiLocale>,
     pub last_folder: Option<String>,
     pub sidebar_visible: bool,
     pub sidebar_tab: SidebarTab,
@@ -99,7 +147,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             theme: "system".to_string(),
-            ui_locale: UiLocale::default(),
+            ui_locale: None,
             last_folder: None,
             sidebar_visible: false,
             sidebar_tab: SidebarTab::Tree,
@@ -145,29 +193,47 @@ pub fn get_settings_in(app_data_dir: &Path) -> Result<Settings, AppError> {
 }
 
 /// Startup locale shared by the native menu and the WebView until the app quits.
-pub struct ActiveUiLocale(UiLocale);
+pub struct ActiveUiLocale(OnceLock<UiLocale>);
 
-impl ActiveUiLocale {
-    fn load(app_data_dir: Option<&Path>) -> Self {
-        let settings = app_data_dir
-            .and_then(|dir| get_settings_in(dir).ok())
-            .unwrap_or_default();
-        Self(settings.ui_locale)
+impl Default for ActiveUiLocale {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
-/// Called by the native menu builder before WebView code can request the locale.
-pub(crate) fn snapshot_ui_locale<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> UiLocale {
-    if app.try_state::<ActiveUiLocale>().is_none() {
-        let app_data_dir = app.path().app_data_dir().ok();
-        app.manage(ActiveUiLocale::load(app_data_dir.as_deref()));
+impl ActiveUiLocale {
+    pub fn new() -> Self {
+        Self(OnceLock::new())
     }
-    app.state::<ActiveUiLocale>().inner().0
+
+    fn load_for(app_data_dir: Option<&Path>, system_locale: Option<&str>) -> UiLocale {
+        let stored = app_data_dir
+            .and_then(|dir| get_settings_in(dir).ok())
+            .and_then(|settings| settings.ui_locale);
+        resolve_ui_locale(stored, system_locale)
+    }
+
+    /// Resolves and caches the active startup locale once.
+    pub fn resolve<R: tauri::Runtime>(&self, app: &tauri::AppHandle<R>) -> UiLocale {
+        *self.0.get_or_init(|| {
+            let app_data_dir = app.path().app_data_dir().ok();
+            let system_locale = current_system_locale();
+            Self::load_for(app_data_dir.as_deref(), system_locale.as_deref())
+        })
+    }
+}
+
+/// Reads (initializing on first call) the managed `ActiveUiLocale` state.
+pub(crate) fn active_ui_locale<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> UiLocale {
+    app.state::<ActiveUiLocale>().resolve(app)
 }
 
 #[tauri::command]
-pub fn get_active_ui_locale(active: tauri::State<'_, ActiveUiLocale>) -> UiLocale {
-    active.inner().0
+pub fn get_active_ui_locale(
+    app: tauri::AppHandle,
+    active: tauri::State<'_, ActiveUiLocale>,
+) -> UiLocale {
+    active.resolve(&app)
 }
 
 /// Keep the on-disk uploader (which runs a local program) and the locale
@@ -207,7 +273,7 @@ pub fn set_settings_in(app_data_dir: &Path, settings: &Settings) -> Result<(), A
 
 fn set_ui_locale_in(app_data_dir: &Path, locale: UiLocale) -> Result<(), AppError> {
     update_settings_in(app_data_dir, |settings| Settings {
-        ui_locale: locale,
+        ui_locale: Some(locale),
         ..settings
     })
 }
@@ -253,7 +319,7 @@ mod tests {
 
         let v = serde_json::to_value(&s).unwrap();
         assert_eq!(v["theme"], "system");
-        assert_eq!(v["uiLocale"], "zh-TW");
+        assert!(v.get("uiLocale").is_none());
         assert!(v["lastFolder"].is_null());
         assert_eq!(v["sidebarVisible"], false);
         assert_eq!(v["sidebarTab"], "tree");
@@ -280,7 +346,7 @@ mod tests {
         let dir = tempdir().expect("tempdir");
         let updated = Settings {
             theme: "melan".to_string(),
-            ui_locale: UiLocale::ZhTw,
+            ui_locale: None,
             last_folder: Some("/tmp/kalamos-test/Notes".to_string()),
             sidebar_visible: true,
             sidebar_tab: SidebarTab::Outline,
@@ -319,16 +385,22 @@ mod tests {
             ..Settings::default()
         };
         set_settings_in(dir.path(), &previous).unwrap();
+        // General settings writes must not lock in a uiLocale when unset.
+        let raw_before: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(dir.path().join("settings.json")).unwrap())
+                .unwrap();
+        assert!(raw_before.get("uiLocale").is_none());
+
         set_ui_locale_in(dir.path(), UiLocale::En).unwrap();
         let stored = get_settings_in(dir.path()).unwrap();
-        assert_eq!(stored, Settings { ui_locale: UiLocale::En, ..previous.clone() });
+        assert_eq!(stored, Settings { ui_locale: Some(UiLocale::En), ..previous.clone() });
         assert_eq!(serde_json::to_value(stored).unwrap()["uiLocale"], "en");
 
         let stale = Settings { font_size: 22, ..previous };
         set_settings_in(dir.path(), &stale).unwrap();
         assert_eq!(
             get_settings_in(dir.path()).unwrap(),
-            Settings { ui_locale: UiLocale::En, ..stale }
+            Settings { ui_locale: Some(UiLocale::En), ..stale }
         );
     }
 
@@ -342,22 +414,117 @@ mod tests {
             )
             .unwrap();
             let settings = get_settings_in(dir.path()).unwrap();
-            assert_eq!(settings.ui_locale, UiLocale::ZhTw);
+            assert_eq!(settings.ui_locale, None);
             assert_eq!(settings.theme, "papyros");
             assert_eq!(settings.upload_args, ["upload"]);
+            assert_eq!(
+                ActiveUiLocale::load_for(Some(dir.path()), Some("zh-Hant-TW")),
+                UiLocale::ZhTw
+            );
+            assert_eq!(
+                ActiveUiLocale::load_for(Some(dir.path()), Some("en-US")),
+                UiLocale::En
+            );
         }
+    }
+
+    #[test]
+    fn default_ui_locale_follows_system_language_tags() {
+        for zh_tag in [
+            "zh",
+            "zh-TW",
+            "zh-Hant",
+            "zh-Hant-TW",
+            "zh-CN",
+            "zh-Hans-CN",
+            "zh-HK",
+            "ZH_tw",
+            "zh_TW.UTF-8",
+            "zh.UTF-8",
+            "  zh-TW  ",
+        ] {
+            assert_eq!(
+                default_ui_locale_for_tag(Some(zh_tag)),
+                UiLocale::ZhTw,
+                "expected zh-TW for {zh_tag:?}"
+            );
+        }
+        for other_tag in [
+            Some("en"),
+            Some("en-US"),
+            Some("en-GB"),
+            Some("ja"),
+            Some("ja-JP"),
+            Some("ko-KR"),
+            Some("fr-FR"),
+            Some("de-DE"),
+            Some(""),
+            None,
+        ] {
+            assert_eq!(
+                default_ui_locale_for_tag(other_tag),
+                UiLocale::En,
+                "expected en for {other_tag:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn active_ui_locale_follows_system_when_unset_and_respects_saved_locale() {
+        let dir = tempdir().unwrap();
+        // Fresh install (no settings.json): follows system locale.
+        assert_eq!(
+            ActiveUiLocale::load_for(Some(dir.path()), Some("zh-Hant-TW")),
+            UiLocale::ZhTw
+        );
+        assert_eq!(
+            ActiveUiLocale::load_for(Some(dir.path()), Some("en-US")),
+            UiLocale::En
+        );
+        assert_eq!(
+            ActiveUiLocale::load_for(Some(dir.path()), Some("ja-JP")),
+            UiLocale::En
+        );
+
+        // Existing settings.json without uiLocale: still follows system locale.
+        fs::write(dir.path().join("settings.json"), r#"{"theme":"melan"}"#).unwrap();
+        assert_eq!(
+            ActiveUiLocale::load_for(Some(dir.path()), Some("zh-CN")),
+            UiLocale::ZhTw
+        );
+        assert_eq!(
+            ActiveUiLocale::load_for(Some(dir.path()), Some("en-GB")),
+            UiLocale::En
+        );
+
+        // Explicit saved zh-TW overrides an English system locale.
+        set_ui_locale_in(dir.path(), UiLocale::ZhTw).unwrap();
+        assert_eq!(
+            ActiveUiLocale::load_for(Some(dir.path()), Some("en-US")),
+            UiLocale::ZhTw
+        );
+
+        // Explicit saved en overrides a Chinese system locale.
+        set_ui_locale_in(dir.path(), UiLocale::En).unwrap();
+        assert_eq!(
+            ActiveUiLocale::load_for(Some(dir.path()), Some("zh-Hant-TW")),
+            UiLocale::En
+        );
     }
 
     #[test]
     fn active_ui_locale_stays_fixed_until_the_next_launch() {
         let dir = tempdir().unwrap();
-        let startup = ActiveUiLocale::load(Some(dir.path()));
-        assert_eq!(serde_json::to_value(startup.0).unwrap(), "zh-TW");
+        let startup = ActiveUiLocale::new();
+        let first = *startup
+            .0
+            .get_or_init(|| ActiveUiLocale::load_for(Some(dir.path()), Some("zh-TW")));
+        assert_eq!(serde_json::to_value(first).unwrap(), "zh-TW");
 
         set_ui_locale_in(dir.path(), UiLocale::En).unwrap();
-        assert_eq!(startup.0, UiLocale::ZhTw);
-        let next_launch = ActiveUiLocale::load(Some(dir.path()));
-        assert_eq!(serde_json::to_value(next_launch.0).unwrap(), "en");
+        assert_eq!(*startup.0.get().unwrap(), UiLocale::ZhTw);
+        let next_launch = ActiveUiLocale::load_for(Some(dir.path()), Some("zh-TW"));
+        assert_eq!(serde_json::to_value(next_launch).unwrap(), "en");
     }
 
     #[test]
@@ -420,7 +587,7 @@ mod tests {
 
         let loaded = get_settings_in(dir.path()).expect("load legacy settings");
         assert_eq!(loaded.theme, "papyros");
-        assert_eq!(loaded.ui_locale, UiLocale::ZhTw);
+        assert_eq!(loaded.ui_locale, None);
         assert_eq!(loaded.last_folder.as_deref(), Some("/demo"));
         assert!(loaded.sidebar_visible);
         assert_eq!(loaded.sidebar_tab, SidebarTab::List);

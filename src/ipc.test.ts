@@ -99,7 +99,6 @@ describe("ipc in-memory mock (api.yaml contract)", () => {
     // Fields absent from older settings files get their defaults.
     expect(await getSettings()).toEqual({
       ...updated,
-      uiLocale: "zh-TW",
       focusMode: false,
       typewriterMode: false,
       uploadCommand: null,
