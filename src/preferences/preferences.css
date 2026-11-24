@@ -71,6 +71,35 @@
   outline-offset: 1px;
 }
 
+.k-pref-restart:modal {
+  max-inline-size: min(360px, calc(100% - 32px));
+  padding: 20px;
+  border: 1px solid var(--k-divider, #d9cdb3);
+  border-radius: 12px;
+  background: var(--k-bg, #f5efe0);
+  color: var(--k-text, #2b2622);
+  font: inherit;
+  overscroll-behavior: contain;
+}
+
+.k-pref-restart::backdrop {
+  background: rgba(0, 0, 0, 0.22);
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+
+.k-pref-restart h1 {
+  margin: 0 0 16px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.k-pref-restart form {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .k-pref-tabs {
   display: flex;
   gap: 4px;

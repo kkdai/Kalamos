@@ -82,6 +82,7 @@ pub fn run() {
             search::search_in_folder,
             menu::sync_menu_state,
             menu::quit_app,
+            menu::restart_app,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

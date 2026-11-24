@@ -575,6 +575,11 @@ pub fn quit_app(app: AppHandle) {
 }
 
 #[tauri::command]
+pub fn restart_app(app: AppHandle) {
+    app.request_restart();
+}
+
+#[tauri::command]
 pub fn sync_menu_state(app: AppHandle, state: MenuSyncState) -> Result<(), AppError> {
     let Some(store) = app.try_state::<MenuStateStore<tauri::Wry>>() else {
         return Ok(());
