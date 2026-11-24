@@ -48,6 +48,9 @@ for (const platform of ["macos", "windows"] as const) {
       const dialog = page.getByRole("dialog", { name: "偏好設定" });
       const language = dialog.getByLabel("介面語言");
       await expect(language).toHaveValue("zh-TW");
+      await expect(
+        language.getByRole("option", { name: "正體中文", exact: true }),
+      ).toHaveCount(1);
       await language.selectOption("en");
       const restart = page.getByRole("dialog", {
         name: "要重新啟動 Kalamos 以套用新語言嗎？",

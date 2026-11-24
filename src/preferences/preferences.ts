@@ -26,7 +26,7 @@ const PREFERENCES_TABS: PreferencesTab[] = [
 ];
 
 const LANGUAGE_NAMES: Record<UiLocale, string> = {
-  "zh-TW": "繁體中文",
+  "zh-TW": "正體中文",
   en: "English",
 };
 
