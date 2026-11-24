@@ -43,9 +43,13 @@ impl MenuLabels {
     fn for_locale(locale: UiLocale) -> &'static Self {
         static ZH_TW: OnceLock<MenuLabels> = OnceLock::new();
         static EN: OnceLock<MenuLabels> = OnceLock::new();
+        static JA: OnceLock<MenuLabels> = OnceLock::new();
+        static KO: OnceLock<MenuLabels> = OnceLock::new();
         let (catalog, json) = match locale {
             UiLocale::ZhTw => (&ZH_TW, include_str!("../../src/i18n/locales/zh-TW.json")),
             UiLocale::En => (&EN, include_str!("../../src/i18n/locales/en.json")),
+            UiLocale::Ja => (&JA, include_str!("../../src/i18n/locales/ja.json")),
+            UiLocale::Ko => (&KO, include_str!("../../src/i18n/locales/ko.json")),
         };
         catalog.get_or_init(|| {
             Self(serde_json::from_str(json).expect("UI locale dictionary is a flat string map"))
@@ -663,9 +667,9 @@ mod tests {
     }
 
     #[test]
-    fn both_locales_cover_every_menu_label() {
+    fn all_locales_cover_every_menu_label() {
         let spec = raw_menu_spec();
-        for locale in [UiLocale::ZhTw, UiLocale::En] {
+        for locale in UiLocale::ALL {
             let labels = MenuLabels::for_locale(locale);
             for node in all_nodes(&spec) {
                 let key = match node {
@@ -725,6 +729,22 @@ mod tests {
                 assert_eq!(maximize, Some(maximize_label));
             }
             assert_eq!(labels.get(RECENT_EMPTY_LABEL_KEY), recent_empty);
+        }
+    }
+
+    #[test]
+    fn japanese_and_korean_labels_are_used_on_both_platforms() {
+        for (locale, expected) in [(UiLocale::Ja, "ファイル"), (UiLocale::Ko, "파일")] {
+            for platform in [MenuPlatform::Macos, MenuPlatform::Windows] {
+                let spec = menu_spec_for(platform);
+                let file_menu = spec.iter().find_map(|node| match node {
+                    MenuNode::Submenu { label_key, .. } if label_key == "menu.file.title" => {
+                        Some(MenuLabels::for_locale(locale).get(label_key))
+                    }
+                    _ => None,
+                });
+                assert_eq!(file_menu, Some(expected));
+            }
         }
     }
 

@@ -10,6 +10,8 @@ import {
 } from "../ipc";
 import { DEFAULT_UI_LOCALE, getUiLocale, initUiLocale, t } from ".";
 import en from "./locales/en.json";
+import ja from "./locales/ja.json";
+import ko from "./locales/ko.json";
 import zhTW from "./locales/zh-TW.json";
 
 function placeholders(message: string): string[] {
@@ -22,14 +24,19 @@ afterEach(async () => {
 });
 
 describe("interface language", () => {
-  it("ships the same nonempty keys and interpolation fields in both dictionaries", () => {
-    expect(Object.keys(en).sort()).toEqual(Object.keys(zhTW).sort());
-    for (const key of Object.keys(zhTW) as (keyof typeof zhTW)[]) {
-      expect(zhTW[key].trim(), key).not.toBe("");
-      expect(en[key].trim(), key).not.toBe("");
-      expect(placeholders(en[key]), key).toEqual(placeholders(zhTW[key]));
-    }
-  });
+  it.each(Object.entries({ en, ja, ko }))(
+    "ships all translation keys and interpolation fields for %s",
+    (_locale, catalog) => {
+      expect(Object.keys(catalog).sort()).toEqual(Object.keys(zhTW).sort());
+      for (const key of Object.keys(zhTW) as (keyof typeof zhTW)[]) {
+        expect(zhTW[key].trim(), key).not.toBe("");
+        expect(catalog[key].trim(), key).not.toBe("");
+        expect(placeholders(catalog[key]), key).toEqual(
+          placeholders(zhTW[key]),
+        );
+      }
+    },
+  );
 
   it("uses the selected locale and keeps file names as literal text", async () => {
     expect(getUiLocale()).toBe("zh-TW");

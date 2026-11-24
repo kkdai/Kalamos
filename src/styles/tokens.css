@@ -9,8 +9,9 @@
     "Source Serif 4", "Noto Serif TC", Georgia, "Songti TC",
     "Microsoft JhengHei UI", "Microsoft JhengHei", serif;
   --k-font-ui:
-    Inter, "Noto Sans TC", "Segoe UI", "Microsoft JhengHei UI",
-    "Microsoft JhengHei", -apple-system, BlinkMacSystemFont, sans-serif;
+    Inter, var(--k-font-ui-cjk, "Noto Sans TC"), "Segoe UI",
+    "Microsoft JhengHei UI", "Microsoft JhengHei", -apple-system,
+    BlinkMacSystemFont, sans-serif;
   --k-font-mono:
     "JetBrains Mono", "Cascadia Mono", "Cascadia Code", Consolas, Menlo,
     "SF Mono", monospace;
@@ -30,4 +31,12 @@
   --k-transition-fast: 150ms ease-out;
   --k-transition: 180ms ease-out;
   --k-transition-slow: 200ms ease-out;
+}
+
+:root:lang(ja) {
+  --k-font-ui-cjk: "Hiragino Sans", "Yu Gothic UI", Meiryo, "Noto Sans CJK JP";
+}
+
+:root:lang(ko) {
+  --k-font-ui-cjk: "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans CJK KR";
 }

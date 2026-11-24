@@ -29,7 +29,7 @@
 對應 CSS 變數（定義於 `tokens.css`）：
 
 - 內文：`--k-font-body: "Source Serif 4", "Noto Serif TC", serif;`
-- 介面：`--k-font-ui: Inter, "Noto Sans TC", sans-serif;`
+- 介面：`--k-font-ui` 使用 `Inter` 搭配 CJK 字體。日文和韓文介面優先使用各語言的系統字體（如 `Hiragino Sans`、`Yu Gothic UI`、`Apple SD Gothic Neo`、`Malgun Gothic`）；不改變 Markdown 內文字體設定。
 - 程式碼：`--k-font-mono: "JetBrains Mono", monospace;`
 
 ---

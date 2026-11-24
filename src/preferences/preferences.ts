@@ -28,6 +28,8 @@ const PREFERENCES_TABS: PreferencesTab[] = [
 const LANGUAGE_NAMES: Record<UiLocale, string> = {
   "zh-TW": "正體中文",
   en: "English",
+  ja: "日本語",
+  ko: "한국어",
 };
 
 export const FONT_SIZE_MIN = 12;

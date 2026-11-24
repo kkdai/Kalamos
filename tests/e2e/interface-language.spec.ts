@@ -106,6 +106,68 @@ for (const platform of ["macos", "windows"] as const) {
   });
 }
 
+for (const {
+  locale,
+  languageName,
+  preferencesName,
+  settingLabel,
+  platform,
+  font,
+} of [
+  {
+    locale: "ja",
+    languageName: "日本語",
+    preferencesName: "設定",
+    settingLabel: "表示言語",
+    platform: "macos",
+    font: /Hiragino Sans/,
+  },
+  {
+    locale: "ko",
+    languageName: "한국어",
+    preferencesName: "환경설정",
+    settingLabel: "인터페이스 언어",
+    platform: "windows",
+    font: /Malgun Gothic/,
+  },
+] as const) {
+  test(`saves and applies ${languageName} on next launch (${platform})`, async ({
+    browser,
+  }) => {
+    const context = await newPlatformContext(browser, platform);
+    const page = await context.newPage();
+    try {
+      await boot(page);
+      await page.keyboard.press(`${MOD}+Comma`);
+      const language = page
+        .getByRole("dialog", { name: "偏好設定" })
+        .getByLabel("介面語言");
+      await expect(
+        language.getByRole("option", { name: languageName }),
+      ).toHaveAttribute("lang", locale);
+      await language.selectOption(locale);
+      await page.getByRole("button", { name: "稍後" }).click();
+      expect(await savedLocale(page)).toBe(locale);
+      await expect(page.locator("html")).toHaveAttribute("lang", "zh-TW");
+
+      await bootWithSavedLocale(page, await savedLocale(page));
+      await expect(page.locator("html")).toHaveAttribute("lang", locale);
+      await page.keyboard.press(`${MOD}+Comma`);
+      const preferences = page.getByRole("dialog", {
+        name: preferencesName,
+        exact: true,
+      });
+      await expect(preferences).toBeVisible();
+      await expect(preferences).toHaveCSS("font-family", font);
+      await expect(
+        preferences.getByRole("combobox", { name: settingLabel, exact: true }),
+      ).toHaveValue(locale);
+    } finally {
+      await context.close();
+    }
+  });
+}
+
 test("restores the saved selection if writing the language fails", async ({
   page,
 }) => {

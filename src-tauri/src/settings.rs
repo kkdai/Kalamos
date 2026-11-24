@@ -39,6 +39,15 @@ pub enum UiLocale {
     ZhTw,
     #[serde(rename = "en")]
     En,
+    #[serde(rename = "ja")]
+    Ja,
+    #[serde(rename = "ko")]
+    Ko,
+}
+
+#[cfg(test)]
+impl UiLocale {
+    pub(crate) const ALL: [Self; 4] = [Self::ZhTw, Self::En, Self::Ja, Self::Ko];
 }
 
 impl<'de> Deserialize<'de> for UiLocale {
@@ -47,6 +56,8 @@ impl<'de> Deserialize<'de> for UiLocale {
         let raw = serde_json::Value::deserialize(deserializer)?;
         Ok(match raw.as_str() {
             Some("en") => Self::En,
+            Some("ja") => Self::Ja,
+            Some("ko") => Self::Ko,
             _ => Self::default(),
         })
     }
@@ -335,7 +346,7 @@ mod tests {
     #[test]
     fn unknown_ui_locale_does_not_reset_other_settings() {
         let dir = tempdir().unwrap();
-        for invalid in [r#""ja""#, "null", "42", "{}"] {
+        for invalid in [r#""fr""#, "null", "42", "{}"] {
             fs::write(
                 dir.path().join("settings.json"),
                 format!(r#"{{"uiLocale":{invalid},"theme":"papyros","uploadArgs":["upload"]}}"#),
@@ -354,10 +365,13 @@ mod tests {
         let startup = ActiveUiLocale::load(Some(dir.path()));
         assert_eq!(serde_json::to_value(startup.0).unwrap(), "zh-TW");
 
-        set_ui_locale_in(dir.path(), UiLocale::En).unwrap();
-        assert_eq!(startup.0, UiLocale::ZhTw);
-        let next_launch = ActiveUiLocale::load(Some(dir.path()));
-        assert_eq!(serde_json::to_value(next_launch.0).unwrap(), "en");
+        for (locale, code) in UiLocale::ALL.into_iter().zip(["zh-TW", "en", "ja", "ko"]) {
+            set_ui_locale_in(dir.path(), locale).unwrap();
+            assert_eq!(startup.0, UiLocale::ZhTw);
+            let next_launch = ActiveUiLocale::load(Some(dir.path()));
+            assert_eq!(next_launch.0, locale);
+            assert_eq!(serde_json::to_value(next_launch.0).unwrap(), code);
+        }
     }
 
     #[test]
