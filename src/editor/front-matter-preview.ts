@@ -1,20 +1,54 @@
 import "./front-matter-preview.css";
 
 import { syntaxTree } from "@codemirror/language";
-import { type EditorState, StateEffect, StateField } from "@codemirror/state";
+import {
+  type EditorState,
+  Prec,
+  StateEffect,
+  StateField,
+} from "@codemirror/state";
 import {
   Decoration,
   EditorView,
+  keymap,
   ViewPlugin,
   WidgetType,
 } from "@codemirror/view";
-import { isAlias, isMap, isScalar, isSeq, parseDocument } from "yaml";
 
-type Fields = { entries: [string, MetadataValue][] };
-type MetadataValue = string | MetadataValue[] | Fields;
+type YamlModule = typeof import("yaml");
 
-function parseFields(source: string): Fields | null {
+let yamlPromise: Promise<YamlModule> | null = null;
+let loadedYaml: YamlModule | null = null;
+
+/** Loads `yaml` (separate chunk) lazily the first time front matter is seen. */
+export function loadYamlModule(): Promise<YamlModule> {
+  if (!yamlPromise) {
+    yamlPromise = import("yaml").then((m) => {
+      loadedYaml = m;
+      return m;
+    });
+    yamlPromise.catch(() => {
+      yamlPromise = null;
+    });
+  }
+  return yamlPromise;
+}
+
+/** The `yaml` module if already loaded (no loading triggered). */
+export function getLoadedYamlModule(): YamlModule | null {
+  return loadedYaml;
+}
+
+export type Fields = { entries: [string, MetadataValue][] };
+export type MetadataValue = string | null | MetadataValue[] | Fields;
+
+export function parseFields(
+  source: string,
+  yaml: YamlModule | null = loadedYaml,
+): Fields | null {
+  if (!yaml) return null;
   try {
+    const { isAlias, isMap, isScalar, isSeq, parseDocument } = yaml;
     const doc = parseDocument(source, { prettyErrors: false });
     if (doc.errors.length || doc.warnings.length || !isMap(doc.contents)) {
       return null;
@@ -24,11 +58,11 @@ function parseFields(source: string): Fields | null {
     function read(node: unknown, depth: number): MetadataValue {
       if (--budget < 0 || depth > 10)
         throw new Error("Metadata preview is too large");
-      if (node == null) return "null";
+      if (node == null) return null;
       if (isScalar(node)) {
-        return typeof node.value === "string"
-          ? node.value
-          : (node.source ?? String(node.value));
+        if (typeof node.value === "string") return node.value;
+        if (node.value === null && !node.source) return null;
+        return node.source ?? String(node.value);
       }
       // Keep aliases literal: expansion can be recursive or much larger than the source.
       if (isAlias(node)) return `*${node.source}`;
@@ -50,7 +84,8 @@ function parseFields(source: string): Fields | null {
   }
 }
 
-function renderValue(doc: Document, value: MetadataValue): Node {
+export function renderValue(doc: Document, value: MetadataValue): Node {
+  if (value === null) return doc.createTextNode("—");
   if (typeof value === "string") return doc.createTextNode(value || '""');
   if (Array.isArray(value)) {
     if (!value.length) return doc.createTextNode("[]");
@@ -118,6 +153,7 @@ type Preview = {
   to: number;
   editPosition: number;
   fields: Fields | null;
+  pending: boolean;
 };
 
 function readPreview(
@@ -133,13 +169,25 @@ function readPreview(
   if (
     previous?.source === source &&
     previous.to === node.to &&
-    previous.editPosition === editPosition
+    previous.editPosition === editPosition &&
+    !(previous.pending && loadedYaml)
   ) {
     return previous;
   }
+  if (!loadedYaml) {
+    return {
+      source,
+      to: node.to,
+      editPosition,
+      fields: null,
+      pending: true,
+    };
+  }
   const fields =
-    previous?.source === source ? previous.fields : parseFields(source);
-  return { source, to: node.to, editPosition, fields };
+    previous && !previous.pending && previous.source === source
+      ? previous.fields
+      : parseFields(source, loadedYaml);
+  return { source, to: node.to, editPosition, fields, pending: false };
 }
 
 function selectionInFrontMatter(
@@ -169,15 +217,21 @@ function previewState(preview: Preview | null, editing: boolean) {
 }
 
 const leaveFrontMatter = StateEffect.define<null>();
+const yamlLoadedEffect = StateEffect.define<null>();
 
-const frontMatterField = StateField.define<ReturnType<typeof previewState>>({
+export const frontMatterField = StateField.define<
+  ReturnType<typeof previewState>
+>({
   create(state) {
     const preview = readPreview(state, null);
     return previewState(preview, selectionInFrontMatter(state, preview));
   },
   update(value, tr) {
+    const yamlLoaded = tr.effects.some((effect) => effect.is(yamlLoadedEffect));
     const preview =
-      tr.docChanged || syntaxTree(tr.startState) !== syntaxTree(tr.state)
+      tr.docChanged ||
+      yamlLoaded ||
+      syntaxTree(tr.startState) !== syntaxTree(tr.state)
         ? readPreview(tr.state, value.preview)
         : value.preview;
     const editing = tr.effects.some((effect) => effect.is(leaveFrontMatter))
@@ -200,6 +254,117 @@ export function finishFrontMatterEdit(state: EditorState): EditorState {
     : state;
 }
 
+/**
+ * In preview mode, Backspace at the start of the line right after the closing
+ * fence (`preview.to + 1`) — or inside the hidden range after a blur — enters
+ * edit mode at the closing fence end instead of deleting the hidden newline.
+ */
+export function handleFrontMatterBackspace(view: EditorView): boolean {
+  const { state } = view;
+  if (state.readOnly) return false;
+  const fm = state.field(frontMatterField, false);
+  if (!fm?.preview?.fields || fm.editing) return false;
+  const sel = state.selection;
+  if (sel.ranges.length !== 1 || !sel.main.empty) return false;
+  const head = sel.main.head;
+  if (head === 0 || head > fm.preview.to + 1) return false;
+  view.dispatch({
+    selection: { anchor: Math.min(head, fm.preview.to) },
+    scrollIntoView: true,
+  });
+  return true;
+}
+
+/**
+ * In preview mode, Delete while the cursor is still inside the hidden front
+ * matter (`0..preview.to`) enters edit mode instead of deleting hidden content
+ * or the newline after the closing fence.
+ */
+export function handleFrontMatterDelete(view: EditorView): boolean {
+  const { state } = view;
+  if (state.readOnly) return false;
+  const fm = state.field(frontMatterField, false);
+  if (!fm?.preview?.fields || fm.editing) return false;
+  const sel = state.selection;
+  if (sel.ranges.length !== 1 || !sel.main.empty) return false;
+  const head = sel.main.head;
+  if (head > fm.preview.to) return false;
+  view.dispatch({
+    selection: { anchor: head === 0 ? fm.preview.editPosition : head },
+    scrollIntoView: true,
+  });
+  return true;
+}
+
+const yamlLoaderPlugin = ViewPlugin.fromClass(
+  class {
+    private loading = false;
+    private destroyed = false;
+
+    constructor(readonly view: EditorView) {
+      this.ensureLoaded();
+    }
+
+    update(): void {
+      this.ensureLoaded();
+    }
+
+    destroy(): void {
+      this.destroyed = true;
+    }
+
+    private ensureLoaded(): void {
+      if (this.loading) return;
+      const fm = this.view.state.field(frontMatterField, false);
+      if (!fm?.preview?.pending) return;
+      this.loading = true;
+      void loadYamlModule()
+        .then(() => {
+          if (this.destroyed) return;
+          if (!this.view.state.field(frontMatterField, false)?.preview?.pending)
+            return;
+          try {
+            this.view.dispatch({ effects: yamlLoadedEffect.of(null) });
+          } catch {
+            // view destroyed meanwhile
+          }
+        })
+        .catch(() => null)
+        .finally(() => {
+          this.loading = false;
+        });
+    }
+  },
+);
+
+const frontMatterKeymap = Prec.high(
+  keymap.of([
+    {
+      key: "Backspace",
+      run: handleFrontMatterBackspace,
+      shift: handleFrontMatterBackspace,
+    },
+    {
+      key: "Mod-Backspace",
+      mac: "Alt-Backspace",
+      run: handleFrontMatterBackspace,
+    },
+    {
+      mac: "Ctrl-h",
+      run: handleFrontMatterBackspace,
+    },
+    {
+      key: "Delete",
+      run: handleFrontMatterDelete,
+      shift: handleFrontMatterDelete,
+    },
+    {
+      mac: "Ctrl-d",
+      run: handleFrontMatterDelete,
+    },
+  ]),
+);
+
 const dismissOnOutsideClick = ViewPlugin.define((view) => {
   const doc = view.dom.ownerDocument;
   function onClick(event: MouseEvent) {
@@ -218,9 +383,13 @@ const dismissOnOutsideClick = ViewPlugin.define((view) => {
 
 export const frontMatterPreviewExtension = [
   frontMatterField,
+  yamlLoaderPlugin,
+  frontMatterKeymap,
   dismissOnOutsideClick,
   EditorView.focusChangeEffect.of((state, focused) =>
-    !focused && state.field(frontMatterField).editing
+    !focused &&
+    state.field(frontMatterField, false)?.editing &&
+    (typeof document === "undefined" || document.hasFocus())
       ? leaveFrontMatter.of(null)
       : null,
   ),

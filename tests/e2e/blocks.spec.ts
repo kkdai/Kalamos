@@ -935,6 +935,7 @@ test.describe("#12 blocks / TOC", () => {
     });
     await setDoc(page, src, src.length);
     const card = page.getByTestId("front-matter-preview");
+    await expect(card).toBeVisible();
     const edit = card.getByRole("button", { name: "編輯文件資訊" });
     await page.keyboard.press("Tab");
     await expect(edit).toBeFocused();
@@ -967,6 +968,33 @@ test.describe("#12 blocks / TOC", () => {
     await page.keyboard.insertText("]");
     await page.getByText("正文", { exact: true }).click();
     await expect(card.locator("li")).toHaveText("broken");
+  });
+
+  test("#122 Backspace at line start after card enters edit without breaking the closing fence", async ({
+    page,
+  }) => {
+    const src = "---\ntitle: a\n---\n# H";
+    const bodyStart = src.indexOf("# H");
+    await setDoc(page, src, bodyStart);
+    const card = page.getByTestId("front-matter-preview");
+    await expect(card).toBeVisible();
+
+    await page.keyboard.press("Backspace");
+    await expect(card).toHaveCount(0);
+    expect(await getDoc(page)).toBe(src);
+    expect((await getSelection(page)).head).toBe(bodyStart - 1);
+    await expect(page.locator(".cm-line.k-frontmatter-last")).toHaveText("---");
+  });
+
+  test("#122 distinguishes YAML null from empty string in preview", async ({
+    page,
+  }) => {
+    const src = '---\nempty_null:\nempty_str: ""\n---\n\n正文';
+    await setDoc(page, src, src.length);
+    const card = page.getByTestId("front-matter-preview");
+    await expect(card).toBeVisible();
+    await expect(card.locator("dt")).toHaveText(["empty_null", "empty_str"]);
+    await expect(card.locator("dd")).toHaveText(["—", '""']);
   });
 
   test("#12 spec: blockquote markers hide and nested quotes get deeper borders", async ({
