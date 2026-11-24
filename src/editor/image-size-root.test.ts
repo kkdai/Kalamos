@@ -12,13 +12,7 @@ import {
   resetMockState,
   setMockDialogHandlers,
 } from "../ipc";
-import {
-  createKalamosApp,
-  IMAGE_ROOT_CLEARED_MESSAGE,
-  IMAGE_ROOT_STATUS_PREFIX,
-  IMAGE_ROOT_TOO_BROAD_PREFIX,
-  type KalamosApp,
-} from "../main";
+import { createKalamosApp, type KalamosApp } from "../main";
 import {
   findTyporaRootUrlInText,
   imageSizeCss,
@@ -373,9 +367,7 @@ describe("IM-04 root folder command", () => {
 
     expect(await app.pickImageRootDir()).toBe(true);
     expect(app.getImageRootDir()).toBe("/tmp/kalamos-test/blog");
-    expect(app.getStatusText()).toBe(
-      `${IMAGE_ROOT_STATUS_PREFIX}/tmp/kalamos-test/blog`,
-    );
+    expect(app.getStatusText()).toBe("圖片根目錄：/tmp/kalamos-test/blog");
     expect(getMockAllowedAssetDirs()).toContain("/tmp/kalamos-test/blog");
     expect((await getSettings()).imageRootDir).toBe("/tmp/kalamos-test/blog");
 
@@ -391,7 +383,7 @@ describe("IM-04 root folder command", () => {
 
     await app.setImageRootDir(null);
     expect(app.getImageRootDir()).toBeNull();
-    expect(app.getStatusText()).toBe(IMAGE_ROOT_CLEARED_MESSAGE);
+    expect(app.getStatusText()).toBe("已清除圖片根目錄");
     expect((await getSettings()).imageRootDir).toBeNull();
   });
 
@@ -468,9 +460,7 @@ describe("IM-04 root folder command", () => {
     setMockDialogHandlers({ openFolder: () => MOCK_HOME_DIR });
     expect(await app.pickImageRootDir()).toBe(true);
     await flush();
-    expect(app.getStatusText()).toBe(
-      `${IMAGE_ROOT_TOO_BROAD_PREFIX}${MOCK_HOME_DIR}`,
-    );
+    expect(app.getStatusText()).toBe(`圖片根目錄範圍過大：${MOCK_HOME_DIR}`);
     expect(getMockAllowedAssetDirs()).not.toContain(MOCK_HOME_DIR);
     const widget = app.editor.view.contentDOM.querySelector<HTMLElement>(
       "[data-testid=image-widget]",
@@ -487,7 +477,7 @@ describe("IM-04 root folder command", () => {
     app.editor.setCursor(app.editor.view.state.doc.length);
     await flush();
     await flush();
-    expect(app.getStatusText()).toBe(`${IMAGE_ROOT_TOO_BROAD_PREFIX}/`);
+    expect(app.getStatusText()).toBe("圖片根目錄範圍過大：/");
     expect(getMockAllowedAssetDirs()).not.toContain("/");
     expect(
       app.editor.view.contentDOM.querySelector("[data-testid=image-widget]"),
@@ -498,8 +488,6 @@ describe("IM-04 root folder command", () => {
     app.editor.setContent("---\ntypora-root-url: ..\n---\n\n![a](/img/a.png)");
     await flush();
     await flush();
-    expect(app.getStatusText()).toBe(
-      `${IMAGE_ROOT_TOO_BROAD_PREFIX}${MOCK_HOME_DIR}`,
-    );
+    expect(app.getStatusText()).toBe(`圖片根目錄範圍過大：${MOCK_HOME_DIR}`);
   });
 });

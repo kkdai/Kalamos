@@ -63,15 +63,24 @@ impl Uploader {
 /// A local image file that may be uploaded (absolute, existing file, supported extension).
 pub fn validate_image_path(path: &str) -> Result<PathBuf, AppError> {
     if path.trim().is_empty() {
-        return Err(AppError::invalid_path("圖片路徑是空的"));
+        return Err(AppError::invalid_path("圖片路徑是空的")
+            .with_message_key("errors.upload.emptyPath"));
     }
     let p = PathBuf::from(path);
     if !p.is_absolute() {
-        return Err(AppError::invalid_path(format!("圖片路徑必須是絕對路徑：{path}")));
+        return Err(AppError::invalid_path(format!("圖片路徑必須是絕對路徑：{path}"))
+            .with_message_key("errors.upload.relativePath")
+            .with_message_arg("path", path));
     }
-    let meta = fs::metadata(&p).map_err(|_| AppError::not_found(format!("找不到圖片：{path}")))?;
+    let meta = fs::metadata(&p).map_err(|_| {
+        AppError::not_found(format!("找不到圖片：{path}"))
+            .with_message_key("errors.upload.imageNotFound")
+            .with_message_arg("path", path)
+    })?;
     if meta.is_dir() {
-        return Err(AppError::invalid_path(format!("不是圖片檔案（是資料夾）：{path}")));
+        return Err(AppError::invalid_path(format!("不是圖片檔案（是資料夾）：{path}"))
+            .with_message_key("errors.upload.imageIsDirectory")
+            .with_message_arg("path", path));
     }
     let ext = p
         .extension()
@@ -79,7 +88,9 @@ pub fn validate_image_path(path: &str) -> Result<PathBuf, AppError> {
         .map(|e| e.to_ascii_lowercase())
         .unwrap_or_default();
     if !ALLOWED_IMAGE_EXTS.contains(&ext.as_str()) {
-        return Err(AppError::invalid_path(format!("不支援的圖片類型：{path}")));
+        return Err(AppError::invalid_path(format!("不支援的圖片類型：{path}"))
+            .with_message_key("errors.upload.unsupportedImageType")
+            .with_message_arg("path", path));
     }
     Ok(p)
 }
@@ -102,7 +113,10 @@ pub fn parse_urls(stdout: &str, count: usize) -> Result<Vec<String>, AppError> {
         return Err(AppError::parse(format!(
             "上傳指令只回傳 {} 個網址，需要 {count} 個",
             urls.len()
-        )));
+        ))
+        .with_message_key("errors.upload.urlCount")
+        .with_message_arg("actual", urls.len())
+        .with_message_arg("expected", count));
     }
     Ok(urls[urls.len() - count..].iter().map(|s| s.to_string()).collect())
 }
@@ -133,11 +147,16 @@ pub fn resolve_command(
         return if is_executable(&p) {
             Ok(p)
         } else {
-            Err(AppError::not_found(format!("找不到可執行的上傳指令：{command}")))
+            Err(AppError::not_found(format!("找不到可執行的上傳指令：{command}"))
+                .with_message_key("errors.upload.programNotExecutable")
+                .with_message_arg("program", command))
         };
     }
-    crate::platform::find_executable(command, path_env, extra_dirs)
-        .ok_or_else(|| AppError::not_found(format!("找不到上傳指令：{command}")))
+    crate::platform::find_executable(command, path_env, extra_dirs).ok_or_else(|| {
+        AppError::not_found(format!("找不到上傳指令：{command}"))
+            .with_message_key("errors.upload.programNotFound")
+            .with_message_arg("program", command)
+    })
 }
 
 fn spawn_reader<R: Read + Send + 'static>(mut reader: R) -> thread::JoinHandle<Vec<u8>> {
@@ -166,7 +185,11 @@ pub fn run_uploader(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .map_err(|e| AppError::new(ErrorKind::Io, format!("無法執行上傳指令：{e}")))?;
+        .map_err(|e| {
+            AppError::new(ErrorKind::Io, format!("無法執行上傳指令：{e}"))
+                .with_message_key("errors.upload.spawnFailed")
+                .with_message_arg("detail", e)
+        })?;
     let out_reader = child.stdout.take().map(spawn_reader);
     let err_reader = child.stderr.take().map(spawn_reader);
 
@@ -181,7 +204,9 @@ pub fn run_uploader(
                     return Err(AppError::new(
                         ErrorKind::Io,
                         format!("上傳逾時（超過 {} 秒），已中止", timeout.as_secs()),
-                    ));
+                    )
+                    .with_message_key("errors.upload.timeout")
+                    .with_message_arg("seconds", timeout.as_secs()));
                 }
                 thread::sleep(Duration::from_millis(20));
             }
@@ -196,14 +221,15 @@ pub fn run_uploader(
             .map(|c| c.to_string())
             .unwrap_or_else(|| "signal".to_string());
         let tail = stderr_tail(&stderr);
-        return Err(AppError::new(
-            ErrorKind::Io,
-            if tail.is_empty() {
-                format!("上傳指令失敗（結束碼 {code}）")
-            } else {
-                format!("上傳指令失敗（結束碼 {code}）：{tail}")
-            },
-        ));
+        let error = if tail.is_empty() {
+            AppError::new(ErrorKind::Io, format!("上傳指令失敗（結束碼 {code}）"))
+                .with_message_key("errors.upload.exit")
+        } else {
+            AppError::new(ErrorKind::Io, format!("上傳指令失敗（結束碼 {code}）：{tail}"))
+                .with_message_key("errors.upload.exitWithDetail")
+                .with_message_arg("detail", tail)
+        };
+        return Err(error.with_message_arg("code", code));
     }
     parse_urls(&String::from_utf8_lossy(&stdout), paths.len())
 }
@@ -235,8 +261,10 @@ pub async fn upload_images(app: tauri::AppHandle, paths: Vec<String>) -> Result<
         .map_err(|e| AppError::invalid_path(e.to_string()))?;
     tauri::async_runtime::spawn_blocking(move || {
         let settings = get_settings_in(&app_data_dir)?;
-        let uploader = Uploader::from_settings(&settings)
-            .ok_or_else(|| AppError::not_found(UPLOADER_NOT_CONFIGURED_MESSAGE))?;
+        let uploader = Uploader::from_settings(&settings).ok_or_else(|| {
+            AppError::not_found(UPLOADER_NOT_CONFIGURED_MESSAGE)
+                .with_message_key("errors.upload.notConfigured")
+        })?;
         upload_with(&uploader, &paths, UPLOAD_TIMEOUT)
     })
     .await
@@ -337,6 +365,9 @@ for p in "$@"; do n=$((n+1)); echo "https://img.example.test/$n.png"; done"#,
         assert_eq!(err.kind, ErrorKind::Io);
         assert!(err.message.contains("結束碼 3"), "{}", err.message);
         assert!(err.message.contains("token expired"), "{}", err.message);
+        assert_eq!(err.message_key.as_deref(), Some("errors.upload.exitWithDetail"));
+        assert_eq!(err.message_args["code"], "3");
+        assert_eq!(err.message_args["detail"], "token expired");
     }
 
     #[test]

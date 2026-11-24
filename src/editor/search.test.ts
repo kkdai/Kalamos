@@ -6,6 +6,7 @@ import {
 } from "@codemirror/search";
 import { EditorState } from "@codemirror/state";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { getUiLocale, initUiLocale } from "../i18n";
 import { resetMockState } from "../ipc";
 import { createKalamosApp, type KalamosApp } from "../main";
 import {
@@ -155,6 +156,31 @@ describe("#73 query helpers", () => {
     expect(tableHitAt(s, 0, 1)).toBeNull();
     expect(tableHitAt(s, cc, doc.indexOf("d |") + 1)).toBeNull();
   });
+});
+
+it("localizes the search panel and CodeMirror announcements in English", async () => {
+  const previousLocale = getUiLocale();
+  await initUiLocale("en");
+  document.body.innerHTML = `<main id="editor-container"></main><div id="status"></div>`;
+  const app = createKalamosApp(document);
+  try {
+    const { view } = app.editor;
+    openFind(view, { replace: true });
+    expect(
+      document
+        .querySelector('[data-testid="search-input"]')
+        ?.getAttribute("placeholder"),
+    ).toBe("Find");
+    expect(
+      document.querySelector('[data-testid="replace-all"]')?.textContent,
+    ).toBe("Replace all");
+    expect(view.state.phrase("replaced $ matches", 6)).toBe(
+      "Replaced matches: 6",
+    );
+  } finally {
+    app.destroy();
+    await initUiLocale(previousLocale);
+  }
 });
 
 const DOC = [

@@ -4,14 +4,16 @@
 //! frontend (which uses the same accelerators to keep a shortcut from running
 //! twice). Items can carry an optional `"platforms"` list (`"macos"`,
 //! `"windows"`, `"linux"`) so macOS-only items stay off Windows and Windows
-//! places Preferences / Quit / About in 檔案 and 說明. Clicking a custom item
+//! puts Preferences and Quit under File and About under Help. Flat `labelKey`
+//! values resolve against the shared dictionaries in `src/i18n/locales` using
+//! the locale selected at startup. Clicking a custom item
 //! emits `menu-action` to the WebView, where the existing keyboard handlers
 //! run — no command logic is duplicated here. Standard edit items (undo / copy
 //! / paste…) are predefined items, so they go through the OS / WebView
 //! responder path.
 
 use std::collections::HashMap;
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
 
 use serde::{Deserialize, Serialize};
 use tauri::menu::{
@@ -21,6 +23,7 @@ use tauri::menu::{
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 
 use crate::error::{AppError, ErrorKind};
+use crate::settings::{snapshot_ui_locale, UiLocale};
 
 pub const MENU_SPEC_JSON: &str = include_str!("../../src/menu/menu-spec.json");
 pub const MENU_ACTION_EVENT: &str = "menu-action";
@@ -32,7 +35,30 @@ pub const RECENT_ITEM_PREFIX: &str = "recent:";
 pub const OPEN_RECENT_ACTION: &str = "file.openRecent";
 const CLEAR_RECENT_ACTION: &str = "file.clearRecent";
 const RECENT_EMPTY_ID: &str = "recent-empty";
-const RECENT_EMPTY_LABEL: &str = "沒有最近開啟的檔案";
+const RECENT_EMPTY_LABEL_KEY: &str = "menu.file.recentEmpty";
+
+struct MenuLabels(HashMap<String, String>);
+
+impl MenuLabels {
+    fn for_locale(locale: UiLocale) -> &'static Self {
+        static ZH_TW: OnceLock<MenuLabels> = OnceLock::new();
+        static EN: OnceLock<MenuLabels> = OnceLock::new();
+        let (catalog, json) = match locale {
+            UiLocale::ZhTw => (&ZH_TW, include_str!("../../src/i18n/locales/zh-TW.json")),
+            UiLocale::En => (&EN, include_str!("../../src/i18n/locales/en.json")),
+        };
+        catalog.get_or_init(|| {
+            Self(serde_json::from_str(json).expect("UI locale dictionary is a flat string map"))
+        })
+    }
+
+    fn get<'a>(&'a self, key: &'a str) -> &'a str {
+        self.0
+            .get(key)
+            .or_else(|| Self::for_locale(UiLocale::ZhTw).0.get(key))
+            .map_or(key, String::as_str)
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -68,35 +94,33 @@ pub enum SubmenuRole {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-#[serde(tag = "type", rename_all = "camelCase")]
+#[serde(tag = "type", rename_all = "camelCase", rename_all_fields = "camelCase")]
 pub enum MenuNode {
     Submenu {
-        label: String,
+        label_key: String,
         #[serde(default)]
         role: Option<SubmenuRole>,
         #[serde(default)]
         platforms: Option<Vec<MenuPlatform>>,
         items: Vec<MenuNode>,
     },
-    /// The 主題 submenu: one check item per theme (filled by `sync_menu_state`),
-    /// then a separator and `items`.
+    /// One check item per theme (filled by `sync_menu_state`), then a separator and `items`.
     Themes {
-        label: String,
+        label_key: String,
         #[serde(default)]
         platforms: Option<Vec<MenuPlatform>>,
         items: Vec<MenuNode>,
     },
-    /// #104: The 打開最近使用 submenu: recent files (filled by `sync_menu_state`),
-    /// then a separator and `items` (清除最近使用).
+    /// #104: Recent files (filled by `sync_menu_state`), then a separator and `items`.
     RecentFiles {
-        label: String,
+        label_key: String,
         #[serde(default)]
         platforms: Option<Vec<MenuPlatform>>,
         items: Vec<MenuNode>,
     },
     Action {
         id: String,
-        label: String,
+        label_key: String,
         #[serde(default)]
         accel: Option<String>,
         #[serde(default)]
@@ -107,13 +131,13 @@ pub enum MenuNode {
     Predefined {
         item: String,
         #[serde(default)]
-        label: Option<String>,
+        label_key: Option<String>,
         #[serde(default)]
         platforms: Option<Vec<MenuPlatform>>,
     },
     Link {
         id: String,
-        label: String,
+        label_key: String,
         url: String,
         #[serde(default)]
         platforms: Option<Vec<MenuPlatform>>,
@@ -152,24 +176,24 @@ pub fn filter_menu_spec(nodes: &[MenuNode], platform: MenuPlatform) -> Vec<MenuN
             continue;
         }
         match node {
-            MenuNode::Submenu { label, role, platforms, items } => {
+            MenuNode::Submenu { label_key, role, platforms, items } => {
                 out.push(MenuNode::Submenu {
-                    label: label.clone(),
+                    label_key: label_key.clone(),
                     role: role.clone(),
                     platforms: platforms.clone(),
                     items: filter_menu_spec(items, platform),
                 });
             }
-            MenuNode::Themes { label, platforms, items } => {
+            MenuNode::Themes { label_key, platforms, items } => {
                 out.push(MenuNode::Themes {
-                    label: label.clone(),
+                    label_key: label_key.clone(),
                     platforms: platforms.clone(),
                     items: filter_menu_spec(items, platform),
                 });
             }
-            MenuNode::RecentFiles { label, platforms, items } => {
+            MenuNode::RecentFiles { label_key, platforms, items } => {
                 out.push(MenuNode::RecentFiles {
-                    label: label.clone(),
+                    label_key: label_key.clone(),
                     platforms: platforms.clone(),
                     items: filter_menu_spec(items, platform),
                 });
@@ -294,6 +318,7 @@ pub struct MenuHandles<R: Runtime> {
     clear_recent_item: Option<MenuItem<R>>,
     recent_list: Vec<RecentFileEntry>,
     recent_synced: bool,
+    recent_empty_label: String,
 }
 
 pub struct MenuStateStore<R: Runtime>(pub Mutex<Option<MenuHandles<R>>>);
@@ -337,22 +362,27 @@ fn predefined<R: Runtime>(
     Ok(Some(built))
 }
 
+fn empty_recent_item<R: Runtime>(app: &AppHandle<R>, label: &str) -> tauri::Result<MenuItem<R>> {
+    MenuItem::with_id(app, RECENT_EMPTY_ID, label, false, None::<&str>)
+}
+
 fn build_items<R: Runtime>(
     app: &AppHandle<R>,
     nodes: &[MenuNode],
+    labels: &MenuLabels,
     handles: &mut MenuHandles<R>,
 ) -> tauri::Result<Vec<MenuItemKind<R>>> {
     let mut out: Vec<MenuItemKind<R>> = Vec::new();
     for node in nodes {
         match node {
-            MenuNode::Submenu { label, role, items, .. } => {
-                let children = build_items(app, items, handles)?;
+            MenuNode::Submenu { label_key, role, items, .. } => {
+                let children = build_items(app, items, labels, handles)?;
                 let refs: Vec<&dyn IsMenuItem<R>> =
                     children.iter().map(|c| c as &dyn IsMenuItem<R>).collect();
                 let label = if *role == Some(SubmenuRole::App) {
-                    app.package_info().name.clone()
+                    app.package_info().name.as_str()
                 } else {
-                    label.clone()
+                    labels.get(label_key)
                 };
                 let submenu = Submenu::with_items(app, label, true, &refs)?;
                 #[cfg(target_os = "macos")]
@@ -363,28 +393,22 @@ fn build_items<R: Runtime>(
                 }
                 out.push(MenuItemKind::Submenu(submenu));
             }
-            MenuNode::Themes { label, items, .. } => {
+            MenuNode::Themes { label_key, items, .. } => {
                 let mut children = vec![MenuItemKind::Predefined(PredefinedMenuItem::separator(app)?)];
-                children.extend(build_items(app, items, handles)?);
+                children.extend(build_items(app, items, labels, handles)?);
                 let refs: Vec<&dyn IsMenuItem<R>> =
                     children.iter().map(|c| c as &dyn IsMenuItem<R>).collect();
-                let submenu = Submenu::with_items(app, label, true, &refs)?;
+                let submenu = Submenu::with_items(app, labels.get(label_key), true, &refs)?;
                 handles.theme_submenu = Some(submenu.clone());
                 out.push(MenuItemKind::Submenu(submenu));
             }
-            MenuNode::RecentFiles { label, items, .. } => {
-                let empty_item = MenuItem::with_id(
-                    app,
-                    RECENT_EMPTY_ID,
-                    RECENT_EMPTY_LABEL,
-                    false,
-                    None::<&str>,
-                )?;
+            MenuNode::RecentFiles { label_key, items, .. } => {
+                let empty_item = empty_recent_item(app, &handles.recent_empty_label)?;
                 let mut children = vec![
                     MenuItemKind::MenuItem(empty_item.clone()),
                     MenuItemKind::Predefined(PredefinedMenuItem::separator(app)?),
                 ];
-                let trailing = build_items(app, items, handles)?;
+                let trailing = build_items(app, items, labels, handles)?;
                 for child in &trailing {
                     if let MenuItemKind::MenuItem(mi) = child {
                         if mi.id().as_ref() == CLEAR_RECENT_ACTION {
@@ -396,12 +420,13 @@ fn build_items<R: Runtime>(
                 children.extend(trailing);
                 let refs: Vec<&dyn IsMenuItem<R>> =
                     children.iter().map(|c| c as &dyn IsMenuItem<R>).collect();
-                let submenu = Submenu::with_items(app, label, true, &refs)?;
+                let submenu = Submenu::with_items(app, labels.get(label_key), true, &refs)?;
                 handles.recent_submenu = Some(submenu.clone());
                 handles.recent_items.push(empty_item);
                 out.push(MenuItemKind::Submenu(submenu));
             }
-            MenuNode::Action { id, label, accel, check, .. } => {
+            MenuNode::Action { id, label_key, accel, check, .. } => {
+                let label = labels.get(label_key);
                 if *check {
                     let item = CheckMenuItem::with_id(
                         app,
@@ -418,13 +443,14 @@ fn build_items<R: Runtime>(
                     out.push(MenuItemKind::MenuItem(item));
                 }
             }
-            MenuNode::Predefined { item, label, .. } => {
-                if let Some(built) = predefined(app, item, label.as_deref())? {
+            MenuNode::Predefined { item, label_key, .. } => {
+                let label = label_key.as_deref().map(|key| labels.get(key));
+                if let Some(built) = predefined(app, item, label)? {
                     out.push(MenuItemKind::Predefined(built));
                 }
             }
-            MenuNode::Link { id, label, .. } => {
-                let item = MenuItem::with_id(app, id.as_str(), label, true, None::<&str>)?;
+            MenuNode::Link { id, label_key, .. } => {
+                let item = MenuItem::with_id(app, id.as_str(), labels.get(label_key), true, None::<&str>)?;
                 out.push(MenuItemKind::MenuItem(item));
             }
         }
@@ -434,6 +460,7 @@ fn build_items<R: Runtime>(
 
 /// Builds the menu bar and registers the handles `sync_menu_state` updates.
 pub fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
+    let labels = MenuLabels::for_locale(snapshot_ui_locale(app));
     let mut handles = MenuHandles {
         checks: HashMap::new(),
         theme_submenu: None,
@@ -444,8 +471,9 @@ pub fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> 
         clear_recent_item: None,
         recent_list: Vec::new(),
         recent_synced: false,
+        recent_empty_label: labels.get(RECENT_EMPTY_LABEL_KEY).to_owned(),
     };
-    let top = build_items(app, &menu_spec(), &mut handles)?;
+    let top = build_items(app, &menu_spec(), labels, &mut handles)?;
     let refs: Vec<&dyn IsMenuItem<R>> = top.iter().map(|c| c as &dyn IsMenuItem<R>).collect();
     let menu = Menu::with_items(app, &refs)?;
     if let Some(store) = app.try_state::<MenuStateStore<R>>() {
@@ -512,13 +540,7 @@ fn apply_sync_state<R: Runtime>(
                 submenu.remove(&item)?;
             }
             if state.recent_files.is_empty() {
-                let empty_item = MenuItem::with_id(
-                    app,
-                    RECENT_EMPTY_ID,
-                    RECENT_EMPTY_LABEL,
-                    false,
-                    None::<&str>,
-                )?;
+                let empty_item = empty_recent_item(app, &handles.recent_empty_label)?;
                 submenu.insert(&empty_item, 0)?;
                 handles.recent_items.push(empty_item);
             } else {
@@ -630,17 +652,80 @@ mod tests {
     }
 
     #[test]
+    fn missing_menu_label_falls_back_to_traditional_chinese() {
+        let partial = MenuLabels(HashMap::new());
+        assert_eq!(partial.get("menu.file.title"), "檔案");
+    }
+
+    #[test]
+    fn both_locales_cover_every_menu_label() {
+        let spec = raw_menu_spec();
+        for locale in [UiLocale::ZhTw, UiLocale::En] {
+            let labels = MenuLabels::for_locale(locale);
+            for node in all_nodes(&spec) {
+                let key = match node {
+                    MenuNode::Submenu { label_key, .. }
+                    | MenuNode::Themes { label_key, .. }
+                    | MenuNode::RecentFiles { label_key, .. }
+                    | MenuNode::Action { label_key, .. }
+                    | MenuNode::Link { label_key, .. } => label_key.as_str(),
+                    MenuNode::Predefined { item, .. } if item == "separator" => continue,
+                    MenuNode::Predefined { label_key, .. } => {
+                        label_key.as_deref().expect("predefined items need localized labels")
+                    }
+                };
+                assert!(labels.0.get(key).is_some_and(|s| !s.is_empty()), "missing {key} for {locale:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn menu_labels_are_localized_on_macos_and_windows() {
+        for (locale, headings, mac_zoom, win_maximize, recent_empty) in [
+            (
+                UiLocale::ZhTw,
+                ["Kalamos", "檔案", "編輯", "段落", "格式", "檢視", "視窗", "說明"],
+                "縮放",
+                "最大化",
+                "沒有最近開啟的檔案",
+            ),
+            (
+                UiLocale::En,
+                ["Kalamos", "File", "Edit", "Paragraph", "Format", "View", "Window", "Help"],
+                "Zoom",
+                "Maximize",
+                "No Recent Files",
+            ),
+        ] {
+            let labels = MenuLabels::for_locale(locale);
+            for (platform, expected, maximize_label) in [
+                (MenuPlatform::Macos, &headings[..], mac_zoom),
+                (MenuPlatform::Windows, &headings[1..], win_maximize),
+            ] {
+                let spec = menu_spec_for(platform);
+                let top: Vec<&str> = spec
+                    .iter()
+                    .filter_map(|n| match n {
+                        MenuNode::Submenu { label_key, .. } => Some(labels.get(label_key)),
+                        _ => None,
+                    })
+                    .collect();
+                assert_eq!(top, expected);
+                let maximize = all_nodes(&spec).into_iter().find_map(|n| match n {
+                    MenuNode::Predefined { item, label_key, .. } if item == "maximize" => {
+                        label_key.as_deref().map(|key| labels.get(key))
+                    }
+                    _ => None,
+                });
+                assert_eq!(maximize, Some(maximize_label));
+            }
+            assert_eq!(labels.get(RECENT_EMPTY_LABEL_KEY), recent_empty);
+        }
+    }
+
+    #[test]
     fn macos_spec_has_the_required_menus_and_items() {
         let spec = menu_spec_for(MenuPlatform::Macos);
-        let labels: Vec<&str> = spec
-            .iter()
-            .filter_map(|n| match n {
-                MenuNode::Submenu { label, .. } => Some(label.as_str()),
-                _ => None,
-            })
-            .collect();
-        assert_eq!(labels, ["Kalamos", "檔案", "編輯", "段落", "格式", "檢視", "視窗", "說明"]);
-
         let nodes = all_nodes(&spec);
         let accel_of = |wanted: &str| {
             nodes.iter().find_map(|n| match n {
@@ -683,15 +768,6 @@ mod tests {
     #[test]
     fn windows_spec_omits_macos_only_items_and_places_preferences_quit_about() {
         let win = menu_spec_for(MenuPlatform::Windows);
-        let labels: Vec<&str> = win
-            .iter()
-            .filter_map(|n| match n {
-                MenuNode::Submenu { label, .. } => Some(label.as_str()),
-                _ => None,
-            })
-            .collect();
-        assert_eq!(labels, ["檔案", "編輯", "段落", "格式", "檢視", "視窗", "說明"]);
-
         let nodes = all_nodes(&win);
         let predefined: HashSet<&str> = nodes
             .iter()
@@ -709,12 +785,12 @@ mod tests {
         let submenu_items = |wanted: &str| -> &[MenuNode] {
             win.iter()
                 .find_map(|n| match n {
-                    MenuNode::Submenu { label, items, .. } if label == wanted => Some(items.as_slice()),
+                    MenuNode::Submenu { label_key, items, .. } if label_key == wanted => Some(items.as_slice()),
                     _ => None,
                 })
                 .expect("submenu exists")
         };
-        let file_items = submenu_items("檔案");
+        let file_items = submenu_items("menu.file.title");
         assert!(file_items.iter().any(|n| matches!(
             n,
             MenuNode::Action { id, accel: Some(a), .. } if id == "app.preferences" && a == "CmdOrCtrl+,"
@@ -723,7 +799,7 @@ mod tests {
             n,
             MenuNode::Action { id, accel: Some(a), .. } if id == "app.quit" && a == "CmdOrCtrl+Q"
         )));
-        let help_items = submenu_items("說明");
+        let help_items = submenu_items("menu.help.title");
         assert!(help_items.iter().any(|n| matches!(n, MenuNode::Predefined { item, .. } if item == "about")));
 
         // macOS and Windows expose the exact same set of custom action ids and accelerators.

@@ -1,11 +1,14 @@
 use std::fs;
 use std::path::Path;
+use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
 use tauri::Manager;
 
-use crate::error::AppError;
+use crate::error::{AppError, ErrorKind};
 use crate::files::save_file_impl;
+
+static SETTINGS_WRITE_LOCK: Mutex<()> = Mutex::new(());
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
@@ -29,6 +32,26 @@ pub enum StartupBehavior {
     Blank,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Default)]
+pub enum UiLocale {
+    #[default]
+    #[serde(rename = "zh-TW")]
+    ZhTw,
+    #[serde(rename = "en")]
+    En,
+}
+
+impl<'de> Deserialize<'de> for UiLocale {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        // An unsupported or malformed locale must not reset unrelated settings.
+        let raw = serde_json::Value::deserialize(deserializer)?;
+        Ok(match raw.as_str() {
+            Some("en") => Self::En,
+            _ => Self::default(),
+        })
+    }
+}
+
 pub const DEFAULT_FONT_SIZE: u32 = 17;
 pub const DEFAULT_CONTENT_WIDTH: u32 = 720;
 
@@ -36,6 +59,8 @@ pub const DEFAULT_CONTENT_WIDTH: u32 = 720;
 #[serde(rename_all = "camelCase", default)]
 pub struct Settings {
     pub theme: String,
+    /// The UI language to use the next time the app starts.
+    pub ui_locale: UiLocale,
     pub last_folder: Option<String>,
     pub sidebar_visible: bool,
     pub sidebar_tab: SidebarTab,
@@ -74,6 +99,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             theme: "system".to_string(),
+            ui_locale: UiLocale::default(),
             last_folder: None,
             sidebar_visible: false,
             sidebar_tab: SidebarTab::Tree,
@@ -118,31 +144,72 @@ pub fn get_settings_in(app_data_dir: &Path) -> Result<Settings, AppError> {
     }
 }
 
-/// Settings the WebView may never change (IM-05 defence in depth): the upload
-/// command runs a local program, so it is only ever taken from the file on
-/// disk. Whatever the frontend sends for these keys is replaced by the
-/// values currently stored (null / [] when the file has none).
+/// Startup locale shared by the native menu and the WebView until the app quits.
+pub struct ActiveUiLocale(UiLocale);
+
+impl ActiveUiLocale {
+    fn load(app_data_dir: Option<&Path>) -> Self {
+        let settings = app_data_dir
+            .and_then(|dir| get_settings_in(dir).ok())
+            .unwrap_or_default();
+        Self(settings.ui_locale)
+    }
+}
+
+/// Called by the native menu builder before WebView code can request the locale.
+pub(crate) fn snapshot_ui_locale<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> UiLocale {
+    if app.try_state::<ActiveUiLocale>().is_none() {
+        let app_data_dir = app.path().app_data_dir().ok();
+        app.manage(ActiveUiLocale::load(app_data_dir.as_deref()));
+    }
+    app.state::<ActiveUiLocale>().inner().0
+}
+
+#[tauri::command]
+pub fn get_active_ui_locale(active: tauri::State<'_, ActiveUiLocale>) -> UiLocale {
+    active.inner().0
+}
+
+/// Keep the on-disk uploader (which runs a local program) and the locale
+/// (written only by `set_ui_locale`, so a stale settings copy cannot reset it).
 pub fn keep_protected_from_disk(incoming: &Settings, on_disk: &Settings) -> Settings {
     Settings {
         upload_command: on_disk.upload_command.clone(),
         upload_args: on_disk.upload_args.clone(),
+        ui_locale: on_disk.ui_locale,
         ..incoming.clone()
     }
 }
 
-/// Writes `settings`, except the protected keys (`uploadCommand`, `uploadArgs`),
-/// which keep the values already in `settings.json`.
-pub fn set_settings_in(app_data_dir: &Path, settings: &Settings) -> Result<(), AppError> {
+fn update_settings_in(
+    app_data_dir: &Path,
+    update: impl FnOnce(Settings) -> Settings,
+) -> Result<(), AppError> {
+    // A general settings save and a locale save must not overwrite each other.
+    let _guard = SETTINGS_WRITE_LOCK
+        .lock()
+        .map_err(|_| AppError::new(ErrorKind::Io, "settings write lock poisoned"))?;
     fs::create_dir_all(app_data_dir)?;
     let settings_path = app_data_dir.join("settings.json");
     let settings_path_str = settings_path
         .to_str()
         .ok_or_else(|| AppError::invalid_path("Non-UTF-8 settings path"))?;
-    let on_disk = get_settings_in(app_data_dir)?;
-    let merged = keep_protected_from_disk(settings, &on_disk);
-    let json = serde_json::to_string_pretty(&merged)?;
+    let updated = update(get_settings_in(app_data_dir)?);
+    let json = serde_json::to_string_pretty(&updated)?;
     save_file_impl(settings_path_str, &json)?;
     Ok(())
+}
+
+/// Write settings, preserving the stored `uploadCommand`, `uploadArgs` and `uiLocale`.
+pub fn set_settings_in(app_data_dir: &Path, settings: &Settings) -> Result<(), AppError> {
+    update_settings_in(app_data_dir, |on_disk| keep_protected_from_disk(settings, &on_disk))
+}
+
+fn set_ui_locale_in(app_data_dir: &Path, locale: UiLocale) -> Result<(), AppError> {
+    update_settings_in(app_data_dir, |settings| Settings {
+        ui_locale: locale,
+        ..settings
+    })
 }
 
 #[tauri::command]
@@ -163,6 +230,16 @@ pub fn set_settings(app: tauri::AppHandle, settings: Settings) -> Result<(), App
     set_settings_in(&app_data_dir, &settings)
 }
 
+/// Save the language for the next launch without changing the active locale.
+#[tauri::command]
+pub fn set_ui_locale(app: tauri::AppHandle, locale: UiLocale) -> Result<(), AppError> {
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| AppError::invalid_path(e.to_string()))?;
+    set_ui_locale_in(&app_data_dir, locale)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -176,6 +253,7 @@ mod tests {
 
         let v = serde_json::to_value(&s).unwrap();
         assert_eq!(v["theme"], "system");
+        assert_eq!(v["uiLocale"], "zh-TW");
         assert!(v["lastFolder"].is_null());
         assert_eq!(v["sidebarVisible"], false);
         assert_eq!(v["sidebarTab"], "tree");
@@ -202,6 +280,7 @@ mod tests {
         let dir = tempdir().expect("tempdir");
         let updated = Settings {
             theme: "melan".to_string(),
+            ui_locale: UiLocale::ZhTw,
             last_folder: Some("/tmp/kalamos-test/Notes".to_string()),
             sidebar_visible: true,
             sidebar_tab: SidebarTab::Outline,
@@ -229,6 +308,56 @@ mod tests {
         set_settings_in(dir.path(), &updated).expect("set_settings");
         let loaded = get_settings_in(dir.path()).expect("get_settings");
         assert_eq!(loaded, updated);
+    }
+
+    #[test]
+    fn locale_save_preserves_other_settings_and_survives_stale_saves() {
+        let dir = tempdir().unwrap();
+        let previous = Settings {
+            theme: "papyros".into(),
+            auto_save: false,
+            ..Settings::default()
+        };
+        set_settings_in(dir.path(), &previous).unwrap();
+        set_ui_locale_in(dir.path(), UiLocale::En).unwrap();
+        let stored = get_settings_in(dir.path()).unwrap();
+        assert_eq!(stored, Settings { ui_locale: UiLocale::En, ..previous.clone() });
+        assert_eq!(serde_json::to_value(stored).unwrap()["uiLocale"], "en");
+
+        let stale = Settings { font_size: 22, ..previous };
+        set_settings_in(dir.path(), &stale).unwrap();
+        assert_eq!(
+            get_settings_in(dir.path()).unwrap(),
+            Settings { ui_locale: UiLocale::En, ..stale }
+        );
+    }
+
+    #[test]
+    fn unknown_ui_locale_does_not_reset_other_settings() {
+        let dir = tempdir().unwrap();
+        for invalid in [r#""ja""#, "null", "42", "{}"] {
+            fs::write(
+                dir.path().join("settings.json"),
+                format!(r#"{{"uiLocale":{invalid},"theme":"papyros","uploadArgs":["upload"]}}"#),
+            )
+            .unwrap();
+            let settings = get_settings_in(dir.path()).unwrap();
+            assert_eq!(settings.ui_locale, UiLocale::ZhTw);
+            assert_eq!(settings.theme, "papyros");
+            assert_eq!(settings.upload_args, ["upload"]);
+        }
+    }
+
+    #[test]
+    fn active_ui_locale_stays_fixed_until_the_next_launch() {
+        let dir = tempdir().unwrap();
+        let startup = ActiveUiLocale::load(Some(dir.path()));
+        assert_eq!(serde_json::to_value(startup.0).unwrap(), "zh-TW");
+
+        set_ui_locale_in(dir.path(), UiLocale::En).unwrap();
+        assert_eq!(startup.0, UiLocale::ZhTw);
+        let next_launch = ActiveUiLocale::load(Some(dir.path()));
+        assert_eq!(serde_json::to_value(next_launch.0).unwrap(), "en");
     }
 
     #[test]
@@ -291,6 +420,7 @@ mod tests {
 
         let loaded = get_settings_in(dir.path()).expect("load legacy settings");
         assert_eq!(loaded.theme, "papyros");
+        assert_eq!(loaded.ui_locale, UiLocale::ZhTw);
         assert_eq!(loaded.last_folder.as_deref(), Some("/demo"));
         assert!(loaded.sidebar_visible);
         assert_eq!(loaded.sidebar_tab, SidebarTab::List);

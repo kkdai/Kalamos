@@ -7,6 +7,8 @@ import { markdownLanguage } from "@codemirror/lang-markdown";
 import type { MarkdownParser } from "@lezer/markdown";
 import { findTyporaRootUrlInText, parseImgTag } from "../editor/image-attrs";
 import { resolveImageRoot, resolveImageSrc } from "../editor/images";
+import { t } from "../i18n";
+import { type AppError, appErrorDetail, formatErrorMessage } from "../ipc";
 import { IS_WINDOWS, toNativePath } from "../platform";
 import { documentTitle } from "./pdf";
 
@@ -16,25 +18,40 @@ export interface PandocFormatInfo {
   id: PandocFormat;
   label: string;
   ext: string;
-  description: string;
+  descriptionKey: string;
 }
 
 export const PANDOC_FORMATS: readonly PandocFormatInfo[] = [
-  { id: "docx", label: "DOCX", ext: "docx", description: "Microsoft Word" },
+  {
+    id: "docx",
+    label: "DOCX",
+    ext: "docx",
+    descriptionKey: "export.pandoc.docx",
+  },
   {
     id: "odt",
     label: "ODT",
     ext: "odt",
-    description: "OpenOffice / LibreOffice",
+    descriptionKey: "export.pandoc.odt",
   },
-  { id: "latex", label: "LaTeX", ext: "tex", description: "LaTeX 原始檔" },
+  {
+    id: "latex",
+    label: "LaTeX",
+    ext: "tex",
+    descriptionKey: "export.pandoc.latex",
+  },
   {
     id: "mediawiki",
     label: "MediaWiki",
     ext: "wiki",
-    description: "MediaWiki 標記",
+    descriptionKey: "export.pandoc.mediaWiki",
   },
-  { id: "epub", label: "EPUB", ext: "epub", description: "電子書" },
+  {
+    id: "epub",
+    label: "EPUB",
+    ext: "epub",
+    descriptionKey: "export.pandoc.epub",
+  },
 ];
 
 /** Extensions `import_pandoc` accepts. */
@@ -49,12 +66,55 @@ export const PANDOC_IMPORT_EXTENSIONS = [
   "mediawiki",
 ];
 
-/** Must match `PANDOC_MISSING_MESSAGE` in src-tauri/src/pandoc.rs (per platform). */
-export const PANDOC_MISSING_MESSAGE = IS_WINDOWS
-  ? "找不到 Pandoc：請先安裝（winget install JohnMacFarlane.Pandoc，或至 pandoc.org 下載安裝程式）"
-  : "找不到 Pandoc：請先安裝（brew install pandoc）";
-export const EXPORTING_MESSAGE = "匯出中…";
-export const IMPORTING_MESSAGE = "匯入中…";
+export function pandocMissingMessage(): string {
+  return t(
+    IS_WINDOWS ? "export.pandoc.missingWindows" : "export.pandoc.missingMac",
+  );
+}
+
+// Legacy IPC errors and older mocks send only a raw message. Do not compare
+// against translated UI text; match the original message in either platform.
+const PANDOC_MISSING_MESSAGES = [
+  "找不到 Pandoc：請先安裝（brew install pandoc）",
+  "找不到 Pandoc：請先安裝（winget install JohnMacFarlane.Pandoc，或至 pandoc.org 下載安裝程式）",
+];
+
+export function pandocErrorMessage(
+  action: "export" | "import",
+  err: unknown,
+): string {
+  const e = err as Partial<AppError> | null;
+  if (e?.kind === "NotFound") {
+    if (
+      e.messageKey === "export.pandoc.missingWindows" ||
+      e.messageKey === "export.pandoc.missingMac"
+    ) {
+      return appErrorDetail(err);
+    }
+    if (
+      typeof e.message === "string" &&
+      PANDOC_MISSING_MESSAGES.includes(e.message)
+    ) {
+      return pandocMissingMessage();
+    }
+  }
+  return formatErrorMessage(
+    t(
+      action === "export"
+        ? "export.pandoc.exportFailed"
+        : "export.pandoc.importFailed",
+    ),
+    err,
+  );
+}
+
+export function exportingMessage(): string {
+  return t("export.exporting");
+}
+
+export function importingMessage(): string {
+  return t("export.importing");
+}
 
 export function formatInfo(format: PandocFormat): PandocFormatInfo {
   return PANDOC_FORMATS.find((f) => f.id === format) ?? PANDOC_FORMATS[0];
@@ -81,12 +141,15 @@ export function ensureExportExtension(
 }
 
 export function exportedMessage(format: PandocFormat, path: string): string {
-  return `已匯出 ${formatInfo(format).label}：${toNativePath(path)}`;
+  return t("export.pandoc.done", {
+    format: formatInfo(format).label,
+    path: toNativePath(path),
+  });
 }
 
 export function importedMessage(path: string): string {
   const slash = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
-  return `已匯入：${path.slice(slash + 1)}`;
+  return t("export.pandoc.imported", { file: path.slice(slash + 1) });
 }
 
 export function isImportablePath(path: string): boolean {

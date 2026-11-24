@@ -8,6 +8,7 @@ import {
   open as openDialog,
   save as saveDialog,
 } from "@tauri-apps/plugin-dialog";
+import { normalizeUiLocale, t, type UiLocale } from "./i18n";
 import {
   isAbsolutePath,
   isMarkdownFilePath,
@@ -36,6 +37,26 @@ export type ErrorKind =
 export interface AppError {
   kind: ErrorKind;
   message: string;
+  messageKey?: string;
+  messageArgs?: Record<string, string | number>;
+}
+
+export function appErrorDetail(error: unknown): string {
+  if (error && typeof error === "object" && "message" in error) {
+    const appError = error as Partial<AppError>;
+    const message = String(error.message);
+    return appError.messageKey
+      ? t(appError.messageKey, {
+          ...appError.messageArgs,
+          defaultValue: message,
+        })
+      : message;
+  }
+  return String(error);
+}
+
+export function formatErrorMessage(prefix: string, error: unknown): string {
+  return t("dialog.errorWithDetail", { prefix, detail: appErrorDetail(error) });
 }
 
 export interface PathArg {
@@ -93,6 +114,7 @@ export interface RecoveryEntry {
 export type SidebarTab = "tree" | "list" | "outline" | "search";
 
 export interface Settings {
+  uiLocale?: UiLocale;
   theme: string;
   lastFolder: string | null;
   sidebarVisible: boolean;
@@ -131,6 +153,7 @@ export interface Settings {
 export type StartupBehavior = "restoreFolder" | "blank";
 
 export const DEFAULT_SETTINGS: Settings = {
+  uiLocale: normalizeUiLocale(undefined),
   theme: "system",
   lastFolder: null,
   sidebarVisible: false,
@@ -165,6 +188,8 @@ const mockDirs = new Set<string>();
 const mockRecovery = new Map<string, RecoveryEntry>();
 const mockCustomThemes = new Map<string, string>();
 let mockSettings: Settings = { ...DEFAULT_SETTINGS, recentFiles: [] };
+let mockActiveUiLocale: UiLocale | undefined;
+let mockSettingsWriteError: Error | null = null;
 let mockWatchedFolder: string | null = null;
 let mockListMarkdownPathsCalls = 0;
 const mockAssetFiles = new Set<string>();
@@ -222,8 +247,15 @@ function nextMockTimestampMs(): number {
   return lastMockTimestampMs;
 }
 
-function createAppError(kind: ErrorKind, message: string): AppError {
-  return { kind, message };
+function createAppError(
+  kind: ErrorKind,
+  message: string,
+  messageKey?: string,
+  messageArgs?: AppError["messageArgs"],
+): AppError {
+  return messageKey
+    ? { kind, message, messageKey, messageArgs }
+    : { kind, message };
 }
 
 function normalizePath(rawPath: string): string {
@@ -351,6 +383,8 @@ export function resetMockState(): void {
   mockRecovery.clear();
   mockCustomThemes.clear();
   mockSettings = { ...DEFAULT_SETTINGS, recentFiles: [] };
+  mockActiveUiLocale = undefined;
+  mockSettingsWriteError = null;
   mockWatchedFolder = null;
   mockListMarkdownPathsCalls = 0;
   lastMockTimestampMs = 0;
@@ -1081,11 +1115,29 @@ export async function clearRecovery(docId: string): Promise<null> {
   return null;
 }
 
+export async function getActiveUiLocale(): Promise<UiLocale> {
+  if (isTauri()) {
+    return normalizeUiLocale(await invoke<UiLocale>("get_active_ui_locale"));
+  }
+  mockActiveUiLocale ??= normalizeUiLocale(mockSettings.uiLocale);
+  return mockActiveUiLocale;
+}
+
+export async function setUiLocale(locale: UiLocale): Promise<void> {
+  if (isTauri()) {
+    await invoke("set_ui_locale", { locale });
+    return;
+  }
+  if (mockSettingsWriteError) throw mockSettingsWriteError;
+  mockSettings = { ...mockSettings, uiLocale: locale };
+}
+
 export async function getSettings(): Promise<Settings> {
   if (isTauri()) {
     const s = await invoke<Settings>("get_settings");
     return {
       ...s,
+      uiLocale: normalizeUiLocale(s.uiLocale),
       lastFolder: toSlashPath(s.lastFolder),
       imageRootDir: toSlashPath(s.imageRootDir),
       recentFiles: (s.recentFiles ?? []).map((p) => toSlashPath(p)),
@@ -1093,6 +1145,7 @@ export async function getSettings(): Promise<Settings> {
   }
   return {
     ...mockSettings,
+    uiLocale: normalizeUiLocale(mockSettings.uiLocale),
     recentFiles: [...(mockSettings.recentFiles ?? [])],
   };
 }
@@ -1101,7 +1154,9 @@ export async function setSettings(settings: Settings): Promise<null> {
   if (isTauri()) {
     return invoke<null>("set_settings", { settings });
   }
+  if (mockSettingsWriteError) throw mockSettingsWriteError;
   mockSettings = {
+    uiLocale: normalizeUiLocale(mockSettings.uiLocale),
     theme: settings.theme ?? DEFAULT_SETTINGS.theme,
     lastFolder: settings.lastFolder ?? DEFAULT_SETTINGS.lastFolder,
     sidebarVisible: settings.sidebarVisible ?? DEFAULT_SETTINGS.sidebarVisible,
@@ -1139,6 +1194,10 @@ export async function setSettings(settings: Settings): Promise<null> {
 /** Test hook: replace the mock settings file wholesale (e.g. an old settings.json). */
 export function seedMockSettings(settings: Partial<Settings>): void {
   mockSettings = { ...(settings as Settings) };
+}
+
+export function setMockSettingsWriteError(error: Error | null): void {
+  mockSettingsWriteError = error;
 }
 
 function isValidThemeStem(stem: string): boolean {
@@ -1243,7 +1302,7 @@ export async function pickSaveFilePath(
 }
 
 export async function askDiscardChanges(
-  message = "目前未命名文件尚有未儲存的變更，確定要捨棄嗎？",
+  message = t("dialog.discardUntitled"),
 ): Promise<boolean> {
   if (isTauri()) {
     return askDialog(message, { title: "Kalamos", kind: "warning" });
@@ -1260,22 +1319,18 @@ export interface SaveChangesLabels {
   cancel: string;
 }
 
-export const SAVE_CHANGES_LABELS: SaveChangesLabels = {
-  yes: "儲存",
-  no: "不儲存",
-  cancel: "取消",
-};
-/** #81 B: closing the window / quitting with several unsaved documents. */
-export const SAVE_ALL_CHANGES_LABELS: SaveChangesLabels = {
-  yes: "全部儲存",
-  no: "不儲存",
-  cancel: "取消",
-};
+export function saveChangesLabels(saveAll = false): SaveChangesLabels {
+  return {
+    yes: t(saveAll ? "dialog.saveAll" : "dialog.save"),
+    no: t("dialog.dontSave"),
+    cancel: t("dialog.cancel"),
+  };
+}
 
 /** #81: 儲存 / 不儲存 / 取消 before closing a tab (or the window) with unsaved changes. */
 export async function askSaveChanges(
   message: string,
-  labels: SaveChangesLabels = SAVE_CHANGES_LABELS,
+  labels: SaveChangesLabels = saveChangesLabels(),
 ): Promise<SaveChangesChoice> {
   if (isTauri()) {
     const result = await messageDialog(message, {
@@ -1912,7 +1967,11 @@ export async function importPandoc(path: string): Promise<PandocImportResult> {
   if (!mockPandocStatus.available)
     throw createAppError("NotFound", PANDOC_MISSING);
   if (!mockSupportsSandbox(mockPandocStatus.version)) {
-    throw createAppError("Io", PANDOC_TOO_OLD_FOR_IMPORT);
+    throw createAppError(
+      "Io",
+      PANDOC_TOO_OLD_FOR_IMPORT,
+      "errors.pandoc.tooOldForImport",
+    );
   }
   if (mockPandocImportHandler)
     return mockPandocImportHandler(normalizePath(path));
@@ -1944,7 +2003,7 @@ export async function pickImportPath(
     const selected = await openDialog({
       multiple: false,
       directory: false,
-      filters: [{ name: "可匯入的文件", extensions }],
+      filters: [{ name: t("dialog.importableFiles"), extensions }],
     });
     return typeof selected === "string" ? toSlashPath(selected) : null;
   }
@@ -2005,7 +2064,11 @@ export async function uploadImages(paths: string[]): Promise<UploadResult> {
   mockUploadCalls.push([...paths]);
   if (mockUploadHandler) return mockUploadHandler(paths);
   if (!mockSettings.uploadCommand || !mockSettings.uploadCommand.trim()) {
-    throw createAppError("NotFound", UPLOADER_NOT_CONFIGURED_MESSAGE);
+    throw createAppError(
+      "NotFound",
+      UPLOADER_NOT_CONFIGURED_MESSAGE,
+      "errors.upload.notConfigured",
+    );
   }
   return {
     urls: paths.map((p) => {

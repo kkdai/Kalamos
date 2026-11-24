@@ -64,6 +64,8 @@ pub fn run() {
             recovery::clear_recovery,
             settings::get_settings,
             settings::set_settings,
+            settings::get_active_ui_locale,
+            settings::set_ui_locale,
             themes::list_themes,
             themes::read_theme_css,
             themes::open_themes_dir,

@@ -13,6 +13,7 @@ import {
   StateEffect,
 } from "@codemirror/state";
 import { EditorView, keymap } from "@codemirror/view";
+import { t } from "../i18n";
 import {
   autoPairBracketsExtension,
   autoPairMarkdownExtension,
@@ -260,6 +261,15 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
 
   const buildExtensions = (content: string): Extension => [
     EditorView.editorAttributes.of({ "data-testid": "editor" }),
+    EditorState.phrases.of({
+      Completions: t("editor.codeMirror.completions"),
+      "Selection deleted": t("editor.codeMirror.selectionDeleted"),
+      "Control character": t("editor.codeMirror.controlCharacter"),
+      "replaced match on line $": t("editor.codeMirror.replacedMatchOnLine"),
+      "replaced $ matches": t("editor.codeMirror.replacedMatches"),
+      "current match": t("editor.codeMirror.currentMatch"),
+      "on line": t("editor.codeMirror.onLine"),
+    }),
     lineSeparatorCompartment.of(lineSeparatorFor(content)),
     ...globalCompartments().map(([compartment, ext]) => compartment.of(ext)),
     EditorState.transactionExtender.of((tr) => {

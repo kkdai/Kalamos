@@ -239,7 +239,10 @@ impl BusyGuard {
         EXPORT_BUSY
             .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
             .map(|_| BusyGuard)
-            .map_err(|_| AppError::new(ErrorKind::Io, "已有 PDF 匯出正在進行"))
+            .map_err(|_| {
+                AppError::new(ErrorKind::Io, "已有 PDF 匯出正在進行")
+                    .with_message_key("errors.pdf.busy")
+            })
     }
 }
 
@@ -458,9 +461,12 @@ mod imp {
             .stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(stderr_stdio);
-        let mut child = cmd
-            .spawn()
-            .map_err(|e| AppError::new(ErrorKind::Io, format!("無法啟動 {}：{e}", browser.display())))?;
+        let mut child = cmd.spawn().map_err(|e| {
+            AppError::new(ErrorKind::Io, format!("無法啟動 {}：{e}", browser.display()))
+                .with_message_key("errors.pdf.browserSpawnFailed")
+                .with_message_arg("browser", browser.display())
+                .with_message_arg("detail", e)
+        })?;
 
         let deadline = Instant::now() + timeout;
         let status = loop {
@@ -471,15 +477,22 @@ mod imp {
                         let _ = child.kill();
                         let _ = child.wait();
                         let stderr_tail = read_stderr_tail(stderr_log);
-                        let detail = if stderr_tail.is_empty() {
-                            String::new()
+                        let (key, detail) = if stderr_tail.is_empty() {
+                            ("errors.pdf.browserTimeout", String::new())
                         } else {
-                            format!("；stderr：{stderr_tail}")
+                            ("errors.pdf.browserTimeoutWithDetail", format!("；stderr：{stderr_tail}"))
                         };
-                        return Err(AppError::new(
+                        let error = AppError::new(
                             ErrorKind::Io,
                             format!("PDF 匯出逾時（超過 {} 秒）{detail}", timeout.as_secs()),
-                        ));
+                        )
+                        .with_message_key(key)
+                        .with_message_arg("seconds", timeout.as_secs());
+                        return Err(if stderr_tail.is_empty() {
+                            error
+                        } else {
+                            error.with_message_arg("detail", stderr_tail)
+                        });
                     }
                     std::thread::sleep(Duration::from_millis(50));
                 }
@@ -492,15 +505,22 @@ mod imp {
                 .map(|c| c.to_string())
                 .unwrap_or_else(|| "unknown".to_string());
             let stderr_tail = read_stderr_tail(stderr_log);
-            let detail = if stderr_tail.is_empty() {
-                String::new()
+            let (key, detail) = if stderr_tail.is_empty() {
+                ("errors.pdf.browserNoOutput", String::new())
             } else {
-                format!("；stderr：{stderr_tail}")
+                ("errors.pdf.browserNoOutputWithDetail", format!("；stderr：{stderr_tail}"))
             };
-            return Err(AppError::new(
+            let error = AppError::new(
                 ErrorKind::Io,
                 format!("PDF 匯出失敗：瀏覽器沒有產生 PDF（結束碼 {code}{detail}）"),
-            ));
+            )
+            .with_message_key(key)
+            .with_message_arg("code", code);
+            return Err(if stderr_tail.is_empty() {
+                error
+            } else {
+                error.with_message_arg("detail", stderr_tail)
+            });
         }
         Ok(())
     }
@@ -511,8 +531,10 @@ mod imp {
         _headings: &[ExportHeading],
         timeout: Duration,
     ) -> Result<FileMeta, AppError> {
-        let browser =
-            find_browser().ok_or_else(|| AppError::not_found(BROWSER_MISSING_MESSAGE))?;
+        let browser = find_browser().ok_or_else(|| {
+            AppError::not_found(BROWSER_MISSING_MESSAGE)
+                .with_message_key("errors.pdf.browserMissing")
+        })?;
         let work = work_dir();
         fs::create_dir_all(&work)?;
         let tmp_pdf = temp_sibling(target, "print");
@@ -639,6 +661,8 @@ mod imp {
             ErrorKind::Io,
             format!("匯出 PDF 逾時（{} 秒）", EXPORT_TIMEOUT.as_secs()),
         )
+        .with_message_key("errors.pdf.timeout")
+        .with_message_arg("seconds", EXPORT_TIMEOUT.as_secs())
     }
 
     fn remaining(deadline: Instant) -> Result<Duration, AppError> {
@@ -861,7 +885,8 @@ mod imp {
                 Ok(printed.is_some())
             })?;
             if printed != Some(true) {
-                return Err(AppError::new(ErrorKind::Io, "列印成 PDF 失敗"));
+                return Err(AppError::new(ErrorKind::Io, "列印成 PDF 失敗")
+                    .with_message_key("errors.pdf.printFailed"));
             }
             Ok(())
         })();
@@ -885,7 +910,8 @@ mod imp {
         result?;
         let size = fs::metadata(pdf_path).map(|m| m.len()).unwrap_or(0);
         if size == 0 {
-            return Err(AppError::new(ErrorKind::Io, "列印成 PDF 失敗（檔案是空的）"));
+            return Err(AppError::new(ErrorKind::Io, "列印成 PDF 失敗（檔案是空的）")
+                .with_message_key("errors.pdf.emptyOutput"));
         }
         Ok(())
     }

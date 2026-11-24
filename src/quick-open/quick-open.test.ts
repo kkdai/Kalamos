@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { getUiLocale, initUiLocale } from "../i18n";
 import {
   emitMockMenuAction,
   getMockListMarkdownPathsCallCount,
@@ -38,6 +39,28 @@ function pressKey(target: EventTarget, init: KeyboardEventInit): KeyboardEvent {
   target.dispatchEvent(ev);
   return ev;
 }
+
+it("localizes Quick Open labels without changing file names or paths", async () => {
+  const previousLocale = getUiLocale();
+  await initUiLocale("en");
+  const parent = document.createElement("div");
+  const panel = createQuickOpen({ parent, onOpenFile: () => {} });
+  try {
+    panel.setRecentFiles(["/notes/筆記 & 草稿.md"]);
+    panel.open();
+    expect(
+      parent.querySelector('[role="dialog"]')?.getAttribute("aria-label"),
+    ).toBe("Quick Open");
+    const item = parent.querySelector<HTMLElement>('[role="option"]');
+    expect(item?.dataset.path).toBe("/notes/筆記 & 草稿.md");
+    expect(
+      item?.querySelector('[data-testid="quick-open-item-name"]')?.textContent,
+    ).toBe("筆記 & 草稿.md");
+  } finally {
+    panel.destroy();
+    await initUiLocale(previousLocale);
+  }
+});
 
 describe("#104 Quick Open panel, IME, recent files, cache & menu", () => {
   let app: KalamosApp | null = null;

@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import type { FileEntry } from "../ipc";
 
 export interface FileListContextTarget {
@@ -50,7 +51,7 @@ export function createFileList(options: FileListOptions): FileListView {
     if (sorted.length === 0) {
       const emptyEl = document.createElement("div");
       emptyEl.className = "k-sidebar-empty";
-      emptyEl.textContent = "尚無 Markdown 檔案";
+      emptyEl.textContent = t("sidebar.list.empty");
       container.appendChild(emptyEl);
       return;
     }

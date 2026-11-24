@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import type { TreeNode } from "../ipc";
 import { shortcutLabel } from "../platform";
 
@@ -138,7 +139,9 @@ export function createFileTree(options: FileTreeOptions): FileTreeView {
     if (!tree) {
       const emptyEl = document.createElement("div");
       emptyEl.className = "k-sidebar-empty";
-      emptyEl.textContent = shortcutLabel("尚未開啟資料夾（Cmd+Shift+O）");
+      emptyEl.textContent = t("sidebar.tree.noFolder", {
+        shortcut: shortcutLabel("Cmd+Shift+O"),
+      });
       container.appendChild(emptyEl);
       return;
     }
@@ -147,7 +150,7 @@ export function createFileTree(options: FileTreeOptions): FileTreeView {
     if (rootChildren.length === 0) {
       const emptyEl = document.createElement("div");
       emptyEl.className = "k-sidebar-empty";
-      emptyEl.textContent = "此資料夾尚無 Markdown 檔案";
+      emptyEl.textContent = t("sidebar.tree.noFiles");
       container.appendChild(emptyEl);
       return;
     }

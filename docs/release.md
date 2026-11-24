@@ -109,6 +109,15 @@ git push origin v0.5.0
 
 確認無誤後，在 GitHub Releases 頁面點擊 **Publish release** 正式公開。
 
+### 實機驗證介面語言
+
+變更介面語言時，發佈前用 macOS 和 Windows 的 Tauri 正式建置各做一次。瀏覽器測試無法驗證原生選單。
+
+1. 用乾淨的測試設定開啟 Kalamos，確認偏好設定與原生選單預設顯示繁體中文。
+2. 輸入尚未儲存的內容，再到「偏好設定 → 一般 → 介面語言」改選 English。確認提示下次啟動生效、語言尚未改變，而且內容未被清除。正常儲存並結束 App。
+3. 重開後確認選單、Preferences 及 App 自有的未儲存對話框顯示英文。確認開檔快捷鍵可用，並可從最近開啟的檔案找回同一份文件，內容無變更。
+4. 到「Preferences → General → Interface language」改回繁體中文，正常結束後重開。確認介面與選單都切回繁體中文。OS 自行顯示的控制項不在此驗證範圍。
+
 ---
 
 ## 使用 `workflow_dispatch` 手動試跑

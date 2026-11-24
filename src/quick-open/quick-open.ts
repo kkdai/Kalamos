@@ -10,6 +10,8 @@
  */
 import "./quick-open.css";
 
+import { getUiLocale, t } from "../i18n";
+import { MAX_QUICK_OPEN_PATHS } from "../ipc";
 import { PLATFORM, shortcutLabel, toNativePath } from "../platform";
 import type { OpenMode } from "../tabs/tab-model";
 import {
@@ -174,10 +176,14 @@ export function createQuickOpen(
     // Section / truncation header bar
     const parts: string[] = [];
     if (isRecentView && currentMatches.length > 0) {
-      parts.push("最近開啟");
+      parts.push(t("quickOpen.recent.heading"));
     }
     if (folderTruncated && folderRoot) {
-      parts.push("僅索引前 20,000 個檔案");
+      parts.push(
+        t("quickOpen.folderIndexTruncated", {
+          limit: MAX_QUICK_OPEN_PATHS.toLocaleString(getUiLocale()),
+        }),
+      );
     }
     if (parts.length > 0) {
       sectionEl.textContent = parts.join(" · ");
@@ -194,12 +200,13 @@ export function createQuickOpen(
       empty.dataset.testid = "quick-open-empty";
       if (isRecentView) {
         empty.textContent = folderRoot
-          ? "尚無最近開啟的檔案，輸入關鍵字以搜尋目前資料夾"
-          : shortcutLabel(
-              "尚無最近開啟的檔案，請開啟檔案（⌘O）或資料夾（⇧⌘O）",
-            );
+          ? t("quickOpen.recent.emptyWithFolder")
+          : t("quickOpen.recent.emptyWithoutFolder", {
+              openFile: shortcutLabel("⌘O"),
+              openFolder: shortcutLabel("⇧⌘O"),
+            });
       } else {
-        empty.textContent = "找不到符合的檔案";
+        empty.textContent = t("quickOpen.noMatches");
       }
       listEl.appendChild(empty);
       inputEl.removeAttribute("aria-activedescendant");
@@ -247,7 +254,7 @@ export function createQuickOpen(
       if (!isRecentView && match.isRecent) {
         const badge = doc.createElement("span");
         badge.className = "k-qo-badge";
-        badge.textContent = "最近";
+        badge.textContent = t("quickOpen.recent.badge");
         item.appendChild(badge);
       }
 
@@ -323,7 +330,7 @@ export function createQuickOpen(
     dialog.dataset.testid = "quick-open";
     dialog.setAttribute("role", "dialog");
     dialog.setAttribute("aria-modal", "true");
-    dialog.setAttribute("aria-label", "快速開啟");
+    dialog.setAttribute("aria-label", t("quickOpen.dialog"));
 
     const inputWrap = doc.createElement("div");
     inputWrap.className = "k-qo-input-wrap";
@@ -334,8 +341,8 @@ export function createQuickOpen(
     input.type = "text";
     input.className = "k-qo-input";
     input.dataset.testid = "quick-open-input";
-    input.placeholder = "輸入檔名或路徑快速開啟…";
-    input.setAttribute("aria-label", "快速開啟檔案");
+    input.placeholder = t("quickOpen.input.placeholder");
+    input.setAttribute("aria-label", t("quickOpen.input.label"));
     input.setAttribute("role", "combobox");
     input.setAttribute("aria-autocomplete", "list");
     input.setAttribute("aria-expanded", "true");
@@ -349,8 +356,8 @@ export function createQuickOpen(
     clearBtn.type = "button";
     clearBtn.className = "k-qo-clear";
     clearBtn.dataset.testid = "quick-open-clear";
-    clearBtn.setAttribute("aria-label", "清除搜尋文字");
-    clearBtn.title = "清除";
+    clearBtn.setAttribute("aria-label", t("quickOpen.clear.label"));
+    clearBtn.title = t("quickOpen.clear.tooltip");
     clearBtn.hidden = true;
     clearBtn.appendChild(strokeIcon(CLOSE_ICON, "k-qo-clear-icon", 14));
     clearBtn.addEventListener("mousedown", (e) => e.preventDefault());
@@ -379,10 +386,10 @@ export function createQuickOpen(
     footer.dataset.testid = "quick-open-footer";
 
     const hints = [
-      "↑↓ 移動",
-      "Enter 開啟",
-      shortcutLabel("⌘Enter 新分頁"),
-      "Esc 關閉",
+      t("quickOpen.hint.move", { shortcut: "↑↓" }),
+      t("quickOpen.hint.open", { shortcut: "Enter" }),
+      t("quickOpen.hint.openInNewTab", { shortcut: shortcutLabel("⌘Enter") }),
+      t("quickOpen.hint.close", { shortcut: "Esc" }),
     ];
     for (const text of hints) {
       const span = doc.createElement("span");

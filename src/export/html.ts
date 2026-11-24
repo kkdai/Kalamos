@@ -19,8 +19,11 @@ import {
   papyrosHighlightStyle,
   resolveCodeLanguage,
 } from "../editor/code-blocks";
-import type { DiagramRenderResult } from "../editor/diagrams";
-import { resolveDiagramKind } from "../editor/diagrams";
+import {
+  type DiagramRenderResult,
+  diagramErrorTitle,
+  resolveDiagramKind,
+} from "../editor/diagrams";
 import {
   buildFootnoteIndex,
   type FootnoteIndex,
@@ -36,11 +39,7 @@ import {
 import { resolveImageRoot, resolveImageSrc } from "../editor/images";
 import { collectDocumentHeadings } from "../editor/lists";
 import { ensureMathJaxLoaded, mathMarkdownExtension } from "../editor/math";
-import {
-  type DiagramFence,
-  diagramErrorTitle,
-  renderExportDiagrams,
-} from "./diagrams";
+import { type DiagramFence, renderExportDiagrams } from "./diagrams";
 import { PRINT_CSS as printCss } from "./print-css";
 
 export interface ExportHeading {

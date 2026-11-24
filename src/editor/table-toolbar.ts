@@ -17,6 +17,7 @@ import {
   ViewPlugin,
   WidgetType,
 } from "@codemirror/view";
+import { t } from "../i18n";
 import { shortcutLabel } from "../platform";
 import {
   type ActiveTableCell,
@@ -327,10 +328,25 @@ function alignIcon(
   return svg;
 }
 
+const ACTION_LABELS: Record<TableAction, string> = {
+  rowAbove: "editor.table.rowAbove",
+  rowBelow: "editor.table.rowBelow",
+  colLeft: "editor.table.columnLeft",
+  colRight: "editor.table.columnRight",
+  alignLeft: "editor.table.alignColumnLeft",
+  alignCenter: "editor.table.alignColumnCenter",
+  alignRight: "editor.table.alignColumnRight",
+  moveColLeft: "editor.table.moveColumnLeft",
+  moveColRight: "editor.table.moveColumnRight",
+  deleteRow: "editor.table.deleteRow",
+  deleteCol: "editor.table.deleteColumn",
+  deleteTable: "editor.table.deleteTable",
+};
+
 interface ButtonSpec {
   action: TableAction;
-  label: string;
-  title: string;
+  labelKey: string;
+  shortcut?: string;
   icon?: "left" | "center" | "right";
 }
 
@@ -338,58 +354,68 @@ const TOOLBAR_GROUPS: ButtonSpec[][] = [
   [
     {
       action: "alignLeft",
-      label: "靠左",
-      title: "欄靠左（⌥⇧⌘←）",
+      labelKey: "editor.table.alignLeft",
+      shortcut: "⌥⇧⌘←",
       icon: "left",
     },
     {
       action: "alignCenter",
-      label: "置中",
-      title: "欄置中（⌥⇧⌘↑）",
+      labelKey: "editor.table.alignCenter",
+      shortcut: "⌥⇧⌘↑",
       icon: "center",
     },
     {
       action: "alignRight",
-      label: "靠右",
-      title: "欄靠右（⌥⇧⌘→）",
+      labelKey: "editor.table.alignRight",
+      shortcut: "⌥⇧⌘→",
       icon: "right",
     },
   ],
   [
-    { action: "rowBelow", label: "+列", title: "下方插入列（⌥⌘↓）" },
-    { action: "colRight", label: "+欄", title: "右側插入欄（⌥⌘→）" },
+    {
+      action: "rowBelow",
+      labelKey: "editor.table.addRowShort",
+      shortcut: "⌥⌘↓",
+    },
+    {
+      action: "colRight",
+      labelKey: "editor.table.addColumnShort",
+      shortcut: "⌥⌘→",
+    },
   ],
   [
-    { action: "deleteRow", label: "−列", title: "刪除列（⇧⌘⌫）" },
-    { action: "deleteCol", label: "−欄", title: "刪除欄（⌥⌘⌫）" },
-    { action: "deleteTable", label: "刪表", title: "刪除表格" },
+    {
+      action: "deleteRow",
+      labelKey: "editor.table.deleteRowShort",
+      shortcut: "⇧⌘⌫",
+    },
+    {
+      action: "deleteCol",
+      labelKey: "editor.table.deleteColumnShort",
+      shortcut: "⌥⌘⌫",
+    },
+    { action: "deleteTable", labelKey: "editor.table.deleteTableShort" },
   ],
 ];
 
-interface MenuItemSpec {
-  action: TableAction;
-  label: string;
-  shortcut?: string;
-}
-
-const MENU_GROUPS: MenuItemSpec[][] = [
+const MENU_GROUPS: { action: TableAction; shortcut?: string }[][] = [
   [
-    { action: "rowAbove", label: "上方插入列", shortcut: "⌥⌘↑" },
-    { action: "rowBelow", label: "下方插入列", shortcut: "⌥⌘↓" },
-    { action: "colLeft", label: "左側插入欄", shortcut: "⌥⌘←" },
-    { action: "colRight", label: "右側插入欄", shortcut: "⌥⌘→" },
+    { action: "rowAbove", shortcut: "⌥⌘↑" },
+    { action: "rowBelow", shortcut: "⌥⌘↓" },
+    { action: "colLeft", shortcut: "⌥⌘←" },
+    { action: "colRight", shortcut: "⌥⌘→" },
   ],
   [
-    { action: "alignLeft", label: "欄靠左", shortcut: "⌥⇧⌘←" },
-    { action: "alignCenter", label: "欄置中", shortcut: "⌥⇧⌘↑" },
-    { action: "alignRight", label: "欄靠右", shortcut: "⌥⇧⌘→" },
-    { action: "moveColLeft", label: "欄左移" },
-    { action: "moveColRight", label: "欄右移" },
+    { action: "alignLeft", shortcut: "⌥⇧⌘←" },
+    { action: "alignCenter", shortcut: "⌥⇧⌘↑" },
+    { action: "alignRight", shortcut: "⌥⇧⌘→" },
+    { action: "moveColLeft" },
+    { action: "moveColRight" },
   ],
   [
-    { action: "deleteRow", label: "刪除列", shortcut: "⇧⌘⌫" },
-    { action: "deleteCol", label: "刪除欄", shortcut: "⌥⌘⌫" },
-    { action: "deleteTable", label: "刪除表格" },
+    { action: "deleteRow", shortcut: "⇧⌘⌫" },
+    { action: "deleteCol", shortcut: "⌥⌘⌫" },
+    { action: "deleteTable" },
   ],
 ];
 
@@ -457,7 +483,7 @@ export function openTableContextMenu(
       item.setAttribute("role", "menuitem");
       item.dataset.action = spec.action;
       const label = doc.createElement("span");
-      label.textContent = spec.label;
+      label.textContent = t(ACTION_LABELS[spec.action]);
       item.append(label);
       if (spec.shortcut) {
         const kbd = doc.createElement("span");
@@ -558,7 +584,7 @@ class TableToolbarView implements PluginValue {
     this.dom.className = "k-table-toolbar";
     this.dom.dataset.testid = "table-toolbar";
     this.dom.setAttribute("role", "toolbar");
-    this.dom.setAttribute("aria-label", "表格");
+    this.dom.setAttribute("aria-label", t("editor.table.label"));
     this.dom.hidden = true;
     TOOLBAR_GROUPS.forEach((group, gi) => {
       if (gi > 0) {
@@ -571,10 +597,17 @@ class TableToolbarView implements PluginValue {
         btn.type = "button";
         btn.className = "k-table-toolbar-btn";
         btn.dataset.action = spec.action;
-        btn.title = shortcutLabel(spec.title);
-        btn.setAttribute("aria-label", spec.label);
+        const label = t(spec.labelKey);
+        const title = t(ACTION_LABELS[spec.action]);
+        btn.title = spec.shortcut
+          ? t("editor.shortcut", {
+              label: title,
+              shortcut: shortcutLabel(spec.shortcut),
+            })
+          : title;
+        btn.setAttribute("aria-label", label);
         if (spec.icon) btn.append(alignIcon(doc, spec.icon));
-        else btn.textContent = spec.label;
+        else btn.textContent = label;
         if (spec.action === "deleteTable") btn.classList.add("is-danger");
         this.buttons.set(spec.action, btn);
         this.dom.append(btn);

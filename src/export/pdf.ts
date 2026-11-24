@@ -1,20 +1,24 @@
+import { t } from "../i18n";
+import { formatErrorMessage } from "../ipc";
 import { toNativePath } from "../platform";
 
 /** EX-01 helpers shared by the app shell (src/main.ts). */
 
-export const EXPORTING_PDF_MESSAGE = "匯出中…";
-export const UNTITLED_DOCUMENT_NAME = "未命名";
+export function exportingPdfMessage(): string {
+  return t("export.exporting");
+}
 
 function basename(path: string): string {
   const trimmed = path.replace(/\/+$/, "");
   return trimmed.slice(trimmed.lastIndexOf("/") + 1);
 }
 
-/** Document name without its Markdown extension ("未命名" when untitled). */
+/** Document name without its Markdown extension, or the UI's untitled label. */
 export function documentTitle(docPath: string | null): string {
-  if (!docPath) return UNTITLED_DOCUMENT_NAME;
-  const stem = basename(docPath).replace(/\.(md|markdown)$/i, "");
-  return stem || UNTITLED_DOCUMENT_NAME;
+  return (
+    (docPath && basename(docPath).replace(/\.(md|markdown)$/i, "")) ||
+    t("export.untitled")
+  );
 }
 
 /** Suggested save-dialog path: next to the document, same name, `.pdf`. */
@@ -31,5 +35,9 @@ export function ensurePdfExtension(path: string): string {
 }
 
 export function exportedPdfMessage(path: string): string {
-  return `已匯出 PDF：${toNativePath(path)}`;
+  return t("export.pdf.done", { path: toNativePath(path) });
+}
+
+export function pdfErrorMessage(err: unknown): string {
+  return formatErrorMessage(t("export.pdf.failed"), err);
 }

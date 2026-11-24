@@ -9,6 +9,7 @@
  * - Results are grouped by file (collapsible), the hit is highlighted in each
  *   snippet, and clicking a hit asks the app to open the file at that spot.
  */
+import { t } from "../i18n";
 import {
   type FolderSearchHit,
   type FolderSearchOptions,
@@ -85,10 +86,27 @@ export function shortenLead(before: string): string {
 }
 
 export function summaryText(results: FolderSearchResults): string {
-  if (results.hits.length === 0) return "無結果";
+  const hits = results.hits.length;
+  if (hits === 0) return t("sidebar.search.noResults");
   const files = new Set(results.hits.map((h) => h.path)).size;
-  const base = `${results.hits.length}${results.truncated ? "+" : ""} 筆結果，${files} 個檔案`;
-  return results.truncated ? `${base}（已截斷，請縮小搜尋範圍）` : base;
+  const resultCount = t(
+    hits === 1 && !results.truncated
+      ? "sidebar.search.resultCount.one"
+      : "sidebar.search.resultCount.other",
+    { amount: results.truncated ? `${hits}+` : hits },
+  );
+  const fileCount = t(
+    files === 1
+      ? "sidebar.search.fileCount.one"
+      : "sidebar.search.fileCount.other",
+    { count: files },
+  );
+  return t(
+    results.truncated
+      ? "sidebar.search.summaryTruncated"
+      : "sidebar.search.summary",
+    { resultCount, fileCount },
+  );
 }
 
 function optionButton(
@@ -143,18 +161,26 @@ export function createFolderSearch(
   input.type = "text";
   input.className = "k-folder-search-input";
   input.dataset.testid = "folder-search-input";
-  input.placeholder = "在資料夾中搜尋";
-  input.setAttribute("aria-label", "在資料夾中搜尋");
+  input.placeholder = t("sidebar.search.input");
+  input.setAttribute("aria-label", t("sidebar.search.input"));
   input.spellcheck = false;
   input.autocomplete = "off";
-  const caseBtn = optionButton("Aa", "區分大小寫", "folder-search-case");
+  const caseBtn = optionButton(
+    "Aa",
+    t("sidebar.search.matchCase"),
+    "folder-search-case",
+  );
   const wordBtn = optionButton(
     "ab",
-    "全字比對",
+    t("sidebar.search.wholeWord"),
     "folder-search-word",
     "k-folder-search-opt-word",
   );
-  const regexBtn = optionButton(".*", "正規表示式", "folder-search-regex");
+  const regexBtn = optionButton(
+    ".*",
+    t("sidebar.search.regularExpression"),
+    "folder-search-regex",
+  );
   const opts = document.createElement("div");
   opts.className = "k-folder-search-options";
   opts.append(caseBtn, wordBtn, regexBtn);
@@ -238,7 +264,7 @@ export function createFolderSearch(
         item.dataset.line = String(hit.line);
         item.dataset.column = String(hit.column);
         item.setAttribute("role", "listitem");
-        item.title = `第 ${hit.line} 行`;
+        item.title = t("sidebar.search.line", { line: hit.line });
         const lineNo = document.createElement("span");
         lineNo.className = "k-folder-search-line";
         lineNo.textContent = String(hit.line);
@@ -271,15 +297,22 @@ export function createFolderSearch(
     }
   }
 
+  function showNoFolder(): void {
+    lastResults = null;
+    resultsEl.innerHTML = "";
+    setStatus(
+      t("sidebar.search.noFolder", { shortcut: shortcutLabel("⇧⌘O") }),
+      "no-folder",
+    );
+  }
+
   async function runNow(): Promise<void> {
     clearTimer();
     const mySeq = ++seq;
     const root = init.getFolder();
     const query = input.value;
     if (!root) {
-      lastResults = null;
-      resultsEl.innerHTML = "";
-      setStatus(shortcutLabel("請先開啟資料夾（⇧⌘O）才能搜尋"), "no-folder");
+      showNoFolder();
       return;
     }
     if (!query) {
@@ -288,7 +321,7 @@ export function createFolderSearch(
       setStatus("", "empty");
       return;
     }
-    setStatus("搜尋中…", "searching");
+    setStatus(t("sidebar.search.searching"), "searching");
     const options: FolderSearchOptions = {
       caseSensitive: pressed(caseBtn),
       wholeWord: pressed(wordBtn),
@@ -313,11 +346,11 @@ export function createFolderSearch(
       resultsEl.innerHTML = "";
       const kind = (err as { kind?: string } | null)?.kind;
       if (kind === "Parse" && options.regex)
-        setStatus("正規表示式無效", "invalid");
+        setStatus(t("sidebar.search.invalidRegex"), "invalid");
       else {
         const message =
           (err as { message?: string } | null)?.message ?? String(err);
-        setStatus(`搜尋失敗：${message}`, "error");
+        setStatus(t("sidebar.search.error", { message }), "error");
       }
     }
   }
@@ -364,9 +397,7 @@ export function createFolderSearch(
     if (!root) {
       seq++;
       clearTimer();
-      lastResults = null;
-      resultsEl.innerHTML = "";
-      setStatus(shortcutLabel("請先開啟資料夾（⇧⌘O）才能搜尋"), "no-folder");
+      showNoFolder();
       return;
     }
     if (lastResults && lastResults.root !== root) {

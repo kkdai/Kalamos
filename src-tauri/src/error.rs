@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -13,9 +15,14 @@ pub enum ErrorKind {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, thiserror::Error)]
 #[error("{kind:?}: {message}")]
+#[serde(rename_all = "camelCase")]
 pub struct AppError {
     pub kind: ErrorKind,
     pub message: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message_key: Option<String>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub message_args: BTreeMap<String, String>,
 }
 
 impl AppError {
@@ -23,7 +30,20 @@ impl AppError {
         Self {
             kind,
             message: message.into(),
+            message_key: None,
+            message_args: BTreeMap::new(),
         }
+    }
+
+    /// A shared dictionary key for UI display. Keep `message` for diagnostics.
+    pub fn with_message_key(mut self, key: &str) -> Self {
+        self.message_key = Some(key.into());
+        self
+    }
+
+    pub fn with_message_arg(mut self, name: &str, value: impl ToString) -> Self {
+        self.message_args.insert(name.into(), value.to_string());
+        self
     }
 
     pub fn not_found(message: impl Into<String>) -> Self {
@@ -49,19 +69,13 @@ impl From<std::io::Error> for AppError {
             std::io::ErrorKind::InvalidData => ErrorKind::Parse,
             _ => ErrorKind::Io,
         };
-        Self {
-            kind,
-            message: err.to_string(),
-        }
+        Self::new(kind, err.to_string())
     }
 }
 
 impl From<serde_json::Error> for AppError {
     fn from(err: serde_json::Error) -> Self {
-        Self {
-            kind: ErrorKind::Parse,
-            message: err.to_string(),
-        }
+        Self::parse(err.to_string())
     }
 }
 
@@ -75,6 +89,9 @@ mod tests {
         let val = serde_json::to_value(&err).expect("serialize AppError");
         assert_eq!(val["kind"], "NotFound");
         assert_eq!(val["message"], "missing file");
+        assert!(val.get("messageKey").is_none());
+        assert!(val.get("messageArgs").is_none());
+        assert_eq!(serde_json::from_value::<AppError>(val).unwrap(), err);
 
         let kinds = [
             (ErrorKind::NotFound, "NotFound"),
@@ -89,5 +106,22 @@ mod tests {
             let v = serde_json::to_value(&kind).expect("serialize ErrorKind");
             assert_eq!(v, expected);
         }
+    }
+
+    #[test]
+    fn serializes_localization_metadata_without_changing_the_raw_error() {
+        let error = AppError::new(ErrorKind::Io, "逾時（60 秒）")
+            .with_message_key("errors.example.timeout")
+            .with_message_arg("seconds", 60);
+        assert_eq!(
+            serde_json::to_value(&error).unwrap(),
+            serde_json::json!({
+                "kind": "Io",
+                "message": "逾時（60 秒）",
+                "messageKey": "errors.example.timeout",
+                "messageArgs": { "seconds": "60" },
+            })
+        );
+        assert_eq!(error.to_string(), "Io: 逾時（60 秒）");
     }
 }

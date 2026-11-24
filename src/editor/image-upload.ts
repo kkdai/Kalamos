@@ -20,6 +20,8 @@ import {
   StateField,
 } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
+import { t } from "../i18n";
+import { appErrorDetail } from "../ipc";
 import {
   collectImageSpecs,
   effectiveImageRoot,
@@ -28,8 +30,6 @@ import {
   resolveImageSrc,
 } from "./images";
 import { mapPosClamped } from "./positions";
-
-export const NO_LOCAL_IMAGES_MESSAGE = "沒有可上傳的本機圖片";
 
 export interface UploadTarget {
   /** Whole reference (`![…](…)` or `<img …>`). */
@@ -297,13 +297,6 @@ function basename(path: string): string {
   return path.replace(/\/+$/, "").split("/").pop() ?? path;
 }
 
-function errorText(err: unknown): string {
-  if (err && typeof err === "object" && "message" in err) {
-    return String((err as { message: unknown }).message);
-  }
-  return String(err);
-}
-
 export async function uploadImagesInEditor(
   options: UploadFlowOptions,
 ): Promise<UploadFlowResult> {
@@ -321,32 +314,39 @@ export async function uploadImagesInEditor(
   }
   const targets = options.targets ?? collectUploadTargets(view.state).targets;
   if (targets.length === 0) {
-    setStatus(NO_LOCAL_IMAGES_MESSAGE, false);
+    setStatus(t("editor.upload.noLocalImages"), false);
     return none;
   }
   // The same file referenced twice is uploaded once.
   const paths = [...new Set(targets.map((t) => t.path))];
   const tool = basename(uploader);
-  setStatus(`將上傳 ${paths.length} 張圖片…（${tool}）`, false);
+  setStatus(t("editor.upload.starting", { count: paths.length, tool }), false);
 
   const trackingId = beginTracking(view);
   const urls = new Map<string, string>();
   try {
     for (const [i, path] of paths.entries()) {
       setStatus(
-        `上傳中… (${i + 1}/${paths.length})：${basename(path)}（${tool}）`,
+        t("editor.upload.progress", {
+          current: i + 1,
+          count: paths.length,
+          file: basename(path),
+          tool,
+        }),
         false,
       );
       const result = await options.upload([path]);
       const url = result.urls[0];
       if (result.urls.length !== 1 || !url) {
-        throw new Error(`上傳指令回傳 ${result.urls.length} 個網址，需要 1 個`);
+        throw new Error(
+          t("editor.upload.unexpectedUrls", { count: result.urls.length }),
+        );
       }
       urls.set(path, url);
     }
   } catch (err) {
     endTracking(view, trackingId);
-    const message = `上傳失敗：${errorText(err)}`;
+    const message = t("editor.upload.failed", { detail: appErrorDetail(err) });
     setStatus(message, true);
     return { ...none, error: message };
   }
@@ -359,8 +359,8 @@ export async function uploadImagesInEditor(
   );
   setStatus(
     skipped > 0
-      ? `已上傳 ${paths.length} 張圖片；${skipped} 處引用在上傳期間被修改，未替換`
-      : `已上傳 ${paths.length} 張圖片`,
+      ? t("editor.upload.doneWithSkipped", { count: paths.length, skipped })
+      : t("editor.upload.done", { count: paths.length }),
     false,
   );
   return { uploaded: paths.length, replaced, skipped, error: null };

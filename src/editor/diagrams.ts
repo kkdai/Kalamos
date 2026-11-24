@@ -34,6 +34,7 @@ import {
   ViewPlugin,
   WidgetType,
 } from "@codemirror/view";
+import { t } from "../i18n";
 import { isSelectionTouchingRange } from "./live-preview";
 import { mapPosClamped } from "./positions";
 
@@ -179,7 +180,10 @@ export function flowToMermaid(source: string): string {
       const [, name, type, rest] = def;
       const shape = FLOW_SHAPES[type.toLowerCase()];
       if (!shape) {
-        throw new DiagramSyntaxError(`未知的節點類型「${type}」`, lineNo);
+        throw new DiagramSyntaxError(
+          t("editor.diagram.unknownNode", { type }),
+          lineNo,
+        );
       }
       const label = rest
         .replace(/:>\S*\s*$/, "") // link target (not followed, for safety)
@@ -192,13 +196,16 @@ export function flowToMermaid(source: string): string {
     if (text.includes("->")) {
       const names = text.split("->").map((s) => s.trim());
       if (names.some((n) => !/^[^\s()]+(\([^)]*\))?$/.test(n))) {
-        throw new DiagramSyntaxError("無法解析的連線語法", lineNo);
+        throw new DiagramSyntaxError(
+          t("editor.diagram.invalidConnection"),
+          lineNo,
+        );
       }
       edges.push({ line: lineNo, names });
       out.push(""); // filled after all nodes are known
       return;
     }
-    throw new DiagramSyntaxError("無法解析的 flowchart.js 語法", lineNo);
+    throw new DiagramSyntaxError(t("editor.diagram.invalidFlow"), lineNo);
   });
 
   for (const edge of edges) {
@@ -207,7 +214,10 @@ export function flowToMermaid(source: string): string {
       const m = /^([^\s()]+)(?:\(([^)]*)\))?$/.exec(token)!;
       const name = m[1];
       if (!defined.has(name)) {
-        throw new DiagramSyntaxError(`未定義的節點「${name}」`, edge.line);
+        throw new DiagramSyntaxError(
+          t("editor.diagram.undefinedNode", { name }),
+          edge.line,
+        );
       }
       if (i > 0) {
         const prev = /^([^\s()]+)(?:\(([^)]*)\))?$/.exec(edge.names[i - 1])!;
@@ -278,7 +288,7 @@ export function sequenceToMermaid(source: string): string {
       );
       return;
     }
-    throw new DiagramSyntaxError("無法解析的序列圖語法", lineNo);
+    throw new DiagramSyntaxError(t("editor.diagram.invalidSequence"), lineNo);
   });
   return out.join("\n");
 }
@@ -568,7 +578,7 @@ function errorMessage(err: unknown): string {
   if (err instanceof Error && err.message) return err.message;
   if (typeof err === "string" && err) return err;
   const msg = (err as { message?: unknown } | null)?.message;
-  return typeof msg === "string" && msg ? msg : "圖表語法錯誤";
+  return typeof msg === "string" && msg ? msg : t("editor.diagram.syntaxError");
 }
 
 /** 1-based error line from a Mermaid (jison / langium) error, if any. */
@@ -598,7 +608,7 @@ async function doRender(
   theme: DiagramTheme,
 ): Promise<DiagramRenderResult> {
   if (!source.trim()) {
-    return { svg: "", error: "空白圖表（Empty diagram）", line: null };
+    return { svg: "", error: t("editor.diagram.empty"), line: null };
   }
   let code = source;
   let lineOffset = 0;
@@ -620,7 +630,9 @@ async function doRender(
   } catch (err) {
     return {
       svg: "",
-      error: `無法載入圖表引擎：${errorMessage(err)}`,
+      error: t("editor.diagram.engineLoadFailed", {
+        detail: errorMessage(err),
+      }),
       line: null,
     };
   }
@@ -692,6 +704,12 @@ interface MountState {
 
 const mountStates = new WeakMap<HTMLElement, MountState>();
 
+export function diagramErrorTitle(result: DiagramRenderResult): string {
+  return result.line !== null
+    ? t("editor.diagram.syntaxErrorLine", { line: result.line })
+    : t("editor.diagram.syntaxError");
+}
+
 function showResult(dom: HTMLElement, result: DiagramRenderResult): void {
   dom.replaceChildren();
   if (result.error) {
@@ -703,10 +721,7 @@ function showResult(dom: HTMLElement, result: DiagramRenderResult): void {
     if (result.line !== null) err.dataset.line = String(result.line);
     const title = document.createElement("div");
     title.className = "k-diagram-error-title";
-    title.textContent =
-      result.line !== null
-        ? `圖表語法錯誤（第 ${result.line} 行）`
-        : "圖表語法錯誤";
+    title.textContent = diagramErrorTitle(result);
     const detail = document.createElement("pre");
     detail.className = "k-diagram-error-detail";
     detail.textContent = result.error.slice(0, 600);
@@ -725,7 +740,7 @@ function showPending(dom: HTMLElement): void {
   dom.dataset.state = "pending";
   const p = document.createElement("div");
   p.className = "k-diagram-pending";
-  p.textContent = "圖表渲染中…";
+  p.textContent = t("editor.diagram.rendering");
   dom.replaceChildren(p);
 }
 

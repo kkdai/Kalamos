@@ -16,18 +16,13 @@ import {
   seedMockFile,
   triggerMockFileDrop,
 } from "../ipc";
-import {
-  createKalamosApp,
-  type KalamosApp,
-  SAVE_BEFORE_IMAGE_MESSAGE,
-} from "../main";
+import { createKalamosApp, type KalamosApp } from "../main";
 import {
   buildImageInsertion,
   collectImageSpecs,
   imageExtFromMime,
   isImageFilePath,
   resolveImageSrc,
-  UNSAVED_RELATIVE_IMAGE_HINT,
 } from "./images";
 
 const toUrl = (p: string) => `asset://localhost/${encodeURIComponent(p)}`;
@@ -294,7 +289,7 @@ describe("Images in the editor (IM-01 / IM-02)", () => {
     const hint = app.editor.view.dom.querySelector(
       '[data-testid="image-needs-save"]',
     );
-    expect(hint?.textContent).toContain(UNSAVED_RELATIVE_IMAGE_HINT);
+    expect(hint?.textContent).toContain("存檔後才能顯示相對路徑圖片");
 
     await app.saveDocumentAs("/tmp/kalamos/saved/doc.md");
     expect(
@@ -363,7 +358,7 @@ describe("Images in the editor (IM-01 / IM-02)", () => {
     });
     await flush();
     expect(app.editor.getContent()).toBe("草稿");
-    expect(app.getStatusText()).toBe(SAVE_BEFORE_IMAGE_MESSAGE);
+    expect(app.getStatusText()).toBe("請先儲存文件，才能插入圖片");
     expect(getMockAssetFiles()).toEqual([]);
   });
 
@@ -410,6 +405,6 @@ describe("Images in the editor (IM-01 / IM-02)", () => {
     const ok = await app.insertPastedImages([file], 0);
     expect(ok).toBe(false);
     expect(app.editor.getContent()).toBe("");
-    expect(app.getStatusText()).toBe(SAVE_BEFORE_IMAGE_MESSAGE);
+    expect(app.getStatusText()).toBe("請先儲存文件，才能插入圖片");
   });
 });
