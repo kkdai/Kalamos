@@ -1,0 +1,61 @@
+.k-frontmatter-preview {
+  position: relative;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--k-divider);
+  border-radius: 6px;
+  background: var(--k-surface);
+  color: var(--k-text);
+  font: 0.85em / 1.45 var(--k-font-ui);
+  overflow-wrap: anywhere;
+}
+
+.k-frontmatter-preview > strong {
+  display: block;
+  margin-block-end: 0.35rem;
+}
+
+.k-frontmatter-edit {
+  position: absolute;
+  inset: 0;
+  padding: 0;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  cursor: text;
+}
+
+.k-frontmatter-edit:hover {
+  background: color-mix(in srgb, var(--k-text) 4%, transparent);
+}
+
+.k-frontmatter-edit:active {
+  background: color-mix(in srgb, var(--k-text) 8%, transparent);
+}
+
+.k-frontmatter-edit:focus-visible {
+  outline: 2px solid var(--k-text);
+  outline-offset: -2px;
+}
+
+.k-frontmatter-preview :is(dl, dd, ul) {
+  margin: 0;
+}
+
+.k-frontmatter-preview dl > div {
+  display: grid;
+  grid-template-columns: minmax(0, min(10rem, 45%)) minmax(0, 1fr);
+  gap: 0.5rem;
+  padding-block: 0.2rem;
+}
+
+.k-frontmatter-preview dt {
+  font-weight: 600;
+}
+
+.k-frontmatter-preview :is(dt, dd, li) {
+  white-space: pre-wrap;
+}
+
+.k-frontmatter-preview ul {
+  padding-inline-start: 1.25em;
+}

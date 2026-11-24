@@ -22,6 +22,7 @@ import { codeLineNumbersFacet } from "./code-blocks";
 import { emojiExtension } from "./emoji";
 import { footnoteExtension } from "./footnotes";
 import { frontMatterExtension } from "./front-matter";
+import { finishFrontMatterEdit } from "./front-matter-preview";
 import {
   type ImageRootTooBroadHandler,
   imageDocPathField,
@@ -422,7 +423,7 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
 
   function switchSession(next: DocSession): void {
     if (next === current) return;
-    current.state = view.state;
+    current.state = finishFrontMatterEdit(view.state);
     let state = next.state;
     const effects = globalSyncEffects(state);
     if (effects.length > 0) state = state.update({ effects }).state;
