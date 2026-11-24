@@ -215,9 +215,12 @@ export function createPreferences(
     notice.id = "k-pref-language-notice";
     notice.setAttribute("role", "status");
     select.setAttribute("aria-describedby", notice.id);
+    let errorNotice: string | null = null;
+    let lastSyncedLocale: UiLocale | null = null;
     const updateNotice = (locale: UiLocale): void => {
       notice.textContent =
-        locale === getUiLocale() ? "" : t("prefs.languageOnRestart");
+        errorNotice ??
+        (locale === getUiLocale() ? "" : t("prefs.languageOnRestart"));
     };
     const prompt = el("dialog", "k-pref-restart");
     const title = el("h1", undefined, t("prefs.restartQuestion"));
@@ -238,26 +241,41 @@ export function createPreferences(
       prompt.returnValue = "";
       if (!confirmed || !prompt.isConnected) return;
       select.disabled = true;
+      errorNotice = null;
       try {
         await host.restartApp();
+        updateNotice(host.getValues().uiLocale);
       } catch {
-        notice.textContent = t("prefs.restartFailed");
+        errorNotice = t("prefs.restartFailed");
+        updateNotice(host.getValues().uiLocale);
       } finally {
         select.disabled = false;
       }
     });
     syncers.push((values) => {
+      if (select.disabled) return;
+      if (lastSyncedLocale !== null && values.uiLocale !== lastSyncedLocale) {
+        errorNotice = null;
+      }
+      lastSyncedLocale = values.uiLocale;
       select.value = values.uiLocale;
       updateNotice(values.uiLocale);
     });
     select.addEventListener("change", async () => {
       select.disabled = true;
+      errorNotice = null;
       try {
         await host.saveUiLocale(normalizeUiLocale(select.value));
-        updateNotice(host.getValues().uiLocale);
+        const saved = host.getValues().uiLocale;
+        lastSyncedLocale = saved;
+        select.value = saved;
+        updateNotice(saved);
       } catch {
-        select.value = host.getValues().uiLocale;
-        notice.textContent = t("prefs.languageSaveError");
+        const saved = host.getValues().uiLocale;
+        lastSyncedLocale = saved;
+        select.value = saved;
+        errorNotice = t("prefs.languageSaveError");
+        updateNotice(saved);
         return;
       } finally {
         select.disabled = false;
