@@ -135,6 +135,20 @@
               <p>独自記法を一切含まない標準 GFM 形式で保存。原子的保存、1 秒自動保存、クラッシュリカバリで大切な下書きを守ります。</p>
             </div>
           </div>
+          <div class="pillars-grid pillars-grid--three">
+            <div class="pillar">
+              <h3>YAML 文書情報プレビュー</h3>
+              <p>文書先頭の YAML Front Matter をすっきりしたカード形式で表示。リストやネストした項目にも対応し、クリックするだけでその場から原文を編集できます。</p>
+            </div>
+            <div class="pillar">
+              <h3>繁体字中国語・英語 UI に対応</h3>
+              <p>既定ではシステム言語に連動（OS 言語が <code>zh</code> で始まる場合は繁体字中国語、それ以外は英語）。<strong>Preferences → General</strong>（<strong>偏好設定 → 一般</strong>）からアプリとネイティブメニューの言語をいつでも切り替えられます。</p>
+            </div>
+            <div class="pillar">
+              <h3>Ctrl + ホイール拡大・縮小</h3>
+              <p><kbd>Ctrl</kbd> を押しながらマウスホイールを回すだけで画面を滑らかに拡大・縮小。<strong>表示</strong>メニューの拡大・縮小・実際のサイズと倍率を共有します。</p>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -250,8 +264,50 @@
         </div>
       </section>
 
-      <!-- Showcase 4: Workflow -->
-      <section class="showcase" id="workflow">
+      <!-- Showcase 4: YAML Front Matter -->
+      <section class="showcase">
+        <div class="container">
+          <div class="showcase-header">
+            <span class="eyebrow">文書メタデータ</span>
+            <h2 class="section-title">YAML Front Matter を、ひと目で読みやすく</h2>
+            <p class="section-desc">ブログ記事や静的サイトの下書きも冒頭から整然と。ファイル先頭の YAML Front Matter を構造化カードとして描画し、リストやネスト項目もわかりやすく表示。クリックひとつで原文をその場で編集できます。</p>
+          </div>
+          <div class="showcase-media">
+            <div class="window-frame">
+              <div class="window-bar" aria-hidden="true">
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-title">front-matter-post.md — Kalamos</span>
+              </div>
+              <img
+                src="../assets/screenshots/front-matter.png"
+                alt="ブログ記事先頭の YAML Front Matter を title・date・tags リスト・ネストした author 項目付きの文書情報カードとして表示する Kalamos"
+                width="1920"
+                height="1400"
+                loading="lazy"
+              />
+            </div>
+          </div>
+          <div class="showcase-notes">
+            <div class="showcase-note">
+              <strong>リスト・ネスト項目に対応</strong>
+              <span>日付・タグ配列・真偽値・ネストした YAML オブジェクトも記号に埋もれず整理表示します。</span>
+            </div>
+            <div class="showcase-note">
+              <strong>クリックしてその場で編集</strong>
+              <span>カードをクリックすると生の YAML を直接編集でき、本文へ戻ると自動でカード表示に折りたたみます。</span>
+            </div>
+            <div class="showcase-note">
+              <strong>元の書式をそのまま保持</strong>
+              <span>編集しない限りファイルを一切書き換えず、元のキー順・コメント・インデントを保ちます。</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Showcase 5: Workflow -->
+      <section class="showcase showcase--tinted" id="workflow">
         <div class="container">
           <div class="showcase-header">
             <span class="eyebrow">下書きから公開・提出まで</span>
@@ -335,20 +391,20 @@
 
             <article class="feature-card">
               <h3>細部まで行き届いた執筆体験</h3>
-              <p>ホバー表示＆ジャンプ対応の脚注、YAML Front Matter、見出しブックマークコピー（<kbd>Cmd+Shift+C</kbd>）、オフライン GitHub 絵文字補完（<code>:smile</code>）、半角・全角括弧の自動ペア補完を標準搭載しています。</p>
+              <p>ホバー表示＆ジャンプ対応の脚注、クリック編集できる YAML 文書情報カード、繁体字中国語／英語の UI 切り替え、<kbd>Ctrl</kbd> + ホイール拡大・縮小、見出しブックマークコピー（<kbd>Cmd+Shift+C</kbd>）、オフライン GitHub 絵文字補完（<code>:smile</code>）、半角・全角括弧の自動ペア補完を標準搭載しています。</p>
               <ul class="feature-tags">
-                <li>脚注ポップアップ</li>
-                <li>Front Matter</li>
-                <li>絵文字 :shortcode</li>
-                <li>括弧自動ペア</li>
+                <li>文書情報カード</li>
+                <li>繁体字・英語 UI</li>
+                <li>Ctrl + ホイールズーム</li>
+                <li>脚注・絵文字補完</li>
               </ul>
             </article>
           </div>
         </div>
       </section>
 
-      <!-- Showcase 5: Themes -->
-      <section class="showcase showcase--tinted">
+      <!-- Showcase 6: Themes -->
+      <section class="showcase">
         <div class="container">
           <div class="showcase-header">
             <span class="eyebrow">テーマとカスタム CSS</span>
@@ -375,8 +431,8 @@
         </div>
       </section>
 
-      <!-- Showcase 6: Writing Modes -->
-      <section class="showcase">
+      <!-- Showcase 7: Writing Modes -->
+      <section class="showcase showcase--tinted">
         <div class="container">
           <div class="showcase-header">
             <span class="eyebrow">ライティングモード</span>
@@ -404,12 +460,12 @@
       </section>
 
       <!-- Shortcuts Summary -->
-      <section class="showcase showcase--tinted" id="shortcuts">
+      <section class="showcase" id="shortcuts">
         <div class="container container--narrow">
           <div class="showcase-header">
             <span class="eyebrow">キーボードファースト</span>
             <h2 class="section-title">主要ショートカット一覧</h2>
-            <p class="section-desc">ホームポジションから手を離さず、主要な操作をすべて完結できます。Windows では <code>Cmd</code> を <code>Ctrl</code>、<code>Opt</code> を <code>Alt</code> に読み替えてください（<code>Ctrl+Tab</code> は両 OS 共通）。</p>
+            <p class="section-desc">ホームポジションから手を離さず、主要な操作をすべて完結できます。Windows では <code>Cmd</code> を <code>Ctrl</code>、<code>Opt</code> を <code>Alt</code> に読み替えてください（<code>Ctrl+Tab</code> と <code>Ctrl + ホイール</code> は両 OS 共通）。</p>
           </div>
 
           <div class="shortcuts-grid">
@@ -477,12 +533,20 @@
               <span class="shortcut-label">括弧 / Markdown 自動ペア切り替え</span>
               <span><kbd>Cmd+Opt+P</kbd> / <kbd>Cmd+Opt+Shift+P</kbd></span>
             </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">拡大 / 縮小 / 実際のサイズ</span>
+              <span><kbd>Cmd+Shift+=</kbd> · <kbd>-</kbd> · <kbd>0</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">マウスホイールで拡大・縮小</span>
+              <span><kbd>Ctrl</kbd> + ホイール</span>
+            </div>
           </div>
         </div>
       </section>
 
       <!-- FAQ -->
-      <section class="showcase" id="faq">
+      <section class="showcase showcase--tinted" id="faq">
         <div class="container container--narrow">
           <div class="showcase-header">
             <span class="eyebrow">FAQ</span>

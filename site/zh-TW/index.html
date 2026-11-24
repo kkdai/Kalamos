@@ -135,6 +135,20 @@
               <p>以標準 GitHub Flavored Markdown 存檔於本機資料夾。原子寫入、1 秒自動存檔與異常救回，讓每份草稿安然無恙。</p>
             </div>
           </div>
+          <div class="pillars-grid pillars-grid--three">
+            <div class="pillar">
+              <h3>YAML 文件資訊預覽</h3>
+              <p>文件開頭的 YAML Front Matter 會直接顯示成結構化卡片，支援清單與巢狀欄位；點一下就能就地編輯原文。</p>
+            </div>
+            <div class="pillar">
+              <h3>繁體中文與英文介面</h3>
+              <p>預設跟隨系統語言（系統為 <code>zh</code> 語系時顯示繁體中文，其餘顯示英文），也可隨時在「<strong>偏好設定 → 一般</strong>」切換，同步套用至 App 介面與原生選單。</p>
+            </div>
+            <div class="pillar">
+              <h3>Ctrl + 滾輪縮放</h3>
+              <p>按住 <kbd>Ctrl</kbd> 滾動滑鼠滾輪即可流暢放大或縮小介面，與「<strong>檢視 → 放大／縮小／實際大小</strong>」共用縮放比例。</p>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -250,8 +264,50 @@
         </div>
       </section>
 
-      <!-- Showcase 4: Workflow -->
-      <section class="showcase" id="workflow">
+      <!-- Showcase 4: YAML Front Matter -->
+      <section class="showcase">
+        <div class="container">
+          <div class="showcase-header">
+            <span class="eyebrow">文件資訊預覽</span>
+            <h2 class="section-title">YAML Front Matter 一目了然</h2>
+            <p class="section-desc">撰寫部落格與靜態網站文章時，開頭的 YAML Front Matter 會自動整理成清爽的結構化卡片，支援清單與巢狀欄位；點一下卡片即可就地展開編輯原文。</p>
+          </div>
+          <div class="showcase-media">
+            <div class="window-frame">
+              <div class="window-bar" aria-hidden="true">
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-title">front-matter-post.md — Kalamos</span>
+              </div>
+              <img
+                src="../assets/screenshots/front-matter.png"
+                alt="Kalamos 將部落格文章開頭的 YAML Front Matter 呈現為結構化文件資訊卡片，包含 title、date、tags 清單與巢狀 author 欄位"
+                width="1920"
+                height="1400"
+                loading="lazy"
+              />
+            </div>
+          </div>
+          <div class="showcase-notes">
+            <div class="showcase-note">
+              <strong>支援清單與巢狀欄位</strong>
+              <span>日期、標籤清單、布林值與巢狀欄位都整齊排列，不再被原始符號打斷閱讀。</span>
+            </div>
+            <div class="showcase-note">
+              <strong>點一下就地編輯</strong>
+              <span>點擊卡片即可直接修改 YAML 原文；游標回到內文後自動收合回預覽卡片。</span>
+            </div>
+            <div class="showcase-note">
+              <strong>原樣保留格式</strong>
+              <span>未編輯時完全不改動檔案內容，原有的欄位順序、註解與縮排都能原封不動保留。</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Showcase 5: Workflow -->
+      <section class="showcase showcase--tinted" id="workflow">
         <div class="container">
           <div class="showcase-header">
             <span class="eyebrow">從草稿到交付</span>
@@ -335,20 +391,20 @@
 
             <article class="feature-card">
               <h3>細膩的寫作細節</h3>
-              <p>支援懸停預覽與點擊跳轉的註腳、YAML Front Matter、標題書籤連結（<kbd>Cmd+Shift+C</kbd>）、離線 GitHub Emoji 自動完成（<code>:smile</code>），以及半形與中文全形括號引號自動配對。</p>
+              <p>支援懸停預覽與點擊跳轉的註腳、可點擊編輯的 YAML 文件資訊卡片、繁體中文與英文介面切換、<kbd>Ctrl</kbd> + 滾輪縮放、標題書籤連結（<kbd>Cmd+Shift+C</kbd>）、離線 GitHub Emoji 補全（<code>:smile</code>），以及半形與中文全形括號引號自動配對。</p>
               <ul class="feature-tags">
-                <li>懸停註腳</li>
-                <li>Front Matter</li>
-                <li>Emoji 補全</li>
-                <li>全形括號配對</li>
+                <li>文件資訊卡片</li>
+                <li>繁中／英文介面</li>
+                <li>Ctrl + 滾輪縮放</li>
+                <li>註腳與 Emoji</li>
               </ul>
             </article>
           </div>
         </div>
       </section>
 
-      <!-- Showcase 5: Themes -->
-      <section class="showcase showcase--tinted">
+      <!-- Showcase 6: Themes -->
+      <section class="showcase">
         <div class="container">
           <div class="showcase-header">
             <span class="eyebrow">主題與自訂 CSS</span>
@@ -375,8 +431,8 @@
         </div>
       </section>
 
-      <!-- Showcase 6: Writing Modes -->
-      <section class="showcase">
+      <!-- Showcase 7: Writing Modes -->
+      <section class="showcase showcase--tinted">
         <div class="container">
           <div class="showcase-header">
             <span class="eyebrow">寫作模式</span>
@@ -404,12 +460,12 @@
       </section>
 
       <!-- Shortcuts Summary -->
-      <section class="showcase showcase--tinted" id="shortcuts">
+      <section class="showcase" id="shortcuts">
         <div class="container container--narrow">
           <div class="showcase-header">
             <span class="eyebrow">鍵盤優先</span>
             <h2 class="section-title">常用快捷鍵一覽</h2>
-            <p class="section-desc">雙手無須離開鍵盤，所有核心操作皆可一鍵完成。在 Windows 上請將 <code>Cmd</code> 對應為 <code>Ctrl</code>、<code>Opt</code> 對應為 <code>Alt</code>（<code>Ctrl+Tab</code> 雙平台相同）。</p>
+            <p class="section-desc">雙手無須離開鍵盤，所有核心操作皆可一鍵完成。在 Windows 上請將 <code>Cmd</code> 對應為 <code>Ctrl</code>、<code>Opt</code> 對應為 <code>Alt</code>（<code>Ctrl+Tab</code> 與 <code>Ctrl + 滾輪</code> 雙平台相同）。</p>
           </div>
 
           <div class="shortcuts-grid">
@@ -477,12 +533,20 @@
               <span class="shortcut-label">括號 / Markdown 自動配對</span>
               <span><kbd>Cmd+Opt+P</kbd> / <kbd>Cmd+Opt+Shift+P</kbd></span>
             </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">放大 / 縮小 / 實際大小</span>
+              <span><kbd>Cmd+Shift+=</kbd> · <kbd>-</kbd> · <kbd>0</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">滾輪縮放介面</span>
+              <span><kbd>Ctrl</kbd> + 滾輪</span>
+            </div>
           </div>
         </div>
       </section>
 
       <!-- FAQ -->
-      <section class="showcase" id="faq">
+      <section class="showcase showcase--tinted" id="faq">
         <div class="container container--narrow">
           <div class="showcase-header">
             <span class="eyebrow">FAQ</span>
