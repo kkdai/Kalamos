@@ -24,6 +24,13 @@ function savedLocale(page: Page): Promise<UiLocale> {
   });
 }
 
+function restartCount(page: Page): Promise<number> {
+  return page.evaluate(async () => {
+    const ipc = await import("/src/ipc.ts" as string);
+    return ipc.getMockRestartCount();
+  });
+}
+
 for (const platform of ["macos", "windows"] as const) {
   test(`applies a saved language on next launch (${platform})`, async ({
     browser,
@@ -42,6 +49,15 @@ for (const platform of ["macos", "windows"] as const) {
       const language = dialog.getByLabel("介面語言");
       await expect(language).toHaveValue("zh-TW");
       await language.selectOption("en");
+      const restart = page.getByRole("dialog", {
+        name: "要重新啟動 Kalamos 以套用新語言嗎？",
+      });
+      const later = restart.getByRole("button", { name: "稍後" });
+      await expect(later).toBeFocused();
+      await later.click();
+      await expect(restart).not.toBeVisible();
+      await expect(dialog).toBeVisible();
+      expect(await restartCount(page)).toBe(0);
       await expect(dialog.getByRole("status")).toHaveText(
         "下次開啟 Kalamos 時生效。",
       );
@@ -65,6 +81,16 @@ for (const platform of ["macos", "windows"] as const) {
       await englishDialog
         .getByLabel("Interface language")
         .selectOption("zh-TW");
+      const restartInEnglish = page.getByRole("dialog", {
+        name: "Restart Kalamos to apply the new language?",
+      });
+      await expect(
+        restartInEnglish.getByRole("button", { name: "Later" }),
+      ).toBeFocused();
+      await page.keyboard.press("Escape");
+      await expect(restartInEnglish).not.toBeVisible();
+      await expect(englishDialog).toBeVisible();
+      expect(await restartCount(page)).toBe(0);
       await expect(englishDialog.getByRole("status")).toHaveText(
         "Takes effect the next time you open Kalamos.",
       );
@@ -93,5 +119,57 @@ test("restores the saved selection if writing the language fails", async ({
     "無法儲存介面語言，請再試一次。",
   );
   await expect(language).toHaveValue("zh-TW");
+  await expect(
+    page.getByRole("button", { name: "立即重啟" }),
+  ).not.toBeVisible();
   expect(await savedLocale(page)).toBe("zh-TW");
+});
+
+test("restarts only after the unsaved draft is saved", async ({ page }) => {
+  await boot(page);
+  await setDoc(page, "# Draft", 7);
+  await page.keyboard.insertText("!");
+  await expect.poll(() => getDoc(page)).toBe("# Draft!");
+  await page.evaluate(async () => {
+    const ipc = await import("/src/ipc.ts" as string);
+    ipc.setMockDialogHandlers({ saveChanges: () => "save", save: () => null });
+  });
+  await page.keyboard.press(`${MOD}+Comma`);
+  const dialog = page.getByRole("dialog", { name: "偏好設定" });
+  const language = dialog.getByLabel("介面語言");
+  await language.selectOption("en");
+  await page.getByRole("button", { name: "立即重啟" }).click();
+  await expect(language).toBeEnabled();
+  await expect
+    .poll(() =>
+      page.evaluate(async () => {
+        const ipc = await import("/src/ipc.ts" as string);
+        return ipc.getMockSaveChangesPrompts().length;
+      }),
+    )
+    .toBe(1);
+  expect(await restartCount(page)).toBe(0);
+  expect(await getDoc(page)).toBe("# Draft!");
+  expect(await savedLocale(page)).toBe("en");
+
+  await language.selectOption("zh-TW");
+  await expect(dialog.getByRole("status")).toBeEmpty();
+  await expect(
+    page.getByRole("button", { name: "立即重啟" }),
+  ).not.toBeVisible();
+  await page.evaluate(async () => {
+    const ipc = await import("/src/ipc.ts" as string);
+    ipc.setMockDialogHandlers({
+      saveChanges: () => "save",
+      save: () => "/demo/draft.md",
+    });
+  });
+  await language.selectOption("en");
+  await page.getByRole("button", { name: "立即重啟" }).click();
+  await expect.poll(() => restartCount(page)).toBe(1);
+  const saved = await page.evaluate(async () => {
+    const ipc = await import("/src/ipc.ts" as string);
+    return ipc.openFile("/demo/draft.md");
+  });
+  expect(saved).toBe("# Draft!");
 });

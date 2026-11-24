@@ -119,6 +119,7 @@ import {
   pickSavePdfPath,
   quitApp,
   type RecoveryEntry,
+  restartApp,
   type Settings,
   saveChangesLabels,
   saveFile,
@@ -1161,6 +1162,7 @@ export function createKalamosApp(
       await setUiLocale(locale);
       currentSettings = { ...currentSettings, uiLocale: locale };
     },
+    restartApp: restartAfterLanguageChange,
     pickImageRootDir: () => pickImageRootDir(),
     clearImageRootDir: () => setImageRootDir(null),
     openThemesDir: async () => {
@@ -2106,6 +2108,12 @@ export function createKalamosApp(
     for (const tab of tabs) clearAutosaveTimer(tab);
     await quitApp().catch(() => null);
     return true;
+  }
+
+  async function restartAfterLanguageChange(): Promise<void> {
+    if (!(await requestCloseWindow())) return;
+    for (const tab of tabs) clearAutosaveTimer(tab);
+    await restartApp();
   }
 
   const onRestoreClick = () => {

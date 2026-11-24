@@ -77,6 +77,7 @@ export interface PreferencesHost {
   refresh?: () => Promise<void>;
   applyChange: (patch: PreferencesPatch) => void | Promise<void>;
   saveUiLocale: (locale: UiLocale) => Promise<void>;
+  restartApp: () => Promise<void>;
   pickImageRootDir: () => Promise<unknown>;
   clearImageRootDir: () => Promise<unknown>;
   openThemesDir: () => Promise<unknown>;
@@ -218,6 +219,33 @@ export function createPreferences(
       notice.textContent =
         locale === getUiLocale() ? "" : t("prefs.languageOnRestart");
     };
+    const prompt = el("dialog", "k-pref-restart");
+    const title = el("h1", undefined, t("prefs.restartQuestion"));
+    title.id = "k-pref-restart-title";
+    prompt.setAttribute("aria-labelledby", title.id);
+    const actions = el("form");
+    actions.method = "dialog";
+    const later = el("button", "k-pref-button", t("prefs.restartLater"));
+    later.value = "later";
+    later.autofocus = true;
+    const now = el("button", "k-pref-button", t("prefs.restartNow"));
+    now.value = "restart";
+    actions.append(later, now);
+    prompt.append(title, actions);
+    prompt.addEventListener("keydown", (event) => event.stopPropagation());
+    prompt.addEventListener("close", async () => {
+      const confirmed = prompt.returnValue === "restart";
+      prompt.returnValue = "";
+      if (!confirmed || !prompt.isConnected) return;
+      select.disabled = true;
+      try {
+        await host.restartApp();
+      } catch {
+        notice.textContent = t("prefs.restartFailed");
+      } finally {
+        select.disabled = false;
+      }
+    });
     syncers.push((values) => {
       select.value = values.uiLocale;
       updateNotice(values.uiLocale);
@@ -230,11 +258,17 @@ export function createPreferences(
       } catch {
         select.value = host.getValues().uiLocale;
         notice.textContent = t("prefs.languageSaveError");
+        return;
       } finally {
         select.disabled = false;
       }
+      if (prompt.isConnected && host.getValues().uiLocale !== getUiLocale()) {
+        prompt.showModal();
+      }
     });
-    return row(t("prefs.language"), select, notice);
+    const field = row(t("prefs.language"), select, notice);
+    field.append(prompt);
+    return field;
   }
 
   function buildGeneral(): HTMLElement {
@@ -490,7 +524,7 @@ export function createPreferences(
   }
 
   const onKeydown = (event: KeyboardEvent): void => {
-    if (!backdrop) return;
+    if (!backdrop || backdrop.querySelector("dialog[open]")) return;
     if (event.key === "Escape") {
       event.preventDefault();
       event.stopPropagation();

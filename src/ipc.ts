@@ -399,6 +399,7 @@ export function resetMockState(): void {
   mockSaveInterceptor = null;
   mockCloseListeners.clear();
   mockQuitCount = 0;
+  mockRestartCount = 0;
   mockFsChangedListeners.clear();
   mockAssetFiles.clear();
   mockAllowedAssetDirs.clear();
@@ -1409,6 +1410,7 @@ export async function triggerMockCloseRequested(): Promise<boolean> {
 }
 
 let mockQuitCount = 0;
+let mockRestartCount = 0;
 
 /** #81 B: exit the app (⌘Q), once the frontend has settled unsaved changes. */
 export async function quitApp(): Promise<void> {
@@ -1421,6 +1423,18 @@ export async function quitApp(): Promise<void> {
 
 export function getMockQuitCount(): number {
   return mockQuitCount;
+}
+
+export async function restartApp(): Promise<void> {
+  if (isTauri()) {
+    await invoke("restart_app");
+    return;
+  }
+  mockRestartCount++;
+}
+
+export function getMockRestartCount(): number {
+  return mockRestartCount;
 }
 
 // ---------------------------------------------------------------------------
