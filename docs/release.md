@@ -7,12 +7,37 @@ Kalamos 使用 [Changesets](https://github.com/changesets/changesets) 管理版�
 | 平台 | 架構 | 檔案 | 說明 |
 | --- | --- | --- | --- |
 | macOS | Apple Silicon (arm64) | `Kalamos_<version>_aarch64.dmg` | ad-hoc 簽章，內含 `Applications` 捷徑 |
+| macOS | Apple Silicon (arm64) | `Kalamos_<version>_aarch64.app.tar.gz` + `.sig` | 自動更新用壓縮包與 minisign 簽章 |
 | macOS | Intel (x86_64) | `Kalamos_<version>_x64.dmg` | ad-hoc 簽章，內含 `Applications` 捷徑 |
-| Windows | x64 | `Kalamos_<version>_x64-setup.exe` | NSIS 安裝程式（`currentUser`，免管理員權限，含繁體中文與英文） |
+| macOS | Intel (x86_64) | `Kalamos_<version>_x64.app.tar.gz` + `.sig` | 自動更新用壓縮包與 minisign 簽章 |
+| Windows | x64 | `Kalamos_<version>_x64-setup.exe` + `.sig` | NSIS 安裝程式（`currentUser`，免管理員權限，含繁體中文與英文）與自動更新 minisign 簽章 |
 | Windows | x64 | `Kalamos_<version>_x64_en-US.msi` | WiX MSI 安裝程式 |
-| 全部 | — | `SHA256SUMS.txt` | 所有安裝檔的 SHA-256 校驗碼 |
+| 全部 | — | `latest.json` | Tauri 自動更新清單（HTTPS 端點：`https://github.com/kkdai/Kalamos/releases/latest/download/latest.json`） |
+| 全部 | — | `SHA256SUMS.txt` | 所有安裝檔、自動更新套件、`.sig` 與 `latest.json` 的 SHA-256 校驗碼 |
 
-> **目前限制**：macOS 產物使用 ad-hoc 簽章（尚未經過 Apple 公證），Windows 產物尚未經過程式碼簽章。首次安裝或開啟時需依 Release Notes 中的說明通過 Gatekeeper / SmartScreen 提示。
+> **目前限制**：macOS 產物使用 ad-hoc 簽章（尚未經過 Apple 公證），Windows 產物尚未經過程式碼簽章。首次安裝、開啟，或透過應用程式內自動更新替換 `Kalamos.app` 後，若系統要求重新授權，需依 Release Notes 中的說明通過 Gatekeeper / SmartScreen 提示（macOS 可對 **Kalamos.app** 按右鍵選「打開」，或執行 `xattr -cr /Applications/Kalamos.app`）。
+
+## 自動更新簽章金鑰保管原則
+
+Kalamos 的自動更新使用 `tauri-plugin-updater` 內建的 minisign 簽章驗證：公鑰寫入 `src-tauri/tauri.conf.json` 的 `plugins.updater.pubkey`，私鑰僅存於維護者本機密碼管理器與 GitHub Actions Secrets。
+
+- **存放位置與權限隔離（Build 與簽章分離）**：
+  - GitHub Secrets：`TAURI_SIGNING_PRIVATE_KEY`（私鑰內容）與 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`（私鑰密碼），僅供 `.github/workflows/release.yml` 中 tag 觸發的 `build` job 內**獨立的簽章 step**使用，並綁定 `environment: release`（維護者可在 GitHub 為 `release` environment 設定 required reviewers）。
+  - **Build step 不帶私鑰**：`npx tauri build`（含 `vite build` 與所有 npm / Cargo 建置期依賴）完全不注入任何簽章私鑰，並關閉 `createUpdaterArtifacts`，避免任何建置依賴讀取私鑰。
+  - **獨立簽章與即時驗章**：打包完成後，先由一般 step 整理 `.app.tar.gz`（macOS，以 `COPYFILE_DISABLE=1 tar -czf ... -C .../macos Kalamos.app` 打包成 `tauri-plugin-updater` 2.x 預期的頂層 `Kalamos.app/` 結構）與 NSIS `-setup.exe`（Windows）；接著才在**僅執行 `node node_modules/@tauri-apps/cli/tauri.js signer sign --app-version <version>`** 的獨立 step 注入私鑰產生 `.sig`（不執行任何 npm script 或建置流程）；簽章完成後立即在不含私鑰的 step 透過 `scripts/verify-updater-signature.mjs` 以 `src-tauri/tauri.conf.json` 中的公鑰進行 Ed25519 + BLAKE2b-512 密碼學驗章。
+  - `workflow_dispatch` 試跑走獨立的 `build-dry-run` job，完全不進入 `environment: release` 也不接觸私鑰。
+  - PR 與 CI（`.github/workflows/ci.yml`）均無法存取私鑰，且專案不使用 `pull_request_target`。
+- **備份原則**：
+  - 私鑰檔案與密碼僅保存在維護者本人的密碼管理器與離線加密備份中，**絕不**提交進 Git、貼入 Issue / PR，或交給任何自動化 agent。
+- **私鑰遺失處理**：
+  - 若私鑰遺失，需由維護者在本機重新產生新的金鑰組，更新 GitHub Secrets 與 `src-tauri/tauri.conf.json` 中的 `plugins.updater.pubkey` 後發佈新版。
+  - 既有舊版 App 仍驗證舊公鑰，無法透過自動更新跨越金鑰輪替，需在 Release Notes 與 README 提醒使用者手動下載安裝一次新版。
+- **私鑰外洩處理**：
+  - 立即輪替金鑰：本機產生新金鑰組、立刻覆蓋 GitHub Secrets 並更新 `plugins.updater.pubkey`。
+  - 檢查既有 GitHub Releases、tag 與 `latest.json` 是否遭竄改；若有疑慮應立即下架受影響的 Release 資產。
+  - 發佈安全公告與新版 Release，提醒使用者從 GitHub Releases 手動下載並以 `SHA256SUMS.txt` 校驗後重新安裝。
+
+> **本機建置方式**：`src-tauri/tauri.conf.json` 預設已將 `bundle.createUpdaterArtifacts` 設為 `false`（正式發佈改由獨立簽章 step 產生 `.app.tar.gz` 與 `.sig`），因此本機不需設定私鑰即可直接執行 `npm run tauri build`。
 
 ## 一次性 Repo 設定
 
@@ -84,9 +109,9 @@ git push origin v0.5.0
 推送 `v*` tag 會自動觸發 `.github/workflows/release.yml`：
 
 1. `check-version`：比對 tag 與 `package.json`、`src-tauri/tauri.conf.json`、`src-tauri/Cargo.toml` 的版本號，若有任何不一致會立即失敗。
-2. `build`：平行建置 macOS（`aarch64`、`x86_64`）與 Windows（`x86_64`）安裝檔，並在 macOS 上自動執行 `codesign --verify --deep --strict` 與 `.dmg` 內的 `Applications` 捷徑檢查。
-3. `checksums`：彙整所有安裝檔並產生 `SHA256SUMS.txt`。
-4. `release`：執行 `scripts/generate-release-notes.mjs` 產生 Release Notes——若 `CHANGELOG.md` 中存在對應的 `## <version>` 段落，會自動填入「更新摘要」位置，否則保留 placeholder 供手動填寫——並建立標題為 `Kalamos v<version>` 的 **Draft Release**，附上所有安裝檔與 `SHA256SUMS.txt`。
+2. `build`（僅 tag 觸發，宣告 `environment: release`）：平行建置 macOS（`aarch64`、`x86_64`）與 Windows（`x86_64`）未簽章安裝檔（build step 不帶任何私鑰），macOS 自動驗證 `codesign --verify --deep --strict`、`.dmg` 內 `Applications` 捷徑與 `.app.tar.gz` 頂層結構；隨後僅在獨立簽章 step 以 `tauri signer sign --app-version` 對 macOS `.app.tar.gz` 與 Windows NSIS `-setup.exe` 簽章，並立即以 `scripts/verify-updater-signature.mjs` 使用 `tauri.conf.json` 的公鑰進行密碼學驗章。
+3. `checksums`：彙整所有產物，在 tag 觸發時執行 `scripts/generate-updater-manifest.mjs` 產生並以公鑰密碼學驗證 `latest.json` 與所有平台 `.sig`（檢查三個平台與架構的檔案、Ed25519 + BLAKE2b-512 簽章、簽章版本號與 HTTPS URL，缺一或驗章失敗即中止），最後產生包含所有產物與 `latest.json` 的 `SHA256SUMS.txt`。
+4. `release`：再次驗證 `latest.json` 與所有 `.sig`，執行 `scripts/generate-release-notes.mjs` 產生 Release Notes——若 `CHANGELOG.md` 中存在對應的 `## <version>` 段落，會自動填入「更新摘要」位置，否則保留 placeholder 供手動填寫——並建立標題為 `Kalamos v<version>` 的 **Draft Release**，附上所有安裝檔、updater 壓縮包、`.sig`、`latest.json` 與 `SHA256SUMS.txt`。GitHub 的 `/releases/latest/download/latest.json` 不會指向 Draft Release，因此唯有維護者按下 **Publish release** 後，使用者才會收到更新通知。
 
 ### 4. 檢查 Draft Release 並實機確認
 
@@ -108,6 +133,17 @@ git push origin v0.5.0
 ### 5. Publish Release
 
 確認無誤後，在 GitHub Releases 頁面點擊 **Publish release** 正式公開。
+
+### 實機驗證自動更新（首次發佈 `0.8.0` → `0.8.1`）
+
+1. 先正式發佈內含自動更新功能的 `v0.8.0`（Publish Release），確認 Draft 內已附上 `latest.json`、macOS 雙架構 `.app.tar.gz` + `.sig` 與 Windows NSIS `-setup.exe.sig`。
+2. 在 macOS 實機從 `v0.8.0` `.dmg` 手動安裝並開啟 Kalamos，執行「**Kalamos → 檢查更新…**」，確認顯示「目前已是最新版本」。
+3. 接著發佈一個小版本（例如 `v0.8.1`），先保留在 **Draft** 狀態：再次於 `0.8.0` 執行「檢查更新…」，確認仍顯示已是最新版（不會抓到 draft）。
+4. 將 `v0.8.1` 按下 **Publish release** 公開後：
+   - 重新啟動 `0.8.0`，確認幾秒後背景檢查自動跳出新版本對話框，顯示 `0.8.1` 版號與 `CHANGELOG.md` 更新摘要，且未經同意不會開始下載。
+   - 在編輯器留下一份未儲存草稿，點選「**立即更新**」，確認下載進度條顯示正常；下載完成後會跳出未儲存變更確認對話框（全部儲存／不儲存／取消）。先試點「取消」確認不會安裝；再次更新並儲存或捨棄後，確認安裝完成並自動重啟為 `0.8.1`。
+   - 若因 ad-hoc 簽章造成更新重啟後系統要求重新授權，依畫面或 Finder 右鍵「打開」授權後確認可正常開啟，且「關於 Kalamos」顯示 `0.8.1`。
+5. 若發佈前尚未在 Windows 實機驗證 NSIS 自動更新，請在 Release Notes 明確標註「Windows 自動更新尚未經過實機驗證」。
 
 ### 實機驗證介面語言
 

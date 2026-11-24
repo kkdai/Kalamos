@@ -44,6 +44,7 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": false,
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -73,6 +74,17 @@
         "installMode": "currentUser",
         "languages": ["English", "TradChinese"],
         "displayLanguageSelector": false
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEE1MjRDRDE4RUZGNjc5OTYKUldTV2VmYnZHTTBrcFp6WklldCtnZzNGcHVEVVE0ckdJVndiTzFtSjdiNWFubElJRjJNRUhueFEK",
+      "endpoints": [
+        "https://github.com/kkdai/Kalamos/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
       }
     }
   }

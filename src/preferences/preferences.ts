@@ -40,6 +40,7 @@ export interface PreferencesValues {
   uiLocale: UiLocale;
   startupBehavior: StartupBehavior;
   autoSave: boolean;
+  autoCheckUpdates: boolean;
   fontSize: number;
   contentWidth: number;
   autoPairBrackets: boolean;
@@ -59,6 +60,7 @@ export type PreferencesPatch = Partial<
     PreferencesValues,
     | "startupBehavior"
     | "autoSave"
+    | "autoCheckUpdates"
     | "fontSize"
     | "contentWidth"
     | "autoPairBrackets"
@@ -145,6 +147,7 @@ export function createPreferences(
   function checkbox(
     key:
       | "autoSave"
+      | "autoCheckUpdates"
       | "autoPairBrackets"
       | "autoPairMarkdown"
       | "codeLineNumbers"
@@ -303,6 +306,15 @@ export function createPreferences(
         t("prefs.autoSave"),
         checkbox("autoSave", t("prefs.autoSaveDescription"), "pref-auto-save"),
         shortcutLabel(t("prefs.autoSaveHint")),
+      ),
+      row(
+        t("prefs.updates"),
+        checkbox(
+          "autoCheckUpdates",
+          t("prefs.autoCheckUpdates"),
+          "pref-auto-check-updates",
+        ),
+        t("prefs.autoCheckUpdatesHint"),
       ),
     );
     return panel;

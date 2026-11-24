@@ -6,6 +6,11 @@
     "platforms": ["macos"],
     "items": [
       { "type": "predefined", "item": "about", "labelKey": "menu.app.about" },
+      {
+        "type": "action",
+        "id": "app.checkForUpdates",
+        "labelKey": "menu.app.checkForUpdates"
+      },
       { "type": "predefined", "item": "separator" },
       {
         "type": "action",
@@ -505,6 +510,12 @@
       {
         "type": "predefined",
         "item": "separator",
+        "platforms": ["windows", "linux"]
+      },
+      {
+        "type": "action",
+        "id": "app.checkForUpdates",
+        "labelKey": "menu.app.checkForUpdates",
         "platforms": ["windows", "linux"]
       },
       {

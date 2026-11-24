@@ -358,7 +358,23 @@ describe("#89 platform-aware menu spec & shortcut labels", () => {
     if (helpSub?.type === "submenu") {
       expect(
         helpSub.items.some(
+          (n) => n.type === "action" && n.id === "app.checkForUpdates",
+        ),
+      ).toBe(true);
+      expect(
+        helpSub.items.some(
           (n) => n.type === "predefined" && n.item === "about",
+        ),
+      ).toBe(true);
+    }
+    const macAppSub = mac.find(
+      (n) => n.type === "submenu" && n.labelKey === "menu.app.title",
+    );
+    expect(macAppSub?.type).toBe("submenu");
+    if (macAppSub?.type === "submenu") {
+      expect(
+        macAppSub.items.some(
+          (n) => n.type === "action" && n.id === "app.checkForUpdates",
         ),
       ).toBe(true);
     }

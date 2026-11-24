@@ -8,6 +8,7 @@ import {
   open as openDialog,
   save as saveDialog,
 } from "@tauri-apps/plugin-dialog";
+import { check as checkUpdater } from "@tauri-apps/plugin-updater";
 import {
   defaultUiLocaleForTag,
   hasMessageKey,
@@ -148,6 +149,8 @@ export interface Settings {
   startupBehavior?: StartupBehavior;
   /** #74: autosave named documents (default on). */
   autoSave?: boolean;
+  /** #91: automatically check for app updates in the background on startup (default on). */
+  autoCheckUpdates?: boolean;
   /** #74: editor font size in px. */
   fontSize?: number;
   /** #74: content column width in px (--k-max-width). */
@@ -176,6 +179,7 @@ export const DEFAULT_SETTINGS: Settings = {
   autoPairMarkdown: false,
   startupBehavior: "restoreFolder",
   autoSave: true,
+  autoCheckUpdates: true,
   fontSize: 17,
   contentWidth: 720,
   recentFiles: [],
@@ -425,6 +429,8 @@ export function resetMockState(): void {
   mockPandocExports.length = 0;
   mockPandocExportHandler = null;
   mockPandocImportHandler = null;
+  mockUpdateHandler = null;
+  mockUpdateCheckCount = 0;
   seedDemoFolder();
   seedDefaultCustomThemes();
 }
@@ -1199,6 +1205,8 @@ export async function setSettings(settings: Settings): Promise<null> {
     startupBehavior:
       settings.startupBehavior ?? DEFAULT_SETTINGS.startupBehavior,
     autoSave: settings.autoSave ?? DEFAULT_SETTINGS.autoSave,
+    autoCheckUpdates:
+      settings.autoCheckUpdates ?? DEFAULT_SETTINGS.autoCheckUpdates,
     fontSize: settings.fontSize ?? DEFAULT_SETTINGS.fontSize,
     contentWidth: settings.contentWidth ?? DEFAULT_SETTINGS.contentWidth,
     recentFiles: [
@@ -2236,4 +2244,60 @@ export async function openThemesDir(): Promise<string> {
 
 export function getMockThemesDirOpenCount(): number {
   return mockThemesDirOpened;
+}
+
+// ---------------------------------------------------------------------------
+// #91: in-app auto-updater (tauri-plugin-updater)
+// ---------------------------------------------------------------------------
+
+export type UpdateDownloadEvent =
+  | { event: "Started"; data: { contentLength?: number } }
+  | { event: "Progress"; data: { chunkLength: number } }
+  | { event: "Finished" };
+
+export interface AvailableUpdate {
+  version: string;
+  currentVersion: string;
+  date?: string;
+  body?: string;
+  download: (onEvent?: (event: UpdateDownloadEvent) => void) => Promise<void>;
+  install: () => Promise<void>;
+  close: () => Promise<void>;
+}
+
+type MockUpdateHandler = () =>
+  | AvailableUpdate
+  | null
+  | Promise<AvailableUpdate | null>;
+
+let mockUpdateHandler: MockUpdateHandler | null = null;
+let mockUpdateCheckCount = 0;
+
+export async function checkForUpdate(): Promise<AvailableUpdate | null> {
+  if (isTauri()) {
+    const update = await checkUpdater();
+    if (!update) return null;
+    return {
+      version: update.version,
+      currentVersion: update.currentVersion,
+      date: update.date,
+      body: update.body,
+      download: (onEvent) => update.download(onEvent),
+      install: () => update.install(),
+      close: () => update.close(),
+    };
+  }
+  mockUpdateCheckCount += 1;
+  if (mockUpdateHandler) {
+    return await mockUpdateHandler();
+  }
+  return null;
+}
+
+export function setMockUpdateHandler(handler: MockUpdateHandler | null): void {
+  mockUpdateHandler = handler;
+}
+
+export function getMockUpdateCheckCount(): number {
+  return mockUpdateCheckCount;
 }

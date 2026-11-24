@@ -35,6 +35,7 @@
     "@tauri-apps/api": "^2.0.0",
     "@tauri-apps/plugin-dialog": "^2.0.0",
     "@tauri-apps/plugin-opener": "^2.0.0",
+    "@tauri-apps/plugin-updater": "2.14.1",
     "codemirror": "^6.0.1",
     "dompurify": "^3.4.18",
     "gemoji": "^8.1.0",

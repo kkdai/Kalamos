@@ -108,6 +108,7 @@ describe("ipc in-memory mock (api.yaml contract)", () => {
       autoPairMarkdown: false,
       startupBehavior: "restoreFolder",
       autoSave: true,
+      autoCheckUpdates: true,
       fontSize: 17,
       contentWidth: 720,
       recentFiles: [],

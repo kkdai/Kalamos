@@ -135,6 +135,8 @@ pub struct Settings {
     pub startup_behavior: StartupBehavior,
     /// #74 preferences: autosave named documents after typing stops.
     pub auto_save: bool,
+    /// #91 preferences: check for updates in the background on startup.
+    pub auto_check_updates: bool,
     /// #74 preferences: editor font size in px (`--k-font-size`).
     pub font_size: u32,
     /// #74 preferences: content column width in px (`--k-max-width`).
@@ -164,6 +166,7 @@ impl Default for Settings {
             auto_pair_markdown: false,
             startup_behavior: StartupBehavior::RestoreFolder,
             auto_save: true,
+            auto_check_updates: true,
             font_size: DEFAULT_FONT_SIZE,
             content_width: DEFAULT_CONTENT_WIDTH,
             recent_files: Vec::new(),
@@ -336,6 +339,7 @@ mod tests {
         assert_eq!(v["autoPairMarkdown"], false);
         assert_eq!(v["startupBehavior"], "restoreFolder");
         assert_eq!(v["autoSave"], true);
+        assert_eq!(v["autoCheckUpdates"], true);
         assert_eq!(v["fontSize"], 17);
         assert_eq!(v["contentWidth"], 720);
         assert_eq!(v["recentFiles"], serde_json::json!([]));
@@ -364,6 +368,7 @@ mod tests {
             auto_pair_markdown: true,
             startup_behavior: StartupBehavior::Blank,
             auto_save: false,
+            auto_check_updates: false,
             font_size: 20,
             content_width: 960,
             recent_files: vec![
@@ -780,6 +785,31 @@ mod tests {
             raw["recentFiles"],
             serde_json::json!(["/tmp/kalamos-test/a.md", "/tmp/kalamos-test/sub/b.md"])
         );
+        assert_eq!(get_settings_in(dir.path()).unwrap(), loaded);
+    }
+
+    #[test]
+    fn reads_settings_without_auto_check_updates_and_roundtrips_it() {
+        let dir = tempdir().expect("tempdir");
+        let settings_path = dir.path().join("settings.json");
+        // Settings written before #91 (v0.7.0) have no autoCheckUpdates key.
+        fs::write(
+            &settings_path,
+            r#"{ "theme": "melan", "autoSave": false, "fontSize": 19 }"#,
+        )
+        .expect("write legacy settings without autoCheckUpdates");
+
+        let mut loaded = get_settings_in(dir.path()).expect("load settings");
+        assert!(loaded.auto_check_updates, "autoCheckUpdates defaults on");
+        assert!(!loaded.auto_save);
+        assert_eq!(loaded.theme, "melan");
+        assert_eq!(loaded.font_size, 19);
+
+        loaded.auto_check_updates = false;
+        set_settings_in(dir.path(), &loaded).expect("save settings");
+        let raw: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(&settings_path).unwrap()).unwrap();
+        assert_eq!(raw["autoCheckUpdates"], false);
         assert_eq!(get_settings_in(dir.path()).unwrap(), loaded);
     }
 }

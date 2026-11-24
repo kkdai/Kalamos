@@ -36,6 +36,9 @@ pub fn run() {
         .menu(menu::build_app_menu)
         .on_menu_event(menu::handle_menu_event);
 
+    #[cfg(desktop)]
+    let builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
+
     builder
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
