@@ -157,6 +157,29 @@
               </p>
             </div>
           </div>
+          <div class="pillars-grid pillars-grid--three">
+            <div class="pillar">
+              <h3>YAML Document Info Preview</h3>
+              <p>
+                YAML Front Matter at the top of a file renders as a structured card with lists and nested fields. Click
+                anywhere on the card to edit the raw YAML in place.
+              </p>
+            </div>
+            <div class="pillar">
+              <h3>Traditional Chinese &amp; English UI</h3>
+              <p>
+                Follows your system language by default (Traditional Chinese for <code>zh</code> locales, English
+                otherwise). Switch anytime in <strong>Preferences → General</strong> across the app and native menu.
+              </p>
+            </div>
+            <div class="pillar">
+              <h3>Ctrl + Wheel Zoom</h3>
+              <p>
+                Hold <kbd>Ctrl</kbd> and scroll the mouse wheel to zoom the interface in or out smoothly, staying in
+                sync with <strong>View → Zoom In / Out / Actual Size</strong>.
+              </p>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -283,8 +306,54 @@
         </div>
       </section>
 
-      <!-- Showcase 4: Workflow (Quick Open, Tabs, Images, Export, Sidebar, Recovery) -->
-      <section class="showcase" id="workflow">
+      <!-- Showcase 4: YAML Front Matter -->
+      <section class="showcase">
+        <div class="container">
+          <div class="showcase-header">
+            <span class="eyebrow">Document Metadata</span>
+            <h2 class="section-title">YAML Front Matter, readable at a glance</h2>
+            <p class="section-desc">
+              Blog posts and static-site drafts stay tidy from line one. Kalamos renders opening YAML Front Matter as a
+              clean metadata card — supporting lists and nested fields — and reveals the raw YAML in place whenever you
+              click it.
+            </p>
+          </div>
+          <div class="showcase-media">
+            <div class="window-frame">
+              <div class="window-bar" aria-hidden="true">
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-title">front-matter-post.md — Kalamos</span>
+              </div>
+              <img
+                src="assets/screenshots/front-matter.png"
+                alt="Kalamos rendering YAML Front Matter as a structured document info card with title, date, tags list, and nested author fields above a blog post"
+                width="1920"
+                height="1400"
+                loading="lazy"
+              />
+            </div>
+          </div>
+          <div class="showcase-notes">
+            <div class="showcase-note">
+              <strong>Lists &amp; Nested Fields</strong>
+              <span>Displays tags, dates, booleans, and nested YAML objects cleanly without raw syntax clutter.</span>
+            </div>
+            <div class="showcase-note">
+              <strong>Click to Edit in Place</strong>
+              <span>Click the card to edit raw YAML directly; move your cursor back into the body to fold it again.</span>
+            </div>
+            <div class="showcase-note">
+              <strong>Untouched Formatting</strong>
+              <span>Your original YAML keys, comments, and indentation stay intact on disk whenever untouched.</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Showcase 5: Workflow (Quick Open, Tabs, Images, Export, Sidebar, Recovery) -->
+      <section class="showcase showcase--tinted" id="workflow">
         <div class="container">
           <div class="showcase-header">
             <span class="eyebrow">From Draft to Delivery</span>
@@ -393,23 +462,23 @@
             <article class="feature-card">
               <h3>Thoughtful Writing Details</h3>
               <p>
-                Hover footnotes with click-to-jump, YAML Front Matter, heading bookmark links (<kbd>Cmd+Shift+C</kbd>),
-                offline GitHub emoji autocomplete (<code>:smile</code>), and smart auto-pairing for ASCII and CJK
-                full-width brackets and quotes.
+                Hover footnotes with click-to-jump, clickable YAML Front Matter cards, Traditional Chinese &amp; English
+                UI switching, <kbd>Ctrl</kbd> + wheel zoom, heading bookmark links (<kbd>Cmd+Shift+C</kbd>), offline
+                GitHub emoji autocomplete (<code>:smile</code>), and smart CJK/ASCII auto-pairing.
               </p>
               <ul class="feature-tags">
-                <li>Footnotes</li>
-                <li>Front Matter</li>
-                <li>Emoji :shortcodes</li>
-                <li>Auto-Pairing</li>
+                <li>Front Matter Card</li>
+                <li>zh-TW &amp; EN UI</li>
+                <li>Ctrl + Wheel Zoom</li>
+                <li>Footnotes &amp; Emoji</li>
               </ul>
             </article>
           </div>
         </div>
       </section>
 
-      <!-- Showcase 5: Themes -->
-      <section class="showcase showcase--tinted">
+      <!-- Showcase 6: Themes -->
+      <section class="showcase">
         <div class="container">
           <div class="showcase-header">
             <span class="eyebrow">Themes &amp; Custom CSS</span>
@@ -440,8 +509,8 @@
         </div>
       </section>
 
-      <!-- Showcase 6: Writing Modes -->
-      <section class="showcase">
+      <!-- Showcase 7: Writing Modes -->
+      <section class="showcase showcase--tinted">
         <div class="container">
           <div class="showcase-header">
             <span class="eyebrow">Writing Modes</span>
@@ -473,15 +542,15 @@
       </section>
 
       <!-- Shortcuts Summary -->
-      <section class="showcase showcase--tinted" id="shortcuts">
+      <section class="showcase" id="shortcuts">
         <div class="container container--narrow">
           <div class="showcase-header">
             <span class="eyebrow">Keyboard First</span>
             <h2 class="section-title">Essential shortcuts at your fingertips</h2>
             <p class="section-desc">
               Every core action is reachable without leaving the keyboard. On Windows, <code>Cmd</code> maps to
-              <code>Ctrl</code> and <code>Opt</code> maps to <code>Alt</code> (<code>Ctrl+Tab</code> is the same on
-              both platforms).
+              <code>Ctrl</code> and <code>Opt</code> maps to <code>Alt</code> (<code>Ctrl+Tab</code> and
+              <code>Ctrl + Wheel</code> are the same on both platforms).
             </p>
           </div>
 
@@ -550,12 +619,20 @@
               <span class="shortcut-label">Bracket / Markdown Auto-Pairing</span>
               <span><kbd>Cmd+Opt+P</kbd> / <kbd>Cmd+Opt+Shift+P</kbd></span>
             </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">Zoom In / Out / Actual Size</span>
+              <span><kbd>Cmd+Shift+=</kbd> · <kbd>-</kbd> · <kbd>0</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">Zoom with Mouse Wheel</span>
+              <span><kbd>Ctrl</kbd> + Wheel</span>
+            </div>
           </div>
         </div>
       </section>
 
       <!-- FAQ -->
-      <section class="showcase" id="faq">
+      <section class="showcase showcase--tinted" id="faq">
         <div class="container container--narrow">
           <div class="showcase-header">
             <span class="eyebrow">FAQ</span>

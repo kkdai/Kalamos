@@ -135,6 +135,20 @@
               <p>독자 문법 없는 표준 GitHub Flavored Markdown 그대로 저장합니다. 원자적 파일 쓰기, 1초 자동 저장, 충돌 복구로 초안을 안전하게 지킵니다.</p>
             </div>
           </div>
+          <div class="pillars-grid pillars-grid--three">
+            <div class="pillar">
+              <h3>YAML 문서 정보 미리보기</h3>
+              <p>문서 상단의 YAML Front Matter를 깔끔한 카드로 보여줍니다. 목록과 중첩 필드를 모두 지원하며, 카드를 클릭하면 그 자리에서 바로 원문을 편집할 수 있습니다.</p>
+            </div>
+            <div class="pillar">
+              <h3>번체 중국어 · 영어 인터페이스</h3>
+              <p>기본으로 시스템 언어를 따르며(OS 언어가 <code>zh</code>로 시작하면 번체 중국어, 그 외에는 영어), 언제든지 <strong>Preferences → General</strong>(<strong>偏好設定 → 一般</strong>)에서 앱 화면과 네이티브 메뉴 언어를 바꿀 수 있습니다.</p>
+            </div>
+            <div class="pillar">
+              <h3>Ctrl + 휠 확대 / 축소</h3>
+              <p><kbd>Ctrl</kbd> 키를 누른 채 마우스 휠을 굴리면 화면을 부드럽게 확대하거나 축소할 수 있으며, <strong>보기</strong> 메뉴의 확대·축소·실제 크기 배율과 연동됩니다.</p>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -250,8 +264,50 @@
         </div>
       </section>
 
-      <!-- Showcase 4: Workflow -->
-      <section class="showcase" id="workflow">
+      <!-- Showcase 4: YAML Front Matter -->
+      <section class="showcase">
+        <div class="container">
+          <div class="showcase-header">
+            <span class="eyebrow">문서 메타데이터</span>
+            <h2 class="section-title">YAML Front Matter를 한눈에 깔끔하게</h2>
+            <p class="section-desc">블로그 글이나 정적 사이트 초안도 첫 줄부터 단정하게 정리됩니다. 문서 상단의 YAML Front Matter를 목록과 중첩 필드까지 갖춘 구조화 카드로 보여주고, 클릭하면 그 자리에서 원문을 바로 편집할 수 있습니다.</p>
+          </div>
+          <div class="showcase-media">
+            <div class="window-frame">
+              <div class="window-bar" aria-hidden="true">
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-title">front-matter-post.md — Kalamos</span>
+              </div>
+              <img
+                src="../assets/screenshots/front-matter.png"
+                alt="블로그 글 상단의 YAML Front Matter를 title, date, tags 목록과 중첩 author 필드가 포함된 문서 정보 카드로 표시하는 Kalamos 화면"
+                width="1920"
+                height="1400"
+                loading="lazy"
+              />
+            </div>
+          </div>
+          <div class="showcase-notes">
+            <div class="showcase-note">
+              <strong>목록과 중첩 필드 지원</strong>
+              <span>날짜, 태그 목록, 불리언, 중첩 YAML 항목까지 원시 문법 없이 정돈된 형태로 표시합니다.</span>
+            </div>
+            <div class="showcase-note">
+              <strong>클릭해서 바로 편집</strong>
+              <span>카드를 클릭하면 원본 YAML을 즉시 수정할 수 있고, 본문으로 커서를 옮기면 다시 카드로 접힙니다.</span>
+            </div>
+            <div class="showcase-note">
+              <strong>원본 형식 그대로 보존</strong>
+              <span>수정하지 않는 한 파일을 건드리지 않아 기존 키 순서, 주석, 들여쓰기가 온전히 유지됩니다.</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Showcase 5: Workflow -->
+      <section class="showcase showcase--tinted" id="workflow">
         <div class="container">
           <div class="showcase-header">
             <span class="eyebrow">초안에서 배포까지</span>
@@ -335,20 +391,20 @@
 
             <article class="feature-card">
               <h3>글쓰기를 돕는 세심한 기능</h3>
-              <p>마우스 오버 미리보기와 클릭 이동을 지원하는 각주, YAML Front Matter, 제목 북마크 복사(<kbd>Cmd+Shift+C</kbd>), 오프라인 GitHub 이모지 자동 완성(<code>:smile</code>), 영문·전각 괄호 자동 짝 맞추기를 기본 제공합니다.</p>
+              <p>마우스 오버 미리보기와 클릭 이동을 지원하는 각주, 클릭 편집 YAML 문서 정보 카드, 번체 중국어·영어 인터페이스 전환, <kbd>Ctrl</kbd> + 휠 확대/축소, 제목 북마크 복사(<kbd>Cmd+Shift+C</kbd>), 오프라인 GitHub 이모지 자동 완성(<code>:smile</code>), 영문·전각 괄호 자동 짝 맞추기를 기본 제공합니다.</p>
               <ul class="feature-tags">
-                <li>각주 미리보기</li>
-                <li>Front Matter</li>
-                <li>이모지 :shortcode</li>
-                <li>괄호 자동 짝</li>
+                <li>문서 정보 카드</li>
+                <li>번체 중국어 · 영어 UI</li>
+                <li>Ctrl + 휠 확대/축소</li>
+                <li>각주 및 이모지</li>
               </ul>
             </article>
           </div>
         </div>
       </section>
 
-      <!-- Showcase 5: Themes -->
-      <section class="showcase showcase--tinted">
+      <!-- Showcase 6: Themes -->
+      <section class="showcase">
         <div class="container">
           <div class="showcase-header">
             <span class="eyebrow">테마와 커스텀 CSS</span>
@@ -375,8 +431,8 @@
         </div>
       </section>
 
-      <!-- Showcase 6: Writing Modes -->
-      <section class="showcase">
+      <!-- Showcase 7: Writing Modes -->
+      <section class="showcase showcase--tinted">
         <div class="container">
           <div class="showcase-header">
             <span class="eyebrow">글쓰기 모드</span>
@@ -404,12 +460,12 @@
       </section>
 
       <!-- Shortcuts Summary -->
-      <section class="showcase showcase--tinted" id="shortcuts">
+      <section class="showcase" id="shortcuts">
         <div class="container container--narrow">
           <div class="showcase-header">
             <span class="eyebrow">키보드 우선</span>
             <h2 class="section-title">핵심 단축키 요약</h2>
-            <p class="section-desc">키보드에서 손을 떼지 않고 모든 주요 기능을 실행할 수 있습니다. Windows에서는 <code>Cmd</code>가 <code>Ctrl</code>, <code>Opt</code>가 <code>Alt</code>에 대응됩니다(<code>Ctrl+Tab</code>은 양쪽 동일).</p>
+            <p class="section-desc">키보드에서 손을 떼지 않고 모든 주요 기능을 실행할 수 있습니다. Windows에서는 <code>Cmd</code>가 <code>Ctrl</code>, <code>Opt</code>가 <code>Alt</code>에 대응됩니다(<code>Ctrl+Tab</code>과 <code>Ctrl + 휠</code>은 양쪽 동일).</p>
           </div>
 
           <div class="shortcuts-grid">
@@ -477,12 +533,20 @@
               <span class="shortcut-label">괄호 / Markdown 자동 짝 전환</span>
               <span><kbd>Cmd+Opt+P</kbd> / <kbd>Cmd+Opt+Shift+P</kbd></span>
             </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">확대 / 축소 / 실제 크기</span>
+              <span><kbd>Cmd+Shift+=</kbd> · <kbd>-</kbd> · <kbd>0</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">마우스 휠로 확대 / 축소</span>
+              <span><kbd>Ctrl</kbd> + 휠</span>
+            </div>
           </div>
         </div>
       </section>
 
       <!-- FAQ -->
-      <section class="showcase" id="faq">
+      <section class="showcase showcase--tinted" id="faq">
         <div class="container container--narrow">
           <div class="showcase-header">
             <span class="eyebrow">FAQ</span>

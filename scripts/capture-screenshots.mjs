@@ -122,16 +122,18 @@ function parseArgs(argv) {
   let heroOnly = false;
   let sharedOnly = false;
   let quickOpenOnly = false;
+  let frontMatterOnly = false;
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === "--hero-only") heroOnly = true;
     else if (arg === "--shared-only") sharedOnly = true;
     else if (arg === "--quick-open-only") quickOpenOnly = true;
+    else if (arg === "--front-matter-only") frontMatterOnly = true;
     else if (arg === "--lang" && argv[i + 1]) lang = argv[++i];
     else if (arg.startsWith("--lang=")) lang = arg.slice("--lang=".length);
     else if (arg === "-h" || arg === "--help") {
       console.log(
-        "Usage: node scripts/capture-screenshots.mjs [--lang en|zh-TW|ja|ko|all] [--hero-only|--shared-only|--quick-open-only]",
+        "Usage: node scripts/capture-screenshots.mjs [--lang en|zh-TW|ja|ko|all] [--hero-only|--shared-only|--quick-open-only|--front-matter-only]",
       );
       process.exit(0);
     } else {
@@ -144,16 +146,23 @@ function parseArgs(argv) {
       `Invalid --lang "${lang}". Expected one of: all, ${validLangs.join(", ")}`,
     );
   }
-  if (Number(heroOnly) + Number(sharedOnly) + Number(quickOpenOnly) > 1) {
+  if (
+    Number(heroOnly) +
+      Number(sharedOnly) +
+      Number(quickOpenOnly) +
+      Number(frontMatterOnly) >
+    1
+  ) {
     throw new Error(
-      "Cannot combine --hero-only, --shared-only, and --quick-open-only",
+      "Cannot combine --hero-only, --shared-only, --quick-open-only, and --front-matter-only",
     );
   }
   return {
     langs: lang === "all" ? validLangs : [lang],
-    captureHeroes: !sharedOnly && !quickOpenOnly,
-    captureShared: !heroOnly && !quickOpenOnly,
-    captureQuickOpen: !heroOnly,
+    captureHeroes: !sharedOnly && !quickOpenOnly && !frontMatterOnly,
+    captureShared: !heroOnly && !quickOpenOnly && !frontMatterOnly,
+    captureQuickOpen: !heroOnly && !frontMatterOnly,
+    captureFrontMatter: !heroOnly && !quickOpenOnly,
   };
 }
 
@@ -568,6 +577,66 @@ async function captureAll() {
       await page.waitForTimeout(250);
       await page.screenshot({ path: path.join(OUT_DIR, "quick-open.png") });
       console.log("Captured quick-open.png");
+    }
+
+    if (opts.captureFrontMatter) {
+      // 8. YAML Front Matter Document Info Preview
+      await resetApp(page, { theme: "papyros", sidebar: false });
+      const frontMatterDoc = [
+        "---",
+        "title: Writing Technical Posts with Kalamos",
+        "date: 2026-11-24",
+        "tags:",
+        "  - markdown",
+        "  - publishing",
+        "  - static-site",
+        "author:",
+        "  name: Evan Lin",
+        "  role: Maintainer",
+        "draft: false",
+        "---",
+        "",
+        "# Writing Technical Posts with Kalamos",
+        "",
+        "When drafting articles for Hugo, Jekyll, or Astro, **YAML Front Matter** sits right at the top of every file. Kalamos turns that metadata block into a structured **metadata card** in Live Preview.",
+        "",
+        "> Click anywhere on the card to edit the raw YAML in place — move your cursor back to the article and it folds right back into a structured view.",
+        "",
+        "## Metadata That Stays Out of Your Way",
+        "",
+        "- Supports scalars, lists such as `tags`, and nested fields like `author`",
+        "- Resolves `typora-root-url` automatically for `/`-rooted static-site images",
+        "- Preserves your original YAML formatting byte-for-byte when untouched",
+        "",
+      ].join("\n");
+      await page.evaluate(
+        async ({ docPath, content }) => {
+          const ipc = await import("/src/ipc.ts");
+          const main = await import("/src/main.ts");
+          ipc.resetMockState();
+          ipc.seedMockFile(docPath, content);
+          const app = main.getActiveApp();
+          await app.openPath(docPath, "current");
+          app.editor.setCursor(content.length);
+          app.editor.view.scrollDOM.scrollTop = 0;
+        },
+        {
+          docPath: "/tmp/kalamos-test/blog/front-matter-post.md",
+          content: frontMatterDoc,
+        },
+      );
+      await page.waitForSelector('[data-testid="front-matter-preview"]', {
+        state: "visible",
+        timeout: 10_000,
+      });
+      await page.evaluate(async () => {
+        const main = await import("/src/main.ts");
+        main.getActiveApp().editor.view.scrollDOM.scrollTop = 0;
+      });
+      await nextFrames(page, 6);
+      await page.waitForTimeout(250);
+      await page.screenshot({ path: path.join(OUT_DIR, "front-matter.png") });
+      console.log("Captured front-matter.png");
     }
   } finally {
     if (browser) await browser.close();

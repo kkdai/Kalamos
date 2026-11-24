@@ -570,6 +570,16 @@ summary:focus-visible {
   padding: 36px 0;
 }
 
+.pillars-grid--three {
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px 32px;
+}
+
+.pillars-grid + .pillars-grid--three {
+  border-top: 0;
+  padding-top: 32px;
+}
+
 .pillar h3 {
   margin: 0 0 8px;
   font-family: var(--font-serif);
@@ -687,6 +697,10 @@ summary:focus-visible {
   box-shadow: var(--shadow-card);
 }
 
+.showcase--tinted .feature-card {
+  background-color: var(--bg);
+}
+
 .feature-card h3 {
   margin: 0 0 10px;
   font-family: var(--font-serif);
@@ -717,6 +731,10 @@ summary:focus-visible {
   border: 1px solid var(--border-subtle);
   font-size: 0.8rem;
   color: var(--ink-secondary);
+}
+
+.showcase--tinted .feature-tags li {
+  background-color: var(--bg-panel);
 }
 
 /* ==========================================================================
@@ -836,6 +854,10 @@ kbd {
   color: var(--ink);
   max-width: 100%;
   overflow-x: auto;
+}
+
+.showcase--tinted .code-chip {
+  background-color: var(--bg);
 }
 
 .copy-btn {
@@ -1097,6 +1119,7 @@ kbd {
 
 @media (max-width: 860px) {
   .pillars-grid,
+  .pillars-grid--three,
   .showcase-notes {
     grid-template-columns: 1fr;
   }
