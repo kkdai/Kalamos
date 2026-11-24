@@ -1,6 +1,7 @@
 import "./table-toolbar.css";
 
 import type { EditorView } from "@codemirror/view";
+import { t } from "../i18n";
 import {
   clampInt,
   insertTable,
@@ -39,11 +40,11 @@ export function pickTableSize(
     panel.dataset.testid = "table-insert-dialog";
     panel.setAttribute("role", "dialog");
     panel.setAttribute("aria-modal", "true");
-    panel.setAttribute("aria-label", "插入表格");
+    panel.setAttribute("aria-label", t("editor.table.insertTitle"));
 
     const title = doc.createElement("div");
     title.className = "k-table-dialog-title";
-    title.textContent = "插入表格";
+    title.textContent = t("editor.table.insertTitle");
 
     const field = (
       label: string,
@@ -66,13 +67,13 @@ export function pickTableSize(
       return { wrap, input };
     };
     const rowsField = field(
-      "列數（含表頭）",
+      t("editor.table.rowsWithHeader"),
       initial.rows,
       MAX_TABLE_ROWS,
       "table-dialog-rows",
     );
     const colsField = field(
-      "欄數",
+      t("editor.table.columns"),
       initial.cols,
       MAX_TABLE_COLS,
       "table-dialog-cols",
@@ -107,7 +108,7 @@ export function pickTableSize(
           Number(cell.dataset.cols) <= cols;
         cell.classList.toggle("is-selected", on);
       }
-      sizeLabel.textContent = `${rows} 列 × ${cols} 欄`;
+      sizeLabel.textContent = t("editor.table.size", { rows, cols });
     };
     const currentSize = (): TableSize => ({
       rows: clampInt(Number(rowsField.input.value), 1, MAX_TABLE_ROWS),
@@ -141,13 +142,13 @@ export function pickTableSize(
     actions.className = "k-table-dialog-actions";
     const cancel = doc.createElement("button");
     cancel.type = "button";
-    cancel.textContent = "取消";
+    cancel.textContent = t("editor.dialog.cancel");
     cancel.dataset.testid = "table-dialog-cancel";
     cancel.addEventListener("click", () => finish(null));
     const ok = doc.createElement("button");
     ok.type = "submit";
     ok.className = "is-primary";
-    ok.textContent = "插入";
+    ok.textContent = t("editor.table.insert");
     ok.dataset.testid = "table-dialog-ok";
     actions.append(cancel, ok);
 

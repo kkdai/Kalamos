@@ -29,6 +29,7 @@ import {
   type ViewUpdate,
 } from "@codemirror/view";
 import type { SyntaxNode } from "@lezer/common";
+import { t } from "../i18n";
 
 export const FOCUS_DIM_CLASS = "k-focus-dim";
 
@@ -325,6 +326,10 @@ export const typewriterModeExtension: Extension = [
 ];
 
 export const FOCUS_MODE_MESSAGE = (on: boolean): string =>
-  `Ataraxia 專注模式：${on ? "開" : "關"}`;
+  t("editor.mode.focus", {
+    state: t(on ? "editor.state.on" : "editor.state.off"),
+  });
 export const TYPEWRITER_MODE_MESSAGE = (on: boolean): string =>
-  `Stichos 打字機模式：${on ? "開" : "關"}`;
+  t("editor.mode.typewriter", {
+    state: t(on ? "editor.state.on" : "editor.state.off"),
+  });

@@ -15,6 +15,7 @@ import {
   diagramThemeFromColors,
   renderDiagram,
 } from "../editor/diagrams";
+import { t } from "../i18n";
 
 /** Same palette as print-css.ts (white paper). */
 export const PRINT_DIAGRAM_THEME = diagramThemeFromColors(
@@ -96,7 +97,7 @@ export async function renderExportDiagrams(
     if (result.error || !result.svg) {
       results.push({
         svg: "",
-        error: result.error ?? "圖表語法錯誤",
+        error: result.error ?? t("editor.diagram.syntaxError"),
         line: result.line,
       });
       continue;
@@ -105,15 +106,8 @@ export async function renderExportDiagrams(
     results.push(
       isStaticSvg(svg)
         ? { svg, error: null, line: null }
-        : { svg: "", error: "圖表包含不允許的內容", line: null },
+        : { svg: "", error: t("export.diagram.disallowedContent"), line: null },
     );
   }
   return results;
-}
-
-/** Short error line, same wording as the editor's diagram error. */
-export function diagramErrorTitle(result: DiagramRenderResult): string {
-  return result.line !== null
-    ? `圖表語法錯誤（第 ${result.line} 行）`
-    : "圖表語法錯誤";
 }

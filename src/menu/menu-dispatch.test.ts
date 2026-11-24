@@ -298,27 +298,18 @@ describe("#89 platform-aware menu spec & shortcut labels", () => {
     const mac = menuSpecFor("macos");
     const win = menuSpecFor("windows");
 
-    const topLabels = (nodes: MenuNode[]) =>
-      nodes.filter((n) => n.type === "submenu").map((n) => n.label);
-    expect(topLabels(mac)).toEqual([
-      "Kalamos",
-      "檔案",
-      "編輯",
-      "段落",
-      "格式",
-      "檢視",
-      "視窗",
-      "說明",
+    const topLabelKeys = (nodes: MenuNode[]) =>
+      nodes.filter((n) => n.type === "submenu").map((n) => n.labelKey);
+    expect(topLabelKeys(win)).toEqual([
+      "menu.file.title",
+      "menu.edit.title",
+      "menu.para.title",
+      "menu.fmt.title",
+      "menu.view.title",
+      "menu.window.title",
+      "menu.help.title",
     ]);
-    expect(topLabels(win)).toEqual([
-      "檔案",
-      "編輯",
-      "段落",
-      "格式",
-      "檢視",
-      "視窗",
-      "說明",
-    ]);
+    expect(topLabelKeys(mac)).toEqual(["menu.app.title", ...topLabelKeys(win)]);
 
     assertCleanSeparators(mac);
     assertCleanSeparators(win);
@@ -337,8 +328,10 @@ describe("#89 platform-aware menu spec & shortcut labels", () => {
     }
     expect(winPredefined.has("about")).toBe(true);
 
-    // Windows puts Preferences and Quit in 檔案, and About in 說明.
-    const fileSub = win.find((n) => n.type === "submenu" && n.label === "檔案");
+    // Windows puts Preferences and Quit under File, and About under Help.
+    const fileSub = win.find(
+      (n) => n.type === "submenu" && n.labelKey === "menu.file.title",
+    );
     expect(fileSub?.type).toBe("submenu");
     if (fileSub?.type === "submenu") {
       expect(
@@ -358,7 +351,9 @@ describe("#89 platform-aware menu spec & shortcut labels", () => {
         ),
       ).toBe(true);
     }
-    const helpSub = win.find((n) => n.type === "submenu" && n.label === "說明");
+    const helpSub = win.find(
+      (n) => n.type === "submenu" && n.labelKey === "menu.help.title",
+    );
     expect(helpSub?.type).toBe("submenu");
     if (helpSub?.type === "submenu") {
       expect(

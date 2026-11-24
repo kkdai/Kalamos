@@ -5,6 +5,7 @@ import {
 import { ensureSyntaxTree, syntaxTree } from "@codemirror/language";
 import { EditorSelection, type EditorState } from "@codemirror/state";
 import { EditorView, WidgetType } from "@codemirror/view";
+import { t } from "../i18n";
 
 const continueMarkupNoBlank = insertNewlineContinueMarkupCommand({
   nonTightLists: false,
@@ -478,7 +479,7 @@ export class TaskCheckboxWidget extends WidgetType {
     input.dataset.checked = this.checked ? "true" : "false";
     input.setAttribute(
       "aria-label",
-      this.checked ? "Completed task" : "Incomplete task",
+      t(this.checked ? "editor.task.completed" : "editor.task.incomplete"),
     );
     input.addEventListener("mousedown", (event) => {
       event.preventDefault();

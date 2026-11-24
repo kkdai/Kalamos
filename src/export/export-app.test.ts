@@ -8,7 +8,6 @@ import {
   setMockExportPdfHandler,
 } from "../ipc";
 import { createKalamosApp, type KalamosApp } from "../main";
-import { EXPORTING_PDF_MESSAGE } from "./pdf";
 
 function setupDom(): void {
   document.body.innerHTML = `
@@ -78,7 +77,7 @@ describe("EX-01 export PDF from the app", () => {
     );
 
     pressExportShortcut();
-    await until(() => app!.getStatusText() === EXPORTING_PDF_MESSAGE);
+    await until(() => app!.getStatusText() === "匯出中…");
     expect(suggested).toEqual(["/notes/Report.pdf"]);
     expect(app.isExportingPdf()).toBe(true);
     // A second shortcut while exporting is ignored.

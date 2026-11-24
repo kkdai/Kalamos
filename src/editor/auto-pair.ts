@@ -28,12 +28,17 @@ import {
 } from "@codemirror/state";
 import { EditorView, keymap } from "@codemirror/view";
 import type { SyntaxNode } from "@lezer/common";
+import { t } from "../i18n";
 import { mapPosClamped } from "./positions";
 
 export const AUTO_PAIR_BRACKETS_MESSAGE = (on: boolean): string =>
-  `自動配對括號：${on ? "開" : "關"}`;
+  t("editor.autoPair.brackets", {
+    state: t(on ? "editor.state.on" : "editor.state.off"),
+  });
 export const AUTO_PAIR_MARKDOWN_MESSAGE = (on: boolean): string =>
-  `自動配對 Markdown 符號：${on ? "開" : "關"}`;
+  t("editor.autoPair.markdown", {
+    state: t(on ? "editor.state.on" : "editor.state.off"),
+  });
 
 /** Openers handed to `closeBrackets` (closers: next code point / ASCII table). */
 export const AUTO_PAIR_BRACKETS = [

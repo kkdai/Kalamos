@@ -17,6 +17,7 @@ import {
   type ViewUpdate,
   WidgetType,
 } from "@codemirror/view";
+import { t } from "../i18n";
 import {
   allowAssetDir,
   allowAssetFile,
@@ -34,7 +35,6 @@ import {
 } from "./image-attrs";
 import { expandedSpanField, isInlineSpanActive } from "./live-preview";
 
-export const UNSAVED_RELATIVE_IMAGE_HINT = "存檔後才能顯示相對路徑圖片";
 export const IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "gif", "webp", "svg"];
 
 // ---------------------------------------------------------------------------
@@ -543,12 +543,11 @@ export class ImageWidget extends WidgetType {
       const hint = doc.createElement("span");
       hint.className = "k-image-hint";
       hint.dataset.testid = "image-needs-save";
-      hint.textContent = this.alt
-        ? `${this.alt} — ${UNSAVED_RELATIVE_IMAGE_HINT}`
-        : UNSAVED_RELATIVE_IMAGE_HINT;
+      const message = t("editor.image.unsavedRelative");
+      hint.textContent = this.alt ? `${this.alt} — ${message}` : message;
       wrapper.append(hint);
     } else if (r.kind === "invalid") {
-      renderImageFallback(wrapper, this.alt, "無法顯示圖片");
+      renderImageFallback(wrapper, this.alt, t("editor.image.unavailable"));
     } else {
       wrapper.dataset.state = "loading";
       // Resolved local path (debugging aid; survives the broken-image fallback).
@@ -581,13 +580,17 @@ export class ImageWidget extends WidgetType {
                 wrapper.dataset.state = "loading";
                 showImage();
               } else {
-                renderImageFallback(wrapper, this.alt, "圖片載入失敗");
+                renderImageFallback(
+                  wrapper,
+                  this.alt,
+                  t("editor.image.loadFailed"),
+                );
               }
               view.requestMeasure();
             });
             return;
           }
-          renderImageFallback(wrapper, this.alt, "圖片載入失敗");
+          renderImageFallback(wrapper, this.alt, t("editor.image.loadFailed"));
           view.requestMeasure();
         });
         img.src = r.url;
@@ -804,7 +807,8 @@ export function insertImageMarkdown(
 export function readFileAsBase64(file: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onerror = () => reject(reader.error ?? new Error("read failed"));
+    reader.onerror = () =>
+      reject(reader.error ?? new Error(t("editor.image.readFailed")));
     reader.onload = () => {
       const result = String(reader.result ?? "");
       const comma = result.indexOf(",");

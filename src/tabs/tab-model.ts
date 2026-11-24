@@ -2,6 +2,7 @@
  * #81 A: pure helpers for the document tabs (naming, collision labels,
  * keyboard cycling, which tab becomes active after a close, reordering).
  */
+import { t } from "../i18n";
 import {
   IS_WINDOWS,
   isMarkdownFilePath,
@@ -10,11 +11,11 @@ import {
 
 export { MARKDOWN_EXTENSIONS };
 
-export const UNTITLED_LABEL = "未命名";
-
-/** 1 → 「未命名」, n → 「未命名 n」. */
+/** Only later untitled tabs have a number in their label. */
 export function untitledLabel(n: number): string {
-  return n <= 1 ? UNTITLED_LABEL : `${UNTITLED_LABEL} ${n}`;
+  return n <= 1
+    ? t("tabs.untitled")
+    : t("tabs.untitledNumbered", { number: n });
 }
 
 /** The lowest positive number no open untitled tab uses. */
@@ -190,6 +191,8 @@ export function resolveOpenTarget(
 
 /** Message of the close-window prompt listing the documents with unsaved changes. */
 export function unsavedChangesMessage(labels: string[]): string {
-  const list = labels.map((label) => `・${label}`).join("\n");
-  return `以下 ${labels.length} 份文件有未儲存的變更：\n${list}\n\n要在關閉前儲存嗎？`;
+  const list = labels
+    .map((name) => t("tabs.unsavedChanges.listItem", { name }))
+    .join("\n");
+  return t("tabs.unsavedChanges", { total: labels.length, list });
 }

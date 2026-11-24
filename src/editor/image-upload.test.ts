@@ -27,7 +27,6 @@ import {
   endTracking,
   imgSrcValueRange,
   markdownDestinationFor,
-  NO_LOCAL_IMAGES_MESSAGE,
   replaceUploadedImages,
   uploadImagesInEditor,
 } from "./image-upload";
@@ -320,7 +319,7 @@ describe("IM-05 upload flow", () => {
       setStatus: (m) => statuses.push(m),
       notConfiguredMessage: "x",
     });
-    expect(statuses).toEqual([NO_LOCAL_IMAGES_MESSAGE]);
+    expect(statuses).toEqual(["沒有可上傳的本機圖片"]);
   });
 });
 

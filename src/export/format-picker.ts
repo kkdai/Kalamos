@@ -1,5 +1,6 @@
 import "./format-picker.css";
 
+import { t } from "../i18n";
 import { PANDOC_FORMATS, type PandocFormat } from "./pandoc";
 
 /**
@@ -21,11 +22,11 @@ export function pickExportFormat(
     panel.dataset.testid = "export-format-picker";
     panel.setAttribute("role", "dialog");
     panel.setAttribute("aria-modal", "true");
-    panel.setAttribute("aria-label", "匯出為…");
+    panel.setAttribute("aria-label", t("export.pandoc.pickerTitle"));
 
     const title = doc.createElement("div");
     title.className = "k-format-picker-title";
-    title.textContent = "匯出為…";
+    title.textContent = t("export.pandoc.pickerTitle");
     panel.append(title);
 
     let settled = false;
@@ -49,7 +50,7 @@ export function pickExportFormat(
       label.textContent = format.label;
       const desc = doc.createElement("span");
       desc.className = "k-format-option-desc";
-      desc.textContent = format.description;
+      desc.textContent = t(format.descriptionKey);
       btn.append(label, desc);
       btn.addEventListener("click", () => finish(format.id));
       buttons.push(btn);
@@ -60,7 +61,7 @@ export function pickExportFormat(
     cancel.type = "button";
     cancel.className = "k-format-cancel";
     cancel.dataset.testid = "export-format-cancel";
-    cancel.textContent = "取消";
+    cancel.textContent = t("editor.dialog.cancel");
     cancel.addEventListener("click", () => finish(null));
     panel.append(cancel);
 

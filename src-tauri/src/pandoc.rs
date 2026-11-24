@@ -40,6 +40,15 @@ pub const PANDOC_MISSING_MESSAGE: &str = "找不到 Pandoc：請先安裝（brew
 pub const PANDOC_MISSING_MESSAGE: &str =
     "找不到 Pandoc：請先安裝（winget install JohnMacFarlane.Pandoc，或至 pandoc.org 下載安裝程式）";
 pub const PANDOC_TOO_OLD_FOR_IMPORT_MESSAGE: &str = "Pandoc 版本過舊，匯入需要 2.15 以上";
+
+fn missing_pandoc() -> AppError {
+    let key = if cfg!(target_os = "windows") {
+        "export.pandoc.missingWindows"
+    } else {
+        "export.pandoc.missingMac"
+    };
+    AppError::not_found(PANDOC_MISSING_MESSAGE).with_message_key(key)
+}
 /// First pandoc release with `--sandbox` (imports run sandboxed).
 pub const MIN_SANDBOX_VERSION: (u32, u32, u32) = (2, 15, 0);
 const STDERR_TAIL_CHARS: usize = 600;
@@ -81,7 +90,9 @@ impl ExportFormat {
             "latex" | "tex" => Ok(Self::Latex),
             "mediawiki" | "wiki" => Ok(Self::Mediawiki),
             "epub" => Ok(Self::Epub),
-            other => Err(AppError::invalid_path(format!("不支援的匯出格式：{other}"))),
+            other => Err(AppError::invalid_path(format!("不支援的匯出格式：{other}"))
+                .with_message_key("errors.pandoc.unsupportedExportFormat")
+                .with_message_arg("format", other)),
         }
     }
 
@@ -123,7 +134,9 @@ pub fn reader_for_path(path: &Path) -> Result<&'static str, AppError> {
         "wiki" | "mediawiki" => Ok("mediawiki"),
         _ => Err(AppError::invalid_path(format!(
             "不支援匯入的檔案類型：.{ext}（支援 docx、odt、epub、tex、html、wiki）"
-        ))),
+        ))
+        .with_message_key("errors.pandoc.unsupportedImportType")
+        .with_message_arg("extension", ext)),
     }
 }
 
@@ -211,7 +224,7 @@ fn require_pandoc() -> Result<(PathBuf, Option<String>), AppError> {
         .path
         .filter(|_| status.available)
         .map(|p| (PathBuf::from(p), version))
-        .ok_or_else(|| AppError::not_found(PANDOC_MISSING_MESSAGE))
+        .ok_or_else(missing_pandoc)
 }
 
 // ---------------------------------------------------------------------------
@@ -268,9 +281,11 @@ pub fn run_pandoc(
     let mut child = attempt
         .map_err(|e| {
             if e.kind() == std::io::ErrorKind::NotFound {
-                AppError::not_found(PANDOC_MISSING_MESSAGE)
+                missing_pandoc()
             } else {
                 AppError::new(ErrorKind::Io, format!("無法執行 Pandoc：{e}"))
+                    .with_message_key("errors.pandoc.spawnFailed")
+                    .with_message_arg("detail", e)
             }
         })?;
 
@@ -300,7 +315,9 @@ pub fn run_pandoc(
                     return Err(AppError::new(
                         ErrorKind::Io,
                         format!("Pandoc 逾時（超過 {} 秒），已中止", timeout.as_secs()),
-                    ));
+                    )
+                    .with_message_key("errors.pandoc.timeout")
+                    .with_message_arg("seconds", timeout.as_secs()));
                 }
                 thread::sleep(Duration::from_millis(20));
             }
@@ -341,14 +358,15 @@ fn check_exit(out: &RunOutput) -> Result<(), AppError> {
         .map(|c| c.to_string())
         .unwrap_or_else(|| "signal".to_string());
     let tail = stderr_tail(&out.stderr);
-    Err(AppError::new(
-        ErrorKind::Io,
-        if tail.is_empty() {
-            format!("Pandoc 執行失敗（exit {code}）")
-        } else {
-            format!("Pandoc 執行失敗（exit {code}）：{tail}")
-        },
-    ))
+    let error = if tail.is_empty() {
+        AppError::new(ErrorKind::Io, format!("Pandoc 執行失敗（exit {code}）"))
+            .with_message_key("errors.pandoc.exit")
+    } else {
+        AppError::new(ErrorKind::Io, format!("Pandoc 執行失敗（exit {code}）：{tail}"))
+            .with_message_key("errors.pandoc.exitWithDetail")
+            .with_message_arg("detail", tail)
+    };
+    Err(error.with_message_arg("code", code))
 }
 
 // ---------------------------------------------------------------------------
@@ -490,7 +508,8 @@ pub fn export_with(
     let result = run_pandoc(pandoc, &args, Some(&req.markdown), timeout).and_then(|out| {
         check_exit(&out)?;
         if !temp.is_file() {
-            return Err(AppError::new(ErrorKind::Io, "Pandoc 沒有產生輸出檔"));
+            return Err(AppError::new(ErrorKind::Io, "Pandoc 沒有產生輸出檔")
+                .with_message_key("errors.pandoc.noOutput"));
         }
         fs::rename(&temp, &target)?;
         file_meta(&target)
@@ -641,7 +660,8 @@ pub fn import_with(
 ) -> Result<ImportResult, AppError> {
     let reader = reader_for_path(source)?;
     if !supports_sandbox(version) {
-        return Err(AppError::new(ErrorKind::Io, PANDOC_TOO_OLD_FOR_IMPORT_MESSAGE));
+        return Err(AppError::new(ErrorKind::Io, PANDOC_TOO_OLD_FOR_IMPORT_MESSAGE)
+            .with_message_key("errors.pandoc.tooOldForImport"));
     }
     if !source.is_file() {
         return Err(AppError::not_found(format!(
@@ -659,7 +679,9 @@ pub fn import_with(
             let args = import_args(source, reader, &work_dir, &filter);
             let out = run_pandoc(pandoc, &args, None, timeout)?;
             check_exit(&out)?;
-            String::from_utf8(out.stdout).map_err(|_| AppError::parse("Pandoc 輸出不是 UTF-8"))
+            String::from_utf8(out.stdout).map_err(|_| {
+                AppError::parse("Pandoc 輸出不是 UTF-8").with_message_key("errors.pandoc.notUtf8")
+            })
         });
     let _ = fs::remove_file(&filter);
     let markdown = match result {

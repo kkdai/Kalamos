@@ -22,27 +22,27 @@ export type MenuPlatform = "macos" | "windows" | "linux";
 export type MenuNode =
   | {
       type: "submenu";
-      label: string;
+      labelKey: string;
       role?: "app" | "window" | "help";
       platforms?: MenuPlatform[];
       items: MenuNode[];
     }
   | {
       type: "themes";
-      label: string;
+      labelKey: string;
       platforms?: MenuPlatform[];
       items: MenuNode[];
     }
   | {
       type: "recentFiles";
-      label: string;
+      labelKey: string;
       platforms?: MenuPlatform[];
       items: MenuNode[];
     }
   | {
       type: "action";
       id: string;
-      label: string;
+      labelKey: string;
       accel?: string;
       check?: boolean;
       platforms?: MenuPlatform[];
@@ -50,13 +50,13 @@ export type MenuNode =
   | {
       type: "predefined";
       item: string;
-      label?: string;
+      labelKey?: string;
       platforms?: MenuPlatform[];
     }
   | {
       type: "link";
       id: string;
-      label: string;
+      labelKey: string;
       url: string;
       platforms?: MenuPlatform[];
     };
@@ -158,7 +158,7 @@ export const MENU_THEN_KEY_WINDOW_MS = 150;
 
 export interface MenuActionNode {
   id: string;
-  label: string;
+  labelKey: string;
   accel?: string;
   check?: boolean;
 }

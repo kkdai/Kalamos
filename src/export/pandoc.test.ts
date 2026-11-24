@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { getUiLocale, initUiLocale } from "../i18n";
 import {
   type FileMeta,
   getMockAllowedAssetDirs,
@@ -16,14 +17,13 @@ import { createKalamosApp, type KalamosApp } from "../main";
 import { pickExportFormat } from "./format-picker";
 import {
   defaultExportPath,
-  EXPORTING_MESSAGE,
   ensureExportExtension,
   exportedMessage,
-  IMPORTING_MESSAGE,
   importedMessage,
   isImportablePath,
   PANDOC_FORMATS,
-  PANDOC_MISSING_MESSAGE,
+  pandocErrorMessage,
+  pandocMissingMessage,
   prepareMarkdownForPandoc,
 } from "./pandoc";
 
@@ -166,6 +166,39 @@ describe("EX-02 format picker", () => {
     expect(picker()).toBeNull();
   });
 
+  it("localizes the English picker and messages without translating format IDs or paths", async () => {
+    const previousLocale = getUiLocale();
+    await initUiLocale("en");
+    try {
+      const choice = pickExportFormat();
+      const epub = picker()!.querySelector<HTMLButtonElement>(
+        '[data-format="epub"]',
+      )!;
+      expect(picker()?.getAttribute("aria-label")).toBe("Export as…");
+      expect(epub.lastElementChild?.textContent).toBe("E-book");
+      epub.click();
+      expect(await choice).toBe("epub");
+      expect(exportedMessage("epub", "/tmp/A & B.epub")).toBe(
+        "Exported EPUB: /tmp/A & B.epub",
+      );
+      expect(
+        pandocErrorMessage("import", {
+          kind: "NotFound",
+          message: "找不到 Pandoc：請先安裝（brew install pandoc）",
+        }),
+      ).toMatch(/^Pandoc not found\. Install it with /);
+      expect(
+        pandocErrorMessage("import", {
+          kind: "NotFound",
+          messageKey: "export.pandoc.missingWindows",
+          message: "Unexpected raw message",
+        }),
+      ).toContain("winget install JohnMacFarlane.Pandoc");
+    } finally {
+      await initUiLocale(previousLocale);
+    }
+  });
+
   it("Escape, 取消 and a backdrop click cancel", async () => {
     let choice = pickExportFormat();
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
@@ -233,7 +266,7 @@ describe("EX-02 / EX-03 in the app", () => {
     press("KeyE", "´");
     await until(() => picker() !== null);
     picker()!.querySelector<HTMLButtonElement>("[data-format=odt]")!.click();
-    await until(() => app!.getStatusText() === EXPORTING_MESSAGE);
+    await until(() => app!.getStatusText() === "匯出中…");
     expect(suggested).toEqual(["/tmp/kalamos-test/notes/Report.odt"]);
     expect(app.isExportingPandoc()).toBe(true);
     release({ path: "/tmp/kalamos-test/notes/out.odt", mtimeMs: 1, size: 10 });
@@ -262,10 +295,10 @@ describe("EX-02 / EX-03 in the app", () => {
       },
     });
     expect(await app.exportDocumentAs()).toBe(false);
-    expect(app.getStatusText()).toBe(PANDOC_MISSING_MESSAGE);
+    expect(app.getStatusText()).toBe(pandocMissingMessage());
     expect(picker()).toBeNull();
     expect(await app.importDocument()).toBe(false);
-    expect(app.getStatusText()).toBe(PANDOC_MISSING_MESSAGE);
+    expect(app.getStatusText()).toBe(pandocMissingMessage());
     expect(saveAsked || openAsked).toBe(false);
     expect(getMockPandocExports()).toEqual([]);
   });
@@ -330,7 +363,7 @@ describe("EX-02 / EX-03 in the app", () => {
         }),
     );
     const done = app.importDocument("/tmp/kalamos-test/a.odt");
-    await until(() => app!.getStatusText() === IMPORTING_MESSAGE);
+    await until(() => app!.getStatusText() === "匯入中…");
     release();
     expect(await done).toBe(true);
     expect(getMockAllowedAssetDirs()).toContain("/tmp/kalamos-test/media");

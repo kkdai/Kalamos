@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { getUiLocale, initUiLocale } from "../i18n";
 import {
   FOLDER_SEARCH_MAX_RESULTS,
   type FolderSearchHit,
@@ -144,6 +145,31 @@ describe("#73 B helpers", () => {
     ).toContain("已截斷");
     expect(shortenLead("short ")).toBe("short ");
     expect(shortenLead("一二三四五六七八九十甲乙丙丁戊")).toBe("…十甲乙丙丁戊");
+  });
+
+  it("distinguishes singular and plural results and files in English", async () => {
+    const previousLocale = getUiLocale();
+    await initUiLocale("en");
+    try {
+      expect(
+        summaryText({
+          hits: [hit("/a.md", 1)],
+          truncated: false,
+          filesSearched: 1,
+        }),
+      ).toBe("1 result in 1 file");
+      expect(
+        summaryText({
+          hits: [hit("/a.md", 1), hit("/a.md", 2), hit("/b.md", 3)],
+          truncated: true,
+          filesSearched: 2,
+        }),
+      ).toBe(
+        "3+ results in 2 files (result limit reached; narrow your search)",
+      );
+    } finally {
+      await initUiLocale(previousLocale);
+    }
   });
 });
 

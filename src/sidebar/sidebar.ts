@@ -1,5 +1,6 @@
 import "./sidebar.css";
 import type { EditorView } from "@codemirror/view";
+import { t } from "../i18n";
 import {
   createFile,
   type FileEntry,
@@ -108,16 +109,20 @@ export function validateSingleFileName(rawName: string): {
 } {
   const trimmed = rawName.trim();
   if (!trimmed) {
-    return { valid: false, trimmed, reason: "名稱不可為空" };
+    return { valid: false, trimmed, reason: t("sidebar.fileName.empty") };
   }
   if (trimmed.includes("/") || trimmed.includes("\\")) {
-    return { valid: false, trimmed, reason: "名稱不可包含路徑分隔符號" };
+    return { valid: false, trimmed, reason: t("sidebar.fileName.separator") };
   }
   if (trimmed.includes("..")) {
-    return { valid: false, trimmed, reason: "名稱不可包含 .." };
+    return {
+      valid: false,
+      trimmed,
+      reason: t("sidebar.fileName.parentSegment"),
+    };
   }
   if (trimmed.startsWith(".")) {
-    return { valid: false, trimmed, reason: "名稱不可為隱藏檔（. 開頭）" };
+    return { valid: false, trimmed, reason: t("sidebar.fileName.hidden") };
   }
   return { valid: true, trimmed };
 }
@@ -155,10 +160,18 @@ export function createSidebar(
   let contextTarget: { path: string; kind: "dir" | "file" } | null = null;
 
   const tabs: SidebarTabDescriptor[] = [
-    { id: "tree", label: "檔案樹", testId: "sidebar-tab-tree" },
-    { id: "list", label: "檔案列表", testId: "sidebar-tab-list" },
-    { id: "outline", label: "大綱", testId: "sidebar-tab-outline" },
-    { id: "search", label: "搜尋", testId: "sidebar-tab-search" },
+    { id: "tree", label: t("sidebar.tab.tree"), testId: "sidebar-tab-tree" },
+    { id: "list", label: t("sidebar.tab.list"), testId: "sidebar-tab-list" },
+    {
+      id: "outline",
+      label: t("sidebar.tab.outline"),
+      testId: "sidebar-tab-outline",
+    },
+    {
+      id: "search",
+      label: t("sidebar.tab.search"),
+      testId: "sidebar-tab-search",
+    },
   ];
 
   // Build Sidebar DOM structure
@@ -170,14 +183,16 @@ export function createSidebar(
   const folderTitleEl = document.createElement("span");
   folderTitleEl.className = "k-sidebar-folder-title";
   folderTitleEl.dataset.testid = "sidebar-folder-title";
-  folderTitleEl.textContent = "未開啟資料夾";
+  folderTitleEl.textContent = t("sidebar.folder.none");
 
   const openFolderBtn = document.createElement("button");
   openFolderBtn.type = "button";
   openFolderBtn.className = "k-sidebar-icon-btn";
   openFolderBtn.dataset.testid = "sidebar-open-folder-btn";
-  openFolderBtn.title = shortcutLabel("開啟資料夾 (Cmd+Shift+O)");
-  openFolderBtn.textContent = "開啟";
+  openFolderBtn.title = t("sidebar.folder.openTooltip", {
+    shortcut: shortcutLabel("Cmd+Shift+O"),
+  });
+  openFolderBtn.textContent = t("sidebar.folder.open");
 
   headerEl.append(folderTitleEl, openFolderBtn);
 
@@ -203,7 +218,7 @@ export function createSidebar(
   createBtn.dataset.testid = "context-menu-create";
   createBtn.dataset.action = "create";
   createBtn.setAttribute("role", "menuitem");
-  createBtn.textContent = "新增檔案";
+  createBtn.textContent = t("sidebar.file.create");
 
   const renameBtn = document.createElement("button");
   renameBtn.type = "button";
@@ -211,7 +226,7 @@ export function createSidebar(
   renameBtn.dataset.testid = "context-menu-rename";
   renameBtn.dataset.action = "rename";
   renameBtn.setAttribute("role", "menuitem");
-  renameBtn.textContent = "重新命名";
+  renameBtn.textContent = t("sidebar.file.rename");
 
   const trashBtn = document.createElement("button");
   trashBtn.type = "button";
@@ -219,7 +234,7 @@ export function createSidebar(
   trashBtn.dataset.testid = "context-menu-trash";
   trashBtn.dataset.action = "trash";
   trashBtn.setAttribute("role", "menuitem");
-  trashBtn.textContent = "移到垃圾桶";
+  trashBtn.textContent = t("sidebar.file.trash");
 
   contextMenuEl.append(createBtn, renameBtn, trashBtn);
   element.append(headerEl, tabsEl, inlineSlotEl, bodyEl, contextMenuEl);
@@ -404,7 +419,7 @@ export function createSidebar(
     try {
       await loadFolderData(currentFolder);
     } catch (err) {
-      onError?.("重新整理資料夾失敗", err);
+      onError?.(t("sidebar.error.refreshFolder"), err);
     }
   }
 
@@ -416,7 +431,7 @@ export function createSidebar(
     try {
       targetPath = explicitPath ?? (await pickOpenFolderPath());
     } catch (err) {
-      onError?.("開啟資料夾失敗", err);
+      onError?.(t("sidebar.error.openFolder"), err);
       return false;
     }
     if (!targetPath) return false;
@@ -439,7 +454,7 @@ export function createSidebar(
       }
       return true;
     } catch (err) {
-      onError?.("開啟資料夾失敗", err);
+      onError?.(t("sidebar.error.openFolder"), err);
       return false;
     }
   }
@@ -450,9 +465,9 @@ export function createSidebar(
   ): Promise<string | null> {
     const validation = validateSingleFileName(rawFileName);
     if (!validation.valid) {
-      onError?.("新增檔案失敗", {
+      onError?.(t("sidebar.error.createFile"), {
         kind: "InvalidPath",
-        message: validation.reason ?? "無效的檔案名稱",
+        message: validation.reason ?? t("sidebar.fileName.invalid"),
       });
       return null;
     }
@@ -469,7 +484,7 @@ export function createSidebar(
       await onSelectFile(fullPath);
       return fullPath;
     } catch (err) {
-      onError?.("新增檔案失敗", err);
+      onError?.(t("sidebar.error.createFile"), err);
       return null;
     }
   }
@@ -480,9 +495,9 @@ export function createSidebar(
   ): Promise<boolean> {
     const validation = validateSingleFileName(rawNewName);
     if (!validation.valid) {
-      onError?.("重新命名失敗", {
+      onError?.(t("sidebar.error.rename"), {
         kind: "InvalidPath",
-        message: validation.reason ?? "無效的檔案名稱",
+        message: validation.reason ?? t("sidebar.fileName.invalid"),
       });
       return false;
     }
@@ -507,7 +522,7 @@ export function createSidebar(
       if (currentFolder) options.onFolderMutated?.(currentFolder);
       return true;
     } catch (err) {
-      onError?.("重新命名失敗", err);
+      onError?.(t("sidebar.error.rename"), err);
       return false;
     }
   }
@@ -526,12 +541,13 @@ export function createSidebar(
       if (currentFolder) options.onFolderMutated?.(currentFolder);
       return true;
     } catch (err) {
-      onError?.("移到垃圾桶失敗", err);
+      onError?.(t("sidebar.error.trash"), err);
       return false;
     }
   }
 
   function showInlineInput(
+    promptLabel: string,
     defaultValue: string,
     onConfirm: (val: string) => void | Promise<void>,
   ): void {
@@ -544,6 +560,7 @@ export function createSidebar(
     input.type = "text";
     input.className = "k-sidebar-inline-input";
     input.dataset.testid = "sidebar-inline-input";
+    input.setAttribute("aria-label", promptLabel);
     input.value = defaultValue;
 
     form.appendChild(input);
@@ -604,7 +621,7 @@ export function createSidebar(
       }
       return;
     }
-    showInlineInput(defaultValue, onConfirm);
+    showInlineInput(promptLabel, defaultValue, onConfirm);
   }
 
   createBtn.addEventListener("click", () => {
@@ -617,9 +634,13 @@ export function createSidebar(
           ? dirnameOf(target.path)
           : currentFolder;
     if (!baseDir) return;
-    void askNameOrShowInline("新增檔案", "untitled.md", async (fileName) => {
-      await createNewFile(baseDir, fileName);
-    });
+    void askNameOrShowInline(
+      t("sidebar.file.create"),
+      "untitled.md",
+      async (fileName) => {
+        await createNewFile(baseDir, fileName);
+      },
+    );
   });
 
   renameBtn.addEventListener("click", () => {
@@ -627,9 +648,13 @@ export function createSidebar(
     closeContextMenu();
     if (!target) return;
     const currentName = basenameOf(target.path);
-    void askNameOrShowInline("重新命名", currentName, async (newName) => {
-      await renameItem(target.path, newName);
-    });
+    void askNameOrShowInline(
+      t("sidebar.file.rename"),
+      currentName,
+      async (newName) => {
+        await renameItem(target.path, newName);
+      },
+    );
   });
 
   trashBtn.addEventListener("click", () => {

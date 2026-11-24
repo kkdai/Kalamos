@@ -30,6 +30,7 @@ import {
   WidgetType,
 } from "@codemirror/view";
 import type { SyntaxNode } from "@lezer/common";
+import { t } from "../i18n";
 import {
   type FootnoteIndex,
   footnoteDefinitionText,
@@ -246,11 +247,11 @@ export class TocWidget extends WidgetType {
     const nav = document.createElement("nav");
     nav.className = "k-toc";
     nav.dataset.testid = "toc";
-    nav.setAttribute("aria-label", "目錄");
+    nav.setAttribute("aria-label", t("editor.toc.label"));
     if (this.entries.length === 0) {
       const empty = document.createElement("div");
       empty.className = "k-toc-empty";
-      empty.textContent = "目錄（尚無標題）";
+      empty.textContent = t("editor.toc.empty");
       nav.appendChild(empty);
       return nav;
     }
@@ -733,7 +734,10 @@ export const footnoteTooltip = hoverTooltip(
         const label = document.createElement("span");
         label.className = "k-footnote-tooltip-label";
         label.textContent = number ? `${number}. ` : "";
-        dom.append(label, document.createTextNode(hit.text || "（空白註腳）"));
+        dom.append(
+          label,
+          document.createTextNode(hit.text || t("editor.footnote.empty")),
+        );
         return { dom };
       },
     };
