@@ -19,7 +19,8 @@ pub mod watch;
 pub fn run() {
     let builder = tauri::Builder::default()
         .manage(watch::WatcherManager::new())
-        .manage(open_with::PendingOpenFiles::new());
+        .manage(open_with::PendingOpenFiles::new())
+        .manage(settings::ActiveUiLocale::new());
 
     // Windows / Linux: a second instance launched by Explorer ("Open with")
     // forwards its argv to the running instance and exits.
@@ -38,13 +39,15 @@ pub fn run() {
     builder
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
-        .setup(|_app| {
+        .setup(|app| {
+            // Ensure startup UI locale is initialized even if menu building is deferred.
+            settings::active_ui_locale(app.handle());
             #[cfg(any(target_os = "windows", target_os = "linux"))]
             {
                 let args: Vec<String> = std::env::args().collect();
                 if args.len() > 1 {
                     let cwd = std::env::current_dir().ok();
-                    open_with::handle_cli_args(_app.handle(), &args, cwd.as_deref());
+                    open_with::handle_cli_args(app.handle(), &args, cwd.as_deref());
                 }
             }
             Ok(())
@@ -64,6 +67,8 @@ pub fn run() {
             recovery::clear_recovery,
             settings::get_settings,
             settings::set_settings,
+            settings::get_active_ui_locale,
+            settings::set_ui_locale,
             themes::list_themes,
             themes::read_theme_css,
             themes::open_themes_dir,
@@ -80,6 +85,7 @@ pub fn run() {
             search::search_in_folder,
             menu::sync_menu_state,
             menu::quit_app,
+            menu::restart_app,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

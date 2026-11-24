@@ -1,5 +1,12 @@
 import "./preferences.css";
 
+import {
+  getUiLocale,
+  normalizeUiLocale,
+  t,
+  UI_LOCALES,
+  type UiLocale,
+} from "../i18n";
 import type { StartupBehavior } from "../ipc";
 import { IS_WINDOWS, shortcutLabel, toNativePath } from "../platform";
 
@@ -11,12 +18,17 @@ import { IS_WINDOWS, shortcutLabel, toNativePath } from "../platform";
 
 export type PreferencesTab = "general" | "editor" | "appearance" | "images";
 
-export const PREFERENCES_TABS: Array<{ id: PreferencesTab; label: string }> = [
-  { id: "general", label: "一般" },
-  { id: "editor", label: "編輯器" },
-  { id: "appearance", label: "外觀" },
-  { id: "images", label: "圖片" },
+const PREFERENCES_TABS: PreferencesTab[] = [
+  "general",
+  "editor",
+  "appearance",
+  "images",
 ];
+
+const LANGUAGE_NAMES: Record<UiLocale, string> = {
+  "zh-TW": "繁體中文",
+  en: "English",
+};
 
 export const FONT_SIZE_MIN = 12;
 export const FONT_SIZE_MAX = 28;
@@ -25,6 +37,7 @@ export const CONTENT_WIDTH_MAX = 1400;
 export const CONTENT_WIDTH_STEP = 20;
 
 export interface PreferencesValues {
+  uiLocale: UiLocale;
   startupBehavior: StartupBehavior;
   autoSave: boolean;
   fontSize: number;
@@ -63,6 +76,8 @@ export interface PreferencesHost {
   /** Reload theme list / upload settings before the modal is shown. */
   refresh?: () => Promise<void>;
   applyChange: (patch: PreferencesPatch) => void | Promise<void>;
+  saveUiLocale: (locale: UiLocale) => Promise<void>;
+  restartApp: () => Promise<void>;
   pickImageRootDir: () => Promise<unknown>;
   clearImageRootDir: () => Promise<unknown>;
   openThemesDir: () => Promise<unknown>;
@@ -112,14 +127,17 @@ export function createPreferences(
   function row(
     label: string,
     control: HTMLElement,
-    hint?: string,
+    hint?: string | HTMLElement,
   ): HTMLElement {
     const wrap = el("div", "k-pref-row");
     const labelEl = el("label", "k-pref-label", label);
     if (control.id) labelEl.htmlFor = control.id;
     const body = el("div", "k-pref-control");
     body.append(control);
-    if (hint) body.append(el("div", "k-pref-hint", hint));
+    if (hint)
+      body.append(
+        typeof hint === "string" ? el("div", "k-pref-hint", hint) : hint,
+      );
     wrap.append(labelEl, body);
     return wrap;
   }
@@ -183,14 +201,84 @@ export function createPreferences(
     return wrap;
   }
 
+  function buildLanguageRow(): HTMLElement {
+    const select = el("select");
+    select.id = "k-pref-language";
+    select.dataset.testid = "pref-language";
+    for (const locale of UI_LOCALES) {
+      const opt = el("option", undefined, LANGUAGE_NAMES[locale]);
+      opt.value = locale;
+      opt.lang = locale;
+      select.append(opt);
+    }
+    const notice = el("div", "k-pref-hint");
+    notice.id = "k-pref-language-notice";
+    notice.setAttribute("role", "status");
+    select.setAttribute("aria-describedby", notice.id);
+    const updateNotice = (locale: UiLocale): void => {
+      notice.textContent =
+        locale === getUiLocale() ? "" : t("prefs.languageOnRestart");
+    };
+    const prompt = el("dialog", "k-pref-restart");
+    const title = el("h1", undefined, t("prefs.restartQuestion"));
+    title.id = "k-pref-restart-title";
+    prompt.setAttribute("aria-labelledby", title.id);
+    const actions = el("form");
+    actions.method = "dialog";
+    const later = el("button", "k-pref-button", t("prefs.restartLater"));
+    later.value = "later";
+    later.autofocus = true;
+    const now = el("button", "k-pref-button", t("prefs.restartNow"));
+    now.value = "restart";
+    actions.append(later, now);
+    prompt.append(title, actions);
+    prompt.addEventListener("keydown", (event) => event.stopPropagation());
+    prompt.addEventListener("close", async () => {
+      const confirmed = prompt.returnValue === "restart";
+      prompt.returnValue = "";
+      if (!confirmed || !prompt.isConnected) return;
+      select.disabled = true;
+      try {
+        await host.restartApp();
+      } catch {
+        notice.textContent = t("prefs.restartFailed");
+      } finally {
+        select.disabled = false;
+      }
+    });
+    syncers.push((values) => {
+      select.value = values.uiLocale;
+      updateNotice(values.uiLocale);
+    });
+    select.addEventListener("change", async () => {
+      select.disabled = true;
+      try {
+        await host.saveUiLocale(normalizeUiLocale(select.value));
+        updateNotice(host.getValues().uiLocale);
+      } catch {
+        select.value = host.getValues().uiLocale;
+        notice.textContent = t("prefs.languageSaveError");
+        return;
+      } finally {
+        select.disabled = false;
+      }
+      if (prompt.isConnected && host.getValues().uiLocale !== getUiLocale()) {
+        prompt.showModal();
+      }
+    });
+    const field = row(t("prefs.language"), select, notice);
+    field.append(prompt);
+    return field;
+  }
+
   function buildGeneral(): HTMLElement {
     const panel = el("div", "k-pref-panel");
     const select = el("select");
     select.id = "k-pref-startup";
     select.dataset.testid = "pref-startup";
     for (const [value, label] of [
-      ["restoreFolder", "重新開啟上次的資料夾"],
-      ["blank", "空白文件"],
+      ["restoreFolder", t("prefs.reopenFolder")],
+      ["blank", t("prefs.blankDocument")],
     ] as const) {
       const opt = el("option", undefined, label);
       opt.value = value;
@@ -205,23 +293,16 @@ export function createPreferences(
       select.value = v.startupBehavior;
     });
     panel.append(
+      buildLanguageRow(),
       row(
-        "啟動時",
+        t("prefs.onStartup"),
         select,
-        IS_WINDOWS
-          ? "從檔案總管開啟的檔案不受影響。"
-          : "從 Finder 開啟的檔案不受影響。",
+        IS_WINDOWS ? t("prefs.startupWindowsHint") : t("prefs.startupMacHint"),
       ),
       row(
-        "自動儲存",
-        checkbox(
-          "autoSave",
-          "停止輸入 1 秒後自動儲存已命名的文件",
-          "pref-auto-save",
-        ),
-        shortcutLabel(
-          "關閉後只有 Cmd+S 會寫入檔案；切換或關閉文件時仍會儲存，未命名文件仍會寫入救回檔。",
-        ),
+        t("prefs.autoSave"),
+        checkbox("autoSave", t("prefs.autoSaveDescription"), "pref-auto-save"),
+        shortcutLabel(t("prefs.autoSaveHint")),
       ),
     );
     return panel;
@@ -231,7 +312,7 @@ export function createPreferences(
     const panel = el("div", "k-pref-panel");
     panel.append(
       row(
-        "字體大小",
+        t("prefs.fontSize"),
         slider(
           "fontSize",
           FONT_SIZE_MIN,
@@ -242,7 +323,7 @@ export function createPreferences(
         ),
       ),
       row(
-        "內容寬度",
+        t("prefs.contentWidth"),
         slider(
           "contentWidth",
           CONTENT_WIDTH_MIN,
@@ -257,12 +338,12 @@ export function createPreferences(
     pairs.append(
       checkbox(
         "autoPairBrackets",
-        shortcutLabel("自動配對括號與引號（Cmd+Opt+P）"),
+        shortcutLabel(t("prefs.autoPairBrackets")),
         "pref-auto-pair-brackets",
       ),
       checkbox(
         "autoPairMarkdown",
-        shortcutLabel("自動配對 Markdown 符號 * _ ` ~（Cmd+Opt+Shift+P）"),
+        shortcutLabel(t("prefs.autoPairMarkdown")),
         "pref-auto-pair-markdown",
       ),
     );
@@ -270,16 +351,19 @@ export function createPreferences(
     blocks.append(
       checkbox(
         "codeLineNumbers",
-        shortcutLabel("程式碼區塊顯示行號（Cmd+Opt+L）"),
+        shortcutLabel(t("prefs.codeLineNumbers")),
         "pref-code-line-numbers",
       ),
       checkbox(
         "mathAutoNumber",
-        shortcutLabel("公式自動編號（Cmd+Opt+N）"),
+        shortcutLabel(t("prefs.mathAutoNumber")),
         "pref-math-auto-number",
       ),
     );
-    panel.append(row("自動配對", pairs), row("區塊", blocks));
+    panel.append(
+      row(t("prefs.autoPair"), pairs),
+      row(t("prefs.blocks"), blocks),
+    );
     return panel;
   }
 
@@ -300,19 +384,15 @@ export function createPreferences(
       }
       select.value = v.theme;
     });
-    const openBtn = el("button", "k-pref-button", "開啟自訂 CSS 資料夾");
+    const openBtn = el("button", "k-pref-button", t("prefs.openThemesFolder"));
     openBtn.type = "button";
     openBtn.dataset.testid = "pref-open-themes-dir";
     openBtn.addEventListener("click", () => {
       void host.openThemesDir();
     });
     panel.append(
-      row("主題", select, shortcutLabel("也可以用 Cmd+Shift+T 循環切換。")),
-      row(
-        "自訂主題",
-        openBtn,
-        "把 .css 檔放進這個資料夾，重新開啟偏好設定或主題選單即可選用。",
-      ),
+      row(t("prefs.theme"), select, shortcutLabel(t("prefs.themeHint"))),
+      row(t("prefs.customTheme"), openBtn, t("prefs.customThemeHint")),
     );
     return panel;
   }
@@ -322,13 +402,13 @@ export function createPreferences(
     const rootWrap = el("div", "k-pref-inline");
     const rootPath = el("code", "k-pref-path");
     rootPath.dataset.testid = "pref-image-root";
-    const pick = el("button", "k-pref-button", "選擇…");
+    const pick = el("button", "k-pref-button", t("prefs.choose"));
     pick.type = "button";
     pick.dataset.testid = "pref-image-root-pick";
     pick.addEventListener("click", () => {
       void host.pickImageRootDir().then(sync);
     });
-    const clear = el("button", "k-pref-button", "清除");
+    const clear = el("button", "k-pref-button", t("prefs.clear"));
     clear.type = "button";
     clear.dataset.testid = "pref-image-root-clear";
     clear.addEventListener("click", () => {
@@ -337,7 +417,7 @@ export function createPreferences(
     syncers.push((v) => {
       rootPath.textContent = v.imageRootDir
         ? toNativePath(v.imageRootDir)
-        : "未設定";
+        : t("prefs.notSet");
       rootPath.dataset.empty = v.imageRootDir ? "false" : "true";
       clear.disabled = !v.imageRootDir;
     });
@@ -347,26 +427,24 @@ export function createPreferences(
     uploader.dataset.testid = "pref-upload-command";
     syncers.push((v) => {
       const cmd = v.uploadCommand?.trim();
-      uploader.textContent = cmd ? [cmd, ...v.uploadArgs].join(" ") : "未設定";
+      uploader.textContent = cmd
+        ? [cmd, ...v.uploadArgs].join(" ")
+        : t("prefs.notSet");
       uploader.dataset.empty = cmd ? "false" : "true";
     });
 
     panel.append(
       row(
-        "圖片根目錄",
+        t("prefs.imageRoot"),
         rootWrap,
-        shortcutLabel("以 / 開頭的圖片路徑會相對於這個資料夾（Cmd+Opt+R）。"),
+        shortcutLabel(t("prefs.imageRootHint")),
       ),
+      row(t("prefs.uploader"), uploader, t("prefs.uploaderHint")),
       row(
-        "上傳程式",
-        uploader,
-        "上傳程式只能在 settings.json 的 uploadCommand / uploadArgs 設定，避免網頁內容執行本機程式。",
-      ),
-      row(
-        "上傳時機",
+        t("prefs.uploadWhen"),
         checkbox(
           "uploadOnInsert",
-          "貼上或拖入圖片後立即上傳",
+          t("prefs.uploadOnInsert"),
           "pref-upload-on-insert",
         ),
       ),
@@ -402,11 +480,13 @@ export function createPreferences(
     dialog.dataset.testid = "preferences";
     dialog.setAttribute("role", "dialog");
     dialog.setAttribute("aria-modal", "true");
-    dialog.setAttribute("aria-label", "偏好設定");
+    dialog.setAttribute("aria-labelledby", "k-pref-title");
 
     const header = el("div", "k-pref-header");
-    header.append(el("div", "k-pref-title", "偏好設定"));
-    const done = el("button", "k-pref-done", "完成");
+    const title = el("div", "k-pref-title", t("prefs.title"));
+    title.id = "k-pref-title";
+    header.append(title);
+    const done = el("button", "k-pref-done", t("prefs.done"));
     done.type = "button";
     done.dataset.testid = "pref-close";
     done.addEventListener("click", close);
@@ -421,8 +501,8 @@ export function createPreferences(
       images: buildImages,
     };
     const body = el("div", "k-pref-body");
-    for (const { id, label } of PREFERENCES_TABS) {
-      const btn = el("button", "k-pref-tab", label);
+    for (const id of PREFERENCES_TABS) {
+      const btn = el("button", "k-pref-tab", t(`prefs.tab.${id}`));
       btn.type = "button";
       btn.dataset.testid = `pref-tab-${id}`;
       btn.setAttribute("role", "tab");
@@ -444,7 +524,7 @@ export function createPreferences(
   }
 
   const onKeydown = (event: KeyboardEvent): void => {
-    if (!backdrop) return;
+    if (!backdrop || backdrop.querySelector("dialog[open]")) return;
     if (event.key === "Escape") {
       event.preventDefault();
       event.stopPropagation();
@@ -457,7 +537,7 @@ export function createPreferences(
       (event.key === "ArrowLeft" || event.key === "ArrowRight")
     ) {
       event.preventDefault();
-      const ids = PREFERENCES_TABS.map((t) => t.id);
+      const ids = PREFERENCES_TABS;
       const idx = ids.indexOf(currentTab);
       const next =
         ids[

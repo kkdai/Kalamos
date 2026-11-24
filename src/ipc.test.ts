@@ -96,7 +96,7 @@ describe("ipc in-memory mock (api.yaml contract)", () => {
       imageRootDir: "/tmp/kalamos-test/blog",
     };
     await setSettings(updated);
-    // Settings saved before WM-01 / WM-02 / IM-05 / ED-09 / #74 get the new keys' defaults.
+    // Fields absent from older settings files get their defaults.
     expect(await getSettings()).toEqual({
       ...updated,
       focusMode: false,

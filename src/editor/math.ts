@@ -27,6 +27,7 @@ import type {
   Line,
   MarkdownConfig,
 } from "@lezer/markdown";
+import { t } from "../i18n";
 import { isSelectionTouchingRange } from "./live-preview";
 import { mapPosClamped } from "./positions";
 
@@ -287,7 +288,7 @@ export async function ensureMathJaxLoaded(
           jax: { formatError: (e: Error) => unknown },
           err: Error,
         ) => {
-          capturedError = err.message || "TeX syntax error";
+          capturedError = err.message || t("editor.math.syntaxError");
           return jax.formatError(err);
         },
       });
@@ -299,7 +300,7 @@ export async function ensureMathJaxLoaded(
           jax: { formatError: (e: Error) => unknown },
           err: Error,
         ) => {
-          capturedError = err.message || "TeX syntax error";
+          capturedError = err.message || t("editor.math.syntaxError");
           return jax.formatError(err);
         },
       });
@@ -358,7 +359,7 @@ export async function ensureMathJaxLoaded(
           if (!trimmed) {
             return {
               svgHtml: "",
-              error: "空白公式（Empty formula）",
+              error: t("editor.math.empty"),
               equationNumbers: [],
             };
           }

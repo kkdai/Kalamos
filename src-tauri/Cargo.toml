@@ -28,6 +28,8 @@ regex = "1"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 # Canonical paths without the Windows `\\?\` verbatim prefix (no-op elsewhere).
 dunce = "1"
+# Cross-platform OS locale detection (CFLocale on macOS, GetUserDefaultLocaleName on Windows, env on Linux).
+sys-locale = "0.3"
 
 [target.'cfg(any(target_os = "windows", target_os = "linux"))'.dependencies]
 # Windows / Linux hand "Open with" files to a second process: forward them to

@@ -14,6 +14,7 @@ import {
   ViewPlugin,
   WidgetType,
 } from "@codemirror/view";
+import { t } from "../i18n";
 
 type YamlModule = typeof import("yaml");
 
@@ -131,11 +132,11 @@ class FrontMatterWidget extends WidgetType {
     card.className = "k-frontmatter-preview";
     card.dataset.testid = "front-matter-preview";
     const label = doc.createElement("strong");
-    label.textContent = "文件資訊";
+    label.textContent = t("editor.frontMatter.label");
     const edit = doc.createElement("button");
     edit.type = "button";
     edit.className = "k-frontmatter-edit";
-    edit.setAttribute("aria-label", "編輯文件資訊");
+    edit.setAttribute("aria-label", t("editor.frontMatter.edit"));
     edit.addEventListener("click", () => {
       view.focus();
       view.dispatch({

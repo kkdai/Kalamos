@@ -13,6 +13,7 @@ import {
   StateEffect,
 } from "@codemirror/state";
 import { EditorView, keymap } from "@codemirror/view";
+import { t } from "../i18n";
 import {
   autoPairBracketsExtension,
   autoPairMarkdownExtension,
@@ -260,6 +261,19 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
 
   const buildExtensions = (content: string): Extension => [
     EditorView.editorAttributes.of({ "data-testid": "editor" }),
+    // Keep document content independent of the UI <html lang> so CJK text
+    // (especially inside monospace code blocks) does not fall back to Simplified
+    // Chinese or Japanese glyphs when the interface is set to English.
+    EditorView.contentAttributes.of({ lang: "zh-Hant" }),
+    EditorState.phrases.of({
+      Completions: t("editor.codeMirror.completions"),
+      "Selection deleted": t("editor.codeMirror.selectionDeleted"),
+      "Control character": t("editor.codeMirror.controlCharacter"),
+      "replaced match on line $": t("editor.codeMirror.replacedMatchOnLine"),
+      "replaced $ matches": t("editor.codeMirror.replacedMatches"),
+      "current match": t("editor.codeMirror.currentMatch"),
+      "on line": t("editor.codeMirror.onLine"),
+    }),
     lineSeparatorCompartment.of(lineSeparatorFor(content)),
     ...globalCompartments().map(([compartment, ext]) => compartment.of(ext)),
     EditorState.transactionExtender.of((tr) => {

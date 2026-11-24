@@ -4,6 +4,7 @@ import { ensureSyntaxTree } from "@codemirror/language";
 import { EditorSelection, EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { getUiLocale, initUiLocale } from "../i18n";
 import {
   getMockUploadCalls,
   getSettings,
@@ -27,7 +28,6 @@ import {
   endTracking,
   imgSrcValueRange,
   markdownDestinationFor,
-  NO_LOCAL_IMAGES_MESSAGE,
   replaceUploadedImages,
   uploadImagesInEditor,
 } from "./image-upload";
@@ -320,7 +320,48 @@ describe("IM-05 upload flow", () => {
       setStatus: (m) => statuses.push(m),
       notConfiguredMessage: "x",
     });
-    expect(statuses).toEqual([NO_LOCAL_IMAGES_MESSAGE]);
+    expect(statuses).toEqual(["沒有可上傳的本機圖片"]);
+  });
+
+  it("uses singular and plural English upload messages", async () => {
+    const prev = getUiLocale();
+    initUiLocale("en");
+    try {
+      const single = mount("![one](assets/one.png)");
+      const singleStatuses: string[] = [];
+      await uploadImagesInEditor({
+        view: single,
+        uploader: "picgo",
+        upload: async () => ({ urls: ["https://img.test/one.png"] }),
+        setStatus: (m) => singleStatuses.push(m),
+        notConfiguredMessage: "x",
+      });
+      expect(singleStatuses[0]).toBe("Uploading 1 image… (picgo)");
+      expect(singleStatuses.at(-1)).toBe("Uploaded 1 image");
+
+      const multi = mount("Intro\n![a](assets/a.png)\n![b](assets/b.png)");
+      const multiStatuses: string[] = [];
+      await uploadImagesInEditor({
+        view: multi,
+        uploader: "picgo",
+        upload: async (paths) => {
+          if (paths[0].endsWith("a.png")) {
+            multi.dispatch({ changes: { from: 8, to: 9, insert: "A" } });
+          }
+          return {
+            urls: [`https://img.test/${paths[0].split("/").pop()}`],
+          };
+        },
+        setStatus: (m) => multiStatuses.push(m),
+        notConfiguredMessage: "x",
+      });
+      expect(multiStatuses[0]).toBe("Uploading 2 images… (picgo)");
+      expect(multiStatuses.at(-1)).toBe(
+        "Uploaded 2 images; 1 reference was edited during upload and left unchanged",
+      );
+    } finally {
+      initUiLocale(prev);
+    }
   });
 });
 

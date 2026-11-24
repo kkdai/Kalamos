@@ -10,6 +10,7 @@ import "./word-count.css";
 
 import { StateEffect } from "@codemirror/state";
 import { EditorView, type ViewUpdate } from "@codemirror/view";
+import { getUiLocale, t } from "../i18n";
 import {
   countDocument,
   countSelection,
@@ -38,26 +39,47 @@ export interface WordCounter {
   destroy: () => void;
 }
 
-const fmt = (n: number): string => n.toLocaleString("en-US");
+const fmt = (n: number): string => n.toLocaleString(getUiLocale());
 
 export function counterLabel(
   doc: TextStats,
   selection: TextStats | null,
 ): string {
+  const value = fmt(doc.words);
   return selection
-    ? `選取 ${fmt(selection.words)} / ${fmt(doc.words)} 字`
-    : `${fmt(doc.words)} 字`;
+    ? t(
+        doc.words === 1
+          ? "editor.wordCount.selectedOne"
+          : "editor.wordCount.selected",
+        {
+          value,
+          selected: fmt(selection.words),
+        },
+      )
+    : t(
+        doc.words === 1
+          ? "editor.wordCount.totalOne"
+          : "editor.wordCount.total",
+        { value },
+      );
 }
 
 export function statsRows(stats: TextStats): Array<[string, string]> {
   return [
-    ["字數", fmt(stats.words)],
-    ["字元", fmt(stats.chars)],
-    ["字元（不含空白）", fmt(stats.charsNoSpaces)],
-    ["行數", fmt(stats.lines)],
+    [t("editor.wordCount.words"), fmt(stats.words)],
+    [t("editor.wordCount.characters"), fmt(stats.chars)],
+    [t("editor.wordCount.charactersNoSpaces"), fmt(stats.charsNoSpaces)],
+    [t("editor.wordCount.lines"), fmt(stats.lines)],
     [
-      "閱讀時間",
-      stats.readingMinutes > 0 ? `約 ${fmt(stats.readingMinutes)} 分鐘` : "—",
+      t("editor.wordCount.readingTime"),
+      stats.readingMinutes > 0
+        ? t(
+            stats.readingMinutes === 1
+              ? "editor.wordCount.readingMinutesOne"
+              : "editor.wordCount.readingMinutes",
+            { value: fmt(stats.readingMinutes) },
+          )
+        : "—",
     ],
   ];
 }
@@ -78,7 +100,7 @@ export function createWordCounter(options: WordCounterOptions): WordCounter {
   popover.className = "k-word-count-popover";
   popover.dataset.testid = "word-count-popover";
   popover.setAttribute("role", "dialog");
-  popover.setAttribute("aria-label", "字數統計");
+  popover.setAttribute("aria-label", t("editor.wordCount.label"));
   popover.hidden = true;
 
   wrap.append(button, popover);
@@ -100,7 +122,9 @@ export function createWordCounter(options: WordCounterOptions): WordCounter {
     popover.replaceChildren();
     const title = document.createElement("div");
     title.className = "k-word-count-title";
-    title.textContent = selStats ? "選取範圍" : "全文";
+    title.textContent = t(
+      selStats ? "editor.wordCount.selection" : "editor.wordCount.document",
+    );
     const dl = document.createElement("dl");
     for (const [label, value] of statsRows(stats)) {
       const dt = document.createElement("dt");

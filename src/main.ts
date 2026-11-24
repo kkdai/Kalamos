@@ -63,25 +63,28 @@ import { pickExportFormat } from "./export/format-picker";
 import { buildExportHtml } from "./export/html";
 import {
   defaultExportPath,
-  EXPORTING_MESSAGE,
   ensureExportExtension,
   exportedMessage,
+  exportingMessage,
   formatInfo,
-  IMPORTING_MESSAGE,
   importedMessage,
+  importingMessage,
   isImportablePath,
   PANDOC_IMPORT_EXTENSIONS,
-  PANDOC_MISSING_MESSAGE,
   type PandocFormat,
+  pandocErrorMessage,
+  pandocMissingMessage,
   prepareMarkdownForPandoc,
 } from "./export/pandoc";
 import {
   defaultPdfPath,
   documentTitle,
-  EXPORTING_PDF_MESSAGE,
   ensurePdfExtension,
   exportedPdfMessage,
+  exportingPdfMessage,
+  pdfErrorMessage,
 } from "./export/pdf";
+import { DEFAULT_UI_LOCALE, getUiLocale, initUiLocale, t } from "./i18n";
 import {
   allowAssetDir,
   askSaveChanges,
@@ -89,6 +92,8 @@ import {
   DEFAULT_SETTINGS,
   exportPandoc,
   exportPdf,
+  formatErrorMessage,
+  getActiveUiLocale,
   getSettings,
   importImage,
   importImageBytes,
@@ -114,15 +119,16 @@ import {
   pickSavePdfPath,
   quitApp,
   type RecoveryEntry,
-  SAVE_ALL_CHANGES_LABELS,
+  restartApp,
   type Settings,
+  saveChangesLabels,
   saveFile,
   setSettings,
+  setUiLocale,
   setWebviewZoom,
   setWindowTitle,
   syncMenuState,
   takePendingOpenFiles,
-  UPLOADER_NOT_CONFIGURED_MESSAGE,
   uploadImages,
   writeRecovery,
 } from "./ipc";
@@ -172,7 +178,6 @@ import {
 
 export const NAMED_AUTOSAVE_DELAY_MS = 1000;
 export const UNTITLED_RECOVERY_INTERVAL_MS = 5000;
-export const SAVE_BEFORE_IMAGE_MESSAGE = "請先儲存文件，才能插入圖片";
 
 export function applyTheme(theme: string): void {
   if (typeof document === "undefined") return;
@@ -202,26 +207,14 @@ function generateDocId(): string {
   return `doc-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
 }
 
-function formatErrorMessage(prefix: string, err: unknown): string {
-  if (err && typeof err === "object" && "message" in err) {
-    return `${prefix}：${String((err as { message: unknown }).message)}`;
-  }
-  if (err instanceof Error) {
-    return `${prefix}：${err.message}`;
-  }
-  return `${prefix}：${String(err)}`;
-}
-
-/** #67: status line for what the OS handed over that Kalamos refused (#81 B: every accepted file opens in a tab). */
+/** #67: status line for unsupported files received from the OS. */
 export function openWithStatusMessage(rejected: string[]): string {
   return rejected.length > 0
-    ? `無法開啟：${rejected.join("、")}（只支援一般的 Markdown 檔案）`
+    ? t("app.openWithRejected", {
+        files: rejected.join(t("app.pathSeparator")),
+      })
     : "";
 }
-
-export const IMAGE_ROOT_STATUS_PREFIX = "圖片根目錄：";
-export const IMAGE_ROOT_CLEARED_MESSAGE = "已清除圖片根目錄";
-export const IMAGE_ROOT_TOO_BROAD_PREFIX = "圖片根目錄範圍過大：";
 
 export const ZOOM_LEVELS = [
   0.5, 0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3,
@@ -376,13 +369,19 @@ export function createKalamosApp(
     sidebarEl.dataset.visible = "false";
     editorContainer.parentElement?.insertBefore(sidebarEl, editorContainer);
   }
+  editorContainer.setAttribute("aria-label", t("app.editor"));
+  sidebarEl.setAttribute("aria-label", t("app.sidebar"));
   const recoveryBanner = root.querySelector<HTMLElement>("#recovery-banner");
+  const recoveryMessage = root.querySelector<HTMLElement>("#recovery-message");
+  if (recoveryMessage) recoveryMessage.textContent = t("app.recoveryMessage");
   const restoreBtn = root.querySelector<HTMLButtonElement>(
     "#recovery-restore-btn",
   );
   const discardBtn = root.querySelector<HTMLButtonElement>(
     "#recovery-discard-btn",
   );
+  if (restoreBtn) restoreBtn.textContent = t("app.restore");
+  if (discardBtn) discardBtn.textContent = t("app.discard");
   const statusEl = root.querySelector<HTMLElement>("#status");
 
   let pendingRecovery: RecoveryEntry | null = null;
@@ -471,7 +470,7 @@ export function createKalamosApp(
         editor.markSessionDirty(tab.doc);
         renderTabs();
       }
-      setStatus(formatErrorMessage("存檔失敗", err), true);
+      setStatus(formatErrorMessage(t("app.saveFailed"), err), true);
       const latestContent = open
         ? editor.getSessionContent(tab.doc)
         : contentToSave;
@@ -640,7 +639,7 @@ export function createKalamosApp(
     },
     onOpenRelativeLink: async (relativePath, slug, view) => {
       if (active.path === null) {
-        setStatus("請先儲存目前文件，才能開啟相對路徑連結", true);
+        setStatus(t("app.saveBeforeRelativeLink"), true);
         return;
       }
       const targetPath = resolveRelativeMarkdownPath(active.path, relativePath);
@@ -654,7 +653,7 @@ export function createKalamosApp(
       await insertPastedImages(files, view.state.selection.main.head);
     },
     onImageRootTooBroad: (root) => {
-      setStatus(`${IMAGE_ROOT_TOO_BROAD_PREFIX}${toNativePath(root)}`, true);
+      setStatus(t("app.imageRootTooBroad", { path: toNativePath(root) }), true);
     },
   });
 
@@ -831,9 +830,7 @@ export function createKalamosApp(
     // Show the tab being asked about.
     if (tab !== active) showTab(tab);
     const label = currentLabels().get(tab.id) ?? "";
-    const choice = await askSaveChanges(
-      `「${label}」有未儲存的變更，要在關閉前儲存嗎？`,
-    );
+    const choice = await askSaveChanges(t("app.confirmCloseTab", { label }));
     if (choice === "cancel" || !tabs.includes(tab)) return false;
     if (choice === "discard") {
       clearAutosaveTimer(tab);
@@ -1025,7 +1022,10 @@ export function createKalamosApp(
         if (tab === active) {
           syncDocumentPath();
           sidebar.setActiveFile(null);
-          setStatus("檔案已移到垃圾桶，內容保留為未命名文件", false);
+          setStatus(
+            t(IS_WINDOWS ? "app.fileTrashedWindows" : "app.fileTrashed"),
+            false,
+          );
         }
       }
       const prunedRecent = removeRecentFile(recentFiles, trashedPath);
@@ -1083,7 +1083,7 @@ export function createKalamosApp(
     zoom = next;
     wheelZoomDelta = 0;
     void setWebviewZoom(next).catch(() => null);
-    setStatus(`縮放 ${Math.round(next * 100)}%`, false);
+    setStatus(t("app.zoom", { percent: Math.round(next * 100) }), false);
   }
 
   // #107: Both macOS and Windows intentionally use Ctrl (never Cmd on macOS)
@@ -1136,6 +1136,7 @@ export function createKalamosApp(
 
   const preferences = createPreferences({
     getValues: () => ({
+      uiLocale: currentSettings.uiLocale ?? getUiLocale(),
       startupBehavior: currentSettings.startupBehavior ?? "restoreFolder",
       autoSave: currentSettings.autoSave ?? true,
       fontSize: clampFontSize(currentSettings.fontSize ?? 17),
@@ -1160,13 +1161,21 @@ export function createKalamosApp(
       scheduleMenuSync();
     },
     applyChange: applyPreferencesChange,
+    saveUiLocale: async (locale) => {
+      await setUiLocale(locale);
+      currentSettings = { ...currentSettings, uiLocale: locale };
+    },
+    restartApp: restartAfterLanguageChange,
     pickImageRootDir: () => pickImageRootDir(),
     clearImageRootDir: () => setImageRootDir(null),
     openThemesDir: async () => {
       try {
         await openThemesDir();
       } catch (err) {
-        setStatus(formatErrorMessage("無法開啟主題資料夾", err), true);
+        setStatus(
+          formatErrorMessage(t("app.openThemeFolderFailed"), err),
+          true,
+        );
       }
     },
   });
@@ -1374,8 +1383,8 @@ export function createKalamosApp(
     sidebarToggleBtn.type = "button";
     sidebarToggleBtn.className = "k-theme-btn";
     sidebarToggleBtn.dataset.testid = "sidebar-toggle-button";
-    sidebarToggleBtn.title = shortcutLabel("切換側欄 (Cmd+Shift+L)");
-    sidebarToggleBtn.setAttribute("aria-label", "切換側欄");
+    sidebarToggleBtn.title = shortcutLabel(t("app.toggleSidebarShortcut"));
+    sidebarToggleBtn.setAttribute("aria-label", t("app.toggleSidebar"));
     sidebarToggleBtn.innerHTML = `<svg class="k-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 4v16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
     sidebarToggleBtn.addEventListener("click", () => {
       void sidebar.toggleVisible();
@@ -1385,8 +1394,8 @@ export function createKalamosApp(
     openFileQuickBtn.type = "button";
     openFileQuickBtn.className = "k-theme-btn";
     openFileQuickBtn.dataset.testid = "open-file-button";
-    openFileQuickBtn.title = shortcutLabel("開啟檔案 (Cmd+O)");
-    openFileQuickBtn.setAttribute("aria-label", "開啟檔案");
+    openFileQuickBtn.title = shortcutLabel(t("app.openFileShortcut"));
+    openFileQuickBtn.setAttribute("aria-label", t("app.openFile"));
     openFileQuickBtn.innerHTML = `<svg class="k-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 3v6h6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
     openFileQuickBtn.addEventListener("click", () => {
       void openDocument();
@@ -1495,8 +1504,8 @@ export function createKalamosApp(
     editor.setImageRootDir(normalized);
     setStatus(
       normalized
-        ? `${IMAGE_ROOT_STATUS_PREFIX}${toNativePath(normalized)}`
-        : IMAGE_ROOT_CLEARED_MESSAGE,
+        ? t("app.imageRoot", { path: toNativePath(normalized) })
+        : t("app.imageRootCleared"),
       false,
     );
     await persistEditorSettingPatch({ imageRootDir: normalized });
@@ -1507,7 +1516,7 @@ export function createKalamosApp(
       // Kept as the setting (images show their fallback), but say why.
       if (isAssetDirTooBroadError(err)) {
         setStatus(
-          `${IMAGE_ROOT_TOO_BROAD_PREFIX}${toNativePath(normalized)}`,
+          t("app.imageRootTooBroad", { path: toNativePath(normalized) }),
           true,
         );
       }
@@ -1519,7 +1528,7 @@ export function createKalamosApp(
     try {
       picked = await pickOpenFolderPath();
     } catch (err) {
-      setStatus(formatErrorMessage("設定圖片根目錄失敗", err), true);
+      setStatus(formatErrorMessage(t("app.setImageRootFailed"), err), true);
       return false;
     }
     if (!picked) return false;
@@ -1545,16 +1554,8 @@ export function createKalamosApp(
   async function isPandocAvailable(): Promise<boolean> {
     const status = await pandocStatus().catch(() => null);
     if (status?.available) return true;
-    setStatus(PANDOC_MISSING_MESSAGE, true);
+    setStatus(pandocMissingMessage(), true);
     return false;
-  }
-
-  function pandocErrorMessage(prefix: string, err: unknown): string {
-    const e = err as { kind?: unknown; message?: unknown } | null;
-    if (e?.kind === "NotFound" && e.message === PANDOC_MISSING_MESSAGE) {
-      return PANDOC_MISSING_MESSAGE;
-    }
-    return formatErrorMessage(prefix, err);
   }
 
   let exportingPandoc = false;
@@ -1581,12 +1582,12 @@ export function createKalamosApp(
             info.ext,
           ));
       } catch (err) {
-        setStatus(formatErrorMessage("匯出失敗", err), true);
+        setStatus(pandocErrorMessage("export", err), true);
         return false;
       }
       if (!outPath) return false;
       outPath = ensureExportExtension(outPath, chosen);
-      setStatus(EXPORTING_MESSAGE, false);
+      setStatus(exportingMessage(), false);
       try {
         const prepared = prepareMarkdownForPandoc(
           editor.getContent(),
@@ -1604,7 +1605,7 @@ export function createKalamosApp(
         setStatus(exportedMessage(chosen, meta.path), false);
         return true;
       } catch (err) {
-        setStatus(pandocErrorMessage("匯出失敗", err), true);
+        setStatus(pandocErrorMessage("export", err), true);
         return false;
       }
     } finally {
@@ -1624,11 +1625,11 @@ export function createKalamosApp(
         source =
           explicitPath ?? (await pickImportPath(PANDOC_IMPORT_EXTENSIONS));
       } catch (err) {
-        setStatus(formatErrorMessage("匯入失敗", err), true);
+        setStatus(pandocErrorMessage("import", err), true);
         return false;
       }
       if (!source) return false;
-      setStatus(IMPORTING_MESSAGE, false);
+      setStatus(importingMessage(), false);
       let markdown: string;
       try {
         const result = await importPandoc(source);
@@ -1637,7 +1638,7 @@ export function createKalamosApp(
           await allowAssetDir(result.mediaDir).catch(() => null);
         }
       } catch (err) {
-        setStatus(pandocErrorMessage("匯入失敗", err), true);
+        setStatus(pandocErrorMessage("import", err), true);
         return false;
       }
       // #81 B: a new untitled tab (or the blank one).
@@ -1678,7 +1679,10 @@ export function createKalamosApp(
       const content = editor.getSessionContent(tab.doc);
       if (content.length > 0) {
         void writeRecovery(tab.docId, content, null).catch((err) => {
-          setStatus(formatErrorMessage("寫入救回檔失敗", err), true);
+          setStatus(
+            formatErrorMessage(t("app.writeRecoveryFailed"), err),
+            true,
+          );
         });
       }
     }
@@ -1691,7 +1695,7 @@ export function createKalamosApp(
     const targetTab = active;
     const docPath = targetTab.path;
     if (docPath === null) {
-      setStatus(SAVE_BEFORE_IMAGE_MESSAGE, true);
+      setStatus(t("app.saveBeforeImage"), true);
       return false;
     }
     const relativePaths: string[] = [];
@@ -1705,7 +1709,10 @@ export function createKalamosApp(
     }
     if (relativePaths.length === 0) {
       if (lastError !== null) {
-        setStatus(formatErrorMessage("插入圖片失敗", lastError), true);
+        setStatus(
+          formatErrorMessage(t("app.insertImageFailed"), lastError),
+          true,
+        );
       }
       return false;
     }
@@ -1715,7 +1722,10 @@ export function createKalamosApp(
     const lengthBefore = view.state.doc.length;
     insertImageMarkdown(view, anchor, relativePaths);
     if (lastError !== null) {
-      setStatus(formatErrorMessage("部分圖片插入失敗", lastError), true);
+      setStatus(
+        formatErrorMessage(t("app.insertSomeImagesFailed"), lastError),
+        true,
+      );
     } else {
       setStatus("", false);
     }
@@ -1763,7 +1773,7 @@ export function createKalamosApp(
         upload: uploadImages,
         setStatus,
         targets,
-        notConfiguredMessage: UPLOADER_NOT_CONFIGURED_MESSAGE,
+        notConfiguredMessage: t("errors.upload.notConfigured"),
       });
       return result.error === null && result.replaced > 0;
     } finally {
@@ -1861,13 +1871,13 @@ export function createKalamosApp(
         }
         if (wasRecent) {
           setStatus(
-            `找不到檔案「${toNativePath(path)}」，已從最近開啟移除`,
+            t("app.recentFileMissing", { path: toNativePath(path) }),
             true,
           );
           return false;
         }
       }
-      setStatus(formatErrorMessage("開檔失敗", err), true);
+      setStatus(formatErrorMessage(t("app.openFailed"), err), true);
       return false;
     }
     // The tabs may have changed while the file was read.
@@ -1894,7 +1904,7 @@ export function createKalamosApp(
     try {
       selectedPath = explicitPath ?? (await pickOpenFilePath());
     } catch (err) {
-      setStatus(formatErrorMessage("開檔失敗", err), true);
+      setStatus(formatErrorMessage(t("app.openFailed"), err), true);
       return false;
     }
     if (!selectedPath) return false;
@@ -1939,7 +1949,7 @@ export function createKalamosApp(
     try {
       selectedPath = explicitPath ?? (await pickSaveFilePath(tab.path));
     } catch (err) {
-      setStatus(formatErrorMessage("存檔失敗", err), true);
+      setStatus(formatErrorMessage(t("app.saveFailed"), err), true);
       return false;
     }
     if (!selectedPath) return false;
@@ -1967,12 +1977,12 @@ export function createKalamosApp(
         outPath =
           explicitPath ?? (await pickSavePdfPath(defaultPdfPath(docPath)));
       } catch (err) {
-        setStatus(formatErrorMessage("匯出 PDF 失敗", err), true);
+        setStatus(pdfErrorMessage(err), true);
         return false;
       }
       if (!outPath) return false;
       outPath = ensurePdfExtension(outPath);
-      setStatus(EXPORTING_PDF_MESSAGE, false);
+      setStatus(exportingPdfMessage(), false);
       try {
         const { html, headings } = await buildExportHtml(editor.getContent(), {
           title: documentTitle(docPath),
@@ -1984,7 +1994,7 @@ export function createKalamosApp(
         setStatus(exportedPdfMessage(meta.path), false);
         return true;
       } catch (err) {
-        setStatus(formatErrorMessage("匯出 PDF 失敗", err), true);
+        setStatus(pdfErrorMessage(err), true);
         return false;
       }
     } finally {
@@ -2061,7 +2071,7 @@ export function createKalamosApp(
       const labels = currentLabels();
       const choice = await askSaveChanges(
         unsavedChangesMessage(unsaved.map((tab) => labels.get(tab.id) ?? "")),
-        SAVE_ALL_CHANGES_LABELS,
+        saveChangesLabels(true),
       );
       if (choice === "cancel") return false;
       if (choice === "discard") {
@@ -2101,6 +2111,25 @@ export function createKalamosApp(
     for (const tab of tabs) clearAutosaveTimer(tab);
     await quitApp().catch(() => null);
     return true;
+  }
+
+  async function restartAfterLanguageChange(): Promise<void> {
+    if (!(await requestCloseWindow())) return;
+    for (const tab of tabs) clearAutosaveTimer(tab);
+    try {
+      await restartApp();
+    } catch (err) {
+      // Restart failed while the app is still running: restore recovery copies
+      // for any still-dirty tabs whose recovery files were cleared on "Don't Save".
+      for (const tab of tabs) {
+        if (!editor.isSessionDirty(tab.doc)) continue;
+        const content = editor.getSessionContent(tab.doc);
+        if (tab.path !== null || content.length > 0) {
+          await writeRecovery(tab.docId, content, tab.path).catch(() => null);
+        }
+      }
+      throw err;
+    }
   }
 
   const onRestoreClick = () => {
@@ -2314,8 +2343,15 @@ if (
   typeof document !== "undefined" &&
   document.querySelector("#editor-container")
 ) {
-  activeApp = createKalamosApp(document);
-  void activeApp.init();
+  void startApp(document);
+}
+
+async function startApp(doc: Document): Promise<void> {
+  const locale = await getActiveUiLocale().catch(() => DEFAULT_UI_LOCALE);
+  await initUiLocale(locale);
+  doc.documentElement.lang = locale;
+  activeApp = createKalamosApp(doc);
+  await activeApp.init();
 }
 
 export function getActiveApp(): KalamosApp | null {

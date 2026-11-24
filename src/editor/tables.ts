@@ -19,6 +19,7 @@ import {
 } from "@codemirror/view";
 import type { SyntaxNode } from "@lezer/common";
 import type { MarkdownParser } from "@lezer/markdown";
+import { t } from "../i18n";
 import { cjkEmphasisExtension } from "./cjk-emphasis";
 import { isSelectionTouchingRange, navigateMarkdownLink } from "./live-preview";
 import { clampPos, mapPosClamped } from "./positions";
@@ -1955,7 +1956,10 @@ export class TableBlockWidget extends WidgetType {
           handle.className = "k-table-row-handle";
           handle.draggable = true;
           handle.dataset.dragRow = String(bodyRowIdx);
-          handle.setAttribute("aria-label", `Drag row ${bodyRowIdx + 1}`);
+          handle.setAttribute(
+            "aria-label",
+            t("editor.table.dragRow", { row: bodyRowIdx + 1 }),
+          );
           const svgNs = "http://www.w3.org/2000/svg";
           const svg = document.createElementNS(svgNs, "svg");
           svg.setAttribute("class", "k-icon");

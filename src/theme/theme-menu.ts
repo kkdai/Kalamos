@@ -1,4 +1,5 @@
 import "./theme-menu.css";
+import { t } from "../i18n";
 import {
   getSettings,
   listThemes,
@@ -129,13 +130,21 @@ export function createThemeMenu(
 ): ThemeMenuController {
   const { parent, onThemeChange, onError } = options;
 
+  function systemOption(): ThemeOptionItem {
+    return { id: "system", label: t("theme.system"), builtin: true };
+  }
+
+  function defaultOptions(): ThemeOptionItem[] {
+    return [
+      systemOption(),
+      { id: "papyros", label: "Papyros", builtin: true },
+      { id: "melan", label: "Melan", builtin: true },
+    ];
+  }
+
   let currentTheme = "system";
   let menuOpen = false;
-  let availableOptions: ThemeOptionItem[] = [
-    { id: "system", label: "跟隨系統", builtin: true },
-    { id: "papyros", label: "Papyros", builtin: true },
-    { id: "melan", label: "Melan", builtin: true },
-  ];
+  let availableOptions = defaultOptions();
 
   const widgetEl = document.createElement("div");
   widgetEl.className = "k-theme-widget";
@@ -145,8 +154,10 @@ export function createThemeMenu(
   btnEl.className = "k-theme-btn";
   btnEl.id = "theme-menu-btn";
   btnEl.dataset.testid = "theme-menu-button";
-  btnEl.title = shortcutLabel("切換主題 (Cmd+Shift+T)");
-  btnEl.setAttribute("aria-label", "主題選單");
+  btnEl.title = t("theme.menu.tooltip", {
+    shortcut: shortcutLabel("Cmd+Shift+T"),
+  });
+  btnEl.setAttribute("aria-label", t("theme.menu.label"));
   btnEl.setAttribute("aria-haspopup", "menu");
   btnEl.setAttribute("aria-expanded", "false");
   // 1.5px stroke width, round linecap icon per PRD §12.5
@@ -196,19 +207,15 @@ export function createThemeMenu(
     try {
       const themes: ThemeInfo[] = await listThemes();
       availableOptions = [
-        { id: "system", label: "跟隨系統", builtin: true },
-        ...themes.map((t) => ({
-          id: t.id,
-          label: t.name,
-          builtin: t.builtin,
+        systemOption(),
+        ...themes.map((theme) => ({
+          id: theme.id,
+          label: theme.name,
+          builtin: theme.builtin,
         })),
       ];
     } catch {
-      availableOptions = [
-        { id: "system", label: "跟隨系統", builtin: true },
-        { id: "papyros", label: "Papyros", builtin: true },
-        { id: "melan", label: "Melan", builtin: true },
-      ];
+      availableOptions = defaultOptions();
     }
     renderOptions();
     return [...availableOptions];
@@ -233,7 +240,7 @@ export function createThemeMenu(
       await onThemeChange?.(targetId);
       return true;
     } catch (err) {
-      onError?.("套用主題失敗", err);
+      onError?.(t("theme.applyError"), err);
       return false;
     }
   }

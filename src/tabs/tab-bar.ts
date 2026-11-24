@@ -7,6 +7,7 @@
  * focus away from the editor.
  */
 import "./tabs.css";
+import { t } from "../i18n";
 import { shortcutLabel } from "../platform";
 
 export interface TabBarItem {
@@ -65,14 +66,14 @@ export function createTabBar(options: TabBarOptions): TabBar {
   const track = document.createElement("div");
   track.className = "k-tabbar-track";
   track.setAttribute("role", "tablist");
-  track.setAttribute("aria-label", "文件分頁");
+  track.setAttribute("aria-label", t("tabs.tabList"));
 
   const newBtn = document.createElement("button");
   newBtn.type = "button";
   newBtn.className = "k-tabbar-new";
   newBtn.dataset.testid = "tab-new";
-  newBtn.title = shortcutLabel("新增分頁（⌘T）");
-  newBtn.setAttribute("aria-label", "新增分頁");
+  newBtn.title = t("tabs.new.tooltip", { shortcut: shortcutLabel("⌘T") });
+  newBtn.setAttribute("aria-label", t("tabs.new.label"));
   newBtn.appendChild(lineIcon("M8 3.5v9M3.5 8h9", 16));
 
   bar.append(track, newBtn);
@@ -132,8 +133,11 @@ export function createTabBar(options: TabBarOptions): TabBar {
       close.className = "k-tab-close";
       close.dataset.testid = "tab-close";
       close.tabIndex = -1;
-      close.setAttribute("aria-label", `關閉 ${item.label}`);
-      close.title = shortcutLabel("關閉分頁（⌘W）");
+      close.setAttribute(
+        "aria-label",
+        t("tabs.close.label", { name: item.label }),
+      );
+      close.title = t("tabs.close.tooltip", { shortcut: shortcutLabel("⌘W") });
       close.appendChild(lineIcon("M4.5 4.5l7 7M11.5 4.5l-7 7", 12));
       const dot = document.createElement("span");
       dot.className = "k-tab-dirty-dot";

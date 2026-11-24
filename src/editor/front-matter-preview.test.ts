@@ -3,6 +3,7 @@ import { ensureSyntaxTree } from "@codemirror/language";
 import { EditorSelection, EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { getUiLocale, initUiLocale } from "../i18n";
 import { frontMatterExtension } from "./front-matter";
 import {
   finishFrontMatterEdit,
@@ -325,5 +326,38 @@ describe("front matter Backspace / Delete and focus behavior", () => {
     expect(onInAppBlur.length).toBe(1);
     view.dispatch({ effects: onInAppBlur as never });
     expect(view.state.field(frontMatterField).editing).toBe(false);
+  });
+
+  it("localizes the preview card heading and edit button aria-label", async () => {
+    await loadYamlModule();
+    const prev = getUiLocale();
+    const doc = "---\ntitle: Hello\n---\n\nBody";
+    try {
+      initUiLocale("zh-TW");
+      view = mountEditor(doc, doc.length);
+      expect(
+        view.dom.querySelector(".k-frontmatter-preview > strong")?.textContent,
+      ).toBe("文件資訊");
+      expect(
+        view.dom
+          .querySelector(".k-frontmatter-edit")
+          ?.getAttribute("aria-label"),
+      ).toBe("編輯文件資訊");
+      view.destroy();
+      view = null;
+
+      initUiLocale("en");
+      view = mountEditor(doc, doc.length);
+      expect(
+        view.dom.querySelector(".k-frontmatter-preview > strong")?.textContent,
+      ).toBe("Document info");
+      expect(
+        view.dom
+          .querySelector(".k-frontmatter-edit")
+          ?.getAttribute("aria-label"),
+      ).toBe("Edit document info");
+    } finally {
+      initUiLocale(prev);
+    }
   });
 });

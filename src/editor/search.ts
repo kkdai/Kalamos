@@ -44,6 +44,7 @@ import {
   ViewPlugin,
   type ViewUpdate,
 } from "@codemirror/view";
+import { t } from "../i18n";
 import { shortcutLabel } from "../platform";
 import { unshifted } from "./keymaps";
 import {
@@ -169,8 +170,8 @@ export function matchLabel({
   current,
 }: MatchLabelInput): string {
   if (!query.search) return "";
-  if (!query.valid) return query.regexp ? "正規表示式無效" : "";
-  if (total === 0) return "無結果";
+  if (!query.valid) return query.regexp ? t("editor.search.invalidRegex") : "";
+  if (total === 0) return t("editor.search.noResults");
   const totalText = capped ? `${total}+` : String(total);
   return `${current >= 0 ? current + 1 : "?"} / ${totalText}`;
 }
@@ -598,20 +599,30 @@ class KalamosSearchPanel implements Panel {
     this.toggleReplace = button(
       "k-search-btn k-search-toggle",
       "search-toggle-replace",
-      "切換取代",
+      t("editor.search.toggleReplace"),
       icon(ICONS.chevron),
     );
     this.toggleReplace.setAttribute("aria-expanded", "false");
 
-    this.findInput = field("search-input", "尋找");
-    this.caseBtn = button("k-search-opt", "search-case", "區分大小寫", "Aa");
+    this.findInput = field("search-input", t("editor.search.find"));
+    this.caseBtn = button(
+      "k-search-opt",
+      "search-case",
+      t("editor.search.matchCase"),
+      "Aa",
+    );
     this.wordBtn = button(
       "k-search-opt k-search-opt-word",
       "search-word",
-      "全字比對",
+      t("editor.search.wholeWord"),
       "ab",
     );
-    this.regexBtn = button("k-search-opt", "search-regex", "正規表示式", ".*");
+    this.regexBtn = button(
+      "k-search-opt",
+      "search-regex",
+      t("editor.search.regexp"),
+      ".*",
+    );
     for (const b of [this.caseBtn, this.wordBtn, this.regexBtn])
       b.setAttribute("aria-pressed", "false");
     const options = document.createElement("div");
@@ -629,19 +640,28 @@ class KalamosSearchPanel implements Panel {
     const prev = button(
       "k-search-btn",
       "search-prev",
-      shortcutLabel("上一個（⇧⌘G）"),
+      t("editor.shortcut", {
+        label: t("editor.search.previous"),
+        shortcut: shortcutLabel("⇧⌘G"),
+      }),
       icon(ICONS.up),
     );
     const next = button(
       "k-search-btn",
       "search-next",
-      shortcutLabel("下一個（⌘G）"),
+      t("editor.shortcut", {
+        label: t("editor.search.next"),
+        shortcut: shortcutLabel("⌘G"),
+      }),
       icon(ICONS.down),
     );
     const close = button(
       "k-search-btn",
       "search-close",
-      "關閉（Esc）",
+      t("editor.shortcut", {
+        label: t("editor.search.close"),
+        shortcut: "Esc",
+      }),
       icon(ICONS.close),
     );
 
@@ -656,21 +676,27 @@ class KalamosSearchPanel implements Panel {
       close,
     );
 
-    this.replaceInput = field("replace-input", "取代");
+    this.replaceInput = field("replace-input", t("editor.search.replace"));
     const replaceField = document.createElement("div");
     replaceField.className = "k-search-field";
     replaceField.append(this.replaceInput);
     const replaceOne = button(
       "k-search-text-btn",
       "replace-one",
-      "取代（Enter）",
-      "取代",
+      t("editor.shortcut", {
+        label: t("editor.search.replace"),
+        shortcut: "Enter",
+      }),
+      t("editor.search.replace"),
     );
     const replaceEvery = button(
       "k-search-text-btn",
       "replace-all",
-      shortcutLabel("全部取代（⌘Enter）"),
-      "全部取代",
+      t("editor.shortcut", {
+        label: t("editor.search.replaceAll"),
+        shortcut: shortcutLabel("⌘Enter"),
+      }),
+      t("editor.search.replaceAll"),
     );
     const spacer = document.createElement("span");
     spacer.className = "k-search-spacer";

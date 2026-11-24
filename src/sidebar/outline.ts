@@ -1,6 +1,7 @@
 import { ensureSyntaxTree, syntaxTree } from "@codemirror/language";
 import { type EditorState, StateEffect } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
+import { t } from "../i18n";
 
 export const OUTLINE_DEBOUNCE_MS = 150;
 
@@ -150,7 +151,7 @@ export function createOutline(options: CreateOutlineOptions): OutlineView {
     if (headings.length === 0) {
       const emptyEl = document.createElement("div");
       emptyEl.className = "k-sidebar-empty";
-      emptyEl.textContent = "目前文件尚無標題";
+      emptyEl.textContent = t("sidebar.outline.empty");
       container.appendChild(emptyEl);
       return;
     }

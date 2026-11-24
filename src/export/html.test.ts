@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { getUiLocale, initUiLocale } from "../i18n";
 import {
   buildExportHtml,
   collectExportHeadings,
@@ -156,6 +157,30 @@ describe("EX-01 export HTML", () => {
     expect(html).toContain("size: A4");
     expect(html).toContain("default-src 'none'");
     expect(html).toContain("<p>hello</p>");
+  });
+
+  it("localizes diagram error punctuation and escapes detail text in exported HTML", async () => {
+    const prev = getUiLocale();
+    const md = "```flow\nnot a valid <script> flow\n```\n";
+    try {
+      initUiLocale("zh-TW");
+      const zh = await render(md);
+      expect(zh.html).toContain(
+        '<p class="k-diagram-error">圖表語法錯誤（第 1 行）：',
+      );
+      expect(zh.html).not.toContain("<script>");
+
+      initUiLocale("en");
+      const en = await render(md);
+      expect(en.html).toContain(
+        '<p class="k-diagram-error">Diagram syntax error (line 1): ',
+      );
+      expect(en.html).not.toContain("）：");
+      expect(en.html).not.toContain(")：");
+      expect(en.html).not.toContain("<script>");
+    } finally {
+      initUiLocale(prev);
+    }
   });
 });
 

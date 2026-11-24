@@ -19,8 +19,11 @@ import {
   papyrosHighlightStyle,
   resolveCodeLanguage,
 } from "../editor/code-blocks";
-import type { DiagramRenderResult } from "../editor/diagrams";
-import { resolveDiagramKind } from "../editor/diagrams";
+import {
+  type DiagramRenderResult,
+  diagramErrorTitle,
+  resolveDiagramKind,
+} from "../editor/diagrams";
 import {
   buildFootnoteIndex,
   type FootnoteIndex,
@@ -36,11 +39,8 @@ import {
 import { resolveImageRoot, resolveImageSrc } from "../editor/images";
 import { collectDocumentHeadings } from "../editor/lists";
 import { ensureMathJaxLoaded, mathMarkdownExtension } from "../editor/math";
-import {
-  type DiagramFence,
-  diagramErrorTitle,
-  renderExportDiagrams,
-} from "./diagrams";
+import { t } from "../i18n";
+import { type DiagramFence, renderExportDiagrams } from "./diagrams";
 import { PRINT_CSS as printCss } from "./print-css";
 
 export interface ExportHeading {
@@ -613,10 +613,12 @@ class Renderer {
     if (diagram.svg) {
       return `<figure class="k-diagram" data-kind="${escapeHtml(lang.toLowerCase())}">${diagram.svg}</figure>\n`;
     }
+    const title = diagramErrorTitle(diagram);
     const detail = (diagram.error ?? "").split("\n")[0].slice(0, 200);
-    return `${pre}<p class="k-diagram-error">${escapeHtml(diagramErrorTitle(diagram))}${
-      detail ? `：${escapeHtml(detail)}` : ""
-    }</p>\n`;
+    const message = detail
+      ? t("dialog.errorWithDetail", { prefix: title, detail })
+      : title;
+    return `${pre}<p class="k-diagram-error">${escapeHtml(message)}</p>\n`;
   }
 
   private indentedCode(node: SyntaxNode): string {
