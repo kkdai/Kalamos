@@ -1,4 +1,5 @@
 import { undo } from "@codemirror/commands";
+import { forceParsing } from "@codemirror/language";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resetMockState } from "../ipc";
 import { createKalamosApp, type KalamosApp } from "../main";
@@ -178,44 +179,44 @@ describe("Tables (BL-01) — block widget, alignment, CJK width, Tab navigation,
     );
   });
 
-  it("caches table ranges in StateField and updates cursor moves in < 5ms on a 10,000-line document with 20 tables", async () => {
+  it("reuses table ranges and decorations on cursor moves outside tables in a 10,000-line document", async () => {
     app = createKalamosApp(document);
     await app.init();
     const { view } = app.editor;
 
-    const lines: string[] = [];
-    for (let i = 0; i < 10_000; i++) {
-      if (i > 0 && i % 500 === 0) {
-        lines.push(`| T${i} A | T${i} B |`);
-        lines.push("| :--- | ---: |");
-        lines.push(`| val ${i} | ${i} |`);
-      } else {
-        lines.push(`Paragraph line ${i} with some text.`);
-      }
+    const lines = Array.from(
+      { length: 10_000 },
+      (_, i) => `Paragraph line ${i} with some text.`,
+    );
+    for (let table = 1; table <= 20; table++) {
+      lines.splice(
+        table * 500 - 10,
+        5,
+        "",
+        `| T${table} A | T${table} B |`,
+        "| :--- | ---: |",
+        `| val ${table} | ${table} |`,
+        "",
+      );
     }
     app.editor.setContent(lines.join("\n"));
     app.editor.setCursor(0);
+    expect(forceParsing(view, view.state.doc.length, 5_000)).toBe(true);
 
-    const stateBefore = view.state.field(tablePreviewStateField);
-
-    // Warm up (first dispatch pays for lazy parsing / JIT), then take the
-    // median of several cursor moves outside tables. A single wall-clock
-    // sample was flaky under load (#32).
-    app.editor.setCursor(view.state.doc.line(100).from);
-    const samples: number[] = [];
-    for (let i = 0; i < 9; i++) {
-      const line = view.state.doc.line(200 + i * 20);
-      const start = performance.now();
-      app.editor.setCursor(line.from + 2);
-      samples.push(performance.now() - start);
+    const cached = view.state.field(tablePreviewStateField);
+    expect(cached.tables).toHaveLength(20);
+    expect(cached.decorations.size).toBe(20);
+    for (const lineNumber of [100, 200, 360, 5500, 9900]) {
+      const pos = view.state.doc.line(lineNumber).from + 2;
+      app.editor.setCursor(pos);
+      expect(view.state.selection.main.head).toBe(pos);
+      expect(view.state.field(tablePreviewStateField)).toBe(cached);
     }
-    samples.sort((a, b) => a - b);
-    const medianMs = samples[Math.floor(samples.length / 2)];
 
-    const stateAfter = view.state.field(tablePreviewStateField);
-    // When moving cursor outside tables, StateField returns the exact same cached state & DecorationSet
-    expect(stateAfter).toBe(stateBefore);
-    expect(medianMs).toBeLessThan(5);
+    app.editor.setCursor(cached.tables[0].delimiterFrom + 1);
+    const active = view.state.field(tablePreviewStateField);
+    expect(active.tables).toBe(cached.tables);
+    expect(active.decorations.size).toBe(19);
   });
 
   it("calculates CJK East Asian Width = 2 and formats tables with aligned columns while preserving escaped pipes \\|", () => {
