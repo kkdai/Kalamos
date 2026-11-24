@@ -13,6 +13,7 @@ function makeValues(
     uiLocale: "zh-TW",
     startupBehavior: "restoreFolder",
     autoSave: true,
+    autoCheckUpdates: true,
     fontSize: 17,
     contentWidth: 720,
     autoPairBrackets: true,
