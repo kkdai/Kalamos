@@ -1,0 +1,78 @@
+name: Rerun on Runner Shortage
+
+on:
+  workflow_run:
+    workflows: ["CI", "Release"]
+    types: [completed]
+
+permissions: {}
+
+concurrency:
+  group: rerun-runner-shortage-${{ github.event.workflow_run.id }}
+  cancel-in-progress: false
+
+jobs:
+  rerun-if-runner-shortage:
+    name: Rerun failed jobs on runner shortage
+    runs-on: ubuntu-latest
+    if: >-
+      (github.event.workflow_run.conclusion == 'failure' ||
+       github.event.workflow_run.conclusion == 'cancelled') &&
+      github.event.workflow_run.run_attempt < 3
+    permissions:
+      actions: write
+      checks: read
+    steps:
+      - name: Check for runner acquisition failure and rerun
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+          WORKFLOW_NAME: ${{ github.event.workflow_run.name }}
+        run: |
+          set -euo pipefail
+
+          echo "Inspecting workflow '${WORKFLOW_NAME}' run ${RUN_ID} (attempt ${RUN_ATTEMPT})..."
+
+          candidate_ids="$(
+            gh api --paginate --slurp \
+              "repos/${REPO}/actions/runs/${RUN_ID}/attempts/${RUN_ATTEMPT}/jobs?per_page=100" \
+              | jq -r '
+                [.[].jobs[]]
+                | map(
+                    select(
+                      (.conclusion == "cancelled" or .conclusion == "failure")
+                      and ((.steps // []) | length == 0)
+                    )
+                  )
+                | .[].id
+              '
+          )"
+
+          if [ -z "$candidate_ids" ]; then
+            echo "No failed or cancelled jobs with 0 steps found; skipping rerun."
+            exit 0
+          fi
+
+          shortage_detected=false
+          for job_id in $candidate_ids; do
+            annotations_json="$(
+              gh api --paginate --slurp \
+                "repos/${REPO}/check-runs/${job_id}/annotations?per_page=100"
+            )"
+            if printf '%s' "$annotations_json" \
+              | jq -e '[.[][]] | any((.message // "") | test("not acquired by runner"; "i"))' >/dev/null; then
+              echo "Detected hosted runner shortage on job ${job_id}."
+              shortage_detected=true
+              break
+            fi
+          done
+
+          if [ "$shortage_detected" != "true" ]; then
+            echo "Zero-step failed/cancelled jobs did not have a runner-acquisition annotation; skipping rerun."
+            exit 0
+          fi
+
+          echo "Triggering rerun of failed jobs for run ${RUN_ID} (next attempt: $((RUN_ATTEMPT + 1)))..."
+          gh api --method POST "repos/${REPO}/actions/runs/${RUN_ID}/rerun-failed-jobs"

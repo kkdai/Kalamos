@@ -112,6 +112,50 @@ test.describe("#91 in-app auto-updater", () => {
       });
   });
 
+  test("manual check failure shows localized error message with expandable technical details", async ({
+    page,
+  }) => {
+    await boot(page);
+    await page.evaluate(async () => {
+      const ipc = await import("/src/ipc.ts" as string);
+      let calls = 0;
+      ipc.setMockUpdateHandler(async () => {
+        calls += 1;
+        if (calls === 1) {
+          throw new Error(
+            "Could not fetch a valid release JSON from the remote",
+          );
+        }
+        return null;
+      });
+    });
+
+    await menuAction(page, "app.checkForUpdates");
+
+    const dialog = page.getByTestId("update-dialog");
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toHaveAttribute("data-state", "error");
+    await expect(page.getByTestId("update-error-message")).toHaveText(
+      "目前無法取得更新資訊，請檢查網路連線後再試一次。",
+    );
+
+    const details = page.getByTestId("update-error-details");
+    await expect(details).toBeVisible();
+    await expect(details).not.toHaveAttribute("open", "");
+    await expect(page.getByTestId("update-error-detail")).toBeHidden();
+
+    await page.getByTestId("update-error-details-summary").click();
+    await expect(page.getByTestId("update-error-detail")).toBeVisible();
+    await expect(page.getByTestId("update-error-detail")).toHaveText(
+      "Could not fetch a valid release JSON from the remote",
+    );
+
+    await page.getByTestId("update-retry").click();
+    await expect(dialog).toHaveAttribute("data-state", "upToDate");
+    await page.getByTestId("update-close").click();
+    await expect(dialog).toHaveCount(0);
+  });
+
   test("preferences general tab exposes autoCheckUpdates toggle (enabled by default)", async ({
     page,
   }) => {
