@@ -410,8 +410,13 @@ jobs:
 
   release:
     name: Create draft GitHub Release
-    needs: [check-version, checksums]
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: [check-version, build, checksums]
+    if: >-
+      always() && !failure() && !cancelled() &&
+      github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') &&
+      needs.check-version.result == 'success' &&
+      needs.build.result == 'success' &&
+      needs.checksums.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write
