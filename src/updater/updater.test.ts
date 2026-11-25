@@ -18,6 +18,7 @@ import {
 } from "../ipc";
 import { createKalamosApp, type KalamosApp } from "../main";
 import {
+  classifyUpdaterError,
   createUpdater,
   formatBytes,
   isSignatureError,
@@ -90,7 +91,122 @@ describe("#91 updater helpers", () => {
     ).toBe(true);
     expect(isSignatureError(new Error("Invalid pubkey"))).toBe(true);
     expect(isSignatureError(new Error("Signed version mismatch"))).toBe(true);
+    expect(
+      isSignatureError(
+        "The signature was created with a different key than the one provided",
+      ),
+    ).toBe(true);
+    expect(
+      isSignatureError(
+        new Error(
+          "The update was signed for version 0.7.0 but the update endpoint announced version 0.8.1.",
+        ),
+      ),
+    ).toBe(true);
     expect(isSignatureError(new Error("network timeout"))).toBe(false);
+  });
+
+  it("classifies updater errors into localized user-friendly categories and preserves technical detail", () => {
+    const fetchCases = [
+      "Could not fetch a valid release JSON from the remote",
+      new Error("Updater does not have any endpoints set."),
+      new Error(
+        "error sending request for url (https://github.com/kkdai/Kalamos/releases/latest/download/latest.json): dns error",
+      ),
+      new Error("connection timed out"),
+      new Error(
+        "the platform `darwin-aarch64` was not found in the response `platforms` object",
+      ),
+      new Error("expected value at line 1 column 1"),
+      new Error("HTTP status server error (502 Bad Gateway)"),
+    ];
+    for (const err of fetchCases) {
+      const result = classifyUpdaterError(err, "check");
+      expect(result.kind).toBe("fetch");
+      expect(result.message).toBe(
+        "目前無法取得更新資訊，請檢查網路連線後再試一次。",
+      );
+      expect(result.detail).not.toBe("");
+    }
+
+    const sigErr = classifyUpdaterError(
+      new Error("The signature verification failed"),
+      "download",
+    );
+    expect(sigErr.kind).toBe("signature");
+    expect(sigErr.message).toBe(
+      "更新檔的簽章驗證失敗，已取消安裝。請到 GitHub Releases 手動下載。",
+    );
+    expect(sigErr.detail).toBe("The signature verification failed");
+
+    const dlErr = classifyUpdaterError(
+      new Error("connection reset by peer"),
+      "download",
+    );
+    expect(dlErr.kind).toBe("download");
+    expect(dlErr.message).toBe("下載更新檔失敗，請檢查網路連線後再試一次。");
+    expect(dlErr.detail).toBe("connection reset by peer");
+
+    const installErr = classifyUpdaterError(
+      new Error("temp directory is not on the same mount point as the app"),
+      "install",
+    );
+    expect(installErr.kind).toBe("install");
+    expect(installErr.message).toBe(
+      "安裝更新失敗，請稍後再試，或到 GitHub Releases 手動下載。",
+    );
+    expect(installErr.detail).toBe(
+      "temp directory is not on the same mount point as the app",
+    );
+
+    const restartErr = classifyUpdaterError(
+      new Error("spawn failed"),
+      "restart",
+    );
+    expect(restartErr.kind).toBe("restart");
+    expect(restartErr.message).toBe(
+      "更新已安裝，但無法自動重新啟動 Kalamos，請手動重新開啟。",
+    );
+    expect(restartErr.detail).toBe("spawn failed");
+
+    const unknownErr = classifyUpdaterError(
+      new Error("unexpected internal panic"),
+      "check",
+    );
+    expect(unknownErr.kind).toBe("unknown");
+    expect(unknownErr.message).toBe(
+      "更新時發生未預期的錯誤，請稍後再試，或到 GitHub Releases 手動下載。",
+    );
+    expect(unknownErr.detail).toBe("unexpected internal panic");
+
+    // Stage-less classification covers all categories too.
+    expect(classifyUpdaterError("Download failed: unexpected EOF").kind).toBe(
+      "download",
+    );
+    expect(classifyUpdaterError("Permission denied (os error 13)").kind).toBe(
+      "install",
+    );
+    expect(classifyUpdaterError(null).detail).toBe("");
+
+    // English locale messages.
+    initUiLocale("en");
+    expect(
+      classifyUpdaterError(
+        "Could not fetch a valid release JSON from the remote",
+        "check",
+      ).message,
+    ).toBe(
+      "Could not fetch update information right now. Please check your internet connection and try again.",
+    );
+    expect(
+      classifyUpdaterError("Invalid encoding in minisign data", "download")
+        .message,
+    ).toBe(
+      "Update signature verification failed, so installation was cancelled. Please download it manually from GitHub Releases.",
+    );
+    expect(classifyUpdaterError("unexpected", "check").message).toBe(
+      "An unexpected error occurred while updating. Please try again later, or download it manually from GitHub Releases.",
+    );
   });
 
   it("renders release notes via DOM nodes without interpreting raw HTML or scripts", () => {
@@ -143,13 +259,14 @@ describe("#91 updater dialog workflow", () => {
 
     const failingUpdater = createUpdater({
       checkForUpdate: async () => {
-        throw new Error("network unreachable");
+        throw new Error("Could not fetch a valid release JSON from the remote");
       },
       prepareForRestart: async () => true,
       restartApp: async () => {},
     });
     await failingUpdater.checkForUpdates({ manual: false });
     expect(failingUpdater.isOpen()).toBe(false);
+    expect(document.querySelector('[data-testid="update-dialog"]')).toBeNull();
     expect(warn).toHaveBeenCalledTimes(1);
     failingUpdater.destroy();
   });
@@ -299,10 +416,18 @@ describe("#91 updater dialog workflow", () => {
     expect(updater.getState()).toBe("error");
     expect(install).not.toHaveBeenCalled();
     expect(restartApp).not.toHaveBeenCalled();
+    const errorMsg = document.querySelector(
+      '[data-testid="update-error-message"]',
+    )?.textContent;
+    expect(errorMsg).toBe(
+      "更新檔的簽章驗證失敗，已取消安裝。請到 GitHub Releases 手動下載。",
+    );
+    expect(errorMsg).not.toContain("minisign");
     expect(
-      document.querySelector('[data-testid="update-error-message"]')
+      document.querySelector('[data-testid="update-error-detail"]')
         ?.textContent,
-    ).toContain("簽章驗證失敗");
+    ).toBe("signature verification failed: invalid minisign");
+    expect(document.querySelector('[data-testid="update-retry"]')).toBeNull();
     updater.destroy();
   });
 
@@ -329,10 +454,12 @@ describe("#91 updater dialog workflow", () => {
     updater.destroy();
   });
 
-  it("shows a clear error message on manual check network failure", async () => {
+  it("shows localized fetch error with collapsed technical details on manual check failure", async () => {
+    const rawDetail =
+      "Could not fetch a valid release JSON from the remote <script>alert(1)</script>";
     const updater = createUpdater({
       checkForUpdate: async () => {
-        throw new Error("connection timed out");
+        throw new Error(rawDetail);
       },
       prepareForRestart: async () => true,
       restartApp: async () => {},
@@ -343,11 +470,107 @@ describe("#91 updater dialog workflow", () => {
     expect(
       document.querySelector('[data-testid="update-error-message"]')
         ?.textContent,
-    ).toContain("connection timed out");
+    ).toBe("目前無法取得更新資訊，請檢查網路連線後再試一次。");
+
+    const details = document.querySelector<HTMLDetailsElement>(
+      '[data-testid="update-error-details"]',
+    )!;
+    expect(details).not.toBeNull();
+    expect(details.open).toBe(false);
+    expect(
+      document.querySelector('[data-testid="update-error-details-summary"]')
+        ?.textContent,
+    ).toBe("詳細資訊");
+    expect(
+      document.querySelector('[data-testid="update-error-detail"]')
+        ?.textContent,
+    ).toBe(rawDetail);
+    expect(details.querySelector("script")).toBeNull();
     expect(
       document.querySelector('[data-testid="update-retry"]'),
     ).not.toBeNull();
     updater.destroy();
+  });
+
+  it("shows localized download, install, and unknown errors with technical details", async () => {
+    // Download failure
+    const dlFake = makeFakeUpdate({
+      download: async () => {
+        throw new Error("HTTP status server error (503 Service Unavailable)");
+      },
+    });
+    const dlUpdater = createUpdater({
+      checkForUpdate: async () => dlFake,
+      prepareForRestart: async () => true,
+      restartApp: async () => {},
+    });
+    await dlUpdater.checkForUpdates({ manual: true });
+    document
+      .querySelector<HTMLButtonElement>('[data-testid="update-now"]')!
+      .click();
+    await settle();
+    expect(dlUpdater.getState()).toBe("error");
+    expect(
+      document.querySelector('[data-testid="update-error-message"]')
+        ?.textContent,
+    ).toBe("下載更新檔失敗，請檢查網路連線後再試一次。");
+    expect(
+      document.querySelector('[data-testid="update-error-detail"]')
+        ?.textContent,
+    ).toBe("HTTP status server error (503 Service Unavailable)");
+    expect(
+      document.querySelector('[data-testid="update-retry"]'),
+    ).not.toBeNull();
+    dlUpdater.destroy();
+
+    // Install failure
+    const installFake = makeFakeUpdate({
+      install: async () => {
+        throw new Error("Permission denied (os error 13)");
+      },
+    });
+    const installUpdater = createUpdater({
+      checkForUpdate: async () => installFake,
+      prepareForRestart: async () => true,
+      restartApp: async () => {},
+    });
+    await installUpdater.checkForUpdates({ manual: true });
+    document
+      .querySelector<HTMLButtonElement>('[data-testid="update-now"]')!
+      .click();
+    await settle();
+    expect(installUpdater.getState()).toBe("error");
+    expect(
+      document.querySelector('[data-testid="update-error-message"]')
+        ?.textContent,
+    ).toBe("安裝更新失敗，請稍後再試，或到 GitHub Releases 手動下載。");
+    expect(
+      document.querySelector('[data-testid="update-error-detail"]')
+        ?.textContent,
+    ).toBe("Permission denied (os error 13)");
+    expect(document.querySelector('[data-testid="update-retry"]')).toBeNull();
+    installUpdater.destroy();
+
+    // Unknown error with empty detail omits the details block
+    const unknownUpdater = createUpdater({
+      checkForUpdate: async () => {
+        throw new Error("");
+      },
+      prepareForRestart: async () => true,
+      restartApp: async () => {},
+    });
+    await unknownUpdater.checkForUpdates({ manual: true });
+    expect(unknownUpdater.getState()).toBe("error");
+    expect(
+      document.querySelector('[data-testid="update-error-message"]')
+        ?.textContent,
+    ).toBe(
+      "更新時發生未預期的錯誤，請稍後再試，或到 GitHub Releases 手動下載。",
+    );
+    expect(
+      document.querySelector('[data-testid="update-error-details"]'),
+    ).toBeNull();
+    unknownUpdater.destroy();
   });
 });
 

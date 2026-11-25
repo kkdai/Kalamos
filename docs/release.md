@@ -182,3 +182,16 @@ gh workflow run release.yml --ref main
 - `sha256sums`
 
 > 注意：試跑時 `check-version` 仍會檢查 `package.json`、`src-tauri/tauri.conf.json`、`src-tauri/Cargo.toml` 三者版本是否一致（只是不比對 Git tag）。
+
+---
+
+## macOS Runner 容量不足自動重跑
+
+GitHub Actions 的託管 macOS（arm64）runner 偶爾會因容量不足而排隊約 15 分鐘後逾時取消，該 job 會呈現 `cancelled`（或 `failure`）、`steps` 數為 `0`，並帶有 annotation：`The job was not acquired by Runner of type hosted even after multiple attempts`。
+
+專案設有 `.github/workflows/rerun-on-runner-shortage.yml` 處理此情況：
+
+- 監聽 `CI` 與 `Release` workflow 的 `workflow_run`（`completed`），僅在整體結論為 `failure` 或 `cancelled` 且 `run_attempt < 3`（最多自動重跑 2 次）時執行。
+- 透過 GitHub REST API 檢查當次 attempt 是否有 `cancelled` / `failure`、step 數為 `0` 且含上述 runner 排隊失敗 annotation 的 job；符合時呼叫 `rerun-failed-jobs` 只重跑失敗的 job（不重跑已通過的平台）。
+- 此 workflow 不 checkout 程式碼、不使用 `pull_request_target` 也不存取任何 secrets，僅授予 `actions: write` 與 `checks: read` 最小權限，即使由 fork PR 觸發也不會執行未受信任的程式碼。
+- 若連續自動重跑 2 次後仍因 runner 容量不足失敗，待 GitHub Actions 恢復容量後於網頁上點選 **Re-run failed jobs** 即可。
