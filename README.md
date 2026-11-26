@@ -73,7 +73,7 @@
 - **Stichos Typewriter Mode** (`WM-02`, `F9`): Keeps the active cursor line vertically centered while typing.
 
 ### Themes
-- **Built-in Themes** (`TH-01`): **Papyros** (warm papyrus light), **Melan** (ink dark), and **System** auto-switching (`prefers-color-scheme`), paired with bundled open-source typography (`Source Serif 4`, `Noto Serif TC`, `Inter`, `Noto Sans TC`, `JetBrains Mono`).
+- **Built-in Themes** (`TH-01`): **Papyros** (warm papyrus light), **Melan** (warm ink dark), **Nyx** (near-black dark), and **System** auto-switching (`prefers-color-scheme`, configurable in **Preferences → Appearance** to use Melan or Nyx in dark mode), paired with bundled open-source typography (`Source Serif 4`, `Noto Serif TC`, `Inter`, `Noto Sans TC`, `JetBrains Mono`).
 - **Custom CSS Themes**: Place `.css` files in `~/Library/Application Support/io.kalamos.app/themes/` (macOS) or `%APPDATA%\io.kalamos.app\themes\` (Windows) to customize `--k-*` variables, typography, paragraph alignment, or automatic heading counters. Switch via the theme menu or `Cmd+Shift+T`. See [docs/themes.md](docs/themes.md).
 
 <p align="center">

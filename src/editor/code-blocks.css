@@ -22,7 +22,9 @@
 }
 
 :root[data-theme="melan"],
-[data-theme="melan"] {
+[data-theme="melan"],
+:root[data-theme="nyx"],
+[data-theme="nyx"] {
   --k-syntax-keyword: var(--k-link);
   --k-syntax-string: var(--k-accent);
   --k-syntax-comment: var(--k-text-muted);

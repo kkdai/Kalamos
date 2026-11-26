@@ -99,6 +99,7 @@ describe("ipc in-memory mock (api.yaml contract)", () => {
     // Fields absent from older settings files get their defaults.
     expect(await getSettings()).toEqual({
       ...updated,
+      systemDarkTheme: "melan",
       focusMode: false,
       typewriterMode: false,
       uploadCommand: null,
@@ -254,6 +255,7 @@ describe("ipc in-memory mock (api.yaml contract)", () => {
     expect(themes).toEqual([
       { id: "papyros", name: "Papyros", builtin: true },
       { id: "melan", name: "Melan", builtin: true },
+      { id: "nyx", name: "Nyx", builtin: true },
       { id: "custom:night", name: "night", builtin: false },
     ]);
 
@@ -265,11 +267,15 @@ describe("ipc in-memory mock (api.yaml contract)", () => {
     expect(updatedThemes.map((t) => t.id)).toEqual([
       "papyros",
       "melan",
+      "nyx",
       "custom:amber",
       "custom:night",
     ]);
 
     await expect(readThemeCss("papyros")).rejects.toMatchObject({
+      kind: "InvalidPath",
+    } satisfies Partial<AppError>);
+    await expect(readThemeCss("nyx")).rejects.toMatchObject({
       kind: "InvalidPath",
     } satisfies Partial<AppError>);
     await expect(readThemeCss("custom:../escape")).rejects.toMatchObject({

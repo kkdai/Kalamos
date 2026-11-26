@@ -1099,6 +1099,7 @@ export const diagramThemePlugin = ViewPlugin.fromClass(
           attributeFilter: [
             "data-theme",
             "data-custom-theme",
+            "data-system-dark-theme",
             "class",
             "style",
           ],

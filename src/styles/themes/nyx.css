@@ -1,0 +1,75 @@
+/**
+ * Kalamos Built-in Theme: Nyx (νύξ — 夜，近黑深色)
+ * Near-black neutral-warm dark palette (Issue #137).
+ */
+
+:root[data-theme="nyx"],
+[data-theme="nyx"] {
+  color-scheme: dark;
+
+  /* Near-black palette (Issue #137) */
+  --k-bg: #121110;
+  --k-surface: #1a1917;
+  --k-text: #e6e0d6;
+  --k-text-muted: #9a9285;
+  --k-accent: #93ae7c;
+  --k-link: #de9068;
+  --k-divider: #2b2926;
+
+  /* Derived semi-transparent selection from --k-link (#DE9068) */
+  --k-selection-bg: rgba(222, 144, 104, 0.25);
+
+  /* High-contrast UI accents on dark surfaces */
+  --k-accent-text: #121110;
+  --k-danger: #e57368;
+
+  /* #81 tab bar */
+  --k-tab-track-bg: var(--k-surface);
+  --k-tab-track-border: color-mix(
+    in srgb,
+    var(--k-divider) 70%,
+    var(--k-surface)
+  );
+  --k-tab-active-bg: color-mix(in srgb, var(--k-divider) 88%, var(--k-text));
+  --k-tab-active-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+  --k-tab-inactive-text: color-mix(
+    in srgb,
+    var(--k-text-muted) 90%,
+    var(--k-surface)
+  );
+  --k-tab-close-hover-bg: color-mix(in srgb, var(--k-text) 12%, transparent);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme])[data-system-dark-theme="nyx"] {
+    color-scheme: dark;
+
+    --k-bg: #121110;
+    --k-surface: #1a1917;
+    --k-text: #e6e0d6;
+    --k-text-muted: #9a9285;
+    --k-accent: #93ae7c;
+    --k-link: #de9068;
+    --k-divider: #2b2926;
+
+    --k-selection-bg: rgba(222, 144, 104, 0.25);
+
+    --k-accent-text: #121110;
+    --k-danger: #e57368;
+
+    --k-tab-track-bg: var(--k-surface);
+    --k-tab-track-border: color-mix(
+      in srgb,
+      var(--k-divider) 70%,
+      var(--k-surface)
+    );
+    --k-tab-active-bg: color-mix(in srgb, var(--k-divider) 88%, var(--k-text));
+    --k-tab-active-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+    --k-tab-inactive-text: color-mix(
+      in srgb,
+      var(--k-text-muted) 90%,
+      var(--k-surface)
+    );
+    --k-tab-close-hover-bg: color-mix(in srgb, var(--k-text) 12%, transparent);
+  }
+}

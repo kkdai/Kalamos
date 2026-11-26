@@ -159,6 +159,28 @@ describe("EX-01 export HTML", () => {
     expect(html).toContain("<p>hello</p>");
   });
 
+  it("produces identical light-themed print HTML in Nyx and Melan (#137)", async () => {
+    const prev = document.documentElement.getAttribute("data-theme");
+    const md =
+      "# Nyx Export\n\nText with [link](https://example.com) and `code`.\n\n```ts\nconst x = 1;\n```\n";
+    try {
+      document.documentElement.setAttribute("data-theme", "melan");
+      const melanOut = await render(md);
+
+      document.documentElement.setAttribute("data-theme", "nyx");
+      const nyxOut = await render(md);
+
+      expect(nyxOut.html).toBe(melanOut.html);
+      expect(nyxOut.html).toContain("background: #fff;");
+      expect(nyxOut.html).toContain("--k-text: #2b2622;");
+      expect(nyxOut.html.toLowerCase()).not.toContain("#121110");
+      expect(nyxOut.html.toLowerCase()).not.toContain("#e6e0d6");
+    } finally {
+      if (prev === null) document.documentElement.removeAttribute("data-theme");
+      else document.documentElement.setAttribute("data-theme", prev);
+    }
+  });
+
   it("localizes diagram error punctuation and escapes detail text in exported HTML", async () => {
     const prev = getUiLocale();
     const md = "```flow\nnot a valid <script> flow\n```\n";

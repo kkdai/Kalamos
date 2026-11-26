@@ -73,7 +73,7 @@
 - **Stichos 타자기 모드**(`WM-02`, `F9`): 입력하는 동안 현재 커서 줄이 화면 세로 중앙에 머물도록 유지합니다.
 
 ### 테마 시스템
-- **기본 제공 테마**(`TH-01`): **Papyros**(따뜻한 파피루스 라이트), **Melan**(먹색 다크), 시스템 자동 전환(`prefers-color-scheme`)을 지원하며 오픈소스 서체(`Source Serif 4`, `Noto Serif TC`, `Inter`, `Noto Sans TC`, `JetBrains Mono`)를 내장했습니다.
+- **기본 제공 테마**(`TH-01`): **Papyros**(따뜻한 파피루스 라이트), **Melan**(따뜻한 먹색 다크), **Nyx**(거의 검은 다크), 시스템 자동 전환(`prefers-color-scheme`, 환경설정 → 모양에서 시스템 다크 모드로 Melan 또는 Nyx 선택 가능)을 지원하며 오픈소스 서체(`Source Serif 4`, `Noto Serif TC`, `Inter`, `Noto Sans TC`, `JetBrains Mono`)를 내장했습니다.
 - **커스텀 CSS 테마**: `~/Library/Application Support/io.kalamos.app/themes/`(macOS) 또는 `%APPDATA%\io.kalamos.app\themes\`(Windows)에 `.css` 파일을 추가해 `--k-*` 변수, 글꼴 크기, 양쪽 정렬, 자동 제목 번호 등을 자유롭게 꾸밀 수 있습니다. 테마 메뉴 또는 `Cmd+Shift+T`로 전환합니다. 자세한 내용은 [docs/themes.md](docs/themes.md)를 참고하세요.
 
 <p align="center">

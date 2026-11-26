@@ -67,8 +67,12 @@
 }
 
 .k-table-toolbar-btn.is-danger:hover:not(:disabled) {
-  background-color: color-mix(in srgb, #b4543a 18%, transparent);
-  color: #9b3f28;
+  background-color: color-mix(
+    in srgb,
+    var(--k-danger, #b4543a) 18%,
+    transparent
+  );
+  color: var(--k-danger, #9b3f28);
 }
 
 .k-table-toolbar-sep {

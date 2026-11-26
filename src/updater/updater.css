@@ -209,7 +209,7 @@
 .k-update-button-primary {
   border-color: var(--k-accent, #5e7a4a);
   background-color: var(--k-accent, #5e7a4a);
-  color: #ffffff;
+  color: var(--k-accent-text, #ffffff);
 }
 
 .k-update-button-primary:hover:not(:disabled) {

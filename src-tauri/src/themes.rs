@@ -40,6 +40,11 @@ pub fn list_themes_in(app_data_dir: &Path) -> Result<Vec<ThemeInfo>, AppError> {
             name: "Melan".to_string(),
             builtin: true,
         },
+        ThemeInfo {
+            id: "nyx".to_string(),
+            name: "Nyx".to_string(),
+            builtin: true,
+        },
     ];
 
     let mut custom_themes = Vec::new();
@@ -194,6 +199,11 @@ mod tests {
                     name: "Melan".to_string(),
                     builtin: true,
                 },
+                ThemeInfo {
+                    id: "nyx".to_string(),
+                    name: "Nyx".to_string(),
+                    builtin: true,
+                },
             ]
         );
 
@@ -204,9 +214,9 @@ mod tests {
         fs::write(themes_dir.join("readme.txt"), "ignored").unwrap();
 
         let listed = list_themes_in(dir.path()).expect("list_themes_in with custom");
-        assert_eq!(listed.len(), 4);
+        assert_eq!(listed.len(), 5);
         assert_eq!(
-            listed[2],
+            listed[3],
             ThemeInfo {
                 id: "custom:Amber".to_string(),
                 name: "Amber".to_string(),
@@ -214,7 +224,7 @@ mod tests {
             }
         );
         assert_eq!(
-            listed[3],
+            listed[4],
             ThemeInfo {
                 id: "custom:zebra".to_string(),
                 name: "zebra".to_string(),
@@ -238,6 +248,7 @@ mod tests {
         for invalid_id in [
             "papyros",
             "melan",
+            "nyx",
             "custom:",
             "custom:../secret",
             "custom:a/b",

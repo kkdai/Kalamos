@@ -73,7 +73,7 @@
 - **Stichos タイプライターモード**（`WM-02`、`F9`）：入力中もカーソル行を常に画面の垂直中央に保ちます。
 
 ### テーマシステム
-- **内蔵テーマ**（`TH-01`）：**Papyros**（温かみのある紙色ライト）、**Melan**（墨色ダーク）、およびシステム連動（`prefers-color-scheme`）を用意。オープンソース書体（`Source Serif 4`、`Noto Serif TC`、`Inter`、`Noto Sans TC`、`JetBrains Mono`）を同梱しています。
+- **内蔵テーマ**（`TH-01`）：**Papyros**（温かみのある紙色ライト）、**Melan**（温かみのある墨色ダーク）、**Nyx**（黒に近いダーク）、およびシステム連動（`prefers-color-scheme`、環境設定の「外観」でダーク時のテーマに Melan / Nyx を選択可能）を用意。オープンソース書体（`Source Serif 4`、`Noto Serif TC`、`Inter`、`Noto Sans TC`、`JetBrains Mono`）を同梱しています。
 - **カスタム CSS テーマ**：`~/Library/Application Support/io.kalamos.app/themes/`（macOS）または `%APPDATA%\io.kalamos.app\themes\`（Windows）に `.css` ファイルを配置することで、`--k-*` 変数、文字サイズ、両端揃え、見出しの自動連番まで自由にカスタマイズ可能です。テーマメニューまたは `Cmd+Shift+T` で切り替えられます。詳細は [docs/themes.md](docs/themes.md) を参照してください。
 
 <p align="center">

@@ -120,9 +120,14 @@ export interface RecoveryEntry {
 
 export type SidebarTab = "tree" | "list" | "outline" | "search";
 
+/** #137: built-in dark theme used when theme === "system" and OS is dark. */
+export type SystemDarkTheme = "melan" | "nyx";
+
 export interface Settings {
   uiLocale?: UiLocale;
   theme: string;
+  /** #137: built-in dark theme used when theme === "system" and OS is dark. */
+  systemDarkTheme?: SystemDarkTheme;
   lastFolder: string | null;
   sidebarVisible: boolean;
   sidebarTab: SidebarTab;
@@ -163,6 +168,7 @@ export type StartupBehavior = "restoreFolder" | "blank";
 
 export const DEFAULT_SETTINGS: Settings = {
   theme: "system",
+  systemDarkTheme: "melan",
   lastFolder: null,
   sidebarVisible: false,
   sidebarTab: "tree",
@@ -1156,6 +1162,7 @@ export async function getSettings(): Promise<Settings> {
     const uiLocale = parseUiLocale(s.uiLocale);
     return {
       ...s,
+      systemDarkTheme: s.systemDarkTheme === "nyx" ? "nyx" : "melan",
       ...(uiLocale ? { uiLocale } : { uiLocale: undefined }),
       lastFolder: toSlashPath(s.lastFolder),
       imageRootDir: toSlashPath(s.imageRootDir),
@@ -1165,6 +1172,7 @@ export async function getSettings(): Promise<Settings> {
   const uiLocale = parseUiLocale(mockSettings.uiLocale);
   const out: Settings = {
     ...mockSettings,
+    systemDarkTheme: mockSettings.systemDarkTheme === "nyx" ? "nyx" : "melan",
     recentFiles: [...(mockSettings.recentFiles ?? [])],
   };
   if (uiLocale) out.uiLocale = uiLocale;
@@ -1181,6 +1189,12 @@ export async function setSettings(settings: Settings): Promise<null> {
   mockSettings = {
     ...(uiLocale ? { uiLocale } : {}),
     theme: settings.theme ?? DEFAULT_SETTINGS.theme,
+    systemDarkTheme:
+      settings.systemDarkTheme === "nyx"
+        ? "nyx"
+        : settings.systemDarkTheme === "melan"
+          ? "melan"
+          : (mockSettings.systemDarkTheme ?? DEFAULT_SETTINGS.systemDarkTheme),
     lastFolder: settings.lastFolder ?? DEFAULT_SETTINGS.lastFolder,
     sidebarVisible: settings.sidebarVisible ?? DEFAULT_SETTINGS.sidebarVisible,
     sidebarTab: settings.sidebarTab ?? DEFAULT_SETTINGS.sidebarTab,
@@ -1254,6 +1268,7 @@ export async function listThemes(): Promise<ThemeInfo[]> {
   const builtins: ThemeInfo[] = [
     { id: "papyros", name: "Papyros", builtin: true },
     { id: "melan", name: "Melan", builtin: true },
+    { id: "nyx", name: "Nyx", builtin: true },
   ];
   const customs: ThemeInfo[] = Array.from(mockCustomThemes.keys())
     .filter((stem) => isValidThemeStem(stem))

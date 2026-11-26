@@ -32,6 +32,27 @@ pub enum StartupBehavior {
     Blank,
 }
 
+/// #137: which built-in dark theme "system" uses when the OS is in dark mode.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum DarkTheme {
+    #[default]
+    Melan,
+    Nyx,
+}
+
+impl<'de> Deserialize<'de> for DarkTheme {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        // An unsupported or malformed dark theme falls back to Melan without
+        // resetting unrelated settings.
+        let raw = serde_json::Value::deserialize(deserializer)?;
+        Ok(match raw.as_str() {
+            Some("nyx") => Self::Nyx,
+            _ => Self::Melan,
+        })
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Default)]
 pub enum UiLocale {
     #[default]
@@ -102,6 +123,8 @@ pub const DEFAULT_CONTENT_WIDTH: u32 = 720;
 #[serde(rename_all = "camelCase", default)]
 pub struct Settings {
     pub theme: String,
+    /// #137: built-in dark theme used when `theme == "system"` and the OS is dark.
+    pub system_dark_theme: DarkTheme,
     /// The UI language to use the next time the app starts (`None` = follow system language).
     #[serde(
         default,
@@ -149,6 +172,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             theme: "system".to_string(),
+            system_dark_theme: DarkTheme::Melan,
             ui_locale: None,
             last_folder: None,
             sidebar_visible: false,
@@ -322,6 +346,7 @@ mod tests {
 
         let v = serde_json::to_value(&s).unwrap();
         assert_eq!(v["theme"], "system");
+        assert_eq!(v["systemDarkTheme"], "melan");
         assert!(v.get("uiLocale").is_none());
         assert!(v["lastFolder"].is_null());
         assert_eq!(v["sidebarVisible"], false);
@@ -350,6 +375,7 @@ mod tests {
         let dir = tempdir().expect("tempdir");
         let updated = Settings {
             theme: "melan".to_string(),
+            system_dark_theme: DarkTheme::Nyx,
             ui_locale: None,
             last_folder: Some("/tmp/kalamos-test/Notes".to_string()),
             sidebar_visible: true,
@@ -811,5 +837,39 @@ mod tests {
             serde_json::from_str(&fs::read_to_string(&settings_path).unwrap()).unwrap();
         assert_eq!(raw["autoCheckUpdates"], false);
         assert_eq!(get_settings_in(dir.path()).unwrap(), loaded);
+    }
+
+    #[test]
+    fn reads_settings_without_system_dark_theme_and_handles_invalid_values() {
+        let dir = tempdir().expect("tempdir");
+        let settings_path = dir.path().join("settings.json");
+        // Legacy settings file written before #137 has no systemDarkTheme key.
+        fs::write(&settings_path, r#"{ "theme": "system", "fontSize": 18 }"#)
+            .expect("write legacy settings without systemDarkTheme");
+
+        let mut loaded = get_settings_in(dir.path()).expect("load legacy settings");
+        assert_eq!(loaded.system_dark_theme, DarkTheme::Melan);
+        assert_eq!(loaded.font_size, 18);
+
+        loaded.system_dark_theme = DarkTheme::Nyx;
+        set_settings_in(dir.path(), &loaded).expect("save settings");
+        let raw: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(&settings_path).unwrap()).unwrap();
+        assert_eq!(raw["systemDarkTheme"], "nyx");
+        assert_eq!(get_settings_in(dir.path()).unwrap(), loaded);
+
+        // Invalid or malformed systemDarkTheme values fall back to Melan without
+        // discarding unrelated settings.
+        for invalid in [r#""obsidian""#, "null", "42", "{}"] {
+            fs::write(
+                &settings_path,
+                format!(r#"{{"systemDarkTheme":{invalid},"theme":"nyx","fontSize":21}}"#),
+            )
+            .unwrap();
+            let fallback = get_settings_in(dir.path()).expect("load with invalid dark theme");
+            assert_eq!(fallback.system_dark_theme, DarkTheme::Melan);
+            assert_eq!(fallback.theme, "nyx");
+            assert_eq!(fallback.font_size, 21);
+        }
     }
 }

@@ -1,7 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { DEFAULT_UI_LOCALE, initUiLocale } from "../i18n";
 import { getSettings, resetMockState, seedMockCustomTheme } from "../ipc";
 import { createKalamosApp, type KalamosApp } from "../main";
-import { CUSTOM_THEME_STYLE_ID } from "./theme-menu";
+import {
+  applySystemDarkTheme,
+  CUSTOM_THEME_STYLE_ID,
+  detectBaseThemeForCustomCss,
+} from "./theme-menu";
 
 function setupDom(): HTMLElement {
   document.body.innerHTML = `
@@ -26,8 +31,10 @@ describe("Theme Menu & Custom CSS (TH-01)", () => {
 
   beforeEach(() => {
     resetMockState();
+    initUiLocale(DEFAULT_UI_LOCALE);
     document.documentElement.removeAttribute("data-theme");
     document.documentElement.removeAttribute("data-custom-theme");
+    document.documentElement.removeAttribute("data-system-dark-theme");
     document.getElementById(CUSTOM_THEME_STYLE_ID)?.remove();
     setupDom();
   });
@@ -35,9 +42,10 @@ describe("Theme Menu & Custom CSS (TH-01)", () => {
   afterEach(() => {
     app?.destroy();
     app = null;
+    initUiLocale(DEFAULT_UI_LOCALE);
   });
 
-  it("lists system, Papyros, Melan, and custom themes in theme-menu and applies selected theme immediately", async () => {
+  it("lists system, Papyros, Melan, Nyx, and custom themes in theme-menu and applies selected theme immediately", async () => {
     seedMockCustomTheme(
       "sepia",
       ":root[data-custom-theme] { color-scheme: light; --k-bg: #f4ecd8; --k-font-size: 19px; }",
@@ -75,8 +83,9 @@ describe("Theme Menu & Custom CSS (TH-01)", () => {
       ),
     ).toEqual([
       "system:跟隨系統",
-      "papyros:Papyros",
-      "melan:Melan",
+      "papyros:Papyros（莎草紙）",
+      "melan:Melan（墨）",
+      "nyx:Nyx（夜）",
       "custom:night:night",
       "custom:sepia:sepia",
     ]);
@@ -91,6 +100,17 @@ describe("Theme Menu & Custom CSS (TH-01)", () => {
     expect(document.documentElement.getAttribute("data-theme")).toBe("melan");
     expect(document.getElementById(CUSTOM_THEME_STYLE_ID)).toBeNull();
     expect((await getSettings()).theme).toBe("melan");
+
+    // Select Nyx
+    const nyxOpt = menuEl.querySelector<HTMLButtonElement>(
+      '[data-theme-id="nyx"]',
+    )!;
+    nyxOpt.click();
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(document.documentElement.getAttribute("data-theme")).toBe("nyx");
+    expect(document.getElementById(CUSTOM_THEME_STYLE_ID)).toBeNull();
+    expect((await getSettings()).theme).toBe("nyx");
 
     // Select custom:sepia -> injects <style id="k-custom-theme"> and sets base theme
     const sepiaOpt = menuEl.querySelector<HTMLButtonElement>(
@@ -188,7 +208,21 @@ describe("Theme Menu & Custom CSS (TH-01)", () => {
     expect(document.documentElement.getAttribute("data-theme")).toBe("melan");
     expect((await getSettings()).theme).toBe("melan");
 
-    // 3rd Cmd+Shift+T: melan -> custom:night
+    // 3rd Cmd+Shift+T: melan -> nyx
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "T",
+        metaKey: true,
+        shiftKey: true,
+        bubbles: true,
+      }),
+    );
+    await new Promise((r) => setTimeout(r, 0));
+    expect(app.themeMenu.getCurrentTheme()).toBe("nyx");
+    expect(document.documentElement.getAttribute("data-theme")).toBe("nyx");
+    expect((await getSettings()).theme).toBe("nyx");
+
+    // 4th Cmd+Shift+T: nyx -> custom:night
     window.dispatchEvent(
       new KeyboardEvent("keydown", {
         key: "T",
@@ -203,5 +237,60 @@ describe("Theme Menu & Custom CSS (TH-01)", () => {
       document.getElementById(CUSTOM_THEME_STYLE_ID)?.textContent,
     ).toContain(":root[data-custom-theme]");
     expect((await getSettings()).theme).toBe("custom:night");
+  });
+
+  it("supports data-base-theme: nyx for custom themes (even with color-scheme: dark) and localized English names", async () => {
+    expect(
+      detectBaseThemeForCustomCss(
+        "/* data-base-theme: nyx */\n:root[data-custom-theme] { color-scheme: dark; --k-accent: #7aa2f7; }",
+      ),
+    ).toBe("nyx");
+    expect(
+      detectBaseThemeForCustomCss(
+        "/* data-base-theme: melan */\n:root[data-custom-theme] { color-scheme: dark; }",
+      ),
+    ).toBe("melan");
+    expect(
+      detectBaseThemeForCustomCss(
+        ":root[data-custom-theme] { color-scheme: dark; }",
+      ),
+    ).toBe("melan");
+
+    seedMockCustomTheme(
+      "obsidian",
+      "/* data-base-theme: nyx */\n:root[data-custom-theme] { color-scheme: dark; --k-accent: #a6d189; }",
+    );
+
+    initUiLocale("en");
+    app = createKalamosApp(document);
+    await app.init();
+
+    await app.themeMenu.openMenu();
+    const labels = app.themeMenu
+      .getAvailableOptions()
+      .map((o) => `${o.id}:${o.label}`);
+    expect(labels).toEqual([
+      "system:Follow System",
+      "papyros:Papyros",
+      "melan:Melan",
+      "nyx:Nyx",
+      "custom:night:night",
+      "custom:obsidian:obsidian",
+    ]);
+
+    await app.themeMenu.selectTheme("custom:obsidian");
+    expect(document.documentElement.getAttribute("data-theme")).toBe("nyx");
+    expect(document.documentElement.getAttribute("data-custom-theme")).toBe(
+      "custom:obsidian",
+    );
+
+    applySystemDarkTheme("nyx");
+    expect(
+      document.documentElement.getAttribute("data-system-dark-theme"),
+    ).toBe("nyx");
+    applySystemDarkTheme("melan");
+    expect(
+      document.documentElement.hasAttribute("data-system-dark-theme"),
+    ).toBe(false);
   });
 });

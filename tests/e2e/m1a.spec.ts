@@ -576,7 +576,7 @@ test("AC12 outline lists heading levels, click scrolls, active section highlight
 // AC13 — theme menu: built-ins + custom themes, applies immediately, persists
 // ---------------------------------------------------------------------------
 
-test("AC13 theme menu lists Papyros, Melan and custom themes; selection applies and persists", async ({
+test("AC13 theme menu lists Papyros, Melan, Nyx and custom themes; selection applies and persists", async ({
   page,
 }) => {
   await page.getByTestId("theme-menu-button").click();
@@ -586,7 +586,7 @@ test("AC13 theme menu lists Papyros, Melan and custom themes; selection applies 
     .getByTestId("theme-option")
     .evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.themeId));
   expect(ids).toEqual(
-    expect.arrayContaining(["papyros", "melan", "custom:night"]),
+    expect.arrayContaining(["papyros", "melan", "nyx", "custom:night"]),
   );
 
   await page
@@ -604,6 +604,23 @@ test("AC13 theme menu lists Papyros, Melan and custom themes; selection applies 
       withIpc<string>(page, "return (await ipc.getSettings()).theme;"),
     )
     .toBe("melan");
+
+  // Select Nyx (#137)
+  await page.getByTestId("theme-menu-button").click();
+  await page
+    .locator('[data-testid="theme-option"][data-theme-id="nyx"]')
+    .click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "nyx");
+  await expect
+    .poll(() =>
+      page.evaluate(() => getComputedStyle(document.body).backgroundColor),
+    )
+    .toBe("rgb(18, 17, 16)");
+  await expect
+    .poll(() =>
+      withIpc<string>(page, "return (await ipc.getSettings()).theme;"),
+    )
+    .toBe("nyx");
 
   // A CSS file dropped into themes/ appears the next time the menu opens.
   await withIpc(
@@ -658,6 +675,15 @@ const PRD_PALETTE: Record<string, Record<string, string>> = {
     "--k-link": "#d98a63",
     "--k-divider": "#3a362f",
   },
+  nyx: {
+    "--k-bg": "#121110",
+    "--k-surface": "#1a1917",
+    "--k-text": "#e6e0d6",
+    "--k-text-muted": "#9a9285",
+    "--k-accent": "#93ae7c",
+    "--k-link": "#de9068",
+    "--k-divider": "#2b2926",
+  },
 };
 
 function luminance(hex: string): number {
@@ -683,8 +709,8 @@ async function readTokens(page: Page): Promise<Record<string, string>> {
   }, Object.keys(PRD_PALETTE.papyros));
 }
 
-for (const theme of ["papyros", "melan"]) {
-  test(`AC14 ${theme} palette equals PRD §12.3 and text contrast ≥ 4.5:1`, async ({
+for (const theme of ["papyros", "melan", "nyx"]) {
+  test(`AC14 ${theme} palette equals spec and text contrast ≥ 4.5:1`, async ({
     page,
   }) => {
     await page.evaluate(
@@ -693,12 +719,22 @@ for (const theme of ["papyros", "melan"]) {
     );
     const tokens = await readTokens(page);
     expect(tokens).toEqual(PRD_PALETTE[theme]);
+    for (const bgKey of ["--k-bg", "--k-surface"] as const) {
+      expect(
+        contrast(tokens["--k-text"], tokens[bgKey]),
+      ).toBeGreaterThanOrEqual(4.5);
+      expect(
+        contrast(tokens["--k-text-muted"], tokens[bgKey]),
+      ).toBeGreaterThanOrEqual(4.5);
+    }
     expect(
-      contrast(tokens["--k-text"], tokens["--k-bg"]),
+      contrast(tokens["--k-link"], tokens["--k-bg"]),
     ).toBeGreaterThanOrEqual(4.5);
-    expect(
-      contrast(tokens["--k-text-muted"], tokens["--k-bg"]),
-    ).toBeGreaterThanOrEqual(4.5);
+    if (theme === "nyx") {
+      expect(
+        contrast(tokens["--k-link"], tokens["--k-surface"]),
+      ).toBeGreaterThanOrEqual(4.5);
+    }
   });
 }
 

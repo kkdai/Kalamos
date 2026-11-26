@@ -58,6 +58,19 @@ test("#37 export HTML has static, light-themed, uniquely-scoped SVG for every di
   // Light print palette: Papyros ink on white, not Melan's light text.
   expect(html.toLowerCase()).toContain("#2b2622");
   expect(html.toLowerCase()).not.toContain("#e8e0d0");
+
+  // #137: Export under Nyx matches Melan (light print palette, no Nyx colors leaked).
+  await page.evaluate(() =>
+    document.documentElement.setAttribute("data-theme", "nyx"),
+  );
+  const nyxHtml = await page.evaluate(async (md) => {
+    const { buildExportHtml } = await import("/src/export/html.ts" as string);
+    const r = await buildExportHtml(md, { title: "t", docPath: null });
+    return r.html.slice(r.html.indexOf("<body>"));
+  }, doc);
+  expect(nyxHtml).toBe(html);
+  expect(nyxHtml.toLowerCase()).not.toContain("#121110");
+  expect(nyxHtml.toLowerCase()).not.toContain("#e6e0d6");
 });
 
 test("#37 twenty diagrams build the export HTML quickly", async ({ page }) => {

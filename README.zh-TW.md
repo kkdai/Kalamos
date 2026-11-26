@@ -73,7 +73,7 @@
 - **Stichos 打字機模式**（`WM-02`，`F9`）：打字與移動游標時始終讓當前行維持於畫面垂直中央。
 
 ### 主題系統
-- **內建主題**（`TH-01`）：提供 **Papyros（莎草紙，淺色）**、**Melan（墨，深色）** 與 **跟隨系統外觀**，並內建開源中英文字體（`Source Serif 4`、`Noto Serif TC`、`Inter`、`Noto Sans TC`、`JetBrains Mono`）。
+- **內建主題**（`TH-01`）：提供 **Papyros（莎草紙，淺色）**、**Melan（墨，溫潤深色）**、**Nyx（夜，近黑深色）** 與 **跟隨系統外觀**（可在 **偏好設定 → 外觀** 指定系統深色模式使用 Melan 或 Nyx），並內建開源中英文字體（`Source Serif 4`、`Noto Serif TC`、`Inter`、`Noto Sans TC`、`JetBrains Mono`）。
 - **自訂 CSS 主題**：將 `.css` 檔案放入 `~/Library/Application Support/io.kalamos.app/themes/`（macOS）或 `%APPDATA%\io.kalamos.app\themes\`（Windows）即可覆寫 `--k-*` 色彩與排版變數、兩端對齊或標題自動編號，可由主題選單或 `Cmd+Shift+T` 循環切換。詳見 [docs/themes.md](docs/themes.md)。
 
 <p align="center">

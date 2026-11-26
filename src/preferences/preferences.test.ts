@@ -21,6 +21,7 @@ function makeValues(
     codeLineNumbers: false,
     mathAutoNumber: false,
     theme: "papyros",
+    systemDarkTheme: "melan",
     imageRootDir: null,
     uploadOnInsert: false,
     uploadCommand: null,
@@ -201,6 +202,46 @@ describe("preferences language notice", () => {
 
       expect(select.disabled).toBe(false);
       expect(select.value).toBe("en");
+    } finally {
+      prefs.destroy();
+    }
+  });
+
+  it("lets the user choose Melan or Nyx for the system dark theme in Appearance", async () => {
+    const values = makeValues({ theme: "system", systemDarkTheme: "melan" });
+    const applyChange = vi.fn();
+    const host: PreferencesHost = {
+      getValues: () => ({ ...values }),
+      getThemes: () => [
+        { id: "system", label: "跟隨系統" },
+        { id: "papyros", label: "Papyros（莎草紙）" },
+        { id: "melan", label: "Melan（墨）" },
+        { id: "nyx", label: "Nyx（夜）" },
+      ],
+      applyChange,
+      saveUiLocale: async () => {},
+      restartApp: async () => {},
+      pickImageRootDir: async () => null,
+      clearImageRootDir: async () => null,
+      openThemesDir: async () => null,
+    };
+
+    const prefs = createPreferences(host, document);
+    try {
+      await prefs.open("appearance");
+      const darkSelect = document.querySelector<HTMLSelectElement>(
+        '[data-testid="pref-system-dark-theme"]',
+      )!;
+      expect(darkSelect).not.toBeNull();
+      expect(darkSelect.value).toBe("melan");
+      expect(Array.from(darkSelect.options).map((o) => o.value)).toEqual([
+        "melan",
+        "nyx",
+      ]);
+
+      darkSelect.value = "nyx";
+      darkSelect.dispatchEvent(new Event("change"));
+      expect(applyChange).toHaveBeenCalledWith({ systemDarkTheme: "nyx" });
     } finally {
       prefs.destroy();
     }
