@@ -14,6 +14,7 @@ import {
   resetAssetFileAllowCache,
   setImageDocPathEffect,
 } from "./images";
+import { ensureFullSyntaxTree } from "./test-utils";
 
 /** #69: `../images/pic.png` from `_posts/` lies outside the document folder. */
 
@@ -36,16 +37,18 @@ function mount(doc: string, docPath: string | null = DOC): EditorView {
   const parent = document.createElement("div");
   document.body.appendChild(parent);
   const view = new EditorView({
-    state: EditorState.create({
-      doc,
-      selection: { anchor: doc.length },
-      extensions: [
-        markdown({ base: markdownLanguage }),
-        imageDocPathField,
-        imageRootSettingField,
-        imagePreviewPlugin,
-      ],
-    }),
+    state: ensureFullSyntaxTree(
+      EditorState.create({
+        doc,
+        selection: { anchor: doc.length },
+        extensions: [
+          markdown({ base: markdownLanguage }),
+          imageDocPathField,
+          imageRootSettingField,
+          imagePreviewPlugin,
+        ],
+      }),
+    ),
     parent,
   });
   view.dispatch({ effects: setImageDocPathEffect.of(docPath) });

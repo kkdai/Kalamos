@@ -1,5 +1,5 @@
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
-import { ensureSyntaxTree, syntaxTree } from "@codemirror/language";
+import { syntaxTree } from "@codemirror/language";
 import { EditorSelection, EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { afterEach, describe, expect, it } from "vitest";
@@ -17,6 +17,7 @@ import {
 import { footnoteExtension } from "./footnotes";
 import { frontMatterExtension } from "./front-matter";
 import { mathMarkdownExtension } from "./math";
+import { ensureFullSyntaxTree } from "./test-utils";
 
 const md = () =>
   markdown({
@@ -35,14 +36,12 @@ function makeState(doc: string, cursor = doc.length): EditorState {
     selection: EditorSelection.cursor(cursor),
     extensions: [md(), blocksExtension],
   });
-  ensureSyntaxTree(state, state.doc.length, 5000);
-  return state;
+  return ensureFullSyntaxTree(state);
 }
 
 function nodeNames(state: EditorState): string[] {
   const names: string[] = [];
-  const tree =
-    ensureSyntaxTree(state, state.doc.length, 5000) ?? syntaxTree(state);
+  const tree = syntaxTree(ensureFullSyntaxTree(state));
   for (let n = tree.topNode.firstChild; n; n = n.nextSibling)
     names.push(n.name);
   return names;
@@ -221,11 +220,11 @@ describe("ED-07 [TOC]", () => {
   it("updates immediately when a heading is added", () => {
     let state = makeState("[TOC]\n\n# One\n", 0);
     expect(state.field(tocField).entries.map((e) => e.text)).toEqual(["One"]);
-    state = state.update({
-      changes: { from: state.doc.length, insert: "\n## Two\n" },
-    }).state;
-    ensureSyntaxTree(state, state.doc.length, 5000);
-    state = state.update({}).state;
+    state = ensureFullSyntaxTree(
+      state.update({
+        changes: { from: state.doc.length, insert: "\n## Two\n" },
+      }).state,
+    );
     expect(state.field(tocField).entries.map((e) => e.text)).toEqual([
       "One",
       "Two",
@@ -259,9 +258,7 @@ describe("ED-07 [TOC]", () => {
     const during = state.field(tocField);
     expect(during.entries).toBe(before.entries);
     expect(during.dirty).toBe(true);
-    state = state.update({}).state;
-    ensureSyntaxTree(state, state.doc.length, 5000);
-    state = state.update({}).state;
+    state = ensureFullSyntaxTree(state.update({}).state);
     expect(state.field(tocField).entries.map((e) => e.text)).toEqual([
       "One",
       "新",
@@ -282,11 +279,7 @@ describe("ED-06 / ED-07 in the editor DOM", () => {
     const doc = "[TOC]\n\n# Alpha\n\ntext\n\n## Beta\n";
     view = new EditorView({
       parent,
-      state: EditorState.create({
-        doc,
-        selection: EditorSelection.cursor(doc.length),
-        extensions: [md(), blocksExtension],
-      }),
+      state: makeState(doc, doc.length),
     });
     const links = Array.from(
       parent.querySelectorAll<HTMLAnchorElement>(".k-toc a"),
@@ -305,11 +298,7 @@ describe("ED-06 / ED-07 in the editor DOM", () => {
     const doc = "Body[^a].\n\n[^a]: Note text";
     view = new EditorView({
       parent,
-      state: EditorState.create({
-        doc,
-        selection: EditorSelection.cursor(doc.length),
-        extensions: [md(), blocksExtension],
-      }),
+      state: makeState(doc, doc.length),
     });
     const ref = parent.querySelector<HTMLElement>(".k-footnote-ref");
     expect(ref?.textContent).toBe("1");

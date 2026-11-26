@@ -52,15 +52,17 @@ import {
   setDiagramThemeEffect,
 } from "./diagrams";
 import { createSourceModeController } from "./source-mode";
+import { ensureFullSyntaxTree } from "./test-utils";
 
 const FLOW_DOC = "前言\n\n```mermaid\nflowchart TD\n  A --> B\n```\n\nend";
 
 function createState(doc: string, cursor = doc.length): EditorState {
-  return EditorState.create({
+  const state = EditorState.create({
     doc,
     selection: EditorSelection.cursor(cursor),
     extensions: [markdown({ base: markdownLanguage }), diagramStateField],
   });
+  return ensureFullSyntaxTree(state);
 }
 
 interface WidgetInfo {
@@ -294,14 +296,16 @@ describe("source mode", () => {
     const parent = document.createElement("div");
     document.body.appendChild(parent);
     const view = new EditorView({
-      state: EditorState.create({
-        doc: FLOW_DOC,
-        selection: EditorSelection.cursor(FLOW_DOC.length),
-        extensions: [
-          markdown({ base: markdownLanguage }),
-          controller.extension,
-        ],
-      }),
+      state: ensureFullSyntaxTree(
+        EditorState.create({
+          doc: FLOW_DOC,
+          selection: EditorSelection.cursor(FLOW_DOC.length),
+          extensions: [
+            markdown({ base: markdownLanguage }),
+            controller.extension,
+          ],
+        }),
+      ),
       parent,
     });
     await settle();

@@ -1,5 +1,4 @@
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
-import { ensureSyntaxTree } from "@codemirror/language";
 import { EditorSelection, EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { afterEach, describe, expect, it } from "vitest";
@@ -15,6 +14,7 @@ import {
   livePreviewExtension,
 } from "./live-preview";
 import { mathMarkdownExtension } from "./math";
+import { ensureFullSyntaxTree } from "./test-utils";
 
 /** #54: inline spans render with the cursor right after them; source only inside. */
 
@@ -44,8 +44,7 @@ function stateOf(
       imagePreviewExtension,
     ],
   });
-  ensureSyntaxTree(state, state.doc.length, 5000);
-  return state;
+  return ensureFullSyntaxTree(state);
 }
 
 const markClasses = (doc: string, cursor: EditorSelection | number) =>
@@ -194,12 +193,13 @@ describe("#54 Backspace and arrows", () => {
     expect(headAfter(13, 12, "select")).toBe(12);
     expect(headAfter(15, 14, "select")).toBe(14);
     // The pure check on an unfiltered transaction.
-    const plain = EditorState.create({
-      doc,
-      selection: EditorSelection.cursor(13),
-      extensions: [markdown({ base: markdownLanguage })],
-    });
-    ensureSyntaxTree(plain, doc.length, 5000);
+    const plain = ensureFullSyntaxTree(
+      EditorState.create({
+        doc,
+        selection: EditorSelection.cursor(13),
+        extensions: [markdown({ base: markdownLanguage })],
+      }),
+    );
     expect(
       enterImageOnArrow(
         plain.update({ selection: { anchor: 2 }, userEvent: "select" }),

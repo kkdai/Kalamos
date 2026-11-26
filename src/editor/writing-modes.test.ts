@@ -1,5 +1,4 @@
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
-import { ensureSyntaxTree } from "@codemirror/language";
 import {
   EditorSelection,
   EditorState,
@@ -18,6 +17,7 @@ import { cjkEmphasisExtension } from "./cjk-emphasis";
 import { footnoteExtension } from "./footnotes";
 import { frontMatterExtension } from "./front-matter";
 import { mathMarkdownExtension } from "./math";
+import { ensureFullSyntaxTree } from "./test-utils";
 import {
   blockAt,
   currentBlocks,
@@ -58,8 +58,7 @@ function stateOf(
       ...(extra as []),
     ],
   });
-  ensureSyntaxTree(state, state.doc.length, 5000);
-  return state;
+  return ensureFullSyntaxTree(state);
 }
 
 /** Text of the current block for the cursor at the first occurrence of `marker`. */

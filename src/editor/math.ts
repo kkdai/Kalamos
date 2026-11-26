@@ -187,6 +187,7 @@ const mathRenderCache = new Map<string, MathRenderResult>();
 let mathEngineInstance: MathJaxEngine | null = null;
 let mathEnginePromise: Promise<MathJaxEngine> | null = null;
 const pendingViews = new Set<EditorView>();
+const deferredEngineViews = new Set<EditorView>();
 
 function getCachedMathResult(key: string): MathRenderResult | undefined {
   const existing = mathRenderCache.get(key);
@@ -409,6 +410,10 @@ export async function ensureMathJaxLoaded(
   const engine = await mathEnginePromise;
   for (const v of Array.from(pendingViews)) {
     pendingViews.delete(v);
+    if (v.composing || v.compositionStarted) {
+      deferredEngineViews.add(v);
+      continue;
+    }
     try {
       v.dispatch({ effects: mathEngineLoadedEffect.of(true) });
     } catch {
@@ -1002,13 +1007,16 @@ export const mathStateField = StateField.define<MathFieldValue>({
 
     const pendingDirty = value.dirty.length > 0 || value.dirtyAll;
     const treeChanged = syntaxTree(tr.startState) !== syntaxTree(tr.state);
+    // While composition edits are pending, ignore background syntax-tree-only
+    // transactions (from CodeMirror's parseWorker) so math previews never
+    // re-render mid-composition.
     if (
       !tr.docChanged &&
       !tr.selection &&
       !tr.reconfigured &&
       !engineLoaded &&
-      !treeChanged &&
-      !(refresh && pendingDirty)
+      !(refresh && pendingDirty) &&
+      (!treeChanged || pendingDirty)
     ) {
       return value;
     }
@@ -1061,6 +1069,26 @@ export const mathStateField = StateField.define<MathFieldValue>({
   provide: (field) => EditorView.decorations.from(field, (v) => v.decorations),
 });
 
+function flushDeferredMathRefresh(view: EditorView): void {
+  if (view.composing || view.compositionStarted) return;
+  if (deferredEngineViews.delete(view)) {
+    try {
+      view.dispatch({ effects: mathEngineLoadedEffect.of(true) });
+    } catch {
+      // Ignore destroyed views
+    }
+    return;
+  }
+  const value = view.state.field(mathStateField, false);
+  if (value && (value.dirty.length > 0 || value.dirtyAll)) {
+    try {
+      view.dispatch({ effects: mathRefreshEffect.of(null) });
+    } catch {
+      // Ignore destroyed views
+    }
+  }
+}
+
 export const mathLoaderPlugin = ViewPlugin.fromClass(
   class {
     constructor(readonly view: EditorView) {
@@ -1076,6 +1104,13 @@ export const mathLoaderPlugin = ViewPlugin.fromClass(
     }
 
     update(update: ViewUpdate): void {
+      if (
+        !update.view.composing &&
+        !update.view.compositionStarted &&
+        deferredEngineViews.has(update.view)
+      ) {
+        queueMicrotask(() => flushDeferredMathRefresh(update.view));
+      }
       if (update.docChanged || update.transactions.length > 0) {
         this.maybeLoad(update.state);
       }
@@ -1083,6 +1118,7 @@ export const mathLoaderPlugin = ViewPlugin.fromClass(
 
     destroy(): void {
       pendingViews.delete(this.view);
+      deferredEngineViews.delete(this.view);
     }
   },
   {
@@ -1091,11 +1127,7 @@ export const mathLoaderPlugin = ViewPlugin.fromClass(
         // Composition finished: render what was typed (deferred so the final
         // composition transaction has been applied first).
         queueMicrotask(() => {
-          if (view.composing) return;
-          const value = view.state.field(mathStateField, false);
-          if (value && (value.dirty.length > 0 || value.dirtyAll)) {
-            view.dispatch({ effects: mathRefreshEffect.of(null) });
-          }
+          flushDeferredMathRefresh(view);
         });
         return false;
       },

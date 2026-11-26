@@ -1,6 +1,5 @@
 import { history, undo } from "@codemirror/commands";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
-import { ensureSyntaxTree } from "@codemirror/language";
 import { EditorSelection, EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -33,6 +32,7 @@ import {
 } from "./image-upload";
 import { imageDocPathField, setImageDocPathEffect } from "./images";
 import { mathMarkdownExtension } from "./math";
+import { ensureFullSyntaxTree } from "./test-utils";
 
 const DOC_PATH = "/tmp/kalamos-test/notes/post.md";
 
@@ -63,8 +63,7 @@ function stateOf(
     ],
   });
   state = state.update({ effects: setImageDocPathEffect.of(DOC_PATH) }).state;
-  ensureSyntaxTree(state, state.doc.length, 5000);
-  return state;
+  return ensureFullSyntaxTree(state);
 }
 
 const DOC = [

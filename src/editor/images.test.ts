@@ -24,6 +24,7 @@ import {
   isImageFilePath,
   resolveImageSrc,
 } from "./images";
+import { ensureFullSyntaxTree } from "./test-utils";
 
 const toUrl = (p: string) => `asset://localhost/${encodeURIComponent(p)}`;
 
@@ -45,10 +46,12 @@ function setupDom(): void {
 }
 
 function stateOf(doc: string): EditorState {
-  return EditorState.create({
-    doc,
-    extensions: [markdown({ base: markdownLanguage })],
-  });
+  return ensureFullSyntaxTree(
+    EditorState.create({
+      doc,
+      extensions: [markdown({ base: markdownLanguage })],
+    }),
+  );
 }
 
 // jsdom has no layout: give Range the rect APIs CodeMirror's measure pass calls

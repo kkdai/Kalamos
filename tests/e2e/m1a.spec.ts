@@ -326,6 +326,8 @@ test("AC9 decorations are frozen during IME composition (CDP imeSetComposition)"
       selectionStart: step.length,
       selectionEnd: step.length,
     });
+    await expect.poll(() => isComposing(page)).toBe(true);
+    await expect.poll(() => getDoc(page)).toBe(`${src}${step}`);
     await nextFrames(page);
     expect(await isComposing(page)).toBe(true);
     expect(await snapshot()).toBe(before);
@@ -336,12 +338,14 @@ test("AC9 decorations are frozen during IME composition (CDP imeSetComposition)"
   expect(mutations).toBe(0);
 
   await cdp.send("Input.insertText", { text: "你好" });
-  await nextFrames(page, 4);
-  expect(await getDoc(page)).toBe(`${src}你好`);
+  await expect.poll(() => getDoc(page)).toBe(`${src}你好`);
+  await expect.poll(() => isComposing(page)).toBe(false);
   // After commit decorations are live again (markers still hidden on line 1).
-  expect(
-    await isCollapsed(page, ".cm-content .cm-line:first-child .k-mark-hidden"),
-  ).toBe(true);
+  await expect
+    .poll(() =>
+      isCollapsed(page, ".cm-content .cm-line:first-child .k-mark-hidden"),
+    )
+    .toBe(true);
 });
 
 test("AC9 composing on a decorated line keeps its markers stable", async ({
@@ -360,21 +364,22 @@ test("AC9 composing on a decorated line keeps its markers stable", async ({
           ".cm-content .cm-line:first-child .k-mark, .cm-content .cm-line:first-child .k-mark-hidden",
         ).length,
     );
+  await expect.poll(markCount).toBeGreaterThan(0);
   const before = await markCount();
-  expect(before).toBeGreaterThan(0);
   for (const step of ["z", "zh", "zho", "中"]) {
     await cdp.send("Input.imeSetComposition", {
       text: step,
       selectionStart: step.length,
       selectionEnd: step.length,
     });
+    await expect.poll(() => isComposing(page)).toBe(true);
+    await expect.poll(() => getDoc(page)).toBe(`${src}${step}`);
     await nextFrames(page);
     expect(await isComposing(page)).toBe(true);
     expect(await markCount()).toBe(before);
   }
   await cdp.send("Input.insertText", { text: "中" });
-  await nextFrames(page, 4);
-  expect(await getDoc(page)).toBe("## 標題中");
+  await expect.poll(() => getDoc(page)).toBe("## 標題中");
 });
 
 test("AC9 math live preview does not re-render during IME composition", async ({
@@ -386,7 +391,11 @@ test("AC9 math live preview does not re-render during IME composition", async ({
   await setDoc(page, src, 5);
   const preview = page.getByTestId("math-block-preview");
   await expect(preview).toHaveCount(1);
+  // Wait for MathJax's initial render so the preview widget is fully settled
+  // before starting IME composition.
+  await expect(preview.locator("svg")).toHaveCount(1);
   const texBefore = await preview.getAttribute("data-tex");
+  expect(texBefore).toBe("\nx+\n");
   const cdp = await page.context().newCDPSession(page);
   for (const step of ["y", "yi", "一"]) {
     await cdp.send("Input.imeSetComposition", {
@@ -394,13 +403,15 @@ test("AC9 math live preview does not re-render during IME composition", async ({
       selectionStart: step.length,
       selectionEnd: step.length,
     });
+    await expect.poll(() => isComposing(page)).toBe(true);
+    await expect.poll(() => getDoc(page)).toBe(`$$\nx+${step}\n$$\n\nend`);
     await nextFrames(page);
     expect(await isComposing(page)).toBe(true);
     expect(await preview.getAttribute("data-tex")).toBe(texBefore);
   }
   await cdp.send("Input.insertText", { text: "一" });
-  await nextFrames(page, 4);
-  expect(await getDoc(page)).toBe("$$\nx+一\n$$\n\nend");
+  await expect.poll(() => getDoc(page)).toBe("$$\nx+一\n$$\n\nend");
+  await expect(preview).toHaveAttribute("data-tex", "\nx+一\n");
 });
 
 // ---------------------------------------------------------------------------

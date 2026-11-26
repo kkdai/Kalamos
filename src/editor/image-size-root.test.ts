@@ -32,19 +32,22 @@ import {
   setImageDocPathEffect,
   setImageRootSettingEffect,
 } from "./images";
+import { ensureFullSyntaxTree } from "./test-utils";
 
 const toUrl = (p: string) => `asset://localhost/${encodeURIComponent(p)}`;
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 function stateOf(doc: string): EditorState {
-  return EditorState.create({
-    doc,
-    extensions: [
-      markdown({ base: markdownLanguage }),
-      imageDocPathField,
-      imageRootSettingField,
-    ],
-  });
+  return ensureFullSyntaxTree(
+    EditorState.create({
+      doc,
+      extensions: [
+        markdown({ base: markdownLanguage }),
+        imageDocPathField,
+        imageRootSettingField,
+      ],
+    }),
+  );
 }
 
 describe("IM-03 <img> attribute parser", () => {
@@ -201,16 +204,18 @@ describe("IM-03 sizes in the widget", () => {
     const parent = document.createElement("div");
     document.body.appendChild(parent);
     const view = new EditorView({
-      state: EditorState.create({
-        doc,
-        selection: { anchor: doc.length },
-        extensions: [
-          markdown({ base: markdownLanguage }),
-          imageDocPathField,
-          imageRootSettingField,
-          imagePreviewPlugin,
-        ],
-      }),
+      state: ensureFullSyntaxTree(
+        EditorState.create({
+          doc,
+          selection: { anchor: doc.length },
+          extensions: [
+            markdown({ base: markdownLanguage }),
+            imageDocPathField,
+            imageRootSettingField,
+            imagePreviewPlugin,
+          ],
+        }),
+      ),
       parent,
     });
     // #69: outside the (untitled) document folder, the file is allowed before it loads.

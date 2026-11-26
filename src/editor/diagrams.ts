@@ -1030,8 +1030,8 @@ export const diagramStateField = StateField.define<DiagramFieldValue>({
       !tr.selection &&
       !tr.reconfigured &&
       !themeChanged &&
-      !treeChanged &&
-      !(refresh && pendingDirty)
+      !(refresh && pendingDirty) &&
+      (!treeChanged || pendingDirty)
     ) {
       return value;
     }
@@ -1132,6 +1132,7 @@ export const diagramThemePlugin = ViewPlugin.fromClass(
     }
 
     sync(): void {
+      if (this.view.composing || this.view.compositionStarted) return;
       const value = this.view.state.field(diagramStateField, false);
       if (!value) return;
       const theme = readDiagramTheme();
@@ -1153,10 +1154,15 @@ export const diagramThemePlugin = ViewPlugin.fromClass(
     eventHandlers: {
       compositionend(_event, view) {
         queueMicrotask(() => {
-          if (view.composing) return;
+          if (view.composing || view.compositionStarted) return;
+          this.sync();
           const value = view.state.field(diagramStateField, false);
           if (value && (value.dirty.length > 0 || value.dirtyAll)) {
-            view.dispatch({ effects: diagramRefreshEffect.of(null) });
+            try {
+              view.dispatch({ effects: diagramRefreshEffect.of(null) });
+            } catch {
+              // view destroyed
+            }
           }
         });
         return false;
