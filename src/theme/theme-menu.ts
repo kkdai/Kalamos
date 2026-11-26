@@ -4,6 +4,7 @@ import {
   getSettings,
   listThemes,
   readThemeCss,
+  type SystemDarkTheme,
   setSettings,
   type ThemeInfo,
 } from "../ipc";
@@ -11,23 +12,57 @@ import { shortcutLabel } from "../platform";
 
 export const CUSTOM_THEME_STYLE_ID = "k-custom-theme";
 
+export type BuiltinThemeId = "papyros" | "melan" | "nyx";
+
 export interface ThemeOptionItem {
   id: string;
   label: string;
   builtin: boolean;
 }
 
-function detectBaseThemeForCustomCss(css: string): "papyros" | "melan" {
-  if (
-    /color-scheme\s*:\s*dark/i.test(css) ||
-    /data-base-theme\s*:\s*melan/i.test(css)
-  ) {
+export function normalizeSystemDarkTheme(
+  value?: string | null,
+): SystemDarkTheme {
+  return value === "nyx" ? "nyx" : "melan";
+}
+
+export function applySystemDarkTheme(darkTheme?: string | null): void {
+  if (typeof document === "undefined") return;
+  const normalized = normalizeSystemDarkTheme(darkTheme);
+  if (normalized === "nyx") {
+    document.documentElement.setAttribute("data-system-dark-theme", "nyx");
+  } else {
+    document.documentElement.removeAttribute("data-system-dark-theme");
+  }
+}
+
+export function builtinThemeLabel(id: string, fallback: string): string {
+  switch (id) {
+    case "papyros":
+      return t("theme.papyros");
+    case "melan":
+      return t("theme.melan");
+    case "nyx":
+      return t("theme.nyx");
+    default:
+      return fallback;
+  }
+}
+
+export function detectBaseThemeForCustomCss(css: string): BuiltinThemeId {
+  if (/data-base-theme\s*:\s*nyx/i.test(css)) {
+    return "nyx";
+  }
+  if (/data-base-theme\s*:\s*melan/i.test(css)) {
     return "melan";
   }
-  if (
-    /color-scheme\s*:\s*light/i.test(css) ||
-    /data-base-theme\s*:\s*papyros/i.test(css)
-  ) {
+  if (/data-base-theme\s*:\s*papyros/i.test(css)) {
+    return "papyros";
+  }
+  if (/color-scheme\s*:\s*dark/i.test(css)) {
+    return "melan";
+  }
+  if (/color-scheme\s*:\s*light/i.test(css)) {
     return "papyros";
   }
   if (
@@ -35,7 +70,10 @@ function detectBaseThemeForCustomCss(css: string): "papyros" | "melan" {
     typeof window.matchMedia === "function" &&
     window.matchMedia("(prefers-color-scheme: dark)").matches
   ) {
-    return "melan";
+    return typeof document !== "undefined" &&
+      document.documentElement.getAttribute("data-system-dark-theme") === "nyx"
+      ? "nyx"
+      : "melan";
   }
   return "papyros";
 }
@@ -80,7 +118,11 @@ export async function applyThemeWithCustomCss(themeId: string): Promise<void> {
     return;
   }
 
-  if (normalized === "papyros" || normalized === "melan") {
+  if (
+    normalized === "papyros" ||
+    normalized === "melan" ||
+    normalized === "nyx"
+  ) {
     removeCustomThemeStyleEl();
     root.removeAttribute("data-custom-theme");
     root.setAttribute("data-theme", normalized);
@@ -137,8 +179,9 @@ export function createThemeMenu(
   function defaultOptions(): ThemeOptionItem[] {
     return [
       systemOption(),
-      { id: "papyros", label: "Papyros", builtin: true },
-      { id: "melan", label: "Melan", builtin: true },
+      { id: "papyros", label: t("theme.papyros"), builtin: true },
+      { id: "melan", label: t("theme.melan"), builtin: true },
+      { id: "nyx", label: t("theme.nyx"), builtin: true },
     ];
   }
 
@@ -210,7 +253,9 @@ export function createThemeMenu(
         systemOption(),
         ...themes.map((theme) => ({
           id: theme.id,
-          label: theme.name,
+          label: theme.builtin
+            ? builtinThemeLabel(theme.id, theme.name)
+            : theme.name,
           builtin: theme.builtin,
         })),
       ];

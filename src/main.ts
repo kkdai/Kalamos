@@ -6,6 +6,7 @@ import "@fontsource/jetbrains-mono";
 import "./styles/tokens.css";
 import "./styles/themes/papyros.css";
 import "./styles/themes/melan.css";
+import "./styles/themes/nyx.css";
 import "./styles/editor.css";
 
 import type { StateEffect } from "@codemirror/state";
@@ -171,9 +172,11 @@ import {
   unsavedChangesMessage,
 } from "./tabs/tab-model";
 import {
+  applySystemDarkTheme,
   applyThemeWithCustomCss,
   CUSTOM_THEME_STYLE_ID,
   createThemeMenu,
+  normalizeSystemDarkTheme,
   type ThemeMenuController,
 } from "./theme/theme-menu";
 import { createUpdater, type UpdaterController } from "./updater/updater";
@@ -1164,6 +1167,9 @@ export function createKalamosApp(
       codeLineNumbers: editor.isCodeLineNumbers(),
       mathAutoNumber: editor.isMathAutoNumber(),
       theme: themeMenu.getCurrentTheme(),
+      systemDarkTheme: normalizeSystemDarkTheme(
+        currentSettings.systemDarkTheme,
+      ),
       imageRootDir: editor.getImageRootDir(),
       uploadOnInsert: Boolean(currentSettings.uploadOnInsert),
       uploadCommand: currentSettings.uploadCommand ?? null,
@@ -1223,6 +1229,8 @@ export function createKalamosApp(
     if (patch.mathAutoNumber !== undefined)
       editor.setMathAutoNumber(patch.mathAutoNumber, true);
     const plain: Partial<Settings> = {};
+    if (patch.systemDarkTheme !== undefined)
+      plain.systemDarkTheme = normalizeSystemDarkTheme(patch.systemDarkTheme);
     if (patch.startupBehavior !== undefined)
       plain.startupBehavior = patch.startupBehavior;
     if (patch.autoSave !== undefined) plain.autoSave = patch.autoSave;
@@ -1236,6 +1244,8 @@ export function createKalamosApp(
       plain.uploadOnInsert = patch.uploadOnInsert;
     if (Object.keys(plain).length > 0) {
       currentSettings = { ...currentSettings, ...plain };
+      if (plain.systemDarkTheme !== undefined)
+        applySystemDarkTheme(plain.systemDarkTheme);
       if (plain.fontSize !== undefined || plain.contentWidth !== undefined)
         applyLayoutSettings();
       for (const tab of tabs) {
@@ -2215,6 +2225,7 @@ export function createKalamosApp(
     const settings = await getSettings().catch(() => null);
     if (settings) {
       currentSettings = { ...settings };
+      applySystemDarkTheme(settings.systemDarkTheme);
       applyTheme(settings.theme);
       editor.setSourceMode(Boolean(settings.sourceMode), false);
       editor.setCodeLineNumbers(Boolean(settings.codeLineNumbers), false);
@@ -2226,6 +2237,8 @@ export function createKalamosApp(
       editor.setAutoPairMarkdown(Boolean(settings.autoPairMarkdown), false);
       recentFiles = sanitizeRecentFiles(settings.recentFiles);
       quickOpen.setRecentFiles(recentFiles);
+    } else {
+      applySystemDarkTheme(currentSettings.systemDarkTheme);
     }
     applyLayoutSettings();
     renderTabs();

@@ -189,6 +189,7 @@ test("#81 tab bar starts after the sidebar; content stays centred", async ({
 const LOOKS = [
   { name: "papyros", theme: "papyros", scheme: "light" },
   { name: "melan", theme: "melan", scheme: "dark" },
+  { name: "nyx", theme: "nyx", scheme: "dark" },
   { name: "system-light", theme: null, scheme: "light" },
   { name: "system-dark", theme: null, scheme: "dark" },
 ] as const;

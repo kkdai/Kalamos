@@ -753,6 +753,44 @@ test.describe("#11 diagrams", () => {
     const [r, g, b] = textFill.match(/\d+/g)!.map(Number);
     // Melan text is light on a dark background.
     expect((r + g + b) / 3).toBeGreaterThan(128);
+
+    // #137: Switching Melan -> Nyx re-renders Mermaid with Nyx's palette (#1a1917 surface).
+    const melanSvg = await diagram.locator("svg").first().innerHTML();
+    await page.evaluate(() =>
+      document.documentElement.setAttribute("data-theme", "nyx"),
+    );
+    await expect
+      .poll(async () => diagram.locator("svg").first().innerHTML(), {
+        timeout: 10_000,
+      })
+      .not.toBe(melanSvg);
+    const nyxSvg = await diagram.locator("svg").first().innerHTML();
+    expect(nyxSvg.toLowerCase()).toContain("#1a1917");
+    expect(nyxSvg.toLowerCase()).not.toContain("#25221e");
+
+    // #137: Follow System + changing systemDarkTheme from Melan to Nyx also re-renders Mermaid.
+    await page.emulateMedia({ colorScheme: "dark" });
+    await page.evaluate(() => {
+      document.documentElement.removeAttribute("data-theme");
+      document.documentElement.removeAttribute("data-system-dark-theme");
+    });
+    await expect
+      .poll(
+        async () =>
+          (await diagram.locator("svg").first().innerHTML()).toLowerCase(),
+        { timeout: 10_000 },
+      )
+      .toContain("#25221e");
+    await page.evaluate(() => {
+      document.documentElement.setAttribute("data-system-dark-theme", "nyx");
+    });
+    await expect
+      .poll(
+        async () =>
+          (await diagram.locator("svg").first().innerHTML()).toLowerCase(),
+        { timeout: 10_000 },
+      )
+      .toContain("#1a1917");
   });
 });
 

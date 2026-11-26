@@ -7,7 +7,7 @@ import {
   UI_LOCALES,
   type UiLocale,
 } from "../i18n";
-import type { StartupBehavior } from "../ipc";
+import type { StartupBehavior, SystemDarkTheme } from "../ipc";
 import { IS_WINDOWS, shortcutLabel, toNativePath } from "../platform";
 
 /**
@@ -48,6 +48,7 @@ export interface PreferencesValues {
   codeLineNumbers: boolean;
   mathAutoNumber: boolean;
   theme: string;
+  systemDarkTheme: SystemDarkTheme;
   imageRootDir: string | null;
   uploadOnInsert: boolean;
   uploadCommand: string | null;
@@ -68,6 +69,7 @@ export type PreferencesPatch = Partial<
     | "codeLineNumbers"
     | "mathAutoNumber"
     | "theme"
+    | "systemDarkTheme"
     | "uploadOnInsert"
   >
 >;
@@ -414,6 +416,25 @@ export function createPreferences(
       }
       select.value = v.theme;
     });
+    const darkSelect = el("select");
+    darkSelect.id = "k-pref-system-dark-theme";
+    darkSelect.dataset.testid = "pref-system-dark-theme";
+    for (const [value, label] of [
+      ["melan", t("theme.melan")],
+      ["nyx", t("theme.nyx")],
+    ] as const) {
+      const opt = el("option", undefined, label);
+      opt.value = value;
+      darkSelect.append(opt);
+    }
+    darkSelect.addEventListener("change", () => {
+      void host.applyChange({
+        systemDarkTheme: darkSelect.value as SystemDarkTheme,
+      });
+    });
+    syncers.push((v) => {
+      darkSelect.value = v.systemDarkTheme;
+    });
     const openBtn = el("button", "k-pref-button", t("prefs.openThemesFolder"));
     openBtn.type = "button";
     openBtn.dataset.testid = "pref-open-themes-dir";
@@ -422,6 +443,11 @@ export function createPreferences(
     });
     panel.append(
       row(t("prefs.theme"), select, shortcutLabel(t("prefs.themeHint"))),
+      row(
+        t("prefs.systemDarkTheme"),
+        darkSelect,
+        t("prefs.systemDarkThemeHint"),
+      ),
       row(t("prefs.customTheme"), openBtn, t("prefs.customThemeHint")),
     );
     return panel;

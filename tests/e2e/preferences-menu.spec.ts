@@ -162,6 +162,103 @@ test.describe("#74 preferences window", () => {
     await expect
       .poll(() => savedSettings(page))
       .toMatchObject({ theme: "melan" });
+
+    // Switch to Nyx (#137) and verify native menu check state syncs.
+    await page.getByTestId("pref-theme").selectOption("nyx");
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "nyx");
+    await expect
+      .poll(() =>
+        page.evaluate(async () => {
+          const ipc = await import("/src/ipc.ts" as string);
+          return ipc.getMockMenuState()?.theme;
+        }),
+      )
+      .toBe("nyx");
+    await expect
+      .poll(() => savedSettings(page))
+      .toMatchObject({ theme: "nyx" });
+  });
+
+  test("appearance: system dark theme setting switches Follow System between Melan and Nyx (#137)", async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme: "dark" });
+    await menuAction(page, "app.preferences");
+    await page.getByTestId("pref-tab-appearance").click();
+
+    await expect(page.getByTestId("pref-theme")).toHaveValue("system");
+    await expect(page.getByTestId("pref-system-dark-theme")).toHaveValue(
+      "melan",
+    );
+    // Default in OS dark mode is Melan (#1c1a17).
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          getComputedStyle(document.documentElement)
+            .getPropertyValue("--k-bg")
+            .trim()
+            .toLowerCase(),
+        ),
+      )
+      .toBe("#1c1a17");
+
+    // Choose Nyx for system dark theme -> switches to #121110 immediately and persists.
+    await page.getByTestId("pref-system-dark-theme").selectOption("nyx");
+    await expect(page.locator("html")).toHaveAttribute(
+      "data-system-dark-theme",
+      "nyx",
+    );
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          getComputedStyle(document.documentElement)
+            .getPropertyValue("--k-bg")
+            .trim()
+            .toLowerCase(),
+        ),
+      )
+      .toBe("#121110");
+    await expect
+      .poll(() => savedSettings(page))
+      .toMatchObject({ theme: "system", systemDarkTheme: "nyx" });
+
+    // Switching OS to light still uses Papyros (#f5efe0).
+    await page.emulateMedia({ colorScheme: "light" });
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          getComputedStyle(document.documentElement)
+            .getPropertyValue("--k-bg")
+            .trim()
+            .toLowerCase(),
+        ),
+      )
+      .toBe("#f5efe0");
+
+    // Back to dark -> Nyx again, and survives a fresh app init reading saved settings.
+    await page.emulateMedia({ colorScheme: "dark" });
+    await page.getByTestId("pref-close").click();
+    await page.evaluate(async () => {
+      const main = await import("/src/main.ts" as string);
+      main.getActiveApp().destroy();
+      document.documentElement.removeAttribute("data-system-dark-theme");
+      const fresh = main.createKalamosApp(document);
+      await fresh.init();
+    });
+    await expect(page.locator("html")).toHaveAttribute(
+      "data-system-dark-theme",
+      "nyx",
+    );
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          getComputedStyle(document.documentElement)
+            .getPropertyValue("--k-bg")
+            .trim()
+            .toLowerCase(),
+        ),
+      )
+      .toBe("#121110");
   });
 
   test("general: autosave off is saved", async ({ page }) => {

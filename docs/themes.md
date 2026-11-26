@@ -1,6 +1,6 @@
 # Kalamos 自訂主題指南（TH-01）
 
-Kalamos 內建兩套主題：**Papyros（莎草紙，淺色）** 與 **Melan（墨，深色）**，並支援以標準 CSS 檔案完全自訂編輯器色彩、字級、排版對齊與標題自動編號。
+Kalamos 內建三套主題：**Papyros（莎草紙，淺色）**、**Melan（墨，深色）** 與 **Nyx（夜，近黑深色）**，並支援以標準 CSS 檔案完全自訂編輯器色彩、字級、排版對齊與標題自動編號。
 
 ---
 
@@ -22,16 +22,19 @@ Kalamos 內建兩套主題：**Papyros（莎草紙，淺色）** 與 **Melan（�
    - 放入新 CSS 檔案後，重啟應用程式或開啟右上角主題選單即可選取套用；也可以使用快捷鍵 **`Cmd+Shift+T`** 循環切換主題。
 
 2. **必須使用 `:root[data-custom-theme]` 選擇器**：
-   - 內建主題色票定義在 `:root[data-theme="papyros"]` 與 `:root[data-theme="melan"]`（CSS 選擇器權重為 `0,2,0`）。
+   - 內建主題色票定義在 `:root[data-theme="papyros"]`、`:root[data-theme="melan"]` 與 `:root[data-theme="nyx"]`（CSS 選擇器權重為 `0,2,0`）。
    - 自訂主題套用時，Kalamos 會在 `<html>` 加上 `data-custom-theme="custom:<檔名>"`，並將自訂 CSS 放進 `<style id="k-custom-theme">` 且固定插入於 `<head>` 的**最後一個子節點**。
    - 因此，**自訂主題的 CSS 變數請一律寫在 `:root[data-custom-theme] { ... }`**（同樣具備 `0,2,0` 權重，且因位於 `<head>` 最後方而必然覆蓋內建主題色票）。
 
-3. **基底主題（Papyros / Melan）判斷與繼承規則**：
-   - 自訂主題以 **Papyros（淺色）** 或 **Melan（深色）** 為基底，**未覆寫的 `--k-*` 變數會自動沿用基底主題的預設值**。
-   - 基底主題的判斷順序如下：
-     1. 若自訂 CSS 含有 `color-scheme: dark`（或 `data-base-theme: melan`）→ 以 **Melan** 為基底（`data-theme="melan"`）。
-     2. 若自訂 CSS 含有 `color-scheme: light`（或 `data-base-theme: papyros`）→ 以 **Papyros** 為基底（`data-theme="papyros"`）。
-     3. 若均未指定 → 跟隨目前系統外觀（`prefers-color-scheme: dark` 時為 **Melan**，否則為 **Papyros**）。
+3. **基底主題（Papyros / Melan / Nyx）判斷與繼承規則**：
+   - 自訂主題以 **Papyros（淺色）**、**Melan（深色）** 或 **Nyx（近黑深色）** 為基底，**未覆寫的 `--k-*` 變數會自動沿用基底主題的預設值**。
+   - 基底主題的判斷順序如下（優先採用明確指定的 `data-base-theme`）：
+     1. 若自訂 CSS 含有 `data-base-theme: nyx`（例如寫在註解中）→ 以 **Nyx** 為基底（`data-theme="nyx"`）。
+     2. 若自訂 CSS 含有 `data-base-theme: melan` → 以 **Melan** 為基底（`data-theme="melan"`）。
+     3. 若自訂 CSS 含有 `data-base-theme: papyros` → 以 **Papyros** 為基底（`data-theme="papyros"`）。
+     4. 若自訂 CSS 含有 `color-scheme: dark` → 以 **Melan** 為基底（`data-theme="melan"`）。
+     5. 若自訂 CSS 含有 `color-scheme: light` → 以 **Papyros** 為基底（`data-theme="papyros"`）。
+     6. 若均未指定 → 跟隨目前系統外觀（`prefers-color-scheme: dark` 時依偏好設定的「系統深色主題」使用 **Melan** 或 **Nyx**，否則為 **Papyros**）。
 
 ---
 
@@ -39,18 +42,18 @@ Kalamos 內建兩套主題：**Papyros（莎草紙，淺色）** 與 **Melan（�
 
 所有變數皆於 `:root[data-custom-theme] { ... }` 內覆寫：
 
-### 色彩變數（PRD §12.3）
+### 色彩變數（PRD §12.3 與 #137）
 
-| 變數名稱 | 用途 | Papyros 基底預設值 | Melan 基底預設值 |
-| --- | --- | --- | --- |
-| `--k-bg` | 背景（紙面） | `#F5EFE0` | `#1C1A17` |
-| `--k-surface` | 側欄 / 表面 / 程式碼底色 | `#EDE4CF` | `#25221E` |
-| `--k-text` | 主要文字（墨）與筆尖游標 | `#2B2622` | `#E8E0D0` |
-| `--k-text-muted` | 次要文字 / 引用 / 語法符號 | `#6E6355` | `#9C9384` |
-| `--k-accent` | 強調色（非文字 UI：引用邊框、分頁指示條、狀態圖示） | `#5E7A4A` | `#93AE7C` |
-| `--k-link` | 連結文字與選取背景基底色 | `#A4552F` | `#D98A63` |
-| `--k-divider` | 分隔線與邊框 | `#D9CDB3` | `#3A362F` |
-| `--k-selection-bg` | 文字選取反白背景（半透明 fallback） | `rgba(164, 85, 47, 0.22)` | `rgba(217, 138, 99, 0.25)` |
+| 變數名稱 | 用途 | Papyros 基底預設值 | Melan 基底預設值 | Nyx 基底預設值 |
+| --- | --- | --- | --- | --- |
+| `--k-bg` | 背景（紙面） | `#F5EFE0` | `#1C1A17` | `#121110` |
+| `--k-surface` | 側欄 / 表面 / 程式碼底色 | `#EDE4CF` | `#25221E` | `#1A1917` |
+| `--k-text` | 主要文字（墨）與筆尖游標 | `#2B2622` | `#E8E0D0` | `#E6E0D6` |
+| `--k-text-muted` | 次要文字 / 引用 / 語法符號 | `#6E6355` | `#9C9384` | `#9A9285` |
+| `--k-accent` | 強調色（非文字 UI：引用邊框、分頁指示條、狀態圖示） | `#5E7A4A` | `#93AE7C` | `#93AE7C` |
+| `--k-link` | 連結文字與選取背景基底色 | `#A4552F` | `#D98A63` | `#DE9068` |
+| `--k-divider` | 分隔線與邊框 | `#D9CDB3` | `#3A362F` | `#2B2926` |
+| `--k-selection-bg` | 文字選取反白背景（半透明 fallback） | `rgba(164, 85, 47, 0.22)` | `rgba(217, 138, 99, 0.25)` | `rgba(222, 144, 104, 0.25)` |
 
 ### 字體、版面與動效變數（PRD §12.4–12.5）
 
