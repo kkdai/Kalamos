@@ -1,5 +1,4 @@
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
-import { ensureSyntaxTree } from "@codemirror/language";
 import { EditorSelection, EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { afterEach, describe, expect, it } from "vitest";
@@ -33,6 +32,7 @@ import {
   type ParsedTable,
   parseTableFromLines,
 } from "./tables";
+import { ensureFullSyntaxTree } from "./test-utils";
 
 /** #59 B: table structure operations, insertion and `|a|b|` + Enter. */
 
@@ -60,8 +60,7 @@ function stateOf(doc: string, cursor: number): EditorState {
     selection: EditorSelection.cursor(cursor),
     extensions: [markdown({ base: markdownLanguage, addKeymap: false })],
   });
-  ensureSyntaxTree(state, state.doc.length, 5000);
-  return state;
+  return ensureFullSyntaxTree(state);
 }
 
 const T = [
@@ -454,8 +453,7 @@ describe("#59 review: space reserved above the active table", () => {
         tableToolbarSpaceField,
       ],
     });
-    ensureSyntaxTree(state, state.doc.length, 5000);
-    return state;
+    return ensureFullSyntaxTree(state);
   };
 
   it("a block spacer sits right before the table only while it is active", () => {

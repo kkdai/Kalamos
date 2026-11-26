@@ -14,6 +14,7 @@ import {
   autoPairBracketsExtension,
   autoPairMarkdownExtension,
 } from "./auto-pair";
+import { ensureFullSyntaxTree } from "./test-utils";
 
 function mount(
   doc: string,
@@ -24,11 +25,13 @@ function mount(
   const parent = document.createElement("div");
   document.body.appendChild(parent);
   return new EditorView({
-    state: EditorState.create({
-      doc,
-      selection: EditorSelection.single(anchor, cursor),
-      extensions: [markdown({ base: markdownLanguage }), ...extensions],
-    }),
+    state: ensureFullSyntaxTree(
+      EditorState.create({
+        doc,
+        selection: EditorSelection.single(anchor, cursor),
+        extensions: [markdown({ base: markdownLanguage }), ...extensions],
+      }),
+    ),
     parent,
   });
 }

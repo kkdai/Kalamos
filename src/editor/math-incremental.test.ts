@@ -1,21 +1,24 @@
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
+import { ensureSyntaxTree, syntaxTree } from "@codemirror/language";
 import { EditorSelection, EditorState } from "@codemirror/state";
-import type { Decoration } from "@codemirror/view";
-import { beforeAll, describe, expect, it } from "vitest";
+import { type Decoration, EditorView } from "@codemirror/view";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import {
   clearMathRenderCache,
   ensureMathJaxLoaded,
   getMathRenderCacheSize,
+  mathExtension,
   mathMarkdownExtension,
   mathRefreshEffect,
   mathStateField,
 } from "./math";
+import { ensureFullSyntaxTree } from "./test-utils";
 
 // Regression tests for #31 BUG-7 (10k-line typing latency) and BUG-3
 // (math preview re-rendering during IME composition).
 
 function createState(doc: string, cursor = 0): EditorState {
-  return EditorState.create({
+  const state = EditorState.create({
     doc,
     selection: EditorSelection.cursor(cursor),
     extensions: [
@@ -23,6 +26,7 @@ function createState(doc: string, cursor = 0): EditorState {
       mathStateField,
     ],
   });
+  return ensureFullSyntaxTree(state);
 }
 
 interface DecoInfo {
@@ -55,6 +59,59 @@ function manyFormulasDoc(count = 700): string {
   for (let i = 0; i < count; i++) parts.push(`段落 ${i} 公式 $x_{${i}}$ 結束`);
   return parts.join("\n\n");
 }
+
+describe("math engine load defers refresh during IME composition (#139)", () => {
+  it("does not re-render preview when MathJax finishes loading mid-composition", async () => {
+    const doc = "$$\nx+\n$$\n\nend";
+    const parent = document.createElement("div");
+    document.body.appendChild(parent);
+    const state = ensureFullSyntaxTree(
+      EditorState.create({
+        doc,
+        selection: EditorSelection.cursor(5),
+        extensions: [
+          markdown({
+            base: markdownLanguage,
+            extensions: [mathMarkdownExtension],
+          }),
+          mathExtension,
+        ],
+      }),
+    );
+    const view = new EditorView({ state, parent });
+    try {
+      const previewTex = () =>
+        decos(view.state).find((d) => d.tex !== undefined)?.tex;
+      expect(previewTex()).toBe("\nx+\n");
+
+      // Begin IME composition before MathJax finishes its async load.
+      view.contentDOM.dispatchEvent(
+        new Event("compositionstart", { bubbles: true }),
+      );
+      expect(view.compositionStarted).toBe(true);
+      view.dispatch({
+        changes: { from: 5, to: 5, insert: "y" },
+        selection: EditorSelection.cursor(6),
+        userEvent: "input.type.compose",
+      });
+      expect(view.state.doc.toString()).toBe("$$\nx+y\n$$\n\nend");
+
+      // Wait for MathJax to finish loading while still composing.
+      await ensureMathJaxLoaded(view);
+      expect(previewTex()).toBe("\nx+\n");
+
+      // Once composition ends, the deferred engine-loaded refresh runs.
+      view.contentDOM.dispatchEvent(
+        new Event("compositionend", { bubbles: true }),
+      );
+      await Promise.resolve();
+      expect(previewTex()).toBe("\nx+y\n");
+    } finally {
+      view.destroy();
+      parent.remove();
+    }
+  });
+});
 
 describe("math decorations are incremental (#31 BUG-7)", () => {
   beforeAll(async () => {
@@ -116,10 +173,12 @@ describe("math decorations are incremental (#31 BUG-7)", () => {
     const doc = "a $x$\n\nb $y$\n\nc $z$";
     const state = createState(doc, 0);
     expect(widgetTexes(state)).toEqual(["x", "y", "z"]);
-    const next = state.update({
-      changes: { from: 0, insert: "$$\n" },
-      selection: EditorSelection.cursor(0),
-    }).state;
+    const next = ensureFullSyntaxTree(
+      state.update({
+        changes: { from: 0, insert: "$$\n" },
+        selection: EditorSelection.cursor(0),
+      }).state,
+    );
     // The unterminated $$ swallows nothing that it should not, and the
     // decorations match a from-scratch build of the new document.
     expect(widgetTexes(next)).toEqual(
@@ -132,9 +191,11 @@ describe("math decorations are incremental (#31 BUG-7)", () => {
     const state = createState(doc, doc.length);
     expect(widgetTexes(state)).toEqual(["\nE=mc^2\n", "q"]);
     const closeFence = doc.indexOf("$$", 3);
-    const next = state.update({
-      changes: { from: closeFence, to: closeFence + 2 },
-    }).state;
+    const next = ensureFullSyntaxTree(
+      state.update({
+        changes: { from: closeFence, to: closeFence + 2 },
+      }).state,
+    );
     expect(widgetTexes(next)).toEqual(
       widgetTexes(createState(next.doc.toString(), next.doc.length)),
     );
@@ -165,6 +226,42 @@ describe("math preview is frozen during IME composition (#31 BUG-3)", () => {
 
     cur = cur.update({ effects: mathRefreshEffect.of(null) }).state;
     expect(preview()?.tex).toBe("\nx+一\n");
+  });
+
+  it("background syntax-tree updates during composition do not flush dirty edits (#139)", () => {
+    const doc = `$$\nx+\n$$\n\n${manyFormulasDoc(50)}`;
+    let cur = createState(doc, 5);
+    const preview = () => decos(cur).find((d) => d.tex !== undefined);
+    expect(preview()?.tex).toBe("\nx+\n");
+
+    // Simulate a slow machine during the compose transaction so LanguageState.apply
+    // stops early, leaving background parsing work for parseWorker.
+    let fakeNow = Date.now();
+    const nowSpy = vi.spyOn(Date, "now").mockImplementation(() => {
+      fakeNow += 50;
+      return fakeNow;
+    });
+    try {
+      cur = cur.update({
+        changes: { from: 5, to: 5, insert: "y" },
+        selection: EditorSelection.cursor(6),
+        userEvent: "input.type.compose",
+      }).state;
+    } finally {
+      nowSpy.mockRestore();
+    }
+    expect(preview()?.tex).toBe("\nx+\n");
+
+    // Background parser advances the tree while still composing.
+    const treeBefore = syntaxTree(cur);
+    ensureSyntaxTree(cur, cur.doc.length, 5000);
+    cur = cur.update({}).state;
+    expect(syntaxTree(cur)).not.toBe(treeBefore);
+    expect(preview()?.tex).toBe("\nx+\n");
+
+    // Composition ends: mathRefreshEffect flushes the composed edit.
+    cur = cur.update({ effects: mathRefreshEffect.of(null) }).state;
+    expect(preview()?.tex).toBe("\nx+y\n");
   });
 
   it("the next normal transaction also flushes edits made during composition", () => {

@@ -1,5 +1,4 @@
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
-import { ensureSyntaxTree } from "@codemirror/language";
 import { EditorSelection, EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { afterEach, describe, expect, it } from "vitest";
@@ -14,6 +13,7 @@ import { frontMatterExtension } from "./front-matter";
 import { handleListBackspace, handleListEnter } from "./lists";
 import { collectLivePreviewSpecs } from "./live-preview";
 import { mathMarkdownExtension } from "./math";
+import { ensureFullSyntaxTree } from "./test-utils";
 
 /** #49: block markers render like Typora; Enter / Backspace leave lists and quotes. */
 
@@ -35,8 +35,7 @@ function stateOf(doc: string, cursor: number): EditorState {
       blocksExtension,
     ],
   });
-  ensureSyntaxTree(state, state.doc.length, 5000);
-  return state;
+  return ensureFullSyntaxTree(state);
 }
 
 function markerSpec(doc: string, cursor: number, from: number) {

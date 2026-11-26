@@ -22,18 +22,21 @@ import {
 } from "./emoji";
 import { frontMatterExtension } from "./front-matter";
 import { mathMarkdownExtension } from "./math";
+import { ensureFullSyntaxTree } from "./test-utils";
 
 function stateOf(doc: string, cursor = doc.length): EditorState {
-  return EditorState.create({
-    doc,
-    selection: EditorSelection.cursor(cursor),
-    extensions: [
-      markdown({
-        base: markdownLanguage,
-        extensions: [mathMarkdownExtension, frontMatterExtension],
-      }),
-    ],
-  });
+  return ensureFullSyntaxTree(
+    EditorState.create({
+      doc,
+      selection: EditorSelection.cursor(cursor),
+      extensions: [
+        markdown({
+          base: markdownLanguage,
+          extensions: [mathMarkdownExtension, frontMatterExtension],
+        }),
+      ],
+    }),
+  );
 }
 
 async function complete(doc: string, cursor = doc.length) {
@@ -171,11 +174,13 @@ describe("ED-08 in an editor", () => {
     const parent = document.createElement("div");
     document.body.appendChild(parent);
     return new EditorView({
-      state: EditorState.create({
-        doc,
-        selection: EditorSelection.cursor(doc.length),
-        extensions: [markdown({ base: markdownLanguage }), emojiExtension],
-      }),
+      state: ensureFullSyntaxTree(
+        EditorState.create({
+          doc,
+          selection: EditorSelection.cursor(doc.length),
+          extensions: [markdown({ base: markdownLanguage }), emojiExtension],
+        }),
+      ),
       parent,
     });
   }

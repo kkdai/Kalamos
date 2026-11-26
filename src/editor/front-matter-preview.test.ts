@@ -1,5 +1,4 @@
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
-import { ensureSyntaxTree } from "@codemirror/language";
 import { EditorSelection, EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -16,6 +15,7 @@ import {
   parseFields,
   renderValue,
 } from "./front-matter-preview";
+import { ensureFullSyntaxTree } from "./test-utils";
 
 const md = () =>
   markdown({
@@ -27,12 +27,13 @@ const md = () =>
 function mountEditor(doc: string, cursor = doc.length): EditorView {
   const parent = document.createElement("div");
   document.body.appendChild(parent);
-  const state = EditorState.create({
-    doc,
-    selection: EditorSelection.cursor(cursor),
-    extensions: [md(), frontMatterPreviewExtension],
-  });
-  ensureSyntaxTree(state, state.doc.length, 5000);
+  const state = ensureFullSyntaxTree(
+    EditorState.create({
+      doc,
+      selection: EditorSelection.cursor(cursor),
+      extensions: [md(), frontMatterPreviewExtension],
+    }),
+  );
   return new EditorView({ state, parent });
 }
 

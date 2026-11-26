@@ -1,5 +1,4 @@
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
-import { ensureSyntaxTree } from "@codemirror/language";
 import { EditorSelection, EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -7,6 +6,7 @@ import { cjkEmphasisExtension } from "./cjk-emphasis";
 import { footnoteExtension } from "./footnotes";
 import { frontMatterExtension } from "./front-matter";
 import { mathMarkdownExtension } from "./math";
+import { ensureFullSyntaxTree } from "./test-utils";
 import {
   countDocument,
   countLines,
@@ -37,8 +37,7 @@ function stateOf(doc: string, selection?: EditorSelection): EditorState {
       }),
     ],
   });
-  ensureSyntaxTree(state, state.doc.length, 5000);
-  return state;
+  return ensureFullSyntaxTree(state);
 }
 
 describe("NV-03 countText", () => {
