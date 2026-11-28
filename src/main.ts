@@ -16,10 +16,7 @@ import {
   AUTO_PAIR_BRACKETS_MESSAGE,
   AUTO_PAIR_MARKDOWN_MESSAGE,
 } from "./editor/auto-pair";
-import {
-  collectUploadTargetsInRange,
-  uploadImagesInEditor,
-} from "./editor/image-upload";
+import type { UploadTarget } from "./editor/image-upload";
 import {
   imageExtFromMime,
   insertImageMarkdown,
@@ -54,43 +51,12 @@ import {
   openFind,
   revealRange,
 } from "./editor/search";
-import { openInsertTableDialog } from "./editor/table-insert-dialog";
 import { createWordCounter, type WordCounter } from "./editor/word-count-view";
 import {
   FOCUS_MODE_MESSAGE,
   TYPEWRITER_MODE_MESSAGE,
 } from "./editor/writing-modes";
-import { pickExportFormat } from "./export/format-picker";
-import { buildExportHtml } from "./export/html";
-import {
-  defaultExportPath,
-  ensureExportExtension,
-  exportedMessage,
-  exportingMessage,
-  formatInfo,
-  importedMessage,
-  importingMessage,
-  isImportablePath,
-  PANDOC_IMPORT_EXTENSIONS,
-  type PandocFormat,
-  pandocErrorMessage,
-  pandocMissingMessage,
-  prepareMarkdownForPandoc,
-} from "./export/pandoc";
-import {
-  defaultPdfPath,
-  documentTitle,
-  ensurePdfExtension,
-  exportedPdfMessage,
-  exportingPdfMessage,
-  pdfErrorMessage,
-} from "./export/pdf";
-import {
-  buildRichTextHtml,
-  copyRichTextErrorMessage,
-  extractRichTextSource,
-  formatCopyRichTextStatus,
-} from "./export/rich-text";
+import type { PandocFormat } from "./export/pandoc";
 import { sha256Hex } from "./external-changes/content-hash";
 import { createExternalChangeBanner } from "./external-changes/external-change-banner";
 import {
@@ -192,6 +158,10 @@ import {
   renameRecentFiles,
   sanitizeRecentFiles,
 } from "./quick-open/recent-files";
+import {
+  createShortcutsModal,
+  type ShortcutsModalController,
+} from "./shortcuts/shortcuts-modal";
 import { createSidebar, type SidebarController } from "./sidebar/sidebar";
 import { createTabBar, type TabBar } from "./tabs/tab-bar";
 import {
@@ -215,6 +185,10 @@ import {
   type ThemeMenuController,
 } from "./theme/theme-menu";
 import { createUpdater, type UpdaterController } from "./updater/updater";
+import {
+  getWelcomeContent,
+  shouldShowWelcomeOnStartup,
+} from "./welcome/welcome";
 
 export const NAMED_AUTOSAVE_DELAY_MS = 1000;
 export const UNTITLED_RECOVERY_INTERVAL_MS = 5000;
@@ -297,6 +271,10 @@ export interface DocumentTab {
   path: string | null;
   /** 「未命名 n」 while untitled. */
   untitledNumber: number;
+  /** #147: optional custom label for an untitled tab (e.g. welcome document). */
+  customLabel?: string;
+  /** #147: true while this tab holds the untitled welcome document. */
+  isWelcome?: boolean;
   /** EditorState + saved content + dirty flag. */
   doc: DocSession;
   scrollTop: number;
@@ -346,6 +324,10 @@ export interface KalamosApp {
   checkForUpdates: (options?: { manual?: boolean }) => Promise<void>;
   /** #104: Cmd+P Quick Open overlay. */
   quickOpen: QuickOpenController;
+  /** #147: keyboard shortcuts cheatsheet overlay. */
+  shortcuts: ShortcutsModalController;
+  /** #147: opens the localized welcome document in an untitled tab. */
+  openWelcomeDocument: () => boolean;
   /** #104: recently opened / saved files (newest first, up to 20). */
   getRecentFiles: () => string[];
   /** #104: clear recently opened files list. */
@@ -527,6 +509,8 @@ export function createKalamosApp(
       setStatus("", false);
       if (tabs.includes(tab)) {
         tab.path = targetPath;
+        tab.customLabel = undefined;
+        tab.isWelcome = false;
         tab.external = outcome.nextState;
         editor.markSessionClean(tab.doc, contentToSave);
         if (tab === active) {
@@ -796,7 +780,9 @@ export function createKalamosApp(
 
   const tabs: DocumentTab[] = [];
   function untitledNumbersInUse(): number[] {
-    return tabs.filter((t) => t.path === null).map((t) => t.untitledNumber);
+    return tabs
+      .filter((t) => t.path === null && !t.customLabel)
+      .map((t) => t.untitledNumber);
   }
 
   let active: DocumentTab = makeTab(editor.getSession(), null);
@@ -1136,7 +1122,8 @@ export function createKalamosApp(
       !preferences.isOpen() &&
       !quickOpen.isOpen() &&
       !updater.isOpen() &&
-      !historyModal.isOpen()
+      !historyModal.isOpen() &&
+      !shortcuts.isOpen()
     )
       view.focus();
   }
@@ -1161,11 +1148,11 @@ export function createKalamosApp(
     clearAutosaveTimer(active);
     const index = tabs.indexOf(active);
     tabs[index] = next;
-    if (next.path === null) {
+    if (next.path === null && !next.customLabel) {
       // The replaced tab's number is free again.
       next.untitledNumber = nextUntitledNumber(
         tabs
-          .filter((t) => t !== next && t.path === null)
+          .filter((t) => t !== next && t.path === null && !t.customLabel)
           .map((t) => t.untitledNumber),
       );
     }
@@ -1282,6 +1269,26 @@ export function createKalamosApp(
     }
   }
 
+  function openWelcomeDocument(): boolean {
+    const existing = tabs.find(
+      (tab) => tab.isWelcome && !editor.isSessionDirty(tab.doc),
+    );
+    if (existing) {
+      activateTab(existing.id);
+      return true;
+    }
+    const tab = makeTab(
+      editor.createSession(getWelcomeContent(), { dirty: false }),
+      null,
+    );
+    tab.customLabel = t("welcome.tabTitle");
+    tab.untitledNumber = 0;
+    tab.isWelcome = true;
+    placeNewTab(tab);
+    setStatus("", false);
+    return true;
+  }
+
   // Cmd+T new tab, Cmd+W close tab, Ctrl+Tab / Ctrl+Shift+Tab next / previous tab.
   const onTabKeydown = (event: KeyboardEvent) => {
     if (
@@ -1289,7 +1296,8 @@ export function createKalamosApp(
       preferences.isOpen() ||
       quickOpen.isOpen() ||
       updater.isOpen() ||
-      historyModal.isOpen()
+      historyModal.isOpen() ||
+      shortcuts.isOpen()
     )
       return;
     if (
@@ -1349,28 +1357,36 @@ export function createKalamosApp(
       document.body,
   });
 
+  const restoreEditorFocus = (prev: HTMLElement | null) => {
+    if (
+      prev &&
+      prev.isConnected &&
+      prev.classList.contains("k-table-cell-content") &&
+      editor.view.contentDOM.contains(prev)
+    ) {
+      prev.focus();
+    } else {
+      editor.view.focus();
+    }
+  };
+
   const quickOpen = createQuickOpen({
     parent: editorContainer.parentElement ?? document.body,
     onOpenFile: (path, mode) => openPath(path, mode),
-    onRestoreFocus: (prev) => {
-      if (
-        prev &&
-        prev.isConnected &&
-        prev.classList.contains("k-table-cell-content") &&
-        editor.view.contentDOM.contains(prev)
-      ) {
-        prev.focus();
-      } else {
-        editor.view.focus();
-      }
-    },
+    onRestoreFocus: restoreEditorFocus,
+  });
+
+  const shortcuts = createShortcutsModal({
+    parent: document.body,
+    onRestoreFocus: restoreEditorFocus,
   });
 
   const unbindShortcuts = bindWindowShortcuts(window, windowHandlers, () =>
     preferences.isOpen() ||
     quickOpen.isOpen() ||
     updater.isOpen() ||
-    historyModal.isOpen()
+    historyModal.isOpen() ||
+    shortcuts.isOpen()
       ? null
       : editor.view,
   );
@@ -1752,10 +1768,12 @@ export function createKalamosApp(
   const menuCommands: Record<string, MenuCommand> = {
     "app.checkForUpdates": () => {
       quickOpen.close(false);
+      shortcuts.close(false);
       return updater.checkForUpdates({ manual: true });
     },
     "app.preferences": () => {
       quickOpen.close(false);
+      shortcuts.close(false);
       return preferences.open();
     },
     "file.new": () => newDocument(),
@@ -1766,7 +1784,10 @@ export function createKalamosApp(
     "app.quit": () => quit(),
     "file.open": () => openDocument(),
     "file.quickOpen": () => {
-      if (!preferences.isOpen()) quickOpen.toggle();
+      if (!preferences.isOpen() && !updater.isOpen()) {
+        shortcuts.close(false);
+        quickOpen.toggle();
+      }
     },
     "file.openRecent": (path) => (path ? openPath(path, "tab") : false),
     "file.clearRecent": () => clearRecentFiles(),
@@ -1797,7 +1818,10 @@ export function createKalamosApp(
     "para.orderedList": onEditor(toggleOrderedList),
     "para.bulletList": onEditor(toggleBulletList),
     "para.taskList": onEditor(toggleTaskList),
-    "para.table": () => openInsertTableDialog(editor.view),
+    "para.table": () =>
+      import("./editor/table-insert-dialog").then((m) =>
+        m.openInsertTableDialog(editor.view),
+      ),
     "para.codeBlock": onEditor(insertCodeBlock),
     "para.mathBlock": onEditor(insertMathBlock),
     "para.quote": onEditor(toggleBlockquote),
@@ -1819,18 +1843,30 @@ export function createKalamosApp(
     "view.actualSize": () => setZoom(1),
     "view.zoomIn": () => setZoom(nextZoomLevel(zoom, 1)),
     "view.zoomOut": () => setZoom(nextZoomLevel(zoom, -1)),
+    "help.shortcuts": () => {
+      if (!preferences.isOpen() && !updater.isOpen()) {
+        quickOpen.close(false);
+        shortcuts.toggle();
+      }
+    },
+    "help.welcome": () => {
+      shortcuts.close(false);
+      quickOpen.close(false);
+      return openWelcomeDocument();
+    },
   };
 
   const menu = createMenuDispatcher({
     commands: menuCommands,
     target: window,
-    // While preferences or Quick Open is open, editing commands would act on the hidden document.
+    // While preferences, Quick Open, updater, or shortcuts is open, editing commands would act on the hidden document.
     canRun: (action) =>
       !(
         (preferences.isOpen() ||
           quickOpen.isOpen() ||
           updater.isOpen() ||
-          historyModal.isOpen()) &&
+          historyModal.isOpen() ||
+          shortcuts.isOpen()) &&
         /^(edit|para|fmt)\./.test(action)
       ),
     afterRun: () => scheduleMenuSync(true),
@@ -1850,9 +1886,24 @@ export function createKalamosApp(
     if (event.metaKey && event.ctrlKey) return;
     if (event.code !== "KeyP" && event.key.toLowerCase() !== "p") return;
     event.preventDefault();
+    shortcuts.close(false);
     quickOpen.toggle();
   };
   window.addEventListener("keydown", onQuickOpenKeydown);
+
+  // #147: Cmd+Opt+/ / Ctrl+Alt+/ toggles the keyboard shortcuts cheatsheet.
+  const onShortcutsKeydown = (event: KeyboardEvent) => {
+    if (event.defaultPrevented || preferences.isOpen() || updater.isOpen())
+      return;
+    if (!(event.metaKey || event.ctrlKey) || !event.altKey || event.shiftKey)
+      return;
+    if (event.metaKey && event.ctrlKey) return;
+    if (event.code !== "Slash" && event.key !== "/") return;
+    event.preventDefault();
+    quickOpen.close(false);
+    shortcuts.toggle();
+  };
+  window.addEventListener("keydown", onShortcutsKeydown);
 
   // Cmd+, opens the preferences (also offered by the native menu; see menu-dispatch.ts).
   const onPreferencesKeydown = (event: KeyboardEvent) => {
@@ -1863,6 +1914,7 @@ export function createKalamosApp(
     event.preventDefault();
     quickOpen.close(false);
     historyModal.close();
+    shortcuts.close(false);
     void preferences.open();
   };
   window.addEventListener("keydown", onPreferencesKeydown);
@@ -1955,7 +2007,8 @@ export function createKalamosApp(
       preferences.isOpen() ||
       quickOpen.isOpen() ||
       updater.isOpen() ||
-      historyModal.isOpen()
+      historyModal.isOpen() ||
+      shortcuts.isOpen()
     )
       return;
     if (event.altKey && event.shiftKey && event.code === "KeyC") {
@@ -2060,6 +2113,7 @@ export function createKalamosApp(
   async function isPandocAvailable(): Promise<boolean> {
     const status = await pandocStatus().catch(() => null);
     if (status?.available) return true;
+    const { pandocMissingMessage } = await import("./export/pandoc");
     setStatus(pandocMissingMessage(), true);
     return false;
   }
@@ -2074,28 +2128,32 @@ export function createKalamosApp(
     exportingPandoc = true;
     try {
       if (!(await isPandocAvailable())) return false;
-      const chosen = format ?? (await pickExportFormat());
+      const [pandoc, picker] = await Promise.all([
+        import("./export/pandoc"),
+        format ? Promise.resolve(null) : import("./export/format-picker"),
+      ]);
+      const chosen = format ?? (await picker!.pickExportFormat());
       if (!chosen) return false;
-      const info = formatInfo(chosen);
+      const info = pandoc.formatInfo(chosen);
       const docPath = active.path;
       let outPath: string | null;
       try {
         outPath =
           explicitPath ??
           (await pickSaveExportPath(
-            defaultExportPath(docPath, chosen),
+            pandoc.defaultExportPath(docPath, chosen),
             info.label,
             info.ext,
           ));
       } catch (err) {
-        setStatus(pandocErrorMessage("export", err), true);
+        setStatus(pandoc.pandocErrorMessage("export", err), true);
         return false;
       }
       if (!outPath) return false;
-      outPath = ensureExportExtension(outPath, chosen);
-      setStatus(exportingMessage(), false);
+      outPath = pandoc.ensureExportExtension(outPath, chosen);
+      setStatus(pandoc.exportingMessage(), false);
       try {
-        const prepared = prepareMarkdownForPandoc(
+        const prepared = pandoc.prepareMarkdownForPandoc(
           editor.getContent(),
           docPath,
           editor.getImageRootDir(),
@@ -2108,10 +2166,10 @@ export function createKalamosApp(
           imageRoot: prepared.imageRoot,
           toc: prepared.toc,
         });
-        setStatus(exportedMessage(chosen, meta.path), false);
+        setStatus(pandoc.exportedMessage(chosen, meta.path), false);
         return true;
       } catch (err) {
-        setStatus(pandocErrorMessage("export", err), true);
+        setStatus(pandoc.pandocErrorMessage("export", err), true);
         return false;
       }
     } finally {
@@ -2126,16 +2184,18 @@ export function createKalamosApp(
     importing = true;
     try {
       if (!(await isPandocAvailable())) return false;
+      const pandoc = await import("./export/pandoc");
       let source: string | null;
       try {
         source =
-          explicitPath ?? (await pickImportPath(PANDOC_IMPORT_EXTENSIONS));
+          explicitPath ??
+          (await pickImportPath(pandoc.PANDOC_IMPORT_EXTENSIONS));
       } catch (err) {
-        setStatus(pandocErrorMessage("import", err), true);
+        setStatus(pandoc.pandocErrorMessage("import", err), true);
         return false;
       }
       if (!source) return false;
-      setStatus(importingMessage(), false);
+      setStatus(pandoc.importingMessage(), false);
       let markdown: string;
       try {
         const result = await importPandoc(source);
@@ -2144,14 +2204,14 @@ export function createKalamosApp(
           await allowAssetDir(result.mediaDir).catch(() => null);
         }
       } catch (err) {
-        setStatus(pandocErrorMessage("import", err), true);
+        setStatus(pandoc.pandocErrorMessage("import", err), true);
         return false;
       }
       // #81 B: a new untitled tab (or the blank one).
       placeNewTab(
         makeTab(editor.createSession(markdown, { dirty: true }), null),
       );
-      setStatus(importedMessage(source), false);
+      setStatus(pandoc.importedMessage(source), false);
       return true;
     } finally {
       importing = false;
@@ -2243,6 +2303,9 @@ export function createKalamosApp(
       active.path === docPath
     ) {
       const insertedTo = anchor + (view.state.doc.length - lengthBefore);
+      const { collectUploadTargetsInRange } = await import(
+        "./editor/image-upload"
+      );
       await runImageUpload(
         collectUploadTargetsInRange(view.state, anchor, insertedTo),
       );
@@ -2266,13 +2329,14 @@ export function createKalamosApp(
 
   let uploadingImages = false;
 
-  async function runImageUpload(
-    targets?: Parameters<typeof uploadImagesInEditor>[0]["targets"],
-  ): Promise<boolean> {
+  async function runImageUpload(targets?: UploadTarget[]): Promise<boolean> {
     if (uploadingImages) return false;
     uploadingImages = true;
     try {
-      const settings = await refreshUploadSettings();
+      const [settings, { uploadImagesInEditor }] = await Promise.all([
+        refreshUploadSettings(),
+        import("./editor/image-upload"),
+      ]);
       const result = await uploadImagesInEditor({
         view: editor.view,
         uploader: settings.uploadCommand,
@@ -2489,26 +2553,35 @@ export function createKalamosApp(
     if (copyingRichText) return false;
     copyingRichText = true;
     try {
-      const source = extractRichTextSource(editor.view.state);
-      if (source.markdown.trim().length === 0) {
-        setStatus(t("export.copyRichText.empty"), false);
+      const richText = await import("./export/rich-text");
+      try {
+        const source = richText.extractRichTextSource(editor.view.state);
+        if (source.markdown.trim().length === 0) {
+          setStatus(t("export.copyRichText.empty"), false);
+          return false;
+        }
+        setStatus(t("export.copyRichText.copying"), false);
+        const settings = await refreshUploadSettings();
+        const result = await richText.buildRichTextHtml(source.markdown, {
+          docPath: active.path,
+          mathAutoNumber: editor.isMathAutoNumber(),
+          imageRootDir: editor.getImageRootDir(),
+          frontMatterImageRoot: source.frontMatterImageRoot,
+          uploadCommand: settings.uploadCommand,
+          uploadImages,
+        });
+        await writeClipboardHtml(result.html, result.plainText);
+        setStatus(
+          richText.formatCopyRichTextStatus(source.scope, result.images),
+          false,
+        );
+        return true;
+      } catch (err) {
+        setStatus(richText.copyRichTextErrorMessage(err), true);
         return false;
       }
-      setStatus(t("export.copyRichText.copying"), false);
-      const settings = await refreshUploadSettings();
-      const result = await buildRichTextHtml(source.markdown, {
-        docPath: active.path,
-        mathAutoNumber: editor.isMathAutoNumber(),
-        imageRootDir: editor.getImageRootDir(),
-        frontMatterImageRoot: source.frontMatterImageRoot,
-        uploadCommand: settings.uploadCommand,
-        uploadImages,
-      });
-      await writeClipboardHtml(result.html, result.plainText);
-      setStatus(formatCopyRichTextStatus(source.scope, result.images), false);
-      return true;
     } catch (err) {
-      setStatus(copyRichTextErrorMessage(err), true);
+      setStatus(formatErrorMessage(t("export.copyRichText.failed"), err), true);
       return false;
     } finally {
       copyingRichText = false;
@@ -2521,30 +2594,34 @@ export function createKalamosApp(
     if (exportingPdf) return false;
     exportingPdf = true;
     try {
+      const [pdf, { buildExportHtml }] = await Promise.all([
+        import("./export/pdf"),
+        import("./export/html"),
+      ]);
       const docPath = active.path;
       let outPath: string | null = null;
       try {
         outPath =
-          explicitPath ?? (await pickSavePdfPath(defaultPdfPath(docPath)));
+          explicitPath ?? (await pickSavePdfPath(pdf.defaultPdfPath(docPath)));
       } catch (err) {
-        setStatus(pdfErrorMessage(err), true);
+        setStatus(pdf.pdfErrorMessage(err), true);
         return false;
       }
       if (!outPath) return false;
-      outPath = ensurePdfExtension(outPath);
-      setStatus(exportingPdfMessage(), false);
+      outPath = pdf.ensurePdfExtension(outPath);
+      setStatus(pdf.exportingPdfMessage(), false);
       try {
         const { html, headings } = await buildExportHtml(editor.getContent(), {
-          title: documentTitle(docPath),
+          title: pdf.documentTitle(docPath),
           docPath,
           mathAutoNumber: editor.isMathAutoNumber(),
           imageRootDir: editor.getImageRootDir(),
         });
         const meta = await exportPdf(html, outPath, headings);
-        setStatus(exportedPdfMessage(meta.path), false);
+        setStatus(pdf.exportedPdfMessage(meta.path), false);
         return true;
       } catch (err) {
-        setStatus(pdfErrorMessage(err), true);
+        setStatus(pdf.pdfErrorMessage(err), true);
         return false;
       }
     } finally {
@@ -2731,7 +2808,8 @@ export function createKalamosApp(
       for (const path of mdPaths) {
         await openPath(path, "tab");
       }
-      if (imagePaths.length === 0 && mdPaths.length === 0) {
+      if (imagePaths.length === 0 && mdPaths.length === 0 && paths.length > 0) {
+        const { isImportablePath } = await import("./export/pandoc");
         const importable = paths.find((p) => isImportablePath(p));
         if (importable) {
           await importDocument(importable);
@@ -2818,8 +2896,20 @@ export function createKalamosApp(
     }
     unlistenOpenFiles = unlistenOpen;
     const pendingOpen = await takePendingOpenFiles().catch(() => null);
+    let openedFilesFromOs = false;
     if (pendingOpen && !destroyed) {
-      await openRequestedFiles(pendingOpen);
+      openedFilesFromOs = await openRequestedFiles(pendingOpen);
+    }
+    if (
+      !destroyed &&
+      shouldShowWelcomeOnStartup({
+        settings,
+        hasRecoveryEntries: entries.length > 0,
+        openedFilesFromOs,
+      })
+    ) {
+      openWelcomeDocument();
+      await persistEditorSettingPatch({ welcomeShown: true });
     }
     if (!destroyed && currentSettings.autoCheckUpdates !== false) {
       const delayMs =
@@ -2861,8 +2951,10 @@ export function createKalamosApp(
     menu.destroy();
     quickOpen.destroy();
     historyModal.destroy();
+    shortcuts.destroy();
     preferences.destroy();
     window.removeEventListener("keydown", onQuickOpenKeydown);
+    window.removeEventListener("keydown", onShortcutsKeydown);
     window.removeEventListener("keydown", onPreferencesKeydown);
     window.removeEventListener("keydown", onMenuShortcutKeydown);
     root.removeEventListener("wheel", onZoomWheel);
@@ -2911,6 +3003,8 @@ export function createKalamosApp(
     updater,
     checkForUpdates: (opts) => updater.checkForUpdates(opts),
     quickOpen,
+    shortcuts,
+    openWelcomeDocument,
     getRecentFiles: () => [...recentFiles],
     clearRecentFiles,
     menu,

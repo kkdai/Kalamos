@@ -116,6 +116,7 @@ describe("ipc in-memory mock (api.yaml contract)", () => {
       historyEnabled: true,
       historyMaxVersions: 50,
       historyMaxTotalMb: 200,
+      welcomeShown: true,
     });
 
     await setSettings({ ...updated, focusMode: true, typewriterMode: true });

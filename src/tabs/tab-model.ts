@@ -32,6 +32,8 @@ export interface TabNameInput {
   path: string | null;
   /** Used while the tab is untitled. */
   untitledNumber: number;
+  /** Optional custom display title while untitled (e.g. welcome document). */
+  customLabel?: string;
 }
 
 function splitPath(path: string): string[] {
@@ -62,7 +64,7 @@ export function tabLabels(
   const byName = new Map<string, TabNameInput[]>();
   for (const tab of tabs) {
     if (tab.path === null) {
-      labels.set(tab.id, untitledLabel(tab.untitledNumber));
+      labels.set(tab.id, tab.customLabel ?? untitledLabel(tab.untitledNumber));
       continue;
     }
     const name = baseNameOf(tab.path);

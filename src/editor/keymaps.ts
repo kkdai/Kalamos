@@ -1,5 +1,6 @@
 import { type EditorState, Prec } from "@codemirror/state";
 import { type Command, EditorView, type KeyBinding } from "@codemirror/view";
+import type { MessageKey } from "../i18n";
 import {
   copyHeadingBookmark,
   handleListBackspace,
@@ -240,6 +241,55 @@ export function unshifted(cmd: Command): Command {
   };
 }
 
+export interface KeymapShortcutDef {
+  readonly id: string;
+  /** CodeMirror key syntax (e.g. "Mod-Alt-p", "Shift-Tab"). */
+  readonly key: string;
+  readonly labelKey: MessageKey;
+  readonly category: "edit" | "search" | "view";
+}
+
+/**
+ * Single source of truth for editor keymap shortcuts that are not listed in
+ * `src/menu/menu-spec.json`. Used by both `createFileKeymap` and the keyboard
+ * shortcuts cheatsheet (#147).
+ */
+export const EDITOR_EXTRA_SHORTCUTS = {
+  indentList: {
+    id: "editor.indentList",
+    key: "Tab",
+    labelKey: "shortcuts.item.indentList",
+    category: "edit",
+  },
+  outdentList: {
+    id: "editor.outdentList",
+    key: "Shift-Tab",
+    labelKey: "shortcuts.item.outdentList",
+    category: "edit",
+  },
+  copyHeadingBookmark: {
+    id: "editor.copyHeadingBookmark",
+    key: "Mod-Shift-c",
+    labelKey: "shortcuts.item.copyHeadingBookmark",
+    category: "edit",
+  },
+  toggleAutoPairBrackets: {
+    id: "editor.toggleAutoPairBrackets",
+    key: "Mod-Alt-p",
+    labelKey: "shortcuts.item.autoPairBrackets",
+    category: "edit",
+  },
+  toggleAutoPairMarkdown: {
+    id: "editor.toggleAutoPairMarkdown",
+    key: "Mod-Alt-Shift-p",
+    labelKey: "shortcuts.item.autoPairMarkdown",
+    category: "edit",
+  },
+} as const satisfies Record<string, KeymapShortcutDef>;
+
+export const EDITOR_EXTRA_SHORTCUT_LIST: readonly KeymapShortcutDef[] =
+  Object.values(EDITOR_EXTRA_SHORTCUTS);
+
 export function createFileKeymap(handlers: FileCommandHandlers): KeyBinding[] {
   return [
     {
@@ -254,11 +304,11 @@ export function createFileKeymap(handlers: FileCommandHandlers): KeyBinding[] {
       run: (view) => expandSpanBeforeCursor(view) || handleListBackspace(view),
     },
     {
-      key: "Tab",
+      key: EDITOR_EXTRA_SHORTCUTS.indentList.key,
       run: (view) => handleTableTab(view) || indentListItem(view),
     },
     {
-      key: "Shift-Tab",
+      key: EDITOR_EXTRA_SHORTCUTS.outdentList.key,
       run: (view) => handleTableShiftTab(view) || outdentListItem(view),
     },
     {
@@ -356,7 +406,7 @@ export function createFileKeymap(handlers: FileCommandHandlers): KeyBinding[] {
       run: (view) => toggleTaskList(view),
     },
     {
-      key: "Mod-Shift-c",
+      key: EDITOR_EXTRA_SHORTCUTS.copyHeadingBookmark.key,
       preventDefault: true,
       run: (view) => copyHeadingBookmark(view) !== null,
     },
@@ -392,14 +442,14 @@ export function createFileKeymap(handlers: FileCommandHandlers): KeyBinding[] {
       },
     },
     {
-      key: "Mod-Alt-p",
+      key: EDITOR_EXTRA_SHORTCUTS.toggleAutoPairBrackets.key,
       run: unshifted(() => {
         void handlers.onToggleAutoPairBrackets?.();
         return true;
       }),
     },
     {
-      key: "Mod-Alt-Shift-p",
+      key: EDITOR_EXTRA_SHORTCUTS.toggleAutoPairMarkdown.key,
       preventDefault: true,
       run: () => {
         void handlers.onToggleAutoPairMarkdown?.();
