@@ -69,6 +69,10 @@
 - **Pandoc 내보내기**(`EX-02`, `Cmd+Opt+E`): **DOCX**, **ODT**(OpenOffice / LibreOffice), **LaTeX**, **MediaWiki**, **EPUB** 형식으로 내보낼 수 있습니다(Pandoc 별도 설치 필요). `[TOC]`, 로컬 이미지 경로, `<img>` 크기 속성을 자동으로 변환합니다.
 - **Pandoc 가져오기**(`EX-03`, `Cmd+Opt+I`): **DOCX**, **ODT**, **EPUB**, **LaTeX**, **HTML**, **MediaWiki** 문서를 `$...$` / `$$...$$` 수식과 추출된 미디어가 포함된 깔끔한 GFM Markdown으로 가져옵니다(`--sandbox` 사용을 위해 Pandoc 2.15 이상 필요).
 
+<p align="center">
+  <img src="site/assets/screenshots/copy-rich-text.png" alt="서식 있는 텍스트로 복사한 뒤 상태 표시줄에 복사 완료가 표시된 Kalamos" width="760" />
+</p>
+
 ### 글쓰기 모드
 - **Ataraxia 집중 모드**(`WM-01`, `F8`): 현재 작성 중인 문단·목록 항목·선택 영역을 제외한 나머지 블록을 부드럽게 흐리게 표시합니다.
 - **Stichos 타자기 모드**(`WM-02`, `F9`): 입력하는 동안 현재 커서 줄이 화면 세로 중앙에 머물도록 유지합니다.
@@ -81,6 +85,18 @@
   <img src="site/assets/screenshots/dark-theme-melan.png" alt="Kalamos Melan 다크 테마 화면" width="760" />
 </p>
 
+### 버전 기록과 외부 변경 감지
+- **로컬 버전 기록**(**File > Browse Version History…**): 저장할 때마다 덮어쓰기 직전의 디스크 내용을 로컬에 보관합니다. 원하는 버전과 현재 내용을 줄 단위로 비교하고 현재 탭으로 복원할 수 있습니다(복원해도 바로 디스크에 쓰지 않으며 `Cmd+Z` / `Ctrl+Z`로 되돌릴 수 있습니다). 자동 저장 시에는 같은 파일당 5분에 최대 1개 버전만 보관합니다. 기본값은 파일당 50개 버전, 전체 200 MB이며 **Preferences → General**에서 켜고 끄기, 한도 조정, 전체 기록 삭제를 할 수 있습니다. 기록은 로컬 앱 데이터 폴더(`history/`)에만 저장됩니다. 자세한 내용은 [docs/version-history.md](docs/version-history.md)(번체 중국어)를 참고하세요.
+- **외부 변경 감지**: 열려 있는 모든 파일을 감시합니다. 저장하지 않은 변경이 없으면 다른 앱에서 바뀐 내용을 커서와 스크롤 위치를 유지한 채 자동으로 다시 불러옵니다. 저장하지 않은 변경이 있으면 편집을 막지 않는 배너에서 **Keep My Version**(내 버전 유지) 또는 **Load Disk Version**(디스크 버전 불러오기)을 선택할 수 있고, 파일이 외부에서 삭제되거나 이름이 바뀌면 **Save As…**(다른 이름으로 저장) 또는 **Recreate at Original Path**(원래 위치에 다시 만들기)를 안내합니다. 선택하기 전까지 자동 저장은 일시 중지되며, 저장 전에는 항상 디스크 내용을 대조하므로 외부 변경을 모르는 사이에 덮어쓰지 않습니다. 자세한 내용은 [docs/external-changes.md](docs/external-changes.md)(번체 중국어)를 참고하세요.
+
+<p align="center">
+  <img src="site/assets/screenshots/version-history.png" alt="왼쪽에 버전 목록, 오른쪽에 선택한 버전과 현재 내용의 줄 단위 차이를 보여 주는 Kalamos 버전 기록 창" width="760" />
+</p>
+
+<p align="center">
+  <img src="site/assets/screenshots/external-change.png" alt="외부 변경을 감지했을 때 Kalamos가 표시하는 충돌 배너. 내 버전 유지와 디스크 버전 불러오기를 선택할 수 있다" width="760" />
+</p>
+
 ### 빠른 열기, 탭, 검색 및 파일 관리
 - **빠른 열기 및 최근 파일**(`Cmd+P` / `Ctrl+P`): 열려 있는 폴더의 Markdown 파일을 퍼지 검색하고 일치한 문자를 강조 표시합니다(파일명·접두사·연속 일치 우선). 입력창이 비어 있을 때는 폴더에 관계없이 최근에 연 파일 최대 20개를 보여주며, `Enter`로 탭 규칙에 따라 열거나 `Cmd+Enter` / `Ctrl+Enter`로 항상 새 탭에서 열 수 있습니다. macOS와 Windows 네이티브 메뉴의 **파일 > 최근 항목 열기**(목록 지우기 포함)에서도 바로 열 수 있습니다.
 - **다중 문서 탭**: 한 창에서 여러 문서를 동시에 편집합니다(`Cmd+T` / `Ctrl+T` 새 탭, `Cmd+W` / `Ctrl+W` 탭 닫기, `Ctrl+Tab` / `Ctrl+Shift+Tab` 탭 전환, 드래그로 순서 변경). 각 탭이 독립적인 실행 취소 기록·커서·스크롤 위치를 유지하며, 창을 닫거나 종료하기 전 저장되지 않은 변경 사항을 안내합니다.
@@ -91,10 +107,17 @@
 - **화면 확대/축소**: `Ctrl` 키를 누른 채 마우스 휠을 굴려 인터페이스를 확대하거나 축소할 수 있으며(macOS·Windows 공통), **보기 > 확대 / 축소 / 실제 크기**(`Cmd+Shift+=` / `-` / `0` 또는 `Ctrl+Shift+=` / `-` / `0`)와 배율을 공유합니다.
 - **사이드바**(`NV-01`, `NV-02`): `Cmd+Shift+L` / `Ctrl+Shift+L`로 토글하고 `Cmd+Shift+O` / `Ctrl+Shift+O`로 폴더를 엽니다. **파일 트리**, **파일 목록**(미리보기 발췌 포함), **개요**(`Cmd+Shift+1` / `Ctrl+Shift+1`), **폴더 검색** 탭을 제공하며 파일 생성·이름 변경·휴지통 이동과 외부 파일 변경 실시간 감지(iCloud Drive / Dropbox 폴더 호환)를 지원합니다.
 - **글자 수·단어 수 통계**(`NV-03`): 상태 표시줄에서 마크업을 제외한 실제 단어 수(CJK + 영문), 글자 수, 줄 수, 예상 읽기 시간을 실시간으로 보여주며 텍스트 선택 시 선택 영역 통계를 표시합니다.
-- **안전한 저장과 충돌 복구**: 임시 파일 작성 후 원자적 이름 바꾸기 저장, 저장된 파일의 1초 디바운스 자동 저장, 제목 없는 초안의 5초 간격 복구 스냅샷 및 재실행 시 원클릭 복원 배너를 지원합니다.
+- **안전한 저장과 충돌 복구**: 임시 파일 작성 후 원자적 이름 바꾸기 저장(저장 전 디스크 내용을 대조해 외부 변경을 덮어쓰지 않음), 저장된 파일의 1초 디바운스 자동 저장, 제목 없는 초안의 5초 간격 복구 스냅샷 및 재실행 시 원클릭 복원 배너를 지원합니다.
+- **키보드 단축키 모음**(macOS `⌥⌘/`, Windows `Ctrl+Alt+/`, **Help > Keyboard Shortcuts…**): 모든 단축키를 분류별로 보고 기능 이름이나 키로 검색할 수 있으며, 키 표기는 사용 중인 플랫폼에 맞게 표시됩니다.
+- **환영 문서**: 새로 설치한 뒤 처음 실행하면 Kalamos의 기능을 소개하는 환영 문서를 제목 없는 탭으로 엽니다(디스크에 저장되지 않으며 번체 중국어와 영어 지원). **Help > Welcome Document**에서 언제든 다시 열 수 있습니다.
+- **더 빨라진 시작**: 수식(MathJax), 다이어그램(Mermaid 등), 내보내기 관련 모듈을 처음 사용할 때 불러오도록 바꿔, 시작할 때 불러오는 메인 번들을 약 970 kB에서 약 390 kB로 줄였습니다.
 
 <p align="center">
   <img src="site/assets/screenshots/quick-open.png" alt="퍼지 검색 강조 표시와 최근 파일 배지가 보이는 Kalamos Cmd+P 빠른 열기 패널" width="760" />
+</p>
+
+<p align="center">
+  <img src="site/assets/screenshots/shortcuts.png" alt="분류별 단축키 목록과 검색창이 있는 Kalamos 키보드 단축키 모음" width="760" />
 </p>
 
 ---
@@ -148,6 +171,9 @@
 | | PDF 내보내기(북마크 포함) | `Cmd+Shift+E` | `Ctrl+Shift+E` |
 | | Pandoc 내보내기(DOCX/ODT/LaTeX/Wiki/EPUB) | `Cmd+Opt+E` | `Ctrl+Alt+E` |
 | | Pandoc 가져오기 | `Cmd+Opt+I` | `Ctrl+Alt+I` |
+| **도움말** | 키보드 단축키 모음 | `Cmd+Opt+/` | `Ctrl+Alt+/` |
+
+> **전체 단축키 목록**: 앱에서 `Cmd+Opt+/`(Windows는 `Ctrl+Alt+/`)를 누르거나 **Help > Keyboard Shortcuts…**를 선택하면 모든 단축키를 분류별로 보고 검색할 수 있습니다.
 
 > **빠른 열기 패널 내 조작**: `↑` / `↓`(macOS에서는 `Ctrl+N` / `Ctrl+P`도 지원)로 항목을 이동하고, `Enter`로 열기, `Cmd+Enter` / `Ctrl+Enter`로 항상 새 탭에서 열기, `Esc`로 닫고 원래 커서 위치로 돌아갑니다.
 
@@ -260,6 +286,9 @@ npm run bench
 
 - 제품 요구사항 정의서: [docs/PRD.md](docs/PRD.md)
 - 표 편집 가이드: [docs/tables.md](docs/tables.md)
+- 서식 있는 텍스트 복사 가이드: [docs/rich-text-copy.md](docs/rich-text-copy.md)
+- 로컬 버전 기록 가이드: [docs/version-history.md](docs/version-history.md)
+- 외부 변경 감지 가이드: [docs/external-changes.md](docs/external-changes.md)
 - 커스텀 CSS 테마 가이드: [docs/themes.md](docs/themes.md)
 - 이미지 업로드 설정 가이드: [docs/image-upload.md](docs/image-upload.md)
 

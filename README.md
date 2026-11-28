@@ -69,6 +69,10 @@
 - **Pandoc Export** (`EX-02`, `Cmd+Opt+E`): Export to **DOCX**, **ODT** (OpenOffice / LibreOffice), **LaTeX**, **MediaWiki**, and **EPUB** (requires optional Pandoc). Resolves `[TOC]`, local image paths, and `<img>` sizes automatically.
 - **Pandoc Import** (`EX-03`, `Cmd+Opt+I`): Import **DOCX**, **ODT**, **EPUB**, **LaTeX**, **HTML**, and **MediaWiki** into clean GFM Markdown with `$...$` / `$$...$$` math and extracted media (requires Pandoc 2.15+ for `--sandbox`).
 
+<p align="center">
+  <img src="site/assets/screenshots/copy-rich-text.png" alt="Kalamos after Copy as Rich Text, with the status bar confirming the copy" width="760" />
+</p>
+
 ### Writing Modes
 - **Ataraxia Focus Mode** (`WM-01`, `F8`): Softly dims every block outside the active paragraph, list item, or selection.
 - **Stichos Typewriter Mode** (`WM-02`, `F9`): Keeps the active cursor line vertically centered while typing.
@@ -81,6 +85,18 @@
   <img src="site/assets/screenshots/dark-theme-melan.png" alt="Kalamos Melan dark theme" width="760" />
 </p>
 
+### Version History & External Changes
+- **Local Version History** (**File > Browse Version History…**): Before each save, Kalamos keeps the previous on-disk version locally. Compare any version with the current content line by line and restore it into the current tab (nothing is written to disk until you save, and `Cmd+Z` / `Ctrl+Z` undoes the restore). Autosaves keep at most one version per file every 5 minutes. By default each file keeps 50 versions with a 200 MB total cap; turn it on or off, change the limits, or clear all history in **Preferences → General**. History stays in the local app data folder (`history/`). See [docs/version-history.md](docs/version-history.md) (Traditional Chinese).
+- **External Change Detection**: Watches every open file. When you have no unsaved edits, changes made by other apps are reloaded automatically, keeping your cursor and scroll position. With unsaved edits, a non-blocking banner lets you **Keep My Version** or **Load Disk Version**; if the file is deleted or renamed elsewhere, you can **Save As…** or **Recreate at Original Path**. Autosave pauses until you decide, and every save checks the disk first so external edits are never silently overwritten. See [docs/external-changes.md](docs/external-changes.md) (Traditional Chinese).
+
+<p align="center">
+  <img src="site/assets/screenshots/version-history.png" alt="Kalamos Version History window with the version list on the left and a line-by-line diff against the current content on the right" width="760" />
+</p>
+
+<p align="center">
+  <img src="site/assets/screenshots/external-change.png" alt="Kalamos conflict banner after an external change, offering Keep My Version and Load Disk Version" width="760" />
+</p>
+
 ### Quick Open, Tabs, Search & Files
 - **Quick Open & Recent Files** (`Cmd+P` / `Ctrl+P`): Fuzzy-search Markdown files across the open folder with highlighted match characters (prioritizing filename, prefix, and consecutive hits). With an empty input, lists up to 20 recently opened files across folders; press `Enter` to open following tab rules or `Cmd+Enter` / `Ctrl+Enter` to always open in a new tab. Also available under **File > Open Recent** (with **Clear Recent**) on macOS and Windows.
 - **Multi-Document Tabs**: Work on multiple files in one window (`Cmd+T` / `Ctrl+T` new tab, `Cmd+W` / `Ctrl+W` close tab, `Ctrl+Tab` / `Ctrl+Shift+Tab` switch tabs, drag to reorder), each preserving independent undo history, cursor, and scroll position, with unsaved-change prompts before closing.
@@ -91,10 +107,17 @@
 - **Interface Zoom**: Hold `Ctrl` and scroll the mouse wheel to zoom in or out smoothly (on both macOS and Windows), sharing the same zoom level with **View > Zoom In / Zoom Out / Actual Size** (`Cmd+Shift+=` / `-` / `0` or `Ctrl+Shift+=` / `-` / `0`).
 - **Sidebar** (`NV-01`, `NV-02`): Toggle with `Cmd+Shift+L` / `Ctrl+Shift+L` and open folders with `Cmd+Shift+O` / `Ctrl+Shift+O`. Switch between **File Tree**, **File List** (with excerpts), **Outline** (`Cmd+Shift+1` / `Ctrl+Shift+1`), and **Folder Search**. Create, rename, and move files to Trash; watches external filesystem changes (compatible with iCloud Drive and Dropbox folders).
 - **Word Count** (`NV-03`): Live status-bar count of reader-visible words (CJK + Latin), grapheme characters, lines, and estimated reading time, with automatic selection stats when text is highlighted.
-- **Safe Saving & Crash Recovery**: Atomic temp-file + rename writes, 1-second debounced autosave for saved files, and 5-second crash-recovery snapshots for untitled drafts with a one-click restore banner on relaunch.
+- **Safe Saving & Crash Recovery**: Atomic temp-file + rename writes that check the disk first so external edits are not overwritten, 1-second debounced autosave for saved files, and 5-second crash-recovery snapshots for untitled drafts with a one-click restore banner on relaunch.
+- **Keyboard Shortcuts Cheat Sheet** (`⌥⌘/` on macOS, `Ctrl+Alt+/` on Windows, **Help > Keyboard Shortcuts…**): Browse every shortcut by category and search by command name or key, with keys shown for your platform.
+- **Welcome Document**: On the very first launch after a fresh install, Kalamos opens an untitled welcome document that tours its features (never written to disk; available in Traditional Chinese and English). Reopen it anytime from **Help > Welcome Document**.
+- **Faster Startup**: Math (MathJax), diagrams (Mermaid and friends), and export modules now load the first time you need them, shrinking the main bundle loaded at startup from about 970 kB to about 390 kB.
 
 <p align="center">
   <img src="site/assets/screenshots/quick-open.png" alt="Kalamos Cmd+P Quick Open with fuzzy search highlights and recent file badges" width="760" />
+</p>
+
+<p align="center">
+  <img src="site/assets/screenshots/shortcuts.png" alt="Kalamos keyboard shortcuts cheat sheet listing shortcuts by category with a search field" width="760" />
 </p>
 
 ---
@@ -148,6 +171,9 @@
 | | Export PDF (with bookmarks) | `Cmd+Shift+E` | `Ctrl+Shift+E` |
 | | Export via Pandoc (DOCX/ODT/LaTeX/Wiki/EPUB) | `Cmd+Opt+E` | `Ctrl+Alt+E` |
 | | Import via Pandoc | `Cmd+Opt+I` | `Ctrl+Alt+I` |
+| **Help** | Keyboard Shortcuts Cheat Sheet | `Cmd+Opt+/` | `Ctrl+Alt+/` |
+
+> **Full shortcut list**: Press `Cmd+Opt+/` (`Ctrl+Alt+/` on Windows) or choose **Help > Keyboard Shortcuts…** in the app to browse and search every shortcut by category.
 
 > **Inside Quick Open**: use `↑` / `↓` (or `Ctrl+N` / `Ctrl+P` on macOS) to navigate, `Enter` to open, `Cmd+Enter` / `Ctrl+Enter` to always open in a new tab, and `Esc` to close.
 
@@ -295,6 +321,9 @@ prek run --all-files                 # Check all tracked files
 
 - Product Requirements: [docs/PRD.md](docs/PRD.md)
 - Visual Tables Guide: [docs/tables.md](docs/tables.md)
+- Copy as Rich Text Guide: [docs/rich-text-copy.md](docs/rich-text-copy.md)
+- Local Version History Guide: [docs/version-history.md](docs/version-history.md)
+- External Change Detection Guide: [docs/external-changes.md](docs/external-changes.md)
 - Custom CSS Themes Guide: [docs/themes.md](docs/themes.md)
 - Custom Image Upload Guide: [docs/image-upload.md](docs/image-upload.md)
 

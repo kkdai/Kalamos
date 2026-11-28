@@ -135,6 +135,24 @@
               <p>以標準 GitHub Flavored Markdown 存檔於本機資料夾。原子寫入、1 秒自動存檔與異常救回，讓每份草稿安然無恙。</p>
             </div>
           </div>
+          <div class="pillars-grid">
+            <div class="pillar">
+              <h3>本機版本歷史</h3>
+              <p>每次存檔前自動保留舊版本。從「<strong>檔案 &gt; 瀏覽版本歷史…</strong>」逐行比對差異並還原到目前分頁，還原後仍可 <kbd>Cmd+Z</kbd> 復原；歷史只存在本機。</p>
+            </div>
+            <div class="pillar">
+              <h3>外部修改偵測</h3>
+              <p>檔案被其他程式或同步服務改動時自動重新載入；若你也有未儲存的修改，就以橫幅讓你選擇保留哪個版本，存檔前也會先比對磁碟內容。</p>
+            </div>
+            <div class="pillar">
+              <h3>複製為富文字</h3>
+              <p>按 <kbd>Cmd+Opt+Shift+C</kbd> 將選取範圍或整份文件轉成乾淨的富文字，直接貼到 Gmail、Google Docs、Medium 或 Notion，公式與圖表自動轉為圖片。</p>
+            </div>
+            <div class="pillar">
+              <h3>鍵盤快捷鍵速查表</h3>
+              <p>按 <kbd>Cmd+Opt+/</kbd>（Windows 為 <kbd>Ctrl+Alt+/</kbd>）或從「<strong>說明 &gt; 鍵盤快捷鍵…</strong>」依分類瀏覽並搜尋所有快捷鍵。</p>
+            </div>
+          </div>
           <div class="pillars-grid pillars-grid--three">
             <div class="pillar">
               <h3>YAML 文件資訊預覽</h3>
@@ -149,6 +167,7 @@
               <p>按住 <kbd>Ctrl</kbd> 滾動滑鼠滾輪即可流暢放大或縮小介面，與「<strong>檢視 → 放大／縮小／實際大小</strong>」共用縮放比例。</p>
             </div>
           </div>
+          <p class="pillars-note">啟動也更快了：數學公式、圖表與匯出模組改為需要時才載入，啟動時載入的主程式從約 970&nbsp;kB 減為約 390&nbsp;kB。</p>
         </div>
       </section>
 
@@ -459,6 +478,125 @@
         </div>
       </section>
 
+      <!-- Showcase 8: Version History & External Changes -->
+      <section class="showcase" id="history">
+        <div class="container">
+          <div class="showcase-header">
+            <span class="eyebrow">版本歷史與外部修改</span>
+            <h2 class="section-title">每一次存檔，都留有退路</h2>
+            <p class="section-desc">Kalamos 會在每次存檔前，把磁碟上的舊內容保留在本機。從「<strong>檔案 &gt; 瀏覽版本歷史…</strong>」選一個版本，就能逐行比對它和目前內容的差異，再一鍵還原。</p>
+          </div>
+          <div class="showcase-media">
+            <div class="window-frame">
+              <div class="window-bar" aria-hidden="true">
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-title">release-notes.md — Kalamos</span>
+              </div>
+              <img
+                src="../assets/screenshots/version-history.png"
+                alt="Kalamos 版本歷史視窗，左側為版本列表，右側為所選版本與目前內容的逐行差異"
+                width="1280"
+                height="800"
+                loading="lazy"
+              />
+            </div>
+          </div>
+          <div class="showcase-notes">
+            <div class="showcase-note">
+              <strong>還原可以復原</strong>
+              <span>還原只載入目前分頁、不直接寫入磁碟，按 Cmd+Z 就能回到還原前。</span>
+            </div>
+            <div class="showcase-note">
+              <strong>自動整理容量</strong>
+              <span>自動存檔每 5 分鐘最多留一版；預設每檔 50 版、總計 200 MB，可在偏好設定調整或清除。</span>
+            </div>
+            <div class="showcase-note">
+              <strong>只存在本機</strong>
+              <span>歷史存放在應用程式資料夾的 history/ 內，不上傳、不同步。</span>
+            </div>
+          </div>
+          <div class="showcase-subheader">
+            <h3>別的程式改了檔案，也不會被你蓋掉</h3>
+            <p>開著的檔案若被其他編輯器、<code>git</code> 或 iCloud、Dropbox 同步改動，沒有未儲存變更時會自動重新載入；有衝突時則以橫幅讓你決定。</p>
+          </div>
+          <div class="showcase-media">
+            <div class="window-frame">
+              <div class="window-bar" aria-hidden="true">
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-title">article.md — Kalamos</span>
+              </div>
+              <img
+                src="../assets/screenshots/external-change.png"
+                alt="Kalamos 偵測到外部修改時，在編輯區上方顯示衝突橫幅，提供「保留我的版本」與「載入磁碟版本」"
+                width="1200"
+                height="320"
+                loading="lazy"
+              />
+            </div>
+          </div>
+          <div class="showcase-notes">
+            <div class="showcase-note">
+              <strong>自動重新載入</strong>
+              <span>沒有未儲存的修改時直接載入新內容，並保留游標與捲動位置。</span>
+            </div>
+            <div class="showcase-note">
+              <strong>衝突時由你決定</strong>
+              <span>選擇保留我的版本或載入磁碟版本；決定之前會暫停自動儲存。</span>
+            </div>
+            <div class="showcase-note">
+              <strong>刪除與改名提示</strong>
+              <span>檔案在外部被刪除或改名時，可以另存新檔或在原路徑重新建立。</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Showcase 9: Copy as Rich Text -->
+      <section class="showcase showcase--tinted">
+        <div class="container">
+          <div class="showcase-header">
+            <span class="eyebrow">複製為富文字</span>
+            <h2 class="section-title">寫在 Markdown，貼到哪裡都整齊</h2>
+            <p class="section-desc">按 <kbd>Cmd+Opt+Shift+C</kbd> 或選擇「<strong>編輯 &gt; 複製為富文字</strong>」，把選取範圍或整份文件轉成精簡的富文字 HTML，同時附上 Markdown 純文字，貼到 Gmail、Google Docs、Medium、Notion 都不必再調格式。</p>
+          </div>
+          <div class="showcase-media">
+            <div class="window-frame">
+              <div class="window-bar" aria-hidden="true">
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-title">rich-text.md — Kalamos</span>
+              </div>
+              <img
+                src="../assets/screenshots/copy-rich-text.png"
+                alt="Kalamos 複製為富文字後，狀態列顯示「已複製為富文字」"
+                width="1200"
+                height="800"
+                loading="lazy"
+              />
+            </div>
+          </div>
+          <div class="showcase-notes">
+            <div class="showcase-note">
+              <strong>乾淨的語意化 HTML</strong>
+              <span>標題、清單、表格與程式碼區塊保留結構，不夾帶整頁主題樣式。</span>
+            </div>
+            <div class="showcase-note">
+              <strong>公式與圖表轉成圖片</strong>
+              <span>MathJax 公式與 Mermaid 圖表自動轉為高解析度 PNG，貼上就能顯示。</span>
+            </div>
+            <div class="showcase-note">
+              <strong>自動排除 YAML</strong>
+              <span>文件開頭的 YAML front matter 不會被複製進去。</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- Shortcuts Summary -->
       <section class="showcase" id="shortcuts">
         <div class="container container--narrow">
@@ -466,6 +604,7 @@
             <span class="eyebrow">鍵盤優先</span>
             <h2 class="section-title">常用快捷鍵一覽</h2>
             <p class="section-desc">雙手無須離開鍵盤，所有核心操作皆可一鍵完成。在 Windows 上請將 <code>Cmd</code> 對應為 <code>Ctrl</code>、<code>Opt</code> 對應為 <code>Alt</code>（<code>Ctrl+Tab</code> 與 <code>Ctrl + 滾輪</code> 雙平台相同）。</p>
+            <p class="section-desc">想看完整清單？按 <kbd>Cmd+Opt+/</kbd> 或選擇「<strong>說明 &gt; 鍵盤快捷鍵…</strong>」，即可依分類瀏覽並搜尋所有快捷鍵。</p>
           </div>
 
           <div class="shortcuts-grid">
@@ -540,6 +679,31 @@
             <div class="shortcut-row">
               <span class="shortcut-label">滾輪縮放介面</span>
               <span><kbd>Ctrl</kbd> + 滾輪</span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">複製為富文字</span>
+              <kbd>Cmd+Opt+Shift+C</kbd>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">鍵盤快捷鍵速查表</span>
+              <kbd>Cmd+Opt+/</kbd>
+            </div>
+          </div>
+          <div class="showcase-media">
+            <div class="window-frame">
+              <div class="window-bar" aria-hidden="true">
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-title">Kalamos</span>
+              </div>
+              <img
+                src="../assets/screenshots/shortcuts.png"
+                alt="Kalamos 鍵盤快捷鍵速查表，依分類列出快捷鍵並提供搜尋欄"
+                width="1280"
+                height="840"
+                loading="lazy"
+              />
             </div>
           </div>
         </div>

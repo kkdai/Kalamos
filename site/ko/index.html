@@ -135,6 +135,24 @@
               <p>독자 문법 없는 표준 GitHub Flavored Markdown 그대로 저장합니다. 원자적 파일 쓰기, 1초 자동 저장, 충돌 복구로 초안을 안전하게 지킵니다.</p>
             </div>
           </div>
+          <div class="pillars-grid">
+            <div class="pillar">
+              <h3>로컬 버전 기록</h3>
+              <p>저장할 때마다 이전 버전을 자동으로 보관합니다. <strong>File &gt; Browse Version History…</strong>에서 줄 단위로 차이를 비교해 현재 탭으로 복원하고, <kbd>Cmd+Z</kbd>로 되돌릴 수 있습니다. 기록은 로컬에만 저장됩니다.</p>
+            </div>
+            <div class="pillar">
+              <h3>외부 변경 감지</h3>
+              <p>다른 앱이나 동기화 서비스가 열린 파일을 바꾸면 자동으로 다시 불러옵니다. 저장하지 않은 변경도 있다면 배너에서 어느 쪽을 남길지 고를 수 있고, 저장 전에는 디스크 내용을 먼저 대조합니다.</p>
+            </div>
+            <div class="pillar">
+              <h3>서식 있는 텍스트로 복사</h3>
+              <p><kbd>Cmd+Opt+Shift+C</kbd>로 선택 영역이나 전체 문서를 깔끔한 서식 있는 텍스트로 바꿔 Gmail, Google Docs, Medium, Notion에 바로 붙여넣습니다. 수식과 다이어그램은 이미지로 변환됩니다.</p>
+            </div>
+            <div class="pillar">
+              <h3>키보드 단축키 모음</h3>
+              <p><kbd>Cmd+Opt+/</kbd>(Windows는 <kbd>Ctrl+Alt+/</kbd>)를 누르거나 <strong>Help &gt; Keyboard Shortcuts…</strong>를 선택해 모든 단축키를 분류별로 보고 검색할 수 있습니다.</p>
+            </div>
+          </div>
           <div class="pillars-grid pillars-grid--three">
             <div class="pillar">
               <h3>YAML 문서 정보 미리보기</h3>
@@ -149,6 +167,7 @@
               <p><kbd>Ctrl</kbd> 키를 누른 채 마우스 휠을 굴리면 화면을 부드럽게 확대하거나 축소할 수 있으며, <strong>보기</strong> 메뉴의 확대·축소·실제 크기 배율과 연동됩니다.</p>
             </div>
           </div>
+          <p class="pillars-note">시작도 더 빨라졌습니다. 수식, 다이어그램, 내보내기 모듈을 필요할 때 불러오도록 바꿔 시작 시 불러오는 메인 번들을 약 970&nbsp;kB에서 약 390&nbsp;kB로 줄였습니다.</p>
         </div>
       </section>
 
@@ -459,6 +478,125 @@
         </div>
       </section>
 
+      <!-- Showcase 8: Version History & External Changes -->
+      <section class="showcase" id="history">
+        <div class="container">
+          <div class="showcase-header">
+            <span class="eyebrow">버전 기록과 외부 변경</span>
+            <h2 class="section-title">저장할 때마다 돌아갈 곳을 남깁니다</h2>
+            <p class="section-desc">Kalamos는 저장하기 직전의 디스크 내용을 로컬에 보관합니다. <strong>File &gt; Browse Version History…</strong>에서 버전을 고르면 현재 내용과의 차이를 줄 단위로 확인하고 한 번에 복원할 수 있습니다.</p>
+          </div>
+          <div class="showcase-media">
+            <div class="window-frame">
+              <div class="window-bar" aria-hidden="true">
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-title">release-notes.md — Kalamos</span>
+              </div>
+              <img
+                src="../assets/screenshots/version-history.png"
+                alt="왼쪽에 버전 목록, 오른쪽에 선택한 버전과 현재 내용의 줄 단위 차이를 보여 주는 Kalamos 버전 기록 창"
+                width="1280"
+                height="800"
+                loading="lazy"
+              />
+            </div>
+          </div>
+          <div class="showcase-notes">
+            <div class="showcase-note">
+              <strong>되돌릴 수 있는 복원</strong>
+              <span>복원은 현재 탭에 불러오기만 하고 디스크에는 쓰지 않습니다. Cmd+Z로 되돌릴 수 있습니다.</span>
+            </div>
+            <div class="showcase-note">
+              <strong>용량은 알아서 정리</strong>
+              <span>자동 저장은 5분에 최대 1개 버전만 남깁니다. 기본값은 파일당 50개, 전체 200 MB이며 환경설정에서 바꿀 수 있습니다.</span>
+            </div>
+            <div class="showcase-note">
+              <strong>내 컴퓨터에만 저장</strong>
+              <span>기록은 앱 데이터 폴더의 history/에 저장되며 업로드하거나 동기화하지 않습니다.</span>
+            </div>
+          </div>
+          <div class="showcase-subheader">
+            <h3>다른 앱이 파일을 바꿔도 모르게 덮어쓰지 않습니다</h3>
+            <p>열린 파일이 다른 편집기나 <code>git</code>, iCloud·Dropbox 동기화로 바뀌면, 저장하지 않은 변경이 없을 때는 자동으로 다시 불러오고 충돌이 있을 때는 배너로 선택을 맡깁니다.</p>
+          </div>
+          <div class="showcase-media">
+            <div class="window-frame">
+              <div class="window-bar" aria-hidden="true">
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-title">article.md — Kalamos</span>
+              </div>
+              <img
+                src="../assets/screenshots/external-change.png"
+                alt="외부 변경을 감지했을 때 편집기 위에 표시되는 Kalamos 충돌 배너. Keep My Version과 Load Disk Version을 선택할 수 있다"
+                width="1200"
+                height="320"
+                loading="lazy"
+              />
+            </div>
+          </div>
+          <div class="showcase-notes">
+            <div class="showcase-note">
+              <strong>자동으로 다시 불러오기</strong>
+              <span>저장하지 않은 변경이 없으면 커서와 스크롤 위치를 유지한 채 새 내용을 불러옵니다.</span>
+            </div>
+            <div class="showcase-note">
+              <strong>충돌은 직접 선택</strong>
+              <span>내 버전을 유지할지, 디스크 버전을 불러올지 고릅니다. 선택할 때까지 자동 저장은 멈춥니다.</span>
+            </div>
+            <div class="showcase-note">
+              <strong>삭제·이름 변경 알림</strong>
+              <span>파일이 외부에서 삭제되거나 이름이 바뀌면 다른 이름으로 저장하거나 원래 위치에 다시 만들 수 있습니다.</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Showcase 9: Copy as Rich Text -->
+      <section class="showcase showcase--tinted">
+        <div class="container">
+          <div class="showcase-header">
+            <span class="eyebrow">서식 있는 텍스트로 복사</span>
+            <h2 class="section-title">Markdown으로 쓰고, 어디에 붙여도 깔끔하게</h2>
+            <p class="section-desc"><kbd>Cmd+Opt+Shift+C</kbd>를 누르거나 <strong>Edit &gt; Copy as Rich Text</strong>를 선택하면 선택 영역이나 전체 문서를 간결한 서식 있는 HTML과 일반 Markdown으로 복사합니다. Gmail, Google Docs, Medium, Notion에 서식을 다시 손볼 필요 없이 붙여넣을 수 있습니다.</p>
+          </div>
+          <div class="showcase-media">
+            <div class="window-frame">
+              <div class="window-bar" aria-hidden="true">
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-title">rich-text.md — Kalamos</span>
+              </div>
+              <img
+                src="../assets/screenshots/copy-rich-text.png"
+                alt="서식 있는 텍스트로 복사한 뒤 상태 표시줄에 복사 완료가 표시된 Kalamos"
+                width="1200"
+                height="800"
+                loading="lazy"
+              />
+            </div>
+          </div>
+          <div class="showcase-notes">
+            <div class="showcase-note">
+              <strong>깔끔한 시맨틱 HTML</strong>
+              <span>제목, 목록, 표, 코드 블록의 구조는 유지하고 테마 스타일은 가져가지 않습니다.</span>
+            </div>
+            <div class="showcase-note">
+              <strong>수식과 다이어그램은 이미지로</strong>
+              <span>MathJax 수식과 Mermaid 다이어그램을 고해상도 PNG로 바꿔 그대로 표시됩니다.</span>
+            </div>
+            <div class="showcase-note">
+              <strong>YAML은 제외</strong>
+              <span>문서 맨 앞의 YAML front matter는 복사하지 않습니다.</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- Shortcuts Summary -->
       <section class="showcase" id="shortcuts">
         <div class="container container--narrow">
@@ -466,6 +604,7 @@
             <span class="eyebrow">키보드 우선</span>
             <h2 class="section-title">핵심 단축키 요약</h2>
             <p class="section-desc">키보드에서 손을 떼지 않고 모든 주요 기능을 실행할 수 있습니다. Windows에서는 <code>Cmd</code>가 <code>Ctrl</code>, <code>Opt</code>가 <code>Alt</code>에 대응됩니다(<code>Ctrl+Tab</code>과 <code>Ctrl + 휠</code>은 양쪽 동일).</p>
+            <p class="section-desc">전체 목록은 <kbd>Cmd+Opt+/</kbd>를 누르거나 <strong>Help &gt; Keyboard Shortcuts…</strong>를 선택해 분류별로 보고 검색할 수 있습니다.</p>
           </div>
 
           <div class="shortcuts-grid">
@@ -540,6 +679,31 @@
             <div class="shortcut-row">
               <span class="shortcut-label">마우스 휠로 확대 / 축소</span>
               <span><kbd>Ctrl</kbd> + 휠</span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">서식 있는 텍스트로 복사</span>
+              <kbd>Cmd+Opt+Shift+C</kbd>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">키보드 단축키 모음</span>
+              <kbd>Cmd+Opt+/</kbd>
+            </div>
+          </div>
+          <div class="showcase-media">
+            <div class="window-frame">
+              <div class="window-bar" aria-hidden="true">
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-title">Kalamos</span>
+              </div>
+              <img
+                src="../assets/screenshots/shortcuts.png"
+                alt="분류별 단축키 목록과 검색창이 있는 Kalamos 키보드 단축키 모음"
+                width="1280"
+                height="840"
+                loading="lazy"
+              />
             </div>
           </div>
         </div>
