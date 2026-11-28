@@ -1,5 +1,14 @@
 # Kalamos guidelines
 
+## Product principles
+
+Every change must fit both principles (see `docs/PRD.md` §0):
+
+1. **Single-machine**: a local, offline desktop editor for plain `.md` files on macOS and Windows. No web or mobile versions, no accounts, servers or built-in cloud sync. Network access is only allowed for features the user explicitly triggers (image upload, update check), and those must be possible to turn off.
+2. **Usable and simple**: polish the core writing experience before adding platform features such as extension marketplaces or external control APIs. Prefer good defaults over new settings.
+
+Proposals that do not fit get a reply and the `not-planned: 不符合產品精神` label. Keep them open, but do not implement them.
+
 ## Changesets
 
 - **Scope**: Include a `.changeset/<name>.md` file in the same PR for any user-visible app change (new features, bug fixes, or behavior changes; see the [release guide](docs/release.md)). Do not proactively add a changeset for documentation, product page, CI, or internal refactoring changes—the maintainer decides whether to include those in the release notes.
