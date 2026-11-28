@@ -132,7 +132,9 @@ test.describe("#144 Copy as Rich Text / HTML", () => {
 
     const clip = await readClipboardPayload(page);
     const html = clip.html || clip.mockHtml;
-    const plain = clip.plain || clip.mockPlain;
+    // The Windows clipboard turns text/plain line endings into CRLF; compare
+    // the Markdown with LF line endings on every platform.
+    const plain = (clip.plain || clip.mockPlain).replace(/\r\n/g, "\n");
 
     // Front matter must be excluded from both text/html and text/plain.
     expect(plain).not.toContain("My Blog Post");
@@ -175,7 +177,9 @@ test.describe("#144 Copy as Rich Text / HTML", () => {
     // Verify browser clipboard received both text/html and text/plain when supported.
     if (clip.html) {
       expect(clip.html).toContain("<h1>標題一</h1>");
-      expect(clip.plain).toBe(clip.mockPlain);
+      expect(clip.plain.replace(/\r\n/g, "\n")).toBe(
+        clip.mockPlain.replace(/\r\n/g, "\n"),
+      );
     }
   });
 
