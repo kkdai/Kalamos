@@ -12,8 +12,13 @@ import {
   seedMockFile,
   seedMockHistoryVersion,
   setMockHistoryThrottleMs,
+  triggerMockOpenFilesChanged,
 } from "../ipc";
-import { createKalamosApp, type KalamosApp } from "../main";
+import {
+  createKalamosApp,
+  type KalamosApp,
+  NAMED_AUTOSAVE_DELAY_MS,
+} from "../main";
 import { createHistoryModal, type HistoryModalHost } from "./history-modal";
 
 async function flushMicrotasks(): Promise<void> {
@@ -289,5 +294,73 @@ describe("#148 app integration: save, restore without disk write, and undo", () 
       totalVersions: 0,
       fileCount: 0,
     });
+  });
+
+  it("interacts cleanly with #145 external-change detection on restore, focus check, and save conflict", async () => {
+    vi.useFakeTimers();
+    try {
+      const filePath = "/tmp/kalamos-test/ext-history.md";
+      seedMockFile(filePath, "# V1");
+      await saveFile(filePath, "# V2", { isAutosave: false });
+      await saveFile(filePath, "# V3", { isAutosave: false });
+
+      await app!.openPath(filePath, "tab");
+      expect(app!.getTabs()[0].externalStatus).toBe("synced");
+
+      // Restore V1 from history modal
+      await app!.openVersionHistory();
+      const items = document.querySelectorAll<HTMLButtonElement>(
+        '[data-testid="history-item"]',
+      );
+      expect(items.length).toBe(2);
+      items[1].click();
+      await flushMicrotasks();
+      document
+        .querySelector<HTMLButtonElement>('[data-testid="history-restore"]')!
+        .click();
+
+      expect(app!.editor.getContent()).toBe("# V1");
+      expect(app!.editor.isDirty()).toBe(true);
+      expect(readMockFile(filePath)).toBe("# V3");
+
+      // Waiting past autosave delay must NOT auto-write the restored content to disk
+      await vi.advanceTimersByTimeAsync(NAMED_AUTOSAVE_DELAY_MS + 500);
+      expect(readMockFile(filePath)).toBe("# V3");
+
+      // Disk check / file-watcher notification must NOT misclassify restored content as external change
+      await triggerMockOpenFilesChanged([filePath]);
+      expect(app!.getTabs()[0].externalStatus).toBe("synced");
+      expect(app!.editor.getContent()).toBe("# V1");
+      expect(
+        document.querySelector<HTMLElement>(
+          '[data-testid="external-change-banner"]',
+        )?.dataset.visible,
+      ).toBe("false");
+
+      // If disk genuinely changes externally while restored content is unsaved,
+      // saveDocument detects conflict, does NOT overwrite disk, and does NOT snapshot history.
+      const countBeforeConflict = (await listHistory(filePath)).length;
+      seedMockFile(filePath, "# External Edit");
+      const saved = await app!.saveDocument();
+      expect(saved).toBe(false);
+      expect(app!.getTabs()[0].externalStatus).toBe("conflict");
+      expect(readMockFile(filePath)).toBe("# External Edit");
+      expect((await listHistory(filePath)).length).toBe(countBeforeConflict);
+
+      // Clicking "Keep My Version" force-saves V1 and snapshots "# External Edit" into history.
+      document
+        .querySelector<HTMLButtonElement>(
+          '[data-testid="external-change-keep-mine"]',
+        )!
+        .click();
+      await flushMicrotasks();
+      expect(app!.getTabs()[0].externalStatus).toBe("synced");
+      expect(readMockFile(filePath)).toBe("# V1");
+      expect((await listHistory(filePath)).length).toBe(
+        countBeforeConflict + 1,
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
