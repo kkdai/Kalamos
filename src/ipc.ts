@@ -2,6 +2,7 @@ import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { writeHtml as writeClipboardHtmlPlugin } from "@tauri-apps/plugin-clipboard-manager";
 import {
   ask as askDialog,
   message as messageDialog,
@@ -437,6 +438,9 @@ export function resetMockState(): void {
   mockPandocImportHandler = null;
   mockUpdateHandler = null;
   mockUpdateCheckCount = 0;
+  mockImageDataUris.clear();
+  mockLastClipboardHtml = null;
+  mockClipboardHtmlHandler = null;
   seedDemoFolder();
   seedDefaultCustomThemes();
 }
@@ -2315,4 +2319,116 @@ export function setMockUpdateHandler(handler: MockUpdateHandler | null): void {
 
 export function getMockUpdateCheckCount(): number {
   return mockUpdateCheckCount;
+}
+
+// ---------------------------------------------------------------------------
+// #144: Copy as Rich Text / HTML (clipboard HTML + local image data URI)
+// ---------------------------------------------------------------------------
+
+export const MAX_IMAGE_DATA_URI_BYTES = 2 * 1024 * 1024;
+
+export interface ImageDataUriResult {
+  status: "ok" | "tooLarge";
+  dataUri: string | null;
+  size: number;
+}
+
+export interface ClipboardHtmlPayload {
+  html: string;
+  plainText: string;
+}
+
+type MockClipboardHtmlHandler = (
+  payload: ClipboardHtmlPayload,
+) => void | Promise<void>;
+
+const mockImageDataUris = new Map<string, { dataUri: string; size: number }>();
+let mockLastClipboardHtml: ClipboardHtmlPayload | null = null;
+let mockClipboardHtmlHandler: MockClipboardHtmlHandler | null = null;
+
+/** Seed a mock local image for `readImageDataUri` in non-Tauri environments. */
+export function seedMockImageDataUri(
+  path: string,
+  dataUri: string,
+  size?: number,
+): void {
+  const norm = normalizePath(path);
+  if (!norm) return;
+  const approxSize = size ?? new TextEncoder().encode(dataUri).byteLength;
+  mockImageDataUris.set(norm, { dataUri, size: approxSize });
+}
+
+/** Read a local image file as a `data:` URI if within `maxBytes` (<= 2 MB). */
+export async function readImageDataUri(
+  path: string,
+  maxBytes: number = MAX_IMAGE_DATA_URI_BYTES,
+): Promise<ImageDataUriResult> {
+  if (isTauri()) {
+    return invoke<ImageDataUriResult>("read_image_data_uri", {
+      path: toNativePath(path),
+      maxBytes,
+    });
+  }
+  const norm = normalizePath(path);
+  const entry = mockImageDataUris.get(norm);
+  if (!entry) {
+    throw createAppError("NotFound", `Image not found: ${path}`);
+  }
+  const effectiveMax = Math.min(maxBytes, MAX_IMAGE_DATA_URI_BYTES);
+  if (entry.size > effectiveMax) {
+    return { status: "tooLarge", dataUri: null, size: entry.size };
+  }
+  return { status: "ok", dataUri: entry.dataUri, size: entry.size };
+}
+
+/**
+ * Write both `text/html` and `text/plain` to the system clipboard.
+ * - Tauri desktop: uses `@tauri-apps/plugin-clipboard-manager` (`writeHtml`),
+ *   which works reliably from native menu events and after async rendering on
+ *   both macOS WKWebView and Windows WebView2 (proper CF_HTML + CF_UNICODETEXT).
+ * - Browser / test environment: writes via `navigator.clipboard.write(ClipboardItem)`
+ *   when available and records the payload in the mock state.
+ */
+export async function writeClipboardHtml(
+  html: string,
+  plainText: string,
+): Promise<void> {
+  if (isTauri()) {
+    await writeClipboardHtmlPlugin(html, plainText);
+    return;
+  }
+  const payload: ClipboardHtmlPayload = { html, plainText };
+  if (mockClipboardHtmlHandler) {
+    await mockClipboardHtmlHandler(payload);
+    mockLastClipboardHtml = payload;
+    return;
+  }
+  mockLastClipboardHtml = payload;
+  if (
+    typeof navigator !== "undefined" &&
+    navigator.clipboard &&
+    typeof navigator.clipboard.write === "function" &&
+    typeof ClipboardItem !== "undefined"
+  ) {
+    try {
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          "text/html": new Blob([html], { type: "text/html" }),
+          "text/plain": new Blob([plainText], { type: "text/plain" }),
+        }),
+      ]);
+    } catch {
+      // Browser environments without clipboard-write permission still keep mockLastClipboardHtml.
+    }
+  }
+}
+
+export function getMockClipboardHtml(): ClipboardHtmlPayload | null {
+  return mockLastClipboardHtml ? { ...mockLastClipboardHtml } : null;
+}
+
+export function setMockClipboardHtmlHandler(
+  handler: MockClipboardHtmlHandler | null,
+): void {
+  mockClipboardHtmlHandler = handler;
 }

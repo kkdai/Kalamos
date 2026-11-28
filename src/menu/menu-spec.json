@@ -170,6 +170,12 @@
       { "type": "predefined", "item": "separator" },
       { "type": "predefined", "item": "cut", "labelKey": "menu.edit.cut" },
       { "type": "predefined", "item": "copy", "labelKey": "menu.edit.copy" },
+      {
+        "type": "action",
+        "id": "edit.copyRichText",
+        "labelKey": "menu.edit.copyRichText",
+        "accel": "CmdOrCtrl+Alt+Shift+C"
+      },
       { "type": "predefined", "item": "paste", "labelKey": "menu.edit.paste" },
       {
         "type": "predefined",

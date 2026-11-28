@@ -64,6 +64,7 @@
 - **커스텀 CLI 업로더**(`IM-05`): `Cmd+Opt+U`(또는 `uploadOnInsert` 옵션)로 PicGo CLI 같은 외부 명령을 실행해 로컬 이미지를 업로드하고 원격 URL로 자동 치환합니다. 보안을 위해 업로드 명령은 `settings.json`에서만 설정할 수 있습니다. 자세한 내용은 [docs/image-upload.md](docs/image-upload.md)를 참고하세요.
 
 ### 내보내기 및 가져오기
+- **서식 있는 텍스트 / HTML로 복사**(`Cmd+Opt+Shift+C` / `Ctrl+Alt+Shift+C`, **편집 > 서식 있는 텍스트로 복사**): 선택한 영역 또는 전체 문서(YAML front matter 자동 제외)를 깔끔한 리치 텍스트 HTML과 일반 Markdown으로 클립보드에 복사해 Gmail, Google Docs, Medium, Notion, Facebook에 바로 붙여넣을 수 있습니다. MathJax 수식과 Mermaid 다이어그램은 PNG 이미지로 변환하며, 로컬 이미지는 업로더가 설정되어 있으면 자동 업로드하고 미설정 시 크기 제한이 적용된 `data:` URI로 오프라인 임베드합니다. 자세한 내용은 [docs/rich-text-copy.md](docs/rich-text-copy.md)를 참고하세요.
 - **네이티브 PDF 내보내기**(`EX-01`, `Cmd+Shift+E`): A4 페이지네이션과 제목 계층에 맞춘 중첩 PDF 북마크(개요)를 자동 생성하며, 렌더링된 수식과 다이어그램도 그대로 포함합니다(macOS는 `WKWebView`·`NSPrintOperation`·`PDFKit`, Windows는 헤드리스 Microsoft Edge 또는 Google Chrome 사용).
 - **Pandoc 내보내기**(`EX-02`, `Cmd+Opt+E`): **DOCX**, **ODT**(OpenOffice / LibreOffice), **LaTeX**, **MediaWiki**, **EPUB** 형식으로 내보낼 수 있습니다(Pandoc 별도 설치 필요). `[TOC]`, 로컬 이미지 경로, `<img>` 크기 속성을 자동으로 변환합니다.
 - **Pandoc 가져오기**(`EX-03`, `Cmd+Opt+I`): **DOCX**, **ODT**, **EPUB**, **LaTeX**, **HTML**, **MediaWiki** 문서를 `$...$` / `$$...$$` 수식과 추출된 미디어가 포함된 깔끔한 GFM Markdown으로 가져옵니다(`--sandbox` 사용을 위해 Pandoc 2.15 이상 필요).
@@ -143,7 +144,8 @@
 | | 열 왼쪽 / 가운데 / 오른쪽 정렬 | `Cmd+Opt+Shift+←` / `↑` / `→` | `Ctrl+Alt+Shift+←` / `↑` / `→` |
 | **이미지** | 이미지 루트 폴더 설정 / 해제 | `Cmd+Opt+R` / `Cmd+Opt+Shift+R` | `Ctrl+Alt+R` / `Ctrl+Alt+Shift+R` |
 | | 로컬 이미지 업로드 | `Cmd+Opt+U` | `Ctrl+Alt+U` |
-| **내보내기/가져오기** | PDF 내보내기(북마크 포함) | `Cmd+Shift+E` | `Ctrl+Shift+E` |
+| **내보내기/가져오기** | 서식 있는 텍스트 / HTML로 복사 | `Cmd+Opt+Shift+C` | `Ctrl+Alt+Shift+C` |
+| | PDF 내보내기(북마크 포함) | `Cmd+Shift+E` | `Ctrl+Shift+E` |
 | | Pandoc 내보내기(DOCX/ODT/LaTeX/Wiki/EPUB) | `Cmd+Opt+E` | `Ctrl+Alt+E` |
 | | Pandoc 가져오기 | `Cmd+Opt+I` | `Ctrl+Alt+I` |
 

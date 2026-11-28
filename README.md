@@ -64,6 +64,7 @@
 - **Custom CLI Uploader** (`IM-05`): Press `Cmd+Opt+U` (or enable `uploadOnInsert`) to upload local images through any CLI tool such as PicGo CLI, configured exclusively via `settings.json` for security. See [docs/image-upload.md](docs/image-upload.md).
 
 ### Export & Import
+- **Copy as Rich Text / HTML** (`Cmd+Opt+Shift+C` / `Ctrl+Alt+Shift+C`, **Edit > Copy as Rich Text**): Copies the current selection or entire document (excluding YAML front matter) as clean rich-text HTML plus plain Markdown to the clipboard for pasting directly into Gmail, Google Docs, Medium, Notion, or Facebook. Rasterizes MathJax formulas and Mermaid diagrams to PNG, uploads local images when a CLI uploader is configured, or embeds them as size-limited `data:` URIs offline. See [docs/rich-text-copy.md](docs/rich-text-copy.md).
 - **Native PDF Export** (`EX-01`, `Cmd+Shift+E`): Paginates to A4 and embeds a nested PDF outline bookmark tree matching heading hierarchy, including rendered math and diagrams (uses `WKWebView` + `NSPrintOperation` + `PDFKit` on macOS, and headless Microsoft Edge or Google Chrome on Windows).
 - **Pandoc Export** (`EX-02`, `Cmd+Opt+E`): Export to **DOCX**, **ODT** (OpenOffice / LibreOffice), **LaTeX**, **MediaWiki**, and **EPUB** (requires optional Pandoc). Resolves `[TOC]`, local image paths, and `<img>` sizes automatically.
 - **Pandoc Import** (`EX-03`, `Cmd+Opt+I`): Import **DOCX**, **ODT**, **EPUB**, **LaTeX**, **HTML**, and **MediaWiki** into clean GFM Markdown with `$...$` / `$$...$$` math and extracted media (requires Pandoc 2.15+ for `--sandbox`).
@@ -143,7 +144,8 @@
 | | Align column left / center / right | `Cmd+Opt+Shift+←` / `↑` / `→` | `Ctrl+Alt+Shift+←` / `↑` / `→` |
 | **Images** | Set / clear image root folder | `Cmd+Opt+R` / `Cmd+Opt+Shift+R` | `Ctrl+Alt+R` / `Ctrl+Alt+Shift+R` |
 | | Upload local images | `Cmd+Opt+U` | `Ctrl+Alt+U` |
-| **Export & Import** | Export PDF (with bookmarks) | `Cmd+Shift+E` | `Ctrl+Shift+E` |
+| **Export & Import** | Copy as Rich Text / HTML | `Cmd+Opt+Shift+C` | `Ctrl+Alt+Shift+C` |
+| | Export PDF (with bookmarks) | `Cmd+Shift+E` | `Ctrl+Shift+E` |
 | | Export via Pandoc (DOCX/ODT/LaTeX/Wiki/EPUB) | `Cmd+Opt+E` | `Ctrl+Alt+E` |
 | | Import via Pandoc | `Cmd+Opt+I` | `Ctrl+Alt+I` |
 

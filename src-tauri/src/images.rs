@@ -371,6 +371,86 @@ pub fn allow_asset_file(app: tauri::AppHandle, path: String) -> Result<(), AppEr
     Ok(())
 }
 
+/// Maximum byte size allowed when embedding a local image as a `data:` URI (#144).
+pub const MAX_IMAGE_DATA_URI_BYTES: u64 = 2 * 1024 * 1024;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImageDataUriResult {
+    /// `"ok"` when `data_uri` is present, or `"tooLarge"` when the file exceeds the limit.
+    pub status: String,
+    pub data_uri: Option<String>,
+    pub size: u64,
+}
+
+fn mime_for_image_ext(ext: &str) -> Option<&'static str> {
+    match ext {
+        "png" => Some("image/png"),
+        "jpg" | "jpeg" => Some("image/jpeg"),
+        "gif" => Some("image/gif"),
+        "webp" => Some("image/webp"),
+        "svg" => Some("image/svg+xml"),
+        _ => None,
+    }
+}
+
+/// Reads a single local image as a `data:<mime>;base64,...` URI if it is a valid
+/// web image within `max_bytes` (capped at `MAX_IMAGE_DATA_URI_BYTES`).
+pub fn read_image_data_uri_impl(
+    path: &Path,
+    max_bytes: u64,
+) -> Result<ImageDataUriResult, AppError> {
+    let canonical = check_asset_file(path)?;
+    let ext = canonical
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(str::to_ascii_lowercase)
+        .unwrap_or_default();
+    let mime = mime_for_image_ext(&ext).ok_or_else(|| {
+        AppError::invalid_path(format!(
+            "Unsupported image type for data URI: .{} (allowed: png, jpg, jpeg, gif, webp, svg)",
+            ext
+        ))
+    })?;
+    let effective_limit = if max_bytes == 0 {
+        MAX_IMAGE_DATA_URI_BYTES
+    } else {
+        max_bytes.min(MAX_IMAGE_DATA_URI_BYTES)
+    };
+    let size = fs::metadata(&canonical)?.len();
+    if size > effective_limit {
+        return Ok(ImageDataUriResult {
+            status: "tooLarge".to_string(),
+            data_uri: None,
+            size,
+        });
+    }
+    let bytes = fs::read(&canonical)?;
+    let actual_size = bytes.len() as u64;
+    if actual_size > effective_limit {
+        return Ok(ImageDataUriResult {
+            status: "tooLarge".to_string(),
+            data_uri: None,
+            size: actual_size,
+        });
+    }
+    validate_image(&ext, &bytes)?;
+    let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
+    Ok(ImageDataUriResult {
+        status: "ok".to_string(),
+        data_uri: Some(format!("data:{mime};base64,{b64}")),
+        size: actual_size,
+    })
+}
+
+#[tauri::command]
+pub fn read_image_data_uri(
+    path: String,
+    max_bytes: Option<u64>,
+) -> Result<ImageDataUriResult, AppError> {
+    read_image_data_uri_impl(Path::new(&path), max_bytes.unwrap_or(MAX_IMAGE_DATA_URI_BYTES))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -648,6 +728,41 @@ mod tests {
         assert_eq!(
             check_asset_file(&root.join("link.png")).unwrap(),
             crate::platform::canonicalize(root.join("real.png")).unwrap()
+        );
+    }
+
+    #[test]
+    fn read_image_data_uri_encodes_valid_images_and_enforces_size_limit() {
+        let dir = asset_test_dir();
+        let root = dir.path();
+        let png_path = root.join("pic.png");
+        fs::write(&png_path, PNG).unwrap();
+        let res = read_image_data_uri_impl(&png_path, 1024).unwrap();
+        assert_eq!(res.status, "ok");
+        assert_eq!(res.size, PNG.len() as u64);
+        let expected_b64 = base64::engine::general_purpose::STANDARD.encode(PNG);
+        assert_eq!(
+            res.data_uri.as_deref(),
+            Some(format!("data:image/png;base64,{expected_b64}").as_str())
+        );
+
+        let too_big = read_image_data_uri_impl(&png_path, 4).unwrap();
+        assert_eq!(too_big.status, "tooLarge");
+        assert!(too_big.data_uri.is_none());
+        assert_eq!(too_big.size, PNG.len() as u64);
+
+        let fake_png = root.join("fake.png");
+        fs::write(&fake_png, b"not a png at all").unwrap();
+        assert_eq!(
+            read_image_data_uri_impl(&fake_png, 1024).unwrap_err().kind,
+            ErrorKind::Parse
+        );
+
+        let bmp_path = root.join("pic.bmp");
+        fs::write(&bmp_path, b"BM123456").unwrap();
+        assert_eq!(
+            read_image_data_uri_impl(&bmp_path, 1024).unwrap_err().kind,
+            ErrorKind::InvalidPath
         );
     }
 }
