@@ -64,6 +64,7 @@
 - **カスタム CLI アップローダ**（`IM-05`）：`Cmd+Opt+U`（または `uploadOnInsert` 設定）で PicGo CLI などの外部コマンドを呼び出し、ローカル画像をアップロードして URL へ自動置換します。安全のためアップロードコマンドは `settings.json` からのみ設定可能です。詳細は [docs/image-upload.md](docs/image-upload.md) を参照してください。
 
 ### エクスポートとインポート
+- **リッチテキスト / HTML としてコピー**（`Cmd+Opt+Shift+C` / `Ctrl+Alt+Shift+C`、**編集 > リッチテキストとしてコピー**）：選択範囲または文書全体（YAML front matter を自動除外）をクリーンなリッチテキスト HTML とプレーン Markdown としてクリップボードへ書き出し、Gmail、Google Docs、Medium、Notion、Facebook にそのまま貼り付けられます。MathJax 数式と Mermaid ダイアグラムは PNG 画像に変換し、ローカル画像はアップローダ設定済みなら自動アップロード、未設定時はサイズ制限付き `data:` URI としてオフライン埋め込みします。詳細は [docs/rich-text-copy.md](docs/rich-text-copy.md) を参照してください。
 - **ネイティブ PDF エクスポート**（`EX-01`、`Cmd+Shift+E`）：見出し階層に対応したネスト済み PDF しおり（アウトライン）付きの A4 PDF を生成し、数式やダイアグラムも描画します（macOS では `WKWebView`・`NSPrintOperation`・`PDFKit`、Windows ではヘッドレス Microsoft Edge または Google Chrome を使用）。
 - **Pandoc エクスポート**（`EX-02`、`Cmd+Opt+E`）：**DOCX**、**ODT**（OpenOffice / LibreOffice）、**LaTeX**、**MediaWiki**、**EPUB** への書き出しに対応（別途 Pandoc が必要）。`[TOC]` やローカル画像パス、`<img>` サイズ指定も自動変換します。
 - **Pandoc インポート**（`EX-03`、`Cmd+Opt+I`）：**DOCX**、**ODT**、**EPUB**、**LaTeX**、**HTML**、**MediaWiki** を `$...$` / `$$...$$` 数式や抽出メディア付きのクリーンな GFM Markdown として取り込めます（`--sandbox` のため Pandoc 2.15 以上が必要）。
@@ -143,7 +144,8 @@
 | | 列を左揃え / 中央揃え / 右揃え | `Cmd+Opt+Shift+←` / `↑` / `→` | `Ctrl+Alt+Shift+←` / `↑` / `→` |
 | **画像** | 画像ルートフォルダを設定 / 解除 | `Cmd+Opt+R` / `Cmd+Opt+Shift+R` | `Ctrl+Alt+R` / `Ctrl+Alt+Shift+R` |
 | | ローカル画像をアップロード | `Cmd+Opt+U` | `Ctrl+Alt+U` |
-| **入出力** | PDF エクスポート（しおり付き） | `Cmd+Shift+E` | `Ctrl+Shift+E` |
+| **入出力** | リッチテキスト / HTML としてコピー | `Cmd+Opt+Shift+C` | `Ctrl+Alt+Shift+C` |
+| | PDF エクスポート（しおり付き） | `Cmd+Shift+E` | `Ctrl+Shift+E` |
 | | Pandoc エクスポート（DOCX/ODT/LaTeX/Wiki/EPUB） | `Cmd+Opt+E` | `Ctrl+Alt+E` |
 | | Pandoc インポート | `Cmd+Opt+I` | `Ctrl+Alt+I` |
 

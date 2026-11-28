@@ -85,6 +85,12 @@ import {
   exportingPdfMessage,
   pdfErrorMessage,
 } from "./export/pdf";
+import {
+  buildRichTextHtml,
+  copyRichTextErrorMessage,
+  extractRichTextSource,
+  formatCopyRichTextStatus,
+} from "./export/rich-text";
 import { sha256Hex } from "./external-changes/content-hash";
 import { createExternalChangeBanner } from "./external-changes/external-change-banner";
 import {
@@ -149,6 +155,7 @@ import {
   takePendingOpenFiles,
   uploadImages,
   watchOpenFiles,
+  writeClipboardHtml,
   writeRecovery,
 } from "./ipc";
 import {
@@ -372,6 +379,9 @@ export interface KalamosApp {
   /** EX-01: export the current document to PDF (Cmd+Shift+E). */
   exportDocumentPdf: (explicitPath?: string) => Promise<boolean>;
   isExportingPdf: () => boolean;
+  /** #144: copy selection or whole document as rich text / HTML (Cmd+Opt+Shift+C). */
+  copyRichText: () => Promise<boolean>;
+  isCopyingRichText: () => boolean;
   dropImageFiles: (
     paths: string[],
     position?: { x: number; y: number },
@@ -1696,6 +1706,7 @@ export function createKalamosApp(
     "file.exportPdf": () => exportDocumentPdf(),
     "file.exportPandoc": () => exportDocumentAs(),
     "file.import": () => importDocument(),
+    "edit.copyRichText": () => copyRichText(),
     "edit.find": () => openFind(editor.view),
     "edit.replace": () => openFind(editor.view, { replace: true }),
     "edit.findNext": () => findNextMatch(editor.view),
@@ -1857,6 +1868,11 @@ export function createKalamosApp(
       }
     }
     if (preferences.isOpen() || quickOpen.isOpen() || updater.isOpen()) return;
+    if (event.altKey && event.shiftKey && event.code === "KeyC") {
+      event.preventDefault();
+      void copyRichText();
+      return;
+    }
     if (event.code === "KeyF" && !event.shiftKey) {
       event.preventDefault();
       openFind(editor.view, { replace: event.altKey });
@@ -2377,6 +2393,38 @@ export function createKalamosApp(
     return newTab();
   }
 
+  let copyingRichText = false;
+
+  async function copyRichText(): Promise<boolean> {
+    if (copyingRichText) return false;
+    copyingRichText = true;
+    try {
+      const source = extractRichTextSource(editor.view.state);
+      if (source.markdown.trim().length === 0) {
+        setStatus(t("export.copyRichText.empty"), false);
+        return false;
+      }
+      setStatus(t("export.copyRichText.copying"), false);
+      const settings = await refreshUploadSettings();
+      const result = await buildRichTextHtml(source.markdown, {
+        docPath: active.path,
+        mathAutoNumber: editor.isMathAutoNumber(),
+        imageRootDir: editor.getImageRootDir(),
+        frontMatterImageRoot: source.frontMatterImageRoot,
+        uploadCommand: settings.uploadCommand,
+        uploadImages,
+      });
+      await writeClipboardHtml(result.html, result.plainText);
+      setStatus(formatCopyRichTextStatus(source.scope, result.images), false);
+      return true;
+    } catch (err) {
+      setStatus(copyRichTextErrorMessage(err), true);
+      return false;
+    } finally {
+      copyingRichText = false;
+    }
+  }
+
   let exportingPdf = false;
 
   async function exportDocumentPdf(explicitPath?: string): Promise<boolean> {
@@ -2800,6 +2848,8 @@ export function createKalamosApp(
     importDocument,
     exportDocumentPdf,
     isExportingPdf: () => exportingPdf,
+    copyRichText,
+    isCopyingRichText: () => copyingRichText,
     dropImageFiles,
     insertPastedImages,
     restoreRecovery,

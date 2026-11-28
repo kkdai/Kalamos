@@ -41,6 +41,7 @@ pub fn run() {
     let builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
 
     builder
+        .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
@@ -84,6 +85,7 @@ pub fn run() {
             images::import_image_bytes,
             images::allow_asset_dir,
             images::allow_asset_file,
+            images::read_image_data_uri,
             export::export_pdf,
             pandoc::pandoc_status,
             pandoc::export_pandoc,
