@@ -17,6 +17,8 @@ export interface TabBarItem {
   title: string;
   dirty: boolean;
   active: boolean;
+  /** #145: unresolved external conflict or missing disk file. */
+  externalStatus?: "synced" | "conflict" | "missing";
 }
 
 export interface TabBarOptions {
@@ -120,6 +122,9 @@ export function createTabBar(options: TabBarOptions): TabBar {
       tab.dataset.tabId = item.id;
       tab.dataset.active = item.active ? "true" : "false";
       tab.dataset.dirty = item.dirty ? "true" : "false";
+      if (item.externalStatus && item.externalStatus !== "synced") {
+        tab.dataset.externalStatus = item.externalStatus;
+      }
       tab.setAttribute("role", "tab");
       tab.setAttribute("aria-selected", item.active ? "true" : "false");
       tab.title = item.title;

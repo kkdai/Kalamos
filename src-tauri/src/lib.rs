@@ -19,6 +19,7 @@ pub mod watch;
 pub fn run() {
     let builder = tauri::Builder::default()
         .manage(watch::WatcherManager::new())
+        .manage(watch::FileWatcherManager::new())
         .manage(open_with::PendingOpenFiles::new())
         .manage(settings::ActiveUiLocale::new());
 
@@ -57,11 +58,15 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             files::open_file,
+            files::open_file_snapshot,
+            files::stat_file_snapshot,
             files::save_file,
+            files::save_file_checked,
             tree::read_tree,
             tree::list_files,
             tree::list_markdown_paths,
             watch::watch_folder,
+            watch::watch_open_files,
             fsops::create_file,
             fsops::rename_path,
             fsops::trash_path,

@@ -24,13 +24,27 @@ test("AC2 Cmd+O opens, Cmd+S on an unedited CRLF/BOM/no-final-newline file write
   await page.keyboard.press(`${MOD}+o`);
   await expect.poll(() => getDoc(page)).toBe(original);
   // Saving re-writes the file; content must be byte-for-byte (string) identical.
-  await withIpc(page, "ipc.seedMockFile('/demo/crlf.md', 'CLOBBERED');");
+  await withIpc(
+    page,
+    `window.__savedPayload = null;
+     ipc.setMockSaveInterceptor(async (_path, content, defaultSave) => {
+       window.__savedPayload = content;
+       return defaultSave();
+     });`,
+  );
   await page.keyboard.press(`${MOD}+s`);
   await expect
     .poll(() =>
-      withIpc<string>(page, "return ipc.readMockFile('/demo/crlf.md');"),
+      page.evaluate(
+        () =>
+          (window as unknown as { __savedPayload: string | null })
+            .__savedPayload,
+      ),
     )
     .toBe(original);
+  expect(
+    await withIpc<string>(page, "return ipc.readMockFile('/demo/crlf.md');"),
+  ).toBe(original);
 });
 
 test("AC2 Cmd+Shift+S saves as a new path; Cmd+N starts an empty document", async ({

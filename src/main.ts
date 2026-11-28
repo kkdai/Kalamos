@@ -85,6 +85,19 @@ import {
   exportingPdfMessage,
   pdfErrorMessage,
 } from "./export/pdf";
+import { sha256Hex } from "./external-changes/content-hash";
+import { createExternalChangeBanner } from "./external-changes/external-change-banner";
+import {
+  applySaveFileResult,
+  canAutosave,
+  createExternalChangeState,
+  type DiskSnapshot,
+  type ExternalChangeState,
+  type ExternalChangeStatus,
+  evaluateDiskCheck,
+  isPathAffectedByFsEvent,
+  needsAttentionBeforeClose,
+} from "./external-changes/external-change-state";
 import { DEFAULT_UI_LOCALE, getUiLocale, initUiLocale, t } from "./i18n";
 import {
   allowAssetDir,
@@ -94,6 +107,7 @@ import {
   DEFAULT_SETTINGS,
   exportPandoc,
   exportPdf,
+  type FileSnapshot,
   formatErrorMessage,
   getActiveUiLocale,
   getSettings,
@@ -108,9 +122,10 @@ import {
   onFileDrop,
   onFsChanged,
   onMenuAction,
+  onOpenFilesChanged,
   onOpenFilesRequested,
   onWindowCloseRequested,
-  openFile,
+  openFileSnapshot,
   openThemesDir,
   pandocStatus,
   pickImportPath,
@@ -124,14 +139,16 @@ import {
   restartApp,
   type Settings,
   saveChangesLabels,
-  saveFile,
+  saveFileChecked,
   setSettings,
   setUiLocale,
   setWebviewZoom,
   setWindowTitle,
+  statFileSnapshot,
   syncMenuState,
   takePendingOpenFiles,
   uploadImages,
+  watchOpenFiles,
   writeRecovery,
 } from "./ipc";
 import {
@@ -162,6 +179,7 @@ import { createSidebar, type SidebarController } from "./sidebar/sidebar";
 import { createTabBar, type TabBar } from "./tabs/tab-bar";
 import {
   activeIndexAfterClose,
+  baseNameOf,
   cycleIndex,
   isMarkdownPath,
   moveItem,
@@ -267,6 +285,12 @@ export interface DocumentTab {
   scrollTop: number;
   scrollSnapshot: StateEffect<unknown> | null;
   autosaveTimer: ReturnType<typeof setTimeout> | null;
+  /** #145: external modification / deletion state and disk baseline snapshot. */
+  external: ExternalChangeState;
+  saving: boolean;
+  recheckAfterSave: boolean;
+  checkingDisk: boolean;
+  recheckPending: boolean;
 }
 
 export interface TabInfo {
@@ -276,6 +300,7 @@ export interface TabInfo {
   docId: string;
   dirty: boolean;
   active: boolean;
+  externalStatus: ExternalChangeStatus;
 }
 
 export interface KalamosApp {
@@ -354,6 +379,8 @@ export interface KalamosApp {
   insertPastedImages: (files: File[], pos: number) => Promise<boolean>;
   restoreRecovery: () => Promise<boolean>;
   discardRecovery: () => Promise<boolean>;
+  /** #145: check all open named tabs against their on-disk state. */
+  checkExternalChanges: () => Promise<void>;
   flushBeforeClose: () => Promise<void>;
   init: () => Promise<void>;
   destroy: () => void;
@@ -399,6 +426,8 @@ export function createKalamosApp(
   let pendingRecovery: RecoveryEntry | null = null;
   let unlistenClose: (() => void) | null = null;
   let unlistenQuickOpenFs: (() => void) | null = null;
+  let unlistenOpenFilesChanged: (() => void) | null = null;
+  let watchedOpenFilesSignature = "";
   let statusText = "";
   let currentSettings: Settings = { ...DEFAULT_SETTINGS, recentFiles: [] };
   let recentFiles: string[] = [];
@@ -444,21 +473,48 @@ export function createKalamosApp(
     targetPath: string,
     tab: DocumentTab,
     contentToSave: string,
+    saveOptions?: { force?: boolean },
   ): Promise<boolean> {
+    const force = Boolean(saveOptions?.force);
+    const expectedHash =
+      !force && tab.path === targetPath
+        ? (tab.external.baseline?.hash ?? null)
+        : null;
+    tab.saving = true;
     try {
       const previousPath = tab.path;
-      await saveFile(targetPath, contentToSave);
+      const result = await saveFileChecked(
+        targetPath,
+        contentToSave,
+        expectedHash,
+      );
+      const outcome = applySaveFileResult(tab.external, result);
+      if (outcome.kind === "conflict" || outcome.kind === "missing") {
+        if (tabs.includes(tab)) {
+          tab.external = outcome.nextState;
+          clearAutosaveTimer(tab);
+          renderTabs();
+          if (tab === active) renderExternalBanner();
+        }
+        return false;
+      }
       setStatus("", false);
       if (tabs.includes(tab)) {
         tab.path = targetPath;
+        tab.external = outcome.nextState;
         editor.markSessionClean(tab.doc, contentToSave);
-        if (tab === active) syncDocumentPath();
+        if (tab === active) {
+          syncDocumentPath();
+          renderExternalBanner();
+        }
         renderTabs();
+        syncWatchedOpenFiles();
         await clearRecovery(tab.docId).catch(() => null);
         if (
           tabs.includes(tab) &&
           editor.isSessionDirty(tab.doc) &&
-          tab.path !== null
+          tab.path !== null &&
+          canAutosave(tab.external)
         ) {
           scheduleNamedAutosave(tab);
         }
@@ -490,6 +546,14 @@ export function createKalamosApp(
         () => null,
       );
       return false;
+    } finally {
+      tab.saving = false;
+      if (tab.recheckAfterSave) {
+        tab.recheckAfterSave = false;
+        if (!destroyed && tabs.includes(tab)) {
+          void checkTabExternalChange(tab);
+        }
+      }
     }
   }
 
@@ -497,6 +561,8 @@ export function createKalamosApp(
   function scheduleNamedAutosave(tab: DocumentTab = active): void {
     clearAutosaveTimer(tab);
     if (tab.path === null) return;
+    // #145: pause autosave while a tab has an unresolved external conflict or missing file.
+    if (!canAutosave(tab.external)) return;
     // #74 preference: autosave off = only explicit saves (and switching / closing) write the file.
     if (currentSettings.autoSave === false) return;
     const targetPath = tab.path;
@@ -505,6 +571,7 @@ export function createKalamosApp(
       if (
         tabs.includes(tab) &&
         tab.path === targetPath &&
+        canAutosave(tab.external) &&
         editor.isSessionDirty(tab.doc)
       ) {
         void persistFileToPath(
@@ -676,6 +743,7 @@ export function createKalamosApp(
     doc: DocSession,
     path: string | null,
     docId = generateDocId(),
+    baseline: DiskSnapshot | null = null,
   ): DocumentTab {
     return {
       id: `tab-${++tabSeq}`,
@@ -687,6 +755,11 @@ export function createKalamosApp(
       scrollTop: 0,
       scrollSnapshot: null,
       autosaveTimer: null,
+      external: createExternalChangeState(baseline),
+      saving: false,
+      recheckAfterSave: false,
+      checkingDisk: false,
+      recheckPending: false,
     };
   }
 
@@ -715,6 +788,261 @@ export function createKalamosApp(
     },
   });
 
+  // ---- #145: external file modification / deletion banner & watcher ----
+
+  const externalBanner = createExternalChangeBanner({
+    parent: editorContainer.parentElement ?? document.body,
+    before: editorContainer.parentElement ? editorContainer : null,
+    onKeepMine: async () => {
+      const tab = active;
+      if (tab.path === null || tab.external.status !== "conflict") return;
+      const saved = await persistFileToPath(
+        tab.path,
+        tab,
+        editor.getSessionContent(tab.doc),
+        { force: true },
+      );
+      if (saved && tab === active) {
+        setStatus(t("externalChange.keptMine"), false);
+      }
+    },
+    onLoadDisk: async () => {
+      const tab = active;
+      const targetPath = tab.path;
+      if (targetPath === null) return;
+      try {
+        const snap = await openFileSnapshot(targetPath);
+        if (destroyed || !tabs.includes(tab) || tab.path !== targetPath) return;
+        await reloadTabFromDisk(tab, snap, tab === active);
+      } catch (err) {
+        const kind = (err as { kind?: string } | null)?.kind;
+        if (kind === "NotFound") {
+          if (tabs.includes(tab) && tab.path === targetPath) {
+            tab.external = {
+              status: "missing",
+              baseline: tab.external.baseline,
+              diskSnapshot: null,
+            };
+            clearAutosaveTimer(tab);
+            renderTabs();
+            if (tab === active) renderExternalBanner();
+          }
+          return;
+        }
+        setStatus(formatErrorMessage(t("app.openFailed"), err), true);
+      }
+    },
+    onSaveAs: async () => {
+      await saveDocumentAs();
+    },
+    onRecreate: async () => {
+      const tab = active;
+      if (tab.path === null || tab.external.status !== "missing") return;
+      const saved = await persistFileToPath(
+        tab.path,
+        tab,
+        editor.getSessionContent(tab.doc),
+        { force: true },
+      );
+      if (saved && tab === active) {
+        setStatus(t("externalChange.recreated"), false);
+      }
+    },
+  });
+
+  function renderExternalBanner(): void {
+    if (active.path === null || active.external.status === "synced") {
+      externalBanner.render({ kind: "hidden" });
+      return;
+    }
+    externalBanner.render({
+      kind: active.external.status,
+      fileName: baseNameOf(active.path),
+    });
+  }
+
+  function syncWatchedOpenFiles(): void {
+    if (destroyed) return;
+    const unique = Array.from(
+      new Set(
+        tabs.map((tab) => tab.path).filter((p): p is string => p !== null),
+      ),
+    ).sort();
+    const sig = JSON.stringify(unique);
+    if (sig === watchedOpenFilesSignature) return;
+    watchedOpenFilesSignature = sig;
+    void watchOpenFiles(unique).catch(() => null);
+  }
+
+  async function reloadTabFromDisk(
+    tab: DocumentTab,
+    snap: FileSnapshot,
+    notifyStatus: boolean,
+  ): Promise<void> {
+    clearAutosaveTimer(tab);
+    tab.external = createExternalChangeState({
+      hash: snap.hash,
+      mtimeMs: snap.mtimeMs,
+      size: snap.size,
+    });
+    if (tab !== active) {
+      tab.scrollSnapshot = null;
+    }
+    editor.reloadSession(tab.doc, snap.content);
+    await clearRecovery(tab.docId).catch(() => null);
+    renderTabs();
+    if (tab === active) {
+      renderExternalBanner();
+      sidebar.outline.refreshNow();
+      wordCounter.flush();
+      if (notifyStatus) {
+        setStatus(t("externalChange.reloaded"), false);
+      }
+    }
+  }
+
+  async function checkTabExternalChange(tab: DocumentTab): Promise<void> {
+    if (destroyed || !tabs.includes(tab) || tab.path === null) return;
+    if (tab.saving) {
+      tab.recheckAfterSave = true;
+      return;
+    }
+    if (tab.checkingDisk) {
+      tab.recheckPending = true;
+      return;
+    }
+    tab.checkingDisk = true;
+    try {
+      const targetPath = tab.path;
+      const disk = await statFileSnapshot(targetPath).catch(() => null);
+      if (
+        !disk ||
+        destroyed ||
+        !tabs.includes(tab) ||
+        tab.path !== targetPath ||
+        tab.saving
+      ) {
+        return;
+      }
+      const localDirty = editor.isSessionDirty(tab.doc);
+      const localContent = editor.getSessionContent(tab.doc);
+      const decision = evaluateDiskCheck({
+        state: tab.external,
+        localDirty,
+        localContentHash: sha256Hex(localContent),
+        disk,
+      });
+
+      if (decision.kind === "noop") {
+        tab.external = decision.nextState;
+        return;
+      }
+      if (decision.kind === "resolved") {
+        tab.external = decision.nextState;
+        if (decision.markClean) {
+          editor.markSessionClean(tab.doc, localContent);
+        } else if (
+          editor.isSessionDirty(tab.doc) &&
+          canAutosave(tab.external)
+        ) {
+          scheduleNamedAutosave(tab);
+        }
+        renderTabs();
+        if (tab === active) renderExternalBanner();
+        return;
+      }
+      if (decision.kind === "conflict" || decision.kind === "missing") {
+        tab.external = decision.nextState;
+        clearAutosaveTimer(tab);
+        renderTabs();
+        if (tab === active) renderExternalBanner();
+        return;
+      }
+      if (decision.kind === "autoReload") {
+        let snap: FileSnapshot;
+        try {
+          snap = await openFileSnapshot(targetPath);
+        } catch (err) {
+          const kind = (err as { kind?: string } | null)?.kind;
+          if (
+            kind === "NotFound" &&
+            !destroyed &&
+            tabs.includes(tab) &&
+            tab.path === targetPath
+          ) {
+            tab.external = {
+              status: "missing",
+              baseline: tab.external.baseline,
+              diskSnapshot: null,
+            };
+            clearAutosaveTimer(tab);
+            renderTabs();
+            if (tab === active) renderExternalBanner();
+          }
+          return;
+        }
+        if (
+          destroyed ||
+          !tabs.includes(tab) ||
+          tab.path !== targetPath ||
+          tab.saving
+        ) {
+          return;
+        }
+        // Guard against user typing while openFileSnapshot was in flight.
+        if (editor.isSessionDirty(tab.doc)) {
+          tab.external = {
+            status: "conflict",
+            baseline: tab.external.baseline,
+            diskSnapshot: {
+              hash: snap.hash,
+              mtimeMs: snap.mtimeMs,
+              size: snap.size,
+            },
+          };
+          clearAutosaveTimer(tab);
+          renderTabs();
+          if (tab === active) renderExternalBanner();
+          return;
+        }
+        await reloadTabFromDisk(tab, snap, tab === active);
+      }
+    } finally {
+      tab.checkingDisk = false;
+      if (tab.recheckPending) {
+        tab.recheckPending = false;
+        if (!destroyed && tabs.includes(tab)) {
+          void checkTabExternalChange(tab);
+        }
+      }
+    }
+  }
+
+  async function checkExternalChangesForPaths(
+    changedPaths: readonly string[],
+  ): Promise<void> {
+    if (destroyed || changedPaths.length === 0) return;
+    const targets = tabs.filter((tab) =>
+      isPathAffectedByFsEvent(tab.path, changedPaths, IS_WINDOWS),
+    );
+    await Promise.all(targets.map((tab) => checkTabExternalChange(tab)));
+  }
+
+  async function checkAllOpenTabsExternalChanges(): Promise<void> {
+    if (destroyed) return;
+    const targets = tabs.filter((tab) => tab.path !== null);
+    await Promise.all(targets.map((tab) => checkTabExternalChange(tab)));
+  }
+
+  const onWindowFocusCheck = () => {
+    void checkAllOpenTabsExternalChanges();
+  };
+  const onVisibilityCheck = () => {
+    if (!document.hidden) {
+      void checkAllOpenTabsExternalChanges();
+    }
+  };
+
   let lastWindowTitle = "";
   function currentLabels(): Map<string, string> {
     return tabLabels(tabs);
@@ -723,13 +1051,25 @@ export function createKalamosApp(
   function renderTabs(): void {
     const labels = currentLabels();
     tabBar.render(
-      tabs.map((tab) => ({
-        id: tab.id,
-        label: labels.get(tab.id) ?? "",
-        title: tab.path ? toNativePath(tab.path) : (labels.get(tab.id) ?? ""),
-        dirty: editor.isSessionDirty(tab.doc),
-        active: tab === active,
-      })),
+      tabs.map((tab) => {
+        const baseTitle = tab.path
+          ? toNativePath(tab.path)
+          : (labels.get(tab.id) ?? "");
+        const title =
+          tab.external.status === "conflict"
+            ? `${baseTitle} — ${t("externalChange.tabBadgeConflict")}`
+            : tab.external.status === "missing"
+              ? `${baseTitle} — ${t("externalChange.tabBadgeMissing")}`
+              : baseTitle;
+        return {
+          id: tab.id,
+          label: labels.get(tab.id) ?? "",
+          title,
+          dirty: editor.isSessionDirty(tab.doc),
+          active: tab === active,
+          externalStatus: tab.external.status,
+        };
+      }),
     );
     const title = labels.get(active.id) ?? "Kalamos";
     if (title !== lastWindowTitle) {
@@ -759,6 +1099,7 @@ export function createKalamosApp(
     sidebar.outline.refreshNow();
     wordCounter.flush();
     renderTabs();
+    renderExternalBanner();
     scheduleMenuSync();
     if (!preferences.isOpen() && !quickOpen.isOpen() && !updater.isOpen())
       view.focus();
@@ -793,6 +1134,7 @@ export function createKalamosApp(
       );
     }
     showTab(next);
+    syncWatchedOpenFiles();
   }
 
   /** Shows a newly made tab: in place of a blank untitled active tab, else as a new tab. */
@@ -830,15 +1172,22 @@ export function createKalamosApp(
 
   /** Unsaved changes in a tab about to close: true = go ahead and close it. */
   async function settleBeforeClose(tab: DocumentTab): Promise<boolean> {
-    if (!editor.isSessionDirty(tab.doc)) return true;
-    // Autosave is on: a named file is simply written, as when switching documents.
-    if (tab.path !== null && currentSettings.autoSave !== false) {
+    const localDirty = editor.isSessionDirty(tab.doc);
+    if (!needsAttentionBeforeClose(tab.external, localDirty)) return true;
+    // Autosave is on: a synced named file is simply written, as when switching documents.
+    if (
+      tab.path !== null &&
+      currentSettings.autoSave !== false &&
+      canAutosave(tab.external)
+    ) {
       clearAutosaveTimer(tab);
-      return persistFileToPath(
+      const saved = await persistFileToPath(
         tab.path,
         tab,
         editor.getSessionContent(tab.doc),
       );
+      if (!saved && tab !== active && tabs.includes(tab)) showTab(tab);
+      return saved;
     }
     // Show the tab being asked about.
     if (tab !== active) showTab(tab);
@@ -850,7 +1199,7 @@ export function createKalamosApp(
       await clearRecovery(tab.docId).catch(() => null);
       return true;
     }
-    if (tab.path !== null) {
+    if (tab.path !== null && tab.external.status !== "missing") {
       clearAutosaveTimer(tab);
       return persistFileToPath(
         tab.path,
@@ -890,6 +1239,7 @@ export function createKalamosApp(
         }
       }
       setStatus("", false);
+      syncWatchedOpenFiles();
       return true;
     } finally {
       closing = false;
@@ -1029,6 +1379,7 @@ export function createKalamosApp(
         void applyRecentFiles(renamedRecent, true);
       }
       renderTabs();
+      syncWatchedOpenFiles();
     },
     onPathTrashed: (trashedPath) => {
       for (const tab of tabs) {
@@ -1037,10 +1388,12 @@ export function createKalamosApp(
           continue;
         clearAutosaveTimer(tab);
         tab.path = null;
+        tab.external = createExternalChangeState(null);
         tab.untitledNumber = nextUntitledNumber(untitledNumbersInUse());
         editor.markSessionDirty(tab.doc);
         if (tab === active) {
           syncDocumentPath();
+          renderExternalBanner();
           sidebar.setActiveFile(null);
           setStatus(
             t(IS_WINDOWS ? "app.fileTrashedWindows" : "app.fileTrashed"),
@@ -1053,6 +1406,7 @@ export function createKalamosApp(
         void applyRecentFiles(prunedRecent, true);
       }
       renderTabs();
+      syncWatchedOpenFiles();
     },
     onError: (prefix, err) => {
       setStatus(formatErrorMessage(prefix, err), true);
@@ -1898,9 +2252,9 @@ export function createKalamosApp(
       setStatus("", false);
       return true;
     }
-    let content: string;
+    let snapshot: FileSnapshot;
     try {
-      content = await openFile(path);
+      snapshot = await openFileSnapshot(path);
     } catch (err) {
       const kind = (err as { kind?: string } | null)?.kind;
       if (kind === "NotFound") {
@@ -1932,12 +2286,22 @@ export function createKalamosApp(
     if (target.kind === "existing") {
       activateTab(target.id);
     } else {
-      const tab = makeTab(editor.createSession(content), path);
+      const tab = makeTab(
+        editor.createSession(snapshot.content),
+        path,
+        undefined,
+        {
+          hash: snapshot.hash,
+          mtimeMs: snapshot.mtimeMs,
+          size: snapshot.size,
+        },
+      );
       if (target.kind === "replace") {
         replaceActiveTab(tab);
       } else {
         tabs.push(tab);
         showTab(tab);
+        syncWatchedOpenFiles();
       }
     }
     recordRecentFile(path);
@@ -1983,7 +2347,7 @@ export function createKalamosApp(
   async function saveDocument(): Promise<boolean> {
     const tab = active;
     clearAutosaveTimer(tab);
-    if (tab.path === null) {
+    if (tab.path === null || tab.external.status === "missing") {
       return saveDocumentAs();
     }
     return persistFileToPath(tab.path, tab, editor.getSessionContent(tab.doc));
@@ -2004,6 +2368,7 @@ export function createKalamosApp(
       selectedPath,
       tab,
       editor.getSessionContent(tab.doc),
+      { force: true },
     );
   }
 
@@ -2061,6 +2426,7 @@ export function createKalamosApp(
     );
     // A blank untitled tab is reused; otherwise the restored text gets its own tab.
     placeNewTab(restored);
+    syncWatchedOpenFiles();
     await clearRecovery(entry.docId).catch(() => null);
     if (restored.path !== null && tabs.includes(restored)) {
       scheduleNamedAutosave(restored);
@@ -2083,10 +2449,10 @@ export function createKalamosApp(
       clearAutosaveTimer(tab);
       if (!editor.isSessionDirty(tab.doc)) continue;
       const content = editor.getSessionContent(tab.doc);
-      if (tab.path !== null) {
+      if (tab.path !== null && canAutosave(tab.external)) {
         await persistFileToPath(tab.path, tab, content);
-      } else if (content.length > 0) {
-        await writeRecovery(tab.docId, content, null).catch(() => null);
+      } else if (tab.path !== null || content.length > 0) {
+        await writeRecovery(tab.docId, content, tab.path).catch(() => null);
       }
     }
   }
@@ -2104,7 +2470,13 @@ export function createKalamosApp(
     try {
       if (currentSettings.autoSave !== false) {
         for (const tab of [...tabs]) {
-          if (tab.path === null || !editor.isSessionDirty(tab.doc)) continue;
+          if (
+            tab.path === null ||
+            !editor.isSessionDirty(tab.doc) ||
+            !canAutosave(tab.external)
+          ) {
+            continue;
+          }
           clearAutosaveTimer(tab);
           await persistFileToPath(
             tab.path,
@@ -2113,7 +2485,9 @@ export function createKalamosApp(
           );
         }
       }
-      const unsaved = tabs.filter((tab) => editor.isSessionDirty(tab.doc));
+      const unsaved = tabs.filter((tab) =>
+        needsAttentionBeforeClose(tab.external, editor.isSessionDirty(tab.doc)),
+      );
       if (unsaved.length === 0) return true;
       const labels = currentLabels();
       const choice = await askSaveChanges(
@@ -2129,17 +2503,26 @@ export function createKalamosApp(
         return true;
       }
       for (const tab of unsaved) {
-        if (!tabs.includes(tab) || !editor.isSessionDirty(tab.doc)) continue;
+        if (
+          !tabs.includes(tab) ||
+          !needsAttentionBeforeClose(
+            tab.external,
+            editor.isSessionDirty(tab.doc),
+          )
+        ) {
+          continue;
+        }
         clearAutosaveTimer(tab);
         let saved: boolean;
-        if (tab.path !== null) {
+        if (tab.path !== null && tab.external.status !== "missing") {
           saved = await persistFileToPath(
             tab.path,
             tab,
             editor.getSessionContent(tab.doc),
           );
+          if (!saved && tabs.includes(tab)) showTab(tab);
         } else {
-          // Show the untitled tab its save dialog is for.
+          // Show the untitled / missing tab its save dialog is for.
           showTab(tab);
           saved = await saveDocumentAs();
         }
@@ -2243,16 +2626,28 @@ export function createKalamosApp(
     applyLayoutSettings();
     renderTabs();
     await themeMenu.init();
-    const unlistenFs = await onFsChanged(async () => {
+    const unlistenFs = await onFsChanged(async (payload) => {
       const folder = sidebar.getCurrentFolder();
       if (folder) {
         await refreshQuickOpenFolderCache(folder);
       }
+      await checkExternalChangesForPaths(payload.paths);
     }).catch(() => null);
     if (destroyed) {
       unlistenFs?.();
     } else {
       unlistenQuickOpenFs = unlistenFs;
+    }
+    const unlistenOpenChanged = await onOpenFilesChanged(async (payload) => {
+      await checkExternalChangesForPaths(payload.paths);
+    }).catch(() => null);
+    if (destroyed) {
+      unlistenOpenChanged?.();
+    } else {
+      unlistenOpenFilesChanged = unlistenOpenChanged;
+      window.addEventListener("focus", onWindowFocusCheck);
+      document.addEventListener("visibilitychange", onVisibilityCheck);
+      syncWatchedOpenFiles();
     }
     await sidebar.init({
       restoreFolder: settings?.startupBehavior !== "blank",
@@ -2318,6 +2713,12 @@ export function createKalamosApp(
     unlistenMenu = null;
     unlistenQuickOpenFs?.();
     unlistenQuickOpenFs = null;
+    unlistenOpenFilesChanged?.();
+    unlistenOpenFilesChanged = null;
+    window.removeEventListener("focus", onWindowFocusCheck);
+    document.removeEventListener("visibilitychange", onVisibilityCheck);
+    externalBanner.destroy();
+    void watchOpenFiles([]).catch(() => null);
     if (menuSyncTimer !== null) clearTimeout(menuSyncTimer);
     menu.destroy();
     quickOpen.destroy();
@@ -2356,6 +2757,7 @@ export function createKalamosApp(
         docId: tab.docId,
         dirty: editor.isSessionDirty(tab.doc),
         active: tab === active,
+        externalStatus: tab.external.status,
       }));
     },
     getActiveTabId: () => active.id,
@@ -2402,6 +2804,7 @@ export function createKalamosApp(
     insertPastedImages,
     restoreRecovery,
     discardRecovery,
+    checkExternalChanges: checkAllOpenTabsExternalChanges,
     flushBeforeClose,
     init,
     destroy,
