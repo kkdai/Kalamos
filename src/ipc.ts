@@ -1,5 +1,6 @@
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { sha256Hex } from "./external-changes/content-hash";
 import {
   defaultUiLocaleForTag,
   hasMessageKey,
@@ -21,6 +22,7 @@ const loadTauriWindow = () => import("@tauri-apps/api/window");
 const loadTauriWebview = () => import("@tauri-apps/api/webview");
 const loadTauriDialog = () => import("@tauri-apps/plugin-dialog");
 const loadTauriUpdater = () => import("@tauri-apps/plugin-updater");
+const loadTauriClipboard = () => import("@tauri-apps/plugin-clipboard-manager");
 
 function normalizeTreeNode(node: TreeNode): TreeNode {
   return {
@@ -70,6 +72,54 @@ export interface FileMeta {
   path: string;
   mtimeMs: number;
   size: number;
+}
+
+/** #145: file content along with its disk metadata and SHA-256 content hash. */
+export interface FileSnapshot {
+  path: string;
+  content: string;
+  mtimeMs: number;
+  size: number;
+  hash: string;
+}
+
+/** #145: current disk state of a named file without transferring content. */
+export type FileDiskState =
+  | {
+      status: "exists";
+      path: string;
+      mtimeMs: number;
+      size: number;
+      hash: string;
+    }
+  | {
+      status: "missing";
+      path: string;
+    };
+
+/** #145: result of a conflict-checked save (pre-save defense against external overwrites). */
+export type SaveFileResult =
+  | {
+      status: "saved";
+      path: string;
+      mtimeMs: number;
+      size: number;
+      hash: string;
+    }
+  | {
+      status: "conflict";
+      path: string;
+      mtimeMs: number;
+      size: number;
+      diskHash: string;
+    }
+  | {
+      status: "missing";
+      path: string;
+    };
+
+export interface OpenFilesChangedPayload {
+  paths: string[];
 }
 
 export type TreeNodeKind = "dir" | "file";
@@ -204,6 +254,7 @@ let mockSystemLocale: string | null = "zh-TW";
 let mockSettingsWriteError: Error | null = null;
 let mockRestartError: Error | null = null;
 let mockWatchedFolder: string | null = null;
+let mockWatchedOpenFiles: string[] = [];
 let mockListMarkdownPathsCalls = 0;
 const mockAssetFiles = new Set<string>();
 const mockAllowedAssetDirs = new Set<string>();
@@ -230,6 +281,9 @@ type MockSaveInterceptor = (
   defaultSave: () => Promise<FileMeta>,
 ) => Promise<FileMeta>;
 type FsChangedListener = (payload: FsChangedPayload) => void | Promise<void>;
+type OpenFilesChangedListener = (
+  payload: OpenFilesChangedPayload,
+) => void | Promise<void>;
 
 let mockOpenDialogHandler: DialogOpenHandler | null = null;
 let mockOpenFolderDialogHandler: DialogOpenHandler | null = null;
@@ -244,6 +298,7 @@ const mockCloseListeners = new Set<
   () => boolean | void | Promise<boolean | void>
 >();
 const mockFsChangedListeners = new Set<FsChangedListener>();
+const mockOpenFilesChangedListeners = new Set<OpenFilesChangedListener>();
 
 export function isTauri(): boolean {
   return (
@@ -401,6 +456,7 @@ export function resetMockState(): void {
   mockSettingsWriteError = null;
   mockRestartError = null;
   mockWatchedFolder = null;
+  mockWatchedOpenFiles = [];
   mockListMarkdownPathsCalls = 0;
   lastMockTimestampMs = 0;
   mockOpenDialogHandler = null;
@@ -416,6 +472,7 @@ export function resetMockState(): void {
   mockQuitCount = 0;
   mockRestartCount = 0;
   mockFsChangedListeners.clear();
+  mockOpenFilesChangedListeners.clear();
   mockAssetFiles.clear();
   mockAllowedAssetDirs.clear();
   mockAllowedAssetFiles.clear();
@@ -433,6 +490,9 @@ export function resetMockState(): void {
   mockPandocImportHandler = null;
   mockUpdateHandler = null;
   mockUpdateCheckCount = 0;
+  mockImageDataUris.clear();
+  mockLastClipboardHtml = null;
+  mockClipboardHtmlHandler = null;
   seedDemoFolder();
   seedDefaultCustomThemes();
 }
@@ -495,8 +555,16 @@ export function readMockFile(path: string): string | undefined {
   return mockFiles.get(normalizePath(path))?.content;
 }
 
+export function deleteMockFile(path: string): boolean {
+  return mockFiles.delete(normalizePath(path));
+}
+
 export function getMockWatchedFolder(): string | null {
   return mockWatchedFolder;
+}
+
+export function getMockWatchedOpenFiles(): string[] {
+  return [...mockWatchedOpenFiles];
 }
 
 export function seedMockCustomTheme(stem: string, css: string): void {
@@ -522,6 +590,52 @@ export async function openFile(path: string): Promise<string> {
     throw createAppError("NotFound", `File not found: ${path}`);
   }
   return entry.content;
+}
+
+export async function openFileSnapshot(path: string): Promise<FileSnapshot> {
+  if (isTauri()) {
+    const snap = await invoke<FileSnapshot>("open_file_snapshot", { path });
+    return { ...snap, path: toSlashPath(snap.path) };
+  }
+  if (!path || !path.trim()) {
+    throw createAppError("InvalidPath", "Path must not be empty");
+  }
+  const norm = normalizePath(path);
+  const entry = mockFiles.get(norm);
+  if (!entry) {
+    throw createAppError("NotFound", `File not found: ${path}`);
+  }
+  const size = new TextEncoder().encode(entry.content).byteLength;
+  return {
+    path: norm,
+    content: entry.content,
+    mtimeMs: entry.mtimeMs,
+    size,
+    hash: sha256Hex(entry.content),
+  };
+}
+
+export async function statFileSnapshot(path: string): Promise<FileDiskState> {
+  if (isTauri()) {
+    const state = await invoke<FileDiskState>("stat_file_snapshot", { path });
+    return { ...state, path: toSlashPath(state.path) };
+  }
+  if (!path || !path.trim()) {
+    throw createAppError("InvalidPath", "Path must not be empty");
+  }
+  const norm = normalizePath(path);
+  const entry = mockFiles.get(norm);
+  if (!entry) {
+    return { status: "missing", path: norm };
+  }
+  const size = new TextEncoder().encode(entry.content).byteLength;
+  return {
+    status: "exists",
+    path: norm,
+    mtimeMs: entry.mtimeMs,
+    size,
+    hash: sha256Hex(entry.content),
+  };
 }
 
 export async function saveFile(
@@ -553,6 +667,53 @@ export async function saveFile(
     return mockSaveInterceptor(path, content, defaultSave);
   }
   return defaultSave();
+}
+
+export async function saveFileChecked(
+  path: string,
+  content: string,
+  expectedHash?: string | null,
+): Promise<SaveFileResult> {
+  if (isTauri()) {
+    const res = await invoke<SaveFileResult>("save_file_checked", {
+      path,
+      content,
+      expectedHash: expectedHash ?? null,
+    });
+    return { ...res, path: toSlashPath(res.path) };
+  }
+  if (!path || !path.trim()) {
+    throw createAppError("InvalidPath", "Path must not be empty");
+  }
+  const norm = normalizePath(path);
+  if (mockDirs.has(norm)) {
+    throw createAppError("InvalidPath", `Target path is a directory: ${path}`);
+  }
+  if (expectedHash !== undefined && expectedHash !== null) {
+    const existing = mockFiles.get(norm);
+    if (!existing) {
+      return { status: "missing", path: norm };
+    }
+    const diskHash = sha256Hex(existing.content);
+    if (diskHash !== expectedHash) {
+      const size = new TextEncoder().encode(existing.content).byteLength;
+      return {
+        status: "conflict",
+        path: norm,
+        mtimeMs: existing.mtimeMs,
+        size,
+        diskHash,
+      };
+    }
+  }
+  const meta = await saveFile(path, content);
+  return {
+    status: "saved",
+    path: meta.path,
+    mtimeMs: meta.mtimeMs,
+    size: meta.size,
+    hash: sha256Hex(content),
+  };
 }
 
 function assertValidMockDir(path: string): string {
@@ -952,6 +1113,16 @@ export async function watchFolder(path: string): Promise<null> {
   return null;
 }
 
+export async function watchOpenFiles(paths: string[]): Promise<null> {
+  if (isTauri()) {
+    return invoke<null>("watch_open_files", { paths });
+  }
+  mockWatchedOpenFiles = paths
+    .map((p) => normalizePath(p))
+    .filter((p) => p.length > 0);
+  return null;
+}
+
 export async function createFile(path: string): Promise<FileMeta> {
   if (isTauri()) {
     const meta = await invoke<FileMeta>("create_file", { path });
@@ -1092,6 +1263,34 @@ export async function triggerMockFsChanged(
         };
   for (const listener of Array.from(mockFsChangedListeners)) {
     await listener(resolved);
+  }
+}
+
+export async function onOpenFilesChanged(
+  listener: OpenFilesChangedListener,
+): Promise<() => void> {
+  if (isTauri()) {
+    return listen<OpenFilesChangedPayload>("open-files-changed", (event) => {
+      void listener({
+        paths: event.payload.paths.map((p) => toSlashPath(p)),
+      });
+    });
+  }
+  mockOpenFilesChangedListeners.add(listener);
+  return () => {
+    mockOpenFilesChangedListeners.delete(listener);
+  };
+}
+
+export async function triggerMockOpenFilesChanged(
+  paths: string[],
+): Promise<void> {
+  const payload: OpenFilesChangedPayload = {
+    paths: paths.map((p) => normalizePath(p)).filter((p) => p.length > 0),
+  };
+  if (payload.paths.length === 0) return;
+  for (const listener of Array.from(mockOpenFilesChangedListeners)) {
+    await listener(payload);
   }
 }
 
@@ -2324,4 +2523,117 @@ export function setMockUpdateHandler(handler: MockUpdateHandler | null): void {
 
 export function getMockUpdateCheckCount(): number {
   return mockUpdateCheckCount;
+}
+
+// ---------------------------------------------------------------------------
+// #144: Copy as Rich Text / HTML (clipboard HTML + local image data URI)
+// ---------------------------------------------------------------------------
+
+export const MAX_IMAGE_DATA_URI_BYTES = 2 * 1024 * 1024;
+
+export interface ImageDataUriResult {
+  status: "ok" | "tooLarge";
+  dataUri: string | null;
+  size: number;
+}
+
+export interface ClipboardHtmlPayload {
+  html: string;
+  plainText: string;
+}
+
+type MockClipboardHtmlHandler = (
+  payload: ClipboardHtmlPayload,
+) => void | Promise<void>;
+
+const mockImageDataUris = new Map<string, { dataUri: string; size: number }>();
+let mockLastClipboardHtml: ClipboardHtmlPayload | null = null;
+let mockClipboardHtmlHandler: MockClipboardHtmlHandler | null = null;
+
+/** Seed a mock local image for `readImageDataUri` in non-Tauri environments. */
+export function seedMockImageDataUri(
+  path: string,
+  dataUri: string,
+  size?: number,
+): void {
+  const norm = normalizePath(path);
+  if (!norm) return;
+  const approxSize = size ?? new TextEncoder().encode(dataUri).byteLength;
+  mockImageDataUris.set(norm, { dataUri, size: approxSize });
+}
+
+/** Read a local image file as a `data:` URI if within `maxBytes` (<= 2 MB). */
+export async function readImageDataUri(
+  path: string,
+  maxBytes: number = MAX_IMAGE_DATA_URI_BYTES,
+): Promise<ImageDataUriResult> {
+  if (isTauri()) {
+    return invoke<ImageDataUriResult>("read_image_data_uri", {
+      path: toNativePath(path),
+      maxBytes,
+    });
+  }
+  const norm = normalizePath(path);
+  const entry = mockImageDataUris.get(norm);
+  if (!entry) {
+    throw createAppError("NotFound", `Image not found: ${path}`);
+  }
+  const effectiveMax = Math.min(maxBytes, MAX_IMAGE_DATA_URI_BYTES);
+  if (entry.size > effectiveMax) {
+    return { status: "tooLarge", dataUri: null, size: entry.size };
+  }
+  return { status: "ok", dataUri: entry.dataUri, size: entry.size };
+}
+
+/**
+ * Write both `text/html` and `text/plain` to the system clipboard.
+ * - Tauri desktop: uses `@tauri-apps/plugin-clipboard-manager` (`writeHtml`),
+ *   which works reliably from native menu events and after async rendering on
+ *   both macOS WKWebView and Windows WebView2 (proper CF_HTML + CF_UNICODETEXT).
+ * - Browser / test environment: writes via `navigator.clipboard.write(ClipboardItem)`
+ *   when available and records the payload in the mock state.
+ */
+export async function writeClipboardHtml(
+  html: string,
+  plainText: string,
+): Promise<void> {
+  if (isTauri()) {
+    const { writeHtml } = await loadTauriClipboard();
+    await writeHtml(html, plainText);
+    return;
+  }
+  const payload: ClipboardHtmlPayload = { html, plainText };
+  if (mockClipboardHtmlHandler) {
+    await mockClipboardHtmlHandler(payload);
+    mockLastClipboardHtml = payload;
+    return;
+  }
+  mockLastClipboardHtml = payload;
+  if (
+    typeof navigator !== "undefined" &&
+    navigator.clipboard &&
+    typeof navigator.clipboard.write === "function" &&
+    typeof ClipboardItem !== "undefined"
+  ) {
+    try {
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          "text/html": new Blob([html], { type: "text/html" }),
+          "text/plain": new Blob([plainText], { type: "text/plain" }),
+        }),
+      ]);
+    } catch {
+      // Browser environments without clipboard-write permission still keep mockLastClipboardHtml.
+    }
+  }
+}
+
+export function getMockClipboardHtml(): ClipboardHtmlPayload | null {
+  return mockLastClipboardHtml ? { ...mockLastClipboardHtml } : null;
+}
+
+export function setMockClipboardHtmlHandler(
+  handler: MockClipboardHtmlHandler | null,
+): void {
+  mockClipboardHtmlHandler = handler;
 }

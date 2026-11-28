@@ -64,6 +64,7 @@
 - **自訂上傳指令**（`IM-05`）：按 `Cmd+Opt+U`（或開啟 `uploadOnInsert`）呼叫外部 CLI 工具（如 PicGo CLI）上傳本機圖片並自動替換為遠端網址；基於安全考量，上傳指令僅能透過 `settings.json` 設定。詳見 [docs/image-upload.md](docs/image-upload.md)。
 
 ### 匯出與匯入
+- **複製為富文字 / HTML**（`Cmd+Opt+Shift+C` / `Ctrl+Alt+Shift+C`，**編輯 > 複製為富文字**）：一鍵將選取範圍或整份文件（自動排除 YAML front matter）以精簡富文字 HTML 與純文字 Markdown 寫入剪貼簿，直接貼到 Gmail、Google Docs、Medium、Notion 或 Facebook。數學公式與 Mermaid 圖表自動轉為 PNG 圖片；本機圖片於有設定圖床時自動上傳取網址，未設定時於離線以大小受限的 `data:` URI 內嵌。詳見 [docs/rich-text-copy.md](docs/rich-text-copy.md)。
 - **原生 PDF 匯出**（`EX-01`，`Cmd+Shift+E`）：自動進行 A4 分頁並寫入對應標題層級的巢狀 PDF 書籤，完整保留數學公式與圖表（macOS 使用 `WKWebView`、`NSPrintOperation` 與 `PDFKit`；Windows 使用無頭 Microsoft Edge 或 Google Chrome）。
 - **Pandoc 多格式匯出**（`EX-02`，`Cmd+Opt+E`）：支援匯出 **DOCX**、**ODT**（OpenOffice / LibreOffice）、**LaTeX**、**MediaWiki** 與 **EPUB**（需選用安裝 Pandoc），自動轉換 `[TOC]`、本機圖片路徑與 `<img>` 尺寸。
 - **Pandoc 匯入**（`EX-03`，`Cmd+Opt+I`）：可將 **DOCX**、**ODT**、**EPUB**、**LaTeX**、**HTML** 與 **MediaWiki** 匯入為乾淨的 GFM Markdown，保留 `$...$` / `$$...$$` 數學公式並提取內嵌媒體（需 Pandoc 2.15 以上以啟用 `--sandbox`）。
@@ -143,7 +144,8 @@
 | | 欄靠左 / 置中 / 靠右對齊 | `Cmd+Opt+Shift+←` / `↑` / `→` | `Ctrl+Alt+Shift+←` / `↑` / `→` |
 | **圖片** | 設定 / 清除圖片根目錄 | `Cmd+Opt+R` / `Cmd+Opt+Shift+R` | `Ctrl+Alt+R` / `Ctrl+Alt+Shift+R` |
 | | 上傳本機圖片至圖床 | `Cmd+Opt+U` | `Ctrl+Alt+U` |
-| **匯出與匯入** | 匯出 PDF（含書籤） | `Cmd+Shift+E` | `Ctrl+Shift+E` |
+| **匯出與匯入** | 複製為富文字 / HTML | `Cmd+Opt+Shift+C` | `Ctrl+Alt+Shift+C` |
+| | 匯出 PDF（含書籤） | `Cmd+Shift+E` | `Ctrl+Shift+E` |
 | | 透過 Pandoc 匯出（DOCX/ODT/LaTeX/Wiki/EPUB） | `Cmd+Opt+E` | `Ctrl+Alt+E` |
 | | 透過 Pandoc 匯入文件 | `Cmd+Opt+I` | `Ctrl+Alt+I` |
 

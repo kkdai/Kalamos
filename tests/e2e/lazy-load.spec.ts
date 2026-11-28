@@ -13,7 +13,7 @@ import { boot, setDoc } from "./helpers";
 const MATH_URL_RE = /math-engine|mathjax/i;
 const MERMAID_URL_RE = /diagram-engine|mermaid|dompurify/i;
 const EXPORT_URL_RE =
-  /\/src\/export\/|\/assets\/(?:html|pandoc|pdf|format-picker)-/i;
+  /\/src\/export\/|\/assets\/(?:html|pandoc|pdf|format-picker|rich-text)-/i;
 const EMOJI_URL_RE = /gemoji/i;
 
 function trackRequests(page: import("@playwright/test").Page): string[] {
