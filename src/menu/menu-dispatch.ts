@@ -130,7 +130,17 @@ export function formatAccelerator(
   }
   if (isMac) {
     const mods = `${ctrl ? "⌃" : ""}${alt ? "⌥" : ""}${shift ? "⇧" : ""}${meta ? "⌘" : ""}`;
-    const key = keyPart.toLowerCase() === "tab" ? "⇥" : keyPart;
+    const macKeys: Record<string, string> = {
+      tab: "⇥",
+      backspace: "⌫",
+      enter: "↩",
+      escape: "Esc",
+      arrowup: "↑",
+      arrowdown: "↓",
+      arrowleft: "←",
+      arrowright: "→",
+    };
+    const key = macKeys[keyPart.toLowerCase()] ?? keyPart;
     return `${mods}${key}`;
   }
   const mods: string[] = [];
@@ -138,7 +148,17 @@ export function formatAccelerator(
   if (meta) mods.push("Win");
   if (alt) mods.push("Alt");
   if (shift) mods.push("Shift");
-  const key = keyPart.toLowerCase() === "tab" ? "Tab" : keyPart;
+  const winKeys: Record<string, string> = {
+    tab: "Tab",
+    backspace: "Backspace",
+    enter: "Enter",
+    escape: "Esc",
+    arrowup: "↑",
+    arrowdown: "↓",
+    arrowleft: "←",
+    arrowright: "→",
+  };
+  const key = winKeys[keyPart.toLowerCase()] ?? keyPart;
   return [...mods, key].join("+");
 }
 

@@ -496,6 +496,18 @@
     "role": "help",
     "items": [
       {
+        "type": "action",
+        "id": "help.shortcuts",
+        "labelKey": "menu.help.shortcuts",
+        "accel": "CmdOrCtrl+Alt+/"
+      },
+      {
+        "type": "action",
+        "id": "help.welcome",
+        "labelKey": "menu.help.welcome"
+      },
+      { "type": "predefined", "item": "separator" },
+      {
         "type": "link",
         "id": "help.repo",
         "labelKey": "menu.help.repo",
