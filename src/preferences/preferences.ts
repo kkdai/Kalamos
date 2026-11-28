@@ -1,5 +1,6 @@
 import "./preferences.css";
 
+import { formatBytes } from "../history/diff";
 import {
   getUiLocale,
   normalizeUiLocale,
@@ -7,7 +8,7 @@ import {
   UI_LOCALES,
   type UiLocale,
 } from "../i18n";
-import type { StartupBehavior, SystemDarkTheme } from "../ipc";
+import type { HistoryStats, StartupBehavior, SystemDarkTheme } from "../ipc";
 import { IS_WINDOWS, shortcutLabel, toNativePath } from "../platform";
 
 /**
@@ -35,12 +36,19 @@ export const FONT_SIZE_MAX = 28;
 export const CONTENT_WIDTH_MIN = 480;
 export const CONTENT_WIDTH_MAX = 1400;
 export const CONTENT_WIDTH_STEP = 20;
+export const HISTORY_MAX_VERSIONS_MIN = 1;
+export const HISTORY_MAX_VERSIONS_MAX = 500;
+export const HISTORY_MAX_TOTAL_MB_MIN = 10;
+export const HISTORY_MAX_TOTAL_MB_MAX = 2048;
 
 export interface PreferencesValues {
   uiLocale: UiLocale;
   startupBehavior: StartupBehavior;
   autoSave: boolean;
   autoCheckUpdates: boolean;
+  historyEnabled: boolean;
+  historyMaxVersions: number;
+  historyMaxTotalMb: number;
   fontSize: number;
   contentWidth: number;
   autoPairBrackets: boolean;
@@ -62,6 +70,9 @@ export type PreferencesPatch = Partial<
     | "startupBehavior"
     | "autoSave"
     | "autoCheckUpdates"
+    | "historyEnabled"
+    | "historyMaxVersions"
+    | "historyMaxTotalMb"
     | "fontSize"
     | "contentWidth"
     | "autoPairBrackets"
@@ -85,6 +96,8 @@ export interface PreferencesHost {
   pickImageRootDir: () => Promise<unknown>;
   clearImageRootDir: () => Promise<unknown>;
   openThemesDir: () => Promise<unknown>;
+  getHistoryStats?: () => Promise<HistoryStats>;
+  clearAllHistory?: () => Promise<void>;
 }
 
 export interface PreferencesController {
@@ -106,6 +119,22 @@ export function clampContentWidth(value: number): number {
   if (!Number.isFinite(value)) return 720;
   const stepped = Math.round(value / CONTENT_WIDTH_STEP) * CONTENT_WIDTH_STEP;
   return Math.min(CONTENT_WIDTH_MAX, Math.max(CONTENT_WIDTH_MIN, stepped));
+}
+
+export function clampHistoryMaxVersions(value: number): number {
+  if (!Number.isFinite(value)) return 50;
+  return Math.min(
+    HISTORY_MAX_VERSIONS_MAX,
+    Math.max(HISTORY_MAX_VERSIONS_MIN, Math.round(value)),
+  );
+}
+
+export function clampHistoryMaxTotalMb(value: number): number {
+  if (!Number.isFinite(value)) return 200;
+  return Math.min(
+    HISTORY_MAX_TOTAL_MB_MAX,
+    Math.max(HISTORY_MAX_TOTAL_MB_MIN, Math.round(value)),
+  );
 }
 
 export function createPreferences(
@@ -150,6 +179,7 @@ export function createPreferences(
     key:
       | "autoSave"
       | "autoCheckUpdates"
+      | "historyEnabled"
       | "autoPairBrackets"
       | "autoPairMarkdown"
       | "codeLineNumbers"
@@ -294,6 +324,172 @@ export function createPreferences(
     return field;
   }
 
+  let refreshHistoryUsage: (() => Promise<void>) | null = null;
+
+  function buildHistoryRow(): HTMLElement {
+    const stack = el("div", "k-pref-stack");
+    const enabledToggle = checkbox(
+      "historyEnabled",
+      t("prefs.historyEnabled"),
+      "pref-history-enabled",
+    );
+
+    const limits = el("div", "k-pref-history-limits");
+
+    const maxVersionsLabel = el("label", "k-pref-number-field");
+    maxVersionsLabel.append(
+      el("span", undefined, t("prefs.historyMaxVersions")),
+    );
+    const maxVersionsInput = el("input", "k-pref-number");
+    maxVersionsInput.type = "number";
+    maxVersionsInput.min = String(HISTORY_MAX_VERSIONS_MIN);
+    maxVersionsInput.max = String(HISTORY_MAX_VERSIONS_MAX);
+    maxVersionsInput.step = "1";
+    maxVersionsInput.dataset.testid = "pref-history-max-versions";
+    maxVersionsInput.addEventListener("change", () => {
+      const clamped = clampHistoryMaxVersions(Number(maxVersionsInput.value));
+      maxVersionsInput.value = String(clamped);
+      void host.applyChange({ historyMaxVersions: clamped });
+    });
+    maxVersionsLabel.append(maxVersionsInput);
+
+    const maxMbLabel = el("label", "k-pref-number-field");
+    maxMbLabel.append(el("span", undefined, t("prefs.historyMaxTotalMb")));
+    const maxMbInput = el("input", "k-pref-number");
+    maxMbInput.type = "number";
+    maxMbInput.min = String(HISTORY_MAX_TOTAL_MB_MIN);
+    maxMbInput.max = String(HISTORY_MAX_TOTAL_MB_MAX);
+    maxMbInput.step = "10";
+    maxMbInput.dataset.testid = "pref-history-max-mb";
+    maxMbInput.addEventListener("change", () => {
+      const clamped = clampHistoryMaxTotalMb(Number(maxMbInput.value));
+      maxMbInput.value = String(clamped);
+      void host.applyChange({ historyMaxTotalMb: clamped });
+    });
+    maxMbLabel.append(maxMbInput);
+
+    limits.append(maxVersionsLabel, maxMbLabel);
+
+    const clearRow = el("div", "k-pref-inline");
+    const clearBtn = el("button", "k-pref-button", t("prefs.historyClear"));
+    clearBtn.type = "button";
+    clearBtn.dataset.testid = "pref-history-clear";
+    const usageNotice = el("span", "k-pref-hint");
+    usageNotice.dataset.testid = "pref-history-notice";
+    usageNotice.setAttribute("aria-live", "polite");
+    clearRow.append(clearBtn, usageNotice);
+
+    const confirmDialog = el("dialog", "k-pref-restart");
+    confirmDialog.dataset.testid = "pref-history-clear-dialog";
+    const confirmTitle = el("h1", undefined, t("prefs.historyClearQuestion"));
+    confirmTitle.id = "k-pref-history-clear-title";
+    confirmDialog.setAttribute("aria-labelledby", confirmTitle.id);
+    const confirmForm = el("form");
+    confirmForm.method = "dialog";
+    const cancelBtn = el("button", "k-pref-button", t("dialog.cancel"));
+    cancelBtn.value = "cancel";
+    cancelBtn.dataset.testid = "pref-history-clear-cancel";
+    cancelBtn.autofocus = true;
+    const confirmBtn = el(
+      "button",
+      "k-pref-button",
+      t("prefs.historyClearConfirm"),
+    );
+    confirmBtn.value = "clear";
+    confirmBtn.dataset.testid = "pref-history-clear-confirm";
+    confirmForm.append(cancelBtn, confirmBtn);
+    confirmDialog.append(confirmTitle, confirmForm);
+    confirmDialog.addEventListener("keydown", (event) =>
+      event.stopPropagation(),
+    );
+
+    let customNotice: string | null = null;
+    let lastStats: HistoryStats | null = null;
+    const renderNotice = () => {
+      if (customNotice !== null) {
+        usageNotice.textContent = customNotice;
+        return;
+      }
+      if (!lastStats) {
+        usageNotice.textContent = "";
+        return;
+      }
+      if (lastStats.totalVersions === 0) {
+        usageNotice.textContent = t("prefs.historyUsageEmpty");
+      } else {
+        usageNotice.textContent = t(
+          lastStats.totalVersions === 1
+            ? "prefs.historyUsageOne"
+            : "prefs.historyUsage",
+          {
+            size: formatBytes(lastStats.totalBytes),
+            versions: lastStats.totalVersions,
+          },
+        );
+      }
+    };
+
+    refreshHistoryUsage = async () => {
+      if (!host.getHistoryStats) return;
+      try {
+        lastStats = await host.getHistoryStats();
+        customNotice = null;
+        renderNotice();
+      } catch {
+        // Keep previous notice if stats cannot be read.
+      }
+    };
+
+    const runClear = async () => {
+      if (!host.clearAllHistory) return;
+      clearBtn.disabled = true;
+      try {
+        await host.clearAllHistory();
+        lastStats = { totalBytes: 0, totalVersions: 0, fileCount: 0 };
+        customNotice = t("prefs.historyCleared");
+        renderNotice();
+      } catch {
+        customNotice = t("prefs.historyClearError");
+        renderNotice();
+      } finally {
+        clearBtn.disabled = false;
+      }
+    };
+
+    confirmDialog.addEventListener("close", () => {
+      const confirmed = confirmDialog.returnValue === "clear";
+      confirmDialog.returnValue = "";
+      if (confirmed && confirmDialog.isConnected) {
+        void runClear();
+      }
+    });
+
+    clearBtn.addEventListener("click", () => {
+      if (!host.clearAllHistory) return;
+      if (typeof confirmDialog.showModal === "function") {
+        confirmDialog.showModal();
+      } else {
+        void runClear();
+      }
+    });
+
+    syncers.push((v) => {
+      maxVersionsInput.value = String(v.historyMaxVersions);
+      maxMbInput.value = String(v.historyMaxTotalMb);
+      maxVersionsInput.disabled = !v.historyEnabled;
+      maxMbInput.disabled = !v.historyEnabled;
+    });
+
+    stack.append(enabledToggle, limits, clearRow);
+    const field = row(
+      t("prefs.history"),
+      stack,
+      shortcutLabel(t("prefs.historyHint")),
+    );
+    field.append(confirmDialog);
+    return field;
+  }
+
   function buildGeneral(): HTMLElement {
     const panel = el("div", "k-pref-panel");
     const select = el("select");
@@ -327,6 +523,7 @@ export function createPreferences(
         checkbox("autoSave", t("prefs.autoSaveDescription"), "pref-auto-save"),
         shortcutLabel(t("prefs.autoSaveHint")),
       ),
+      buildHistoryRow(),
       row(
         t("prefs.updates"),
         checkbox(
@@ -615,6 +812,7 @@ export function createPreferences(
     }
     selectTab(tab ?? currentTab);
     sync();
+    void refreshHistoryUsage?.();
     tabButtons.get(currentTab)?.focus();
   }
 
@@ -623,6 +821,7 @@ export function createPreferences(
     doc.removeEventListener("keydown", onKeydown, true);
     backdrop.remove();
     backdrop = null;
+    refreshHistoryUsage = null;
     previousFocus?.focus?.();
     previousFocus = null;
   }

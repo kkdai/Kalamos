@@ -118,6 +118,8 @@ pub fn current_system_locale() -> Option<String> {
 
 pub const DEFAULT_FONT_SIZE: u32 = 17;
 pub const DEFAULT_CONTENT_WIDTH: u32 = 720;
+pub const DEFAULT_HISTORY_MAX_VERSIONS: u32 = 50;
+pub const DEFAULT_HISTORY_MAX_TOTAL_MB: u32 = 200;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
@@ -166,6 +168,12 @@ pub struct Settings {
     pub content_width: u32,
     /// #104: recently opened / saved file paths (newest first, up to 20).
     pub recent_files: Vec<String>,
+    /// #148: keep local version history snapshots on save (default on).
+    pub history_enabled: bool,
+    /// #148: maximum snapshots kept per file (default 50).
+    pub history_max_versions: u32,
+    /// #148: maximum total local history size in MB across all files (default 200).
+    pub history_max_total_mb: u32,
 }
 
 impl Default for Settings {
@@ -194,6 +202,9 @@ impl Default for Settings {
             font_size: DEFAULT_FONT_SIZE,
             content_width: DEFAULT_CONTENT_WIDTH,
             recent_files: Vec::new(),
+            history_enabled: true,
+            history_max_versions: DEFAULT_HISTORY_MAX_VERSIONS,
+            history_max_total_mb: DEFAULT_HISTORY_MAX_TOTAL_MB,
         }
     }
 }
@@ -368,6 +379,9 @@ mod tests {
         assert_eq!(v["fontSize"], 17);
         assert_eq!(v["contentWidth"], 720);
         assert_eq!(v["recentFiles"], serde_json::json!([]));
+        assert_eq!(v["historyEnabled"], true);
+        assert_eq!(v["historyMaxVersions"], 50);
+        assert_eq!(v["historyMaxTotalMb"], 200);
     }
 
     #[test]
@@ -401,6 +415,9 @@ mod tests {
                 "/tmp/kalamos-test/Notes/a.md".to_string(),
                 "/tmp/kalamos-test/Notes/b.md".to_string(),
             ],
+            history_enabled: false,
+            history_max_versions: 25,
+            history_max_total_mb: 100,
         };
         set_settings_in(dir.path(), &updated).expect("set_settings");
         let loaded = get_settings_in(dir.path()).expect("get_settings");
@@ -871,5 +888,29 @@ mod tests {
             assert_eq!(fallback.theme, "nyx");
             assert_eq!(fallback.font_size, 21);
         }
+    }
+
+    #[test]
+    fn reads_settings_without_history_keys_and_roundtrips_them() {
+        let dir = tempdir().expect("tempdir");
+        let settings_path = dir.path().join("settings.json");
+        fs::write(&settings_path, r#"{ "theme": "papyros", "autoSave": true }"#)
+            .expect("write legacy settings without history keys");
+
+        let mut loaded = get_settings_in(dir.path()).expect("load legacy settings");
+        assert!(loaded.history_enabled);
+        assert_eq!(loaded.history_max_versions, DEFAULT_HISTORY_MAX_VERSIONS);
+        assert_eq!(loaded.history_max_total_mb, DEFAULT_HISTORY_MAX_TOTAL_MB);
+
+        loaded.history_enabled = false;
+        loaded.history_max_versions = 30;
+        loaded.history_max_total_mb = 512;
+        set_settings_in(dir.path(), &loaded).expect("save settings");
+        let raw: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(&settings_path).unwrap()).unwrap();
+        assert_eq!(raw["historyEnabled"], false);
+        assert_eq!(raw["historyMaxVersions"], 30);
+        assert_eq!(raw["historyMaxTotalMb"], 512);
+        assert_eq!(get_settings_in(dir.path()).unwrap(), loaded);
     }
 }

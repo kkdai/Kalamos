@@ -14,6 +14,9 @@ function makeValues(
     startupBehavior: "restoreFolder",
     autoSave: true,
     autoCheckUpdates: true,
+    historyEnabled: true,
+    historyMaxVersions: 50,
+    historyMaxTotalMb: 200,
     fontSize: 17,
     contentWidth: 720,
     autoPairBrackets: true,
@@ -242,6 +245,93 @@ describe("preferences language notice", () => {
       darkSelect.value = "nyx";
       darkSelect.dispatchEvent(new Event("change"));
       expect(applyChange).toHaveBeenCalledWith({ systemDarkTheme: "nyx" });
+    } finally {
+      prefs.destroy();
+    }
+  });
+
+  it("lets the user toggle local history, adjust retention limits, and clear history", async () => {
+    const values = makeValues({
+      historyEnabled: true,
+      historyMaxVersions: 50,
+      historyMaxTotalMb: 200,
+    });
+    const applyChange = vi.fn((patch) => {
+      Object.assign(values, patch);
+    });
+    const clearAllHistory = vi.fn(async () => {});
+    const host: PreferencesHost = {
+      getValues: () => ({ ...values }),
+      getThemes: () => [{ id: "papyros", label: "Papyros" }],
+      applyChange,
+      saveUiLocale: async () => {},
+      restartApp: async () => {},
+      pickImageRootDir: async () => null,
+      clearImageRootDir: async () => null,
+      openThemesDir: async () => null,
+      getHistoryStats: async () => ({
+        totalBytes: 2048,
+        totalVersions: 3,
+        fileCount: 1,
+      }),
+      clearAllHistory,
+    };
+
+    const prefs = createPreferences(host, document);
+    try {
+      await prefs.open("general");
+      await flushMicrotasks();
+
+      const enabled = document.querySelector<HTMLInputElement>(
+        '[data-testid="pref-history-enabled"]',
+      )!;
+      const maxVersions = document.querySelector<HTMLInputElement>(
+        '[data-testid="pref-history-max-versions"]',
+      )!;
+      const maxMb = document.querySelector<HTMLInputElement>(
+        '[data-testid="pref-history-max-mb"]',
+      )!;
+      const notice = document.querySelector<HTMLElement>(
+        '[data-testid="pref-history-notice"]',
+      )!;
+      const dialog = document.querySelector<HTMLDialogElement>(
+        '[data-testid="pref-history-clear-dialog"]',
+      )!;
+      dialog.showModal = vi.fn();
+
+      expect(enabled.checked).toBe(true);
+      expect(maxVersions.value).toBe("50");
+      expect(maxMb.value).toBe("200");
+      expect(notice.textContent).toContain("2.0 KB");
+
+      maxVersions.value = "25";
+      maxVersions.dispatchEvent(new Event("change"));
+      expect(applyChange).toHaveBeenCalledWith({ historyMaxVersions: 25 });
+
+      maxMb.value = "120";
+      maxMb.dispatchEvent(new Event("change"));
+      expect(applyChange).toHaveBeenCalledWith({ historyMaxTotalMb: 120 });
+
+      enabled.checked = false;
+      enabled.dispatchEvent(new Event("change"));
+      expect(applyChange).toHaveBeenCalledWith({ historyEnabled: false });
+      prefs.sync();
+      expect(maxVersions.disabled).toBe(true);
+      expect(maxMb.disabled).toBe(true);
+
+      // Clear all history via confirmation dialog
+      const clearBtn = document.querySelector<HTMLButtonElement>(
+        '[data-testid="pref-history-clear"]',
+      )!;
+      clearBtn.click();
+      expect(dialog.showModal).toHaveBeenCalledTimes(1);
+
+      dialog.returnValue = "clear";
+      dialog.dispatchEvent(new Event("close"));
+      await flushMicrotasks();
+
+      expect(clearAllHistory).toHaveBeenCalledTimes(1);
+      expect(notice.textContent).toBe(t("prefs.historyCleared"));
     } finally {
       prefs.destroy();
     }

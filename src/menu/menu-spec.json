@@ -103,6 +103,11 @@
         "labelKey": "menu.file.saveAs",
         "accel": "CmdOrCtrl+Shift+S"
       },
+      {
+        "type": "action",
+        "id": "file.versionHistory",
+        "labelKey": "menu.file.versionHistory"
+      },
       { "type": "predefined", "item": "separator" },
       {
         "type": "submenu",

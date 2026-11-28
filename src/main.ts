@@ -91,22 +91,29 @@ import {
   extractRichTextSource,
   formatCopyRichTextStatus,
 } from "./export/rich-text";
+import {
+  createHistoryModal,
+  type HistoryModalController,
+} from "./history/history-modal";
 import { DEFAULT_UI_LOCALE, getUiLocale, initUiLocale, t } from "./i18n";
 import {
   allowAssetDir,
   askSaveChanges,
   checkForUpdate,
+  clearAllHistory,
   clearRecovery,
   DEFAULT_SETTINGS,
   exportPandoc,
   exportPdf,
   formatErrorMessage,
   getActiveUiLocale,
+  getHistoryStats,
   getSettings,
   importImage,
   importImageBytes,
   importPandoc,
   isAssetDirTooBroadError,
+  listHistory,
   listMarkdownPaths,
   listRecovery,
   type MenuSyncState,
@@ -127,6 +134,7 @@ import {
   pickSavePdfPath,
   quitApp,
   type RecoveryEntry,
+  readHistoryVersion,
   restartApp,
   type Settings,
   saveChangesLabels,
@@ -150,6 +158,8 @@ import { IS_WINDOWS, shortcutLabel, toNativePath } from "./platform";
 import {
   clampContentWidth,
   clampFontSize,
+  clampHistoryMaxTotalMb,
+  clampHistoryMaxVersions,
   createPreferences,
   type PreferencesController,
   type PreferencesPatch,
@@ -301,6 +311,10 @@ export interface KalamosApp {
   moveTab: (id: string, toIndex: number) => boolean;
   /** #74: Cmd+, preferences modal. */
   preferences: PreferencesController;
+  /** #148: local version history browser modal. */
+  historyModal: HistoryModalController;
+  /** #148: open the version history browser for the active tab. */
+  openVersionHistory: () => Promise<void>;
   /** #91: in-app auto-updater modal & background check controller. */
   updater: UpdaterController;
   /** #91: check for app updates (manual shows up-to-date/error feedback). */
@@ -454,10 +468,11 @@ export function createKalamosApp(
     targetPath: string,
     tab: DocumentTab,
     contentToSave: string,
+    isAutosave = false,
   ): Promise<boolean> {
     try {
       const previousPath = tab.path;
-      await saveFile(targetPath, contentToSave);
+      await saveFile(targetPath, contentToSave, { isAutosave });
       setStatus("", false);
       if (tabs.includes(tab)) {
         tab.path = targetPath;
@@ -521,6 +536,7 @@ export function createKalamosApp(
           targetPath,
           tab,
           editor.getSessionContent(tab.doc),
+          true,
         );
       }
     }, NAMED_AUTOSAVE_DELAY_MS);
@@ -628,8 +644,8 @@ export function createKalamosApp(
     parent: editorContainer,
     initialContent: "",
     handlers,
-    onUserChange: () => {
-      if (active.path !== null) {
+    onUserChange: (_content, info) => {
+      if (active.path !== null && !info?.skipAutosave) {
         scheduleNamedAutosave(active);
       }
       renderTabs();
@@ -770,7 +786,12 @@ export function createKalamosApp(
     wordCounter.flush();
     renderTabs();
     scheduleMenuSync();
-    if (!preferences.isOpen() && !quickOpen.isOpen() && !updater.isOpen())
+    if (
+      !preferences.isOpen() &&
+      !quickOpen.isOpen() &&
+      !updater.isOpen() &&
+      !historyModal.isOpen()
+    )
       view.focus();
   }
 
@@ -912,7 +933,8 @@ export function createKalamosApp(
       event.defaultPrevented ||
       preferences.isOpen() ||
       quickOpen.isOpen() ||
-      updater.isOpen()
+      updater.isOpen() ||
+      historyModal.isOpen()
     )
       return;
     if (
@@ -990,7 +1012,10 @@ export function createKalamosApp(
   });
 
   const unbindShortcuts = bindWindowShortcuts(window, windowHandlers, () =>
-    preferences.isOpen() || quickOpen.isOpen() || updater.isOpen()
+    preferences.isOpen() ||
+    quickOpen.isOpen() ||
+    updater.isOpen() ||
+    historyModal.isOpen()
       ? null
       : editor.view,
   );
@@ -1170,6 +1195,13 @@ export function createKalamosApp(
       startupBehavior: currentSettings.startupBehavior ?? "restoreFolder",
       autoSave: currentSettings.autoSave ?? true,
       autoCheckUpdates: currentSettings.autoCheckUpdates ?? true,
+      historyEnabled: currentSettings.historyEnabled ?? true,
+      historyMaxVersions: clampHistoryMaxVersions(
+        currentSettings.historyMaxVersions ?? 50,
+      ),
+      historyMaxTotalMb: clampHistoryMaxTotalMb(
+        currentSettings.historyMaxTotalMb ?? 200,
+      ),
       fontSize: clampFontSize(currentSettings.fontSize ?? 17),
       contentWidth: clampContentWidth(currentSettings.contentWidth ?? 720),
       autoPairBrackets: editor.isAutoPairBrackets(),
@@ -1212,6 +1244,31 @@ export function createKalamosApp(
         );
       }
     },
+    getHistoryStats: () => getHistoryStats(),
+    clearAllHistory: () => clearAllHistory(),
+  });
+
+  const historyModal = createHistoryModal({
+    getCurrentDocument: () => ({
+      path: active.path,
+      label: currentLabels().get(active.id) ?? "",
+      content: editor.getContent(),
+    }),
+    isHistoryEnabled: () => currentSettings.historyEnabled !== false,
+    listVersions: (path) => listHistory(path),
+    readVersion: (path, versionId) => readHistoryVersion(path, versionId),
+    restoreContent: (content) => {
+      clearAutosaveTimer(active);
+      editor.replaceContentUndoable(content, { skipAutosave: true });
+      sidebar.outline.refreshNow();
+      wordCounter.flush();
+      renderTabs();
+      setStatus(shortcutLabel(t("app.historyRestored")), false);
+      editor.view.focus();
+    },
+    onRestoreFocus: () => {
+      editor.view.focus();
+    },
   });
 
   const updater = createUpdater({
@@ -1246,6 +1303,14 @@ export function createKalamosApp(
     if (patch.autoSave !== undefined) plain.autoSave = patch.autoSave;
     if (patch.autoCheckUpdates !== undefined)
       plain.autoCheckUpdates = patch.autoCheckUpdates;
+    if (patch.historyEnabled !== undefined)
+      plain.historyEnabled = patch.historyEnabled;
+    if (patch.historyMaxVersions !== undefined)
+      plain.historyMaxVersions = clampHistoryMaxVersions(
+        patch.historyMaxVersions,
+      );
+    if (patch.historyMaxTotalMb !== undefined)
+      plain.historyMaxTotalMb = clampHistoryMaxTotalMb(patch.historyMaxTotalMb);
     if (patch.fontSize !== undefined)
       plain.fontSize = clampFontSize(patch.fontSize);
     if (patch.contentWidth !== undefined)
@@ -1349,6 +1414,11 @@ export function createKalamosApp(
     "file.openFolder": () => sidebar.openFolder(),
     "file.save": () => saveDocument(),
     "file.saveAs": () => saveDocumentAs(),
+    "file.versionHistory": () => {
+      quickOpen.close(false);
+      preferences.close();
+      return historyModal.open();
+    },
     "file.exportPdf": () => exportDocumentPdf(),
     "file.exportPandoc": () => exportDocumentAs(),
     "file.import": () => importDocument(),
@@ -1398,7 +1468,10 @@ export function createKalamosApp(
     // While preferences or Quick Open is open, editing commands would act on the hidden document.
     canRun: (action) =>
       !(
-        (preferences.isOpen() || quickOpen.isOpen() || updater.isOpen()) &&
+        (preferences.isOpen() ||
+          quickOpen.isOpen() ||
+          updater.isOpen() ||
+          historyModal.isOpen()) &&
         /^(edit|para|fmt)\./.test(action)
       ),
     afterRun: () => scheduleMenuSync(true),
@@ -1406,7 +1479,12 @@ export function createKalamosApp(
 
   // #104: Cmd+P / Ctrl+P toggles Quick Open (also offered by 檔案 > 快速開啟…).
   const onQuickOpenKeydown = (event: KeyboardEvent) => {
-    if (event.defaultPrevented || preferences.isOpen() || updater.isOpen())
+    if (
+      event.defaultPrevented ||
+      preferences.isOpen() ||
+      updater.isOpen() ||
+      historyModal.isOpen()
+    )
       return;
     if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey)
       return;
@@ -1425,6 +1503,7 @@ export function createKalamosApp(
     if (event.code !== "Comma" && event.key !== ",") return;
     event.preventDefault();
     quickOpen.close(false);
+    historyModal.close();
     void preferences.open();
   };
   window.addEventListener("keydown", onPreferencesKeydown);
@@ -1513,7 +1592,13 @@ export function createKalamosApp(
         return;
       }
     }
-    if (preferences.isOpen() || quickOpen.isOpen() || updater.isOpen()) return;
+    if (
+      preferences.isOpen() ||
+      quickOpen.isOpen() ||
+      updater.isOpen() ||
+      historyModal.isOpen()
+    )
+      return;
     if (event.altKey && event.shiftKey && event.code === "KeyC") {
       event.preventDefault();
       void copyRichText();
@@ -2369,6 +2454,7 @@ export function createKalamosApp(
     if (menuSyncTimer !== null) clearTimeout(menuSyncTimer);
     menu.destroy();
     quickOpen.destroy();
+    historyModal.destroy();
     preferences.destroy();
     window.removeEventListener("keydown", onQuickOpenKeydown);
     window.removeEventListener("keydown", onPreferencesKeydown);
@@ -2413,6 +2499,8 @@ export function createKalamosApp(
     cycleTab,
     moveTab,
     preferences,
+    historyModal,
+    openVersionHistory: () => historyModal.open(),
     updater,
     checkForUpdates: (opts) => updater.checkForUpdates(opts),
     quickOpen,

@@ -2,7 +2,12 @@ import "./editor-blocks.css";
 import "./tables.css";
 import "./images.css";
 
-import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
+import {
+  defaultKeymap,
+  history,
+  historyKeymap,
+  isolateHistory,
+} from "@codemirror/commands";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { languages } from "@codemirror/language-data";
 import {
@@ -49,6 +54,7 @@ import { createSourceModeController } from "./source-mode";
 import { focusModeExtension, typewriterModeExtension } from "./writing-modes";
 
 const ExternalLoadAnnotation = Annotation.define<boolean>();
+const SkipAutosaveAnnotation = Annotation.define<boolean>();
 
 export interface KalamosTestApi {
   getDoc: () => string;
@@ -75,7 +81,7 @@ export interface CreateEditorOptions {
   /** ED-09 (default false). */
   initialAutoPairMarkdown?: boolean;
   handlers: FileCommandHandlers;
-  onUserChange?: (content: string) => void;
+  onUserChange?: (content: string, info?: { skipAutosave?: boolean }) => void;
   onSourceModeChange?: (sourceMode: boolean) => void;
   onCodeLineNumbersChange?: (enabled: boolean) => void;
   onMathAutoNumberChange?: (enabled: boolean) => void;
@@ -113,6 +119,11 @@ export interface KalamosEditor {
   view: EditorView;
   getContent: () => string;
   setContent: (content: string, options?: SetContentOptions) => void;
+  /** #148: replace document content as a single undoable edit (without clearing undo history). */
+  replaceContentUndoable: (
+    content: string,
+    options?: { skipAutosave?: boolean },
+  ) => void;
   setCursor: (pos: number) => void;
   isSourceMode: () => boolean;
   setSourceMode: (enabled: boolean, notify?: boolean) => void;
@@ -329,10 +340,16 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
         Boolean(tr.annotation(ExternalLoadAnnotation)),
       );
       if (isExternal) return;
+      const skipAutosave = update.transactions.every((tr) =>
+        Boolean(tr.annotation(SkipAutosaveAnnotation)),
+      );
       current.hasUserEditsSinceLoad = true;
       const text = update.state.sliceDoc(0, update.state.doc.length);
       current.dirty = text !== current.savedContent;
-      options.onUserChange?.(text);
+      options.onUserChange?.(
+        text,
+        skipAutosave ? { skipAutosave: true } : undefined,
+      );
     }),
   ];
 
@@ -405,6 +422,30 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
       },
       effects: lineSeparatorCompartment.reconfigure(lineSeparatorFor(content)),
       annotations: ExternalLoadAnnotation.of(true),
+    });
+  }
+
+  function replaceContentUndoable(
+    content: string,
+    replaceOptions?: { skipAutosave?: boolean },
+  ): void {
+    const annotations: Annotation<unknown>[] = [isolateHistory.of("full")];
+    if (replaceOptions?.skipAutosave) {
+      annotations.push(SkipAutosaveAnnotation.of(true));
+    }
+    view.dispatch({
+      changes: {
+        from: 0,
+        to: view.state.doc.length,
+        insert: content,
+      },
+      selection: { anchor: 0, head: 0 },
+      effects: [
+        lineSeparatorCompartment.reconfigure(lineSeparatorFor(content)),
+        EditorView.scrollIntoView(0, { y: "start" }),
+      ],
+      annotations,
+      userEvent: "input.restoreHistory",
     });
   }
 
@@ -655,6 +696,7 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
     view,
     getContent,
     setContent,
+    replaceContentUndoable,
     setCursor,
     isSourceMode,
     setSourceMode,

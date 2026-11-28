@@ -224,6 +224,37 @@
   flex-wrap: wrap;
 }
 
+.k-pref-history-limits {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.k-pref-number-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--k-text-muted, #6e6355);
+}
+
+.k-pref-number {
+  width: 74px;
+  padding: 4px 6px;
+  border: 1px solid var(--k-divider, #d9cdb3);
+  border-radius: 6px;
+  background-color: var(--k-surface, #ede4cf);
+  color: var(--k-text, #2b2622);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+.k-pref-number:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .k-pref-path {
   flex: 1;
   min-width: 0;

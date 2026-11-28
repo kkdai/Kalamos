@@ -113,7 +113,14 @@ pub fn save_file(
     app: tauri::AppHandle,
     path: String,
     content: String,
+    is_autosave: Option<bool>,
 ) -> Result<FileMeta, AppError> {
+    crate::history::snapshot_before_save_for_app(
+        &app,
+        &path,
+        &content,
+        is_autosave.unwrap_or(false),
+    );
     let meta = save_file_impl(&path, &content)?;
     crate::images::allow_parent_dir(&app, &path);
     Ok(meta)
