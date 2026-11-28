@@ -1,0 +1,131 @@
+/* #145: non-blocking external change / missing file banner.
+   Styled strictly with Kalamos theme tokens (Papyros / Melan / Nyx / custom). */
+
+.k-external-banner {
+  display: none;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  padding: 9px 16px;
+  border-bottom: 1px solid var(--k-divider, #d9cdb3);
+  background-color: var(--k-surface, #ede4cf);
+  /* biome-ignore lint/suspicious/noDuplicateProperties: fallback for WebKit without color-mix */
+  background-color: color-mix(
+    in srgb,
+    var(--k-link, #a4552f) 10%,
+    var(--k-surface, #ede4cf)
+  );
+  box-shadow: inset 3px 0 0 var(--k-link, #a4552f);
+  color: var(--k-text, #2b2622);
+  font-family: var(--k-font-ui, Inter, "Noto Sans TC", sans-serif);
+  font-size: 13px;
+  line-height: 1.45;
+  transition: padding-left var(--k-transition, 180ms ease-out);
+}
+
+.k-external-banner[data-visible="true"] {
+  display: flex;
+}
+
+.k-external-banner[data-kind="missing"] {
+  box-shadow: inset 3px 0 0 var(--k-danger, var(--k-link, #a4552f));
+}
+
+/* When the tab bar is hidden (single tab), leave room for the fixed top-right theme button. */
+.k-tabbar[data-visible="false"] + .k-external-banner {
+  padding-right: calc(16px + 30px + 12px);
+}
+
+/* When the sidebar is open, start the banner after it (like .k-tabbar and #editor-container). */
+.k-sidebar[data-visible="true"] ~ .k-external-banner {
+  padding-left: calc(var(--k-sidebar-width, 260px) + 16px);
+}
+
+/* On Windows, floating top-left quick controls occupy top-left when tab bar is hidden. */
+:has(> .k-sidebar-toggle-widget)
+  > .k-tabbar[data-visible="false"]
+  + .k-external-banner {
+  padding-left: calc(16px + 66px + 12px);
+}
+
+:has(> .k-sidebar-toggle-widget)
+  > .k-sidebar[data-visible="true"]
+  ~ .k-tabbar[data-visible="false"]
+  + .k-external-banner {
+  padding-left: calc(var(--k-sidebar-width, 260px) + 12px + 66px + 12px);
+}
+
+.k-external-banner-lead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1 1 280px;
+}
+
+.k-external-banner-icon {
+  flex-shrink: 0;
+  color: var(--k-link, #a4552f);
+}
+
+.k-external-banner[data-kind="missing"] .k-external-banner-icon {
+  color: var(--k-danger, var(--k-link, #a4552f));
+}
+
+.k-external-banner-message {
+  min-width: 0;
+  word-break: break-word;
+}
+
+.k-external-banner-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.k-external-banner-btn {
+  padding: 5px 12px;
+  border: 1px solid var(--k-divider, #d9cdb3);
+  border-radius: 6px;
+  background-color: var(--k-bg, #f5efe0);
+  color: var(--k-text, #2b2622);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.3;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    border-color var(--k-transition-fast, 150ms ease-out),
+    background-color var(--k-transition-fast, 150ms ease-out),
+    filter var(--k-transition-fast, 150ms ease-out);
+}
+
+.k-external-banner-btn:hover:not(:disabled) {
+  border-color: var(--k-accent, #5e7a4a);
+}
+
+.k-external-banner-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.k-external-banner-btn-primary {
+  border-color: var(--k-accent, #5e7a4a);
+  background-color: var(--k-accent, #5e7a4a);
+  color: var(--k-accent-text, var(--k-bg, #f5efe0));
+}
+
+.k-external-banner-btn-primary:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+.k-external-banner-btn:focus-visible {
+  outline: 2px solid
+    color-mix(in srgb, var(--k-accent, #5e7a4a) 60%, transparent);
+  outline-offset: 1px;
+}

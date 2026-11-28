@@ -10,6 +10,7 @@ import {
   save as saveDialog,
 } from "@tauri-apps/plugin-dialog";
 import { check as checkUpdater } from "@tauri-apps/plugin-updater";
+import { sha256Hex } from "./external-changes/content-hash";
 import {
   defaultUiLocaleForTag,
   hasMessageKey,
@@ -75,6 +76,54 @@ export interface FileMeta {
   path: string;
   mtimeMs: number;
   size: number;
+}
+
+/** #145: file content along with its disk metadata and SHA-256 content hash. */
+export interface FileSnapshot {
+  path: string;
+  content: string;
+  mtimeMs: number;
+  size: number;
+  hash: string;
+}
+
+/** #145: current disk state of a named file without transferring content. */
+export type FileDiskState =
+  | {
+      status: "exists";
+      path: string;
+      mtimeMs: number;
+      size: number;
+      hash: string;
+    }
+  | {
+      status: "missing";
+      path: string;
+    };
+
+/** #145: result of a conflict-checked save (pre-save defense against external overwrites). */
+export type SaveFileResult =
+  | {
+      status: "saved";
+      path: string;
+      mtimeMs: number;
+      size: number;
+      hash: string;
+    }
+  | {
+      status: "conflict";
+      path: string;
+      mtimeMs: number;
+      size: number;
+      diskHash: string;
+    }
+  | {
+      status: "missing";
+      path: string;
+    };
+
+export interface OpenFilesChangedPayload {
+  paths: string[];
 }
 
 export type TreeNodeKind = "dir" | "file";
@@ -209,6 +258,7 @@ let mockSystemLocale: string | null = "zh-TW";
 let mockSettingsWriteError: Error | null = null;
 let mockRestartError: Error | null = null;
 let mockWatchedFolder: string | null = null;
+let mockWatchedOpenFiles: string[] = [];
 let mockListMarkdownPathsCalls = 0;
 const mockAssetFiles = new Set<string>();
 const mockAllowedAssetDirs = new Set<string>();
@@ -235,6 +285,9 @@ type MockSaveInterceptor = (
   defaultSave: () => Promise<FileMeta>,
 ) => Promise<FileMeta>;
 type FsChangedListener = (payload: FsChangedPayload) => void | Promise<void>;
+type OpenFilesChangedListener = (
+  payload: OpenFilesChangedPayload,
+) => void | Promise<void>;
 
 let mockOpenDialogHandler: DialogOpenHandler | null = null;
 let mockOpenFolderDialogHandler: DialogOpenHandler | null = null;
@@ -249,6 +302,7 @@ const mockCloseListeners = new Set<
   () => boolean | void | Promise<boolean | void>
 >();
 const mockFsChangedListeners = new Set<FsChangedListener>();
+const mockOpenFilesChangedListeners = new Set<OpenFilesChangedListener>();
 
 export function isTauri(): boolean {
   return (
@@ -406,6 +460,7 @@ export function resetMockState(): void {
   mockSettingsWriteError = null;
   mockRestartError = null;
   mockWatchedFolder = null;
+  mockWatchedOpenFiles = [];
   mockListMarkdownPathsCalls = 0;
   lastMockTimestampMs = 0;
   mockOpenDialogHandler = null;
@@ -421,6 +476,7 @@ export function resetMockState(): void {
   mockQuitCount = 0;
   mockRestartCount = 0;
   mockFsChangedListeners.clear();
+  mockOpenFilesChangedListeners.clear();
   mockAssetFiles.clear();
   mockAllowedAssetDirs.clear();
   mockAllowedAssetFiles.clear();
@@ -503,8 +559,16 @@ export function readMockFile(path: string): string | undefined {
   return mockFiles.get(normalizePath(path))?.content;
 }
 
+export function deleteMockFile(path: string): boolean {
+  return mockFiles.delete(normalizePath(path));
+}
+
 export function getMockWatchedFolder(): string | null {
   return mockWatchedFolder;
+}
+
+export function getMockWatchedOpenFiles(): string[] {
+  return [...mockWatchedOpenFiles];
 }
 
 export function seedMockCustomTheme(stem: string, css: string): void {
@@ -530,6 +594,52 @@ export async function openFile(path: string): Promise<string> {
     throw createAppError("NotFound", `File not found: ${path}`);
   }
   return entry.content;
+}
+
+export async function openFileSnapshot(path: string): Promise<FileSnapshot> {
+  if (isTauri()) {
+    const snap = await invoke<FileSnapshot>("open_file_snapshot", { path });
+    return { ...snap, path: toSlashPath(snap.path) };
+  }
+  if (!path || !path.trim()) {
+    throw createAppError("InvalidPath", "Path must not be empty");
+  }
+  const norm = normalizePath(path);
+  const entry = mockFiles.get(norm);
+  if (!entry) {
+    throw createAppError("NotFound", `File not found: ${path}`);
+  }
+  const size = new TextEncoder().encode(entry.content).byteLength;
+  return {
+    path: norm,
+    content: entry.content,
+    mtimeMs: entry.mtimeMs,
+    size,
+    hash: sha256Hex(entry.content),
+  };
+}
+
+export async function statFileSnapshot(path: string): Promise<FileDiskState> {
+  if (isTauri()) {
+    const state = await invoke<FileDiskState>("stat_file_snapshot", { path });
+    return { ...state, path: toSlashPath(state.path) };
+  }
+  if (!path || !path.trim()) {
+    throw createAppError("InvalidPath", "Path must not be empty");
+  }
+  const norm = normalizePath(path);
+  const entry = mockFiles.get(norm);
+  if (!entry) {
+    return { status: "missing", path: norm };
+  }
+  const size = new TextEncoder().encode(entry.content).byteLength;
+  return {
+    status: "exists",
+    path: norm,
+    mtimeMs: entry.mtimeMs,
+    size,
+    hash: sha256Hex(entry.content),
+  };
 }
 
 export async function saveFile(
@@ -561,6 +671,53 @@ export async function saveFile(
     return mockSaveInterceptor(path, content, defaultSave);
   }
   return defaultSave();
+}
+
+export async function saveFileChecked(
+  path: string,
+  content: string,
+  expectedHash?: string | null,
+): Promise<SaveFileResult> {
+  if (isTauri()) {
+    const res = await invoke<SaveFileResult>("save_file_checked", {
+      path,
+      content,
+      expectedHash: expectedHash ?? null,
+    });
+    return { ...res, path: toSlashPath(res.path) };
+  }
+  if (!path || !path.trim()) {
+    throw createAppError("InvalidPath", "Path must not be empty");
+  }
+  const norm = normalizePath(path);
+  if (mockDirs.has(norm)) {
+    throw createAppError("InvalidPath", `Target path is a directory: ${path}`);
+  }
+  if (expectedHash !== undefined && expectedHash !== null) {
+    const existing = mockFiles.get(norm);
+    if (!existing) {
+      return { status: "missing", path: norm };
+    }
+    const diskHash = sha256Hex(existing.content);
+    if (diskHash !== expectedHash) {
+      const size = new TextEncoder().encode(existing.content).byteLength;
+      return {
+        status: "conflict",
+        path: norm,
+        mtimeMs: existing.mtimeMs,
+        size,
+        diskHash,
+      };
+    }
+  }
+  const meta = await saveFile(path, content);
+  return {
+    status: "saved",
+    path: meta.path,
+    mtimeMs: meta.mtimeMs,
+    size: meta.size,
+    hash: sha256Hex(content),
+  };
 }
 
 function assertValidMockDir(path: string): string {
@@ -960,6 +1117,16 @@ export async function watchFolder(path: string): Promise<null> {
   return null;
 }
 
+export async function watchOpenFiles(paths: string[]): Promise<null> {
+  if (isTauri()) {
+    return invoke<null>("watch_open_files", { paths });
+  }
+  mockWatchedOpenFiles = paths
+    .map((p) => normalizePath(p))
+    .filter((p) => p.length > 0);
+  return null;
+}
+
 export async function createFile(path: string): Promise<FileMeta> {
   if (isTauri()) {
     const meta = await invoke<FileMeta>("create_file", { path });
@@ -1100,6 +1267,34 @@ export async function triggerMockFsChanged(
         };
   for (const listener of Array.from(mockFsChangedListeners)) {
     await listener(resolved);
+  }
+}
+
+export async function onOpenFilesChanged(
+  listener: OpenFilesChangedListener,
+): Promise<() => void> {
+  if (isTauri()) {
+    return listen<OpenFilesChangedPayload>("open-files-changed", (event) => {
+      void listener({
+        paths: event.payload.paths.map((p) => toSlashPath(p)),
+      });
+    });
+  }
+  mockOpenFilesChangedListeners.add(listener);
+  return () => {
+    mockOpenFilesChangedListeners.delete(listener);
+  };
+}
+
+export async function triggerMockOpenFilesChanged(
+  paths: string[],
+): Promise<void> {
+  const payload: OpenFilesChangedPayload = {
+    paths: paths.map((p) => normalizePath(p)).filter((p) => p.length > 0),
+  };
+  if (payload.paths.length === 0) return;
+  for (const listener of Array.from(mockOpenFilesChangedListeners)) {
+    await listener(payload);
   }
 }
 
