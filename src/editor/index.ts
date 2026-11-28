@@ -3,7 +3,6 @@ import "./tables.css";
 import "./images.css";
 
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
-import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { languages } from "@codemirror/language-data";
 import {
   Annotation,
@@ -11,6 +10,8 @@ import {
   EditorState,
   type Extension,
   StateEffect,
+  type Text,
+  Transaction,
 } from "@codemirror/state";
 import { EditorView, keymap } from "@codemirror/view";
 import { t } from "../i18n";
@@ -43,6 +44,7 @@ import {
   type RelativeLinkHandler,
   relativeLinkHandlerFacet,
 } from "./live-preview";
+import { createMarkdownSupport } from "./markdown-lang";
 import { mathAutoNumberFacet, mathMarkdownExtension } from "./math";
 import { kalamosSearchExtension, kalamosSearchKeymap } from "./search";
 import { createSourceModeController } from "./source-mode";
@@ -153,6 +155,8 @@ export interface KalamosEditor {
   isSessionDirty: (session: DocSession) => boolean;
   markSessionClean: (session: DocSession, savedContent: string) => void;
   markSessionDirty: (session: DocSession) => void;
+  /** #145: reload a session from disk while preserving line/column cursor & scrollTop. */
+  reloadSession: (session: DocSession, content: string) => void;
   /** Path of the current document (null = untitled); used to resolve relative image paths. */
   setDocumentPath: (path: string | null) => void;
   /** IM-04: image root folder setting (null = none). */
@@ -301,12 +305,8 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
       : []),
     history(),
     EditorView.lineWrapping,
-    markdown({
-      base: markdownLanguage,
+    createMarkdownSupport({
       codeLanguages: languages,
-      addKeymap: false,
-      // Only emoji completion (ED-08); no HTML tag suggestions for `<di…`.
-      completeHTMLTags: false,
       extensions: [
         mathMarkdownExtension,
         cjkEmphasisExtension,
@@ -616,6 +616,81 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
     markSessionClean(current, justSavedContent);
   }
 
+  function mapLineColPos(
+    oldState: EditorState,
+    newDoc: Text,
+    pos: number,
+  ): number {
+    const clampedOld = Math.max(0, Math.min(pos, oldState.doc.length));
+    const oldLine = oldState.doc.lineAt(clampedOld);
+    const col = clampedOld - oldLine.from;
+    const targetLineNum = Math.min(oldLine.number, newDoc.lines);
+    const targetLine = newDoc.line(targetLineNum);
+    return Math.min(targetLine.from + col, targetLine.to);
+  }
+
+  function reloadSession(session: DocSession, content: string): void {
+    const oldState = getSessionState(session);
+    const oldSel = oldState.selection.main;
+    const lineSepEffect = lineSeparatorCompartment.reconfigure(
+      lineSeparatorFor(content),
+    );
+    const annotations = [
+      ExternalLoadAnnotation.of(true),
+      Transaction.addToHistory.of(false),
+    ];
+    const draft = oldState.update({
+      changes: { from: 0, to: oldState.doc.length, insert: content },
+      effects: lineSepEffect,
+      annotations,
+    });
+    const nextAnchor = mapLineColPos(oldState, draft.newDoc, oldSel.anchor);
+    const nextHead = mapLineColPos(oldState, draft.newDoc, oldSel.head);
+
+    session.unmodifiedContent = content;
+    session.savedContent = content;
+    session.hasUserEditsSinceLoad = false;
+    session.dirty = false;
+
+    if (session === current) {
+      const savedScrollTop = view.scrollDOM.scrollTop;
+      const savedScrollLeft = view.scrollDOM.scrollLeft;
+      const effects: StateEffect<unknown>[] = [lineSepEffect];
+      if (savedScrollTop > 0) {
+        const topBlock = view.lineBlockAtHeight(savedScrollTop);
+        const topLineNum = oldState.doc.lineAt(topBlock.from).number;
+        const newTopLine = draft.newDoc.line(
+          Math.min(topLineNum, draft.newDoc.lines),
+        );
+        const beforeCoords = view.coordsAtPos(topBlock.from);
+        const scrollerTop = view.scrollDOM.getBoundingClientRect().top;
+        const yMargin = beforeCoords ? beforeCoords.top - scrollerTop : 0;
+        effects.push(
+          EditorView.scrollIntoView(newTopLine.from, {
+            y: "start",
+            yMargin,
+          }),
+        );
+      }
+      view.dispatch({
+        changes: { from: 0, to: oldState.doc.length, insert: content },
+        selection: { anchor: nextAnchor, head: nextHead },
+        effects,
+        annotations,
+      });
+      if (savedScrollLeft > 0) {
+        view.scrollDOM.scrollLeft = savedScrollLeft;
+      }
+    } else {
+      session.state = oldState.update({
+        changes: { from: 0, to: oldState.doc.length, insert: content },
+        selection: { anchor: nextAnchor, head: nextHead },
+        effects: lineSepEffect,
+        annotations,
+      }).state;
+    }
+  }
+
   function markSessionDirty(session: DocSession): void {
     session.dirty = true;
   }
@@ -691,6 +766,7 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
     isSessionDirty: (session) => session.dirty,
     markSessionClean,
     markSessionDirty,
+    reloadSession,
     setDocumentPath,
     setImageRootDir,
     getImageRootDir,

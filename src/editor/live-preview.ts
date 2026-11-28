@@ -14,7 +14,6 @@ import {
   ViewPlugin,
   type ViewUpdate,
 } from "@codemirror/view";
-import { openUrl } from "@tauri-apps/plugin-opener";
 import { isTauri } from "../ipc";
 import {
   BulletMarkerWidget,
@@ -109,7 +108,9 @@ export function navigateMarkdownLink(
   // 3. External `http:` / `https:` / `mailto:` link
   if (!isAllowedExternalUrl(url)) return false;
   if (isTauri()) {
-    void openUrl(url).catch(() => null);
+    void import("@tauri-apps/plugin-opener")
+      .then(({ openUrl }) => openUrl(url))
+      .catch(() => null);
   } else if (
     typeof window !== "undefined" &&
     typeof window.open === "function"
