@@ -162,6 +162,8 @@ export interface Settings {
   contentWidth?: number;
   /** #104: recently opened / saved file paths (newest first, up to 20). */
   recentFiles?: string[];
+  /** #147: whether the first-launch welcome document has already been shown. */
+  welcomeShown?: boolean;
 }
 
 export type StartupBehavior = "restoreFolder" | "blank";
@@ -189,6 +191,7 @@ export const DEFAULT_SETTINGS: Settings = {
   fontSize: 17,
   contentWidth: 720,
   recentFiles: [],
+  welcomeShown: true,
 };
 
 export const MAX_EXCERPT_CHARS = 120;
@@ -1174,6 +1177,7 @@ export async function getSettings(): Promise<Settings> {
     ...mockSettings,
     systemDarkTheme: mockSettings.systemDarkTheme === "nyx" ? "nyx" : "melan",
     recentFiles: [...(mockSettings.recentFiles ?? [])],
+    welcomeShown: mockSettings.welcomeShown ?? true,
   };
   if (uiLocale) out.uiLocale = uiLocale;
   else delete out.uiLocale;
@@ -1226,6 +1230,10 @@ export async function setSettings(settings: Settings): Promise<null> {
     recentFiles: [
       ...(settings.recentFiles ?? DEFAULT_SETTINGS.recentFiles ?? []),
     ],
+    welcomeShown:
+      settings.welcomeShown ??
+      mockSettings.welcomeShown ??
+      DEFAULT_SETTINGS.welcomeShown,
   };
   return null;
 }
@@ -1233,6 +1241,16 @@ export async function setSettings(settings: Settings): Promise<null> {
 /** Test hook: replace the mock settings file wholesale (e.g. an old settings.json). */
 export function seedMockSettings(settings: Partial<Settings>): void {
   mockSettings = { ...(settings as Settings) };
+}
+
+/** Test hook (#147): simulate a brand-new install with no settings file or recent files. */
+export function seedMockFirstLaunch(): void {
+  mockSettings = {
+    ...DEFAULT_SETTINGS,
+    recentFiles: [],
+    lastFolder: null,
+    welcomeShown: false,
+  };
 }
 
 export function setMockSettingsWriteError(error: Error | null): void {

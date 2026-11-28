@@ -158,6 +158,10 @@ import {
   renameRecentFiles,
   sanitizeRecentFiles,
 } from "./quick-open/recent-files";
+import {
+  createShortcutsModal,
+  type ShortcutsModalController,
+} from "./shortcuts/shortcuts-modal";
 import { createSidebar, type SidebarController } from "./sidebar/sidebar";
 import { createTabBar, type TabBar } from "./tabs/tab-bar";
 import {
@@ -180,6 +184,10 @@ import {
   type ThemeMenuController,
 } from "./theme/theme-menu";
 import { createUpdater, type UpdaterController } from "./updater/updater";
+import {
+  getWelcomeContent,
+  shouldShowWelcomeOnStartup,
+} from "./welcome/welcome";
 
 export const NAMED_AUTOSAVE_DELAY_MS = 1000;
 export const UNTITLED_RECOVERY_INTERVAL_MS = 5000;
@@ -262,6 +270,10 @@ export interface DocumentTab {
   path: string | null;
   /** 「未命名 n」 while untitled. */
   untitledNumber: number;
+  /** #147: optional custom label for an untitled tab (e.g. welcome document). */
+  customLabel?: string;
+  /** #147: true while this tab holds the untitled welcome document. */
+  isWelcome?: boolean;
   /** EditorState + saved content + dirty flag. */
   doc: DocSession;
   scrollTop: number;
@@ -300,6 +312,10 @@ export interface KalamosApp {
   checkForUpdates: (options?: { manual?: boolean }) => Promise<void>;
   /** #104: Cmd+P Quick Open overlay. */
   quickOpen: QuickOpenController;
+  /** #147: keyboard shortcuts cheatsheet overlay. */
+  shortcuts: ShortcutsModalController;
+  /** #147: opens the localized welcome document in an untitled tab. */
+  openWelcomeDocument: () => boolean;
   /** #104: recently opened / saved files (newest first, up to 20). */
   getRecentFiles: () => string[];
   /** #104: clear recently opened files list. */
@@ -451,6 +467,8 @@ export function createKalamosApp(
       setStatus("", false);
       if (tabs.includes(tab)) {
         tab.path = targetPath;
+        tab.customLabel = undefined;
+        tab.isWelcome = false;
         editor.markSessionClean(tab.doc, contentToSave);
         if (tab === active) syncDocumentPath();
         renderTabs();
@@ -692,7 +710,9 @@ export function createKalamosApp(
 
   const tabs: DocumentTab[] = [];
   function untitledNumbersInUse(): number[] {
-    return tabs.filter((t) => t.path === null).map((t) => t.untitledNumber);
+    return tabs
+      .filter((t) => t.path === null && !t.customLabel)
+      .map((t) => t.untitledNumber);
   }
 
   let active: DocumentTab = makeTab(editor.getSession(), null);
@@ -760,7 +780,12 @@ export function createKalamosApp(
     wordCounter.flush();
     renderTabs();
     scheduleMenuSync();
-    if (!preferences.isOpen() && !quickOpen.isOpen() && !updater.isOpen())
+    if (
+      !preferences.isOpen() &&
+      !quickOpen.isOpen() &&
+      !updater.isOpen() &&
+      !shortcuts.isOpen()
+    )
       view.focus();
   }
 
@@ -784,11 +809,11 @@ export function createKalamosApp(
     clearAutosaveTimer(active);
     const index = tabs.indexOf(active);
     tabs[index] = next;
-    if (next.path === null) {
+    if (next.path === null && !next.customLabel) {
       // The replaced tab's number is free again.
       next.untitledNumber = nextUntitledNumber(
         tabs
-          .filter((t) => t !== next && t.path === null)
+          .filter((t) => t !== next && t.path === null && !t.customLabel)
           .map((t) => t.untitledNumber),
       );
     }
@@ -896,13 +921,34 @@ export function createKalamosApp(
     }
   }
 
+  function openWelcomeDocument(): boolean {
+    const existing = tabs.find(
+      (tab) => tab.isWelcome && !editor.isSessionDirty(tab.doc),
+    );
+    if (existing) {
+      activateTab(existing.id);
+      return true;
+    }
+    const tab = makeTab(
+      editor.createSession(getWelcomeContent(), { dirty: false }),
+      null,
+    );
+    tab.customLabel = t("welcome.tabTitle");
+    tab.untitledNumber = 0;
+    tab.isWelcome = true;
+    placeNewTab(tab);
+    setStatus("", false);
+    return true;
+  }
+
   // Cmd+T new tab, Cmd+W close tab, Ctrl+Tab / Ctrl+Shift+Tab next / previous tab.
   const onTabKeydown = (event: KeyboardEvent) => {
     if (
       event.defaultPrevented ||
       preferences.isOpen() ||
       quickOpen.isOpen() ||
-      updater.isOpen()
+      updater.isOpen() ||
+      shortcuts.isOpen()
     )
       return;
     if (
@@ -962,25 +1008,35 @@ export function createKalamosApp(
       document.body,
   });
 
+  const restoreEditorFocus = (prev: HTMLElement | null) => {
+    if (
+      prev &&
+      prev.isConnected &&
+      prev.classList.contains("k-table-cell-content") &&
+      editor.view.contentDOM.contains(prev)
+    ) {
+      prev.focus();
+    } else {
+      editor.view.focus();
+    }
+  };
+
   const quickOpen = createQuickOpen({
     parent: editorContainer.parentElement ?? document.body,
     onOpenFile: (path, mode) => openPath(path, mode),
-    onRestoreFocus: (prev) => {
-      if (
-        prev &&
-        prev.isConnected &&
-        prev.classList.contains("k-table-cell-content") &&
-        editor.view.contentDOM.contains(prev)
-      ) {
-        prev.focus();
-      } else {
-        editor.view.focus();
-      }
-    },
+    onRestoreFocus: restoreEditorFocus,
+  });
+
+  const shortcuts = createShortcutsModal({
+    parent: document.body,
+    onRestoreFocus: restoreEditorFocus,
   });
 
   const unbindShortcuts = bindWindowShortcuts(window, windowHandlers, () =>
-    preferences.isOpen() || quickOpen.isOpen() || updater.isOpen()
+    preferences.isOpen() ||
+    quickOpen.isOpen() ||
+    updater.isOpen() ||
+    shortcuts.isOpen()
       ? null
       : editor.view,
   );
@@ -1318,10 +1374,12 @@ export function createKalamosApp(
   const menuCommands: Record<string, MenuCommand> = {
     "app.checkForUpdates": () => {
       quickOpen.close(false);
+      shortcuts.close(false);
       return updater.checkForUpdates({ manual: true });
     },
     "app.preferences": () => {
       quickOpen.close(false);
+      shortcuts.close(false);
       return preferences.open();
     },
     "file.new": () => newDocument(),
@@ -1332,7 +1390,10 @@ export function createKalamosApp(
     "app.quit": () => quit(),
     "file.open": () => openDocument(),
     "file.quickOpen": () => {
-      if (!preferences.isOpen()) quickOpen.toggle();
+      if (!preferences.isOpen() && !updater.isOpen()) {
+        shortcuts.close(false);
+        quickOpen.toggle();
+      }
     },
     "file.openRecent": (path) => (path ? openPath(path, "tab") : false),
     "file.clearRecent": () => clearRecentFiles(),
@@ -1379,15 +1440,29 @@ export function createKalamosApp(
     "view.actualSize": () => setZoom(1),
     "view.zoomIn": () => setZoom(nextZoomLevel(zoom, 1)),
     "view.zoomOut": () => setZoom(nextZoomLevel(zoom, -1)),
+    "help.shortcuts": () => {
+      if (!preferences.isOpen() && !updater.isOpen()) {
+        quickOpen.close(false);
+        shortcuts.toggle();
+      }
+    },
+    "help.welcome": () => {
+      shortcuts.close(false);
+      quickOpen.close(false);
+      return openWelcomeDocument();
+    },
   };
 
   const menu = createMenuDispatcher({
     commands: menuCommands,
     target: window,
-    // While preferences or Quick Open is open, editing commands would act on the hidden document.
+    // While preferences, Quick Open, updater, or shortcuts is open, editing commands would act on the hidden document.
     canRun: (action) =>
       !(
-        (preferences.isOpen() || quickOpen.isOpen() || updater.isOpen()) &&
+        (preferences.isOpen() ||
+          quickOpen.isOpen() ||
+          updater.isOpen() ||
+          shortcuts.isOpen()) &&
         /^(edit|para|fmt)\./.test(action)
       ),
     afterRun: () => scheduleMenuSync(true),
@@ -1402,9 +1477,24 @@ export function createKalamosApp(
     if (event.metaKey && event.ctrlKey) return;
     if (event.code !== "KeyP" && event.key.toLowerCase() !== "p") return;
     event.preventDefault();
+    shortcuts.close(false);
     quickOpen.toggle();
   };
   window.addEventListener("keydown", onQuickOpenKeydown);
+
+  // #147: Cmd+Opt+/ / Ctrl+Alt+/ toggles the keyboard shortcuts cheatsheet.
+  const onShortcutsKeydown = (event: KeyboardEvent) => {
+    if (event.defaultPrevented || preferences.isOpen() || updater.isOpen())
+      return;
+    if (!(event.metaKey || event.ctrlKey) || !event.altKey || event.shiftKey)
+      return;
+    if (event.metaKey && event.ctrlKey) return;
+    if (event.code !== "Slash" && event.key !== "/") return;
+    event.preventDefault();
+    quickOpen.close(false);
+    shortcuts.toggle();
+  };
+  window.addEventListener("keydown", onShortcutsKeydown);
 
   // Cmd+, opens the preferences (also offered by the native menu; see menu-dispatch.ts).
   const onPreferencesKeydown = (event: KeyboardEvent) => {
@@ -1414,6 +1504,7 @@ export function createKalamosApp(
     if (event.code !== "Comma" && event.key !== ",") return;
     event.preventDefault();
     quickOpen.close(false);
+    shortcuts.close(false);
     void preferences.open();
   };
   window.addEventListener("keydown", onPreferencesKeydown);
@@ -1502,7 +1593,13 @@ export function createKalamosApp(
         return;
       }
     }
-    if (preferences.isOpen() || quickOpen.isOpen() || updater.isOpen()) return;
+    if (
+      preferences.isOpen() ||
+      quickOpen.isOpen() ||
+      updater.isOpen() ||
+      shortcuts.isOpen()
+    )
+      return;
     if (event.code === "KeyF" && !event.shiftKey) {
       event.preventDefault();
       openFind(editor.view, { replace: event.altKey });
@@ -2285,8 +2382,20 @@ export function createKalamosApp(
     }
     unlistenOpenFiles = unlistenOpen;
     const pendingOpen = await takePendingOpenFiles().catch(() => null);
+    let openedFilesFromOs = false;
     if (pendingOpen && !destroyed) {
-      await openRequestedFiles(pendingOpen);
+      openedFilesFromOs = await openRequestedFiles(pendingOpen);
+    }
+    if (
+      !destroyed &&
+      shouldShowWelcomeOnStartup({
+        settings,
+        hasRecoveryEntries: entries.length > 0,
+        openedFilesFromOs,
+      })
+    ) {
+      openWelcomeDocument();
+      await persistEditorSettingPatch({ welcomeShown: true });
     }
     if (!destroyed && currentSettings.autoCheckUpdates !== false) {
       const delayMs =
@@ -2321,8 +2430,10 @@ export function createKalamosApp(
     if (menuSyncTimer !== null) clearTimeout(menuSyncTimer);
     menu.destroy();
     quickOpen.destroy();
+    shortcuts.destroy();
     preferences.destroy();
     window.removeEventListener("keydown", onQuickOpenKeydown);
+    window.removeEventListener("keydown", onShortcutsKeydown);
     window.removeEventListener("keydown", onPreferencesKeydown);
     window.removeEventListener("keydown", onMenuShortcutKeydown);
     root.removeEventListener("wheel", onZoomWheel);
@@ -2368,6 +2479,8 @@ export function createKalamosApp(
     updater,
     checkForUpdates: (opts) => updater.checkForUpdates(opts),
     quickOpen,
+    shortcuts,
+    openWelcomeDocument,
     getRecentFiles: () => [...recentFiles],
     clearRecentFiles,
     menu,

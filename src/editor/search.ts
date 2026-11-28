@@ -44,7 +44,7 @@ import {
   ViewPlugin,
   type ViewUpdate,
 } from "@codemirror/view";
-import { t } from "../i18n";
+import { type MessageKey, t } from "../i18n";
 import { shortcutLabel } from "../platform";
 import { unshifted } from "./keymaps";
 import {
@@ -463,6 +463,24 @@ export function closeFind(view: EditorView): boolean {
   return true;
 }
 
+/**
+ * Search keymap bindings not listed in `src/menu/menu-spec.json`.
+ * Shared with the keyboard shortcuts cheatsheet (#147).
+ */
+export const SEARCH_EXTRA_SHORTCUTS: ReadonlyArray<{
+  readonly id: string;
+  readonly key: string;
+  readonly labelKey: MessageKey;
+  readonly category: "search";
+}> = [
+  {
+    id: "search.useSelection",
+    key: "Mod-e",
+    labelKey: "shortcuts.item.useSelectionForFind",
+    category: "search",
+  },
+];
+
 export const kalamosSearchKeymap: readonly KeyBinding[] = [
   { key: "Mod-f", run: unshifted((view) => openFind(view)) },
   {
@@ -472,7 +490,7 @@ export const kalamosSearchKeymap: readonly KeyBinding[] = [
   },
   { key: "Mod-g", run: unshifted(findNextMatch), shift: findPreviousMatch },
   {
-    key: "Mod-e",
+    key: SEARCH_EXTRA_SHORTCUTS[0].key,
     run: unshifted((view) => {
       useSelectionForFind(view);
       return true;

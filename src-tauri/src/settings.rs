@@ -116,6 +116,10 @@ pub fn current_system_locale() -> Option<String> {
     sys_locale::get_locale()
 }
 
+fn default_welcome_shown_on_disk() -> bool {
+    true
+}
+
 pub const DEFAULT_FONT_SIZE: u32 = 17;
 pub const DEFAULT_CONTENT_WIDTH: u32 = 720;
 
@@ -166,6 +170,11 @@ pub struct Settings {
     pub content_width: u32,
     /// #104: recently opened / saved file paths (newest first, up to 20).
     pub recent_files: Vec<String>,
+    /// #147: whether the first-launch welcome document has already been shown.
+    /// Absent in older settings files on disk, where it defaults to `true` so
+    /// existing users are unaffected; `Settings::default()` (no file yet) is `false`.
+    #[serde(default = "default_welcome_shown_on_disk")]
+    pub welcome_shown: bool,
 }
 
 impl Default for Settings {
@@ -194,6 +203,7 @@ impl Default for Settings {
             font_size: DEFAULT_FONT_SIZE,
             content_width: DEFAULT_CONTENT_WIDTH,
             recent_files: Vec::new(),
+            welcome_shown: false,
         }
     }
 }
@@ -207,14 +217,14 @@ pub fn get_settings_in(app_data_dir: &Path) -> Result<Settings, AppError> {
         Ok(s) => s,
         Err(err) => {
             eprintln!("Failed to read settings.json, falling back to defaults: {err}");
-            return Ok(Settings::default());
+            return Ok(Settings { welcome_shown: true, ..Settings::default() });
         }
     };
     match serde_json::from_str::<Settings>(&raw) {
         Ok(settings) => Ok(settings),
         Err(err) => {
             eprintln!("Corrupted settings.json, falling back to defaults: {err}");
-            Ok(Settings::default())
+            Ok(Settings { welcome_shown: true, ..Settings::default() })
         }
     }
 }
@@ -368,6 +378,7 @@ mod tests {
         assert_eq!(v["fontSize"], 17);
         assert_eq!(v["contentWidth"], 720);
         assert_eq!(v["recentFiles"], serde_json::json!([]));
+        assert_eq!(v["welcomeShown"], false);
     }
 
     #[test]
@@ -401,6 +412,7 @@ mod tests {
                 "/tmp/kalamos-test/Notes/a.md".to_string(),
                 "/tmp/kalamos-test/Notes/b.md".to_string(),
             ],
+            welcome_shown: true,
         };
         set_settings_in(dir.path(), &updated).expect("set_settings");
         let loaded = get_settings_in(dir.path()).expect("get_settings");
@@ -631,6 +643,8 @@ mod tests {
         assert_eq!(loaded.upload_command, None);
         assert!(loaded.upload_args.is_empty());
         assert!(!loaded.upload_on_insert);
+        // Existing settings.json without welcomeShown must not trigger first-launch welcome.
+        assert!(loaded.welcome_shown);
     }
 
     #[test]
@@ -784,7 +798,27 @@ mod tests {
         fs::write(&settings_path, "{ invalid json !!!").expect("write corrupted settings");
 
         let loaded = get_settings_in(dir.path()).expect("fallback to defaults");
-        assert_eq!(loaded, Settings::default());
+        assert_eq!(loaded, Settings { welcome_shown: true, ..Settings::default() });
+    }
+
+    #[test]
+    fn welcome_shown_is_false_only_without_settings_file_or_when_explicitly_false() {
+        let dir = tempdir().expect("tempdir");
+        // Brand-new install: no settings.json -> welcome_shown is false.
+        assert!(!get_settings_in(dir.path()).unwrap().welcome_shown);
+
+        // Existing settings.json from older version without welcomeShown -> true.
+        let settings_path = dir.path().join("settings.json");
+        fs::write(&settings_path, r#"{ "theme": "melan" }"#).unwrap();
+        assert!(get_settings_in(dir.path()).unwrap().welcome_shown);
+
+        // Explicit false / true round-trips cleanly.
+        fs::write(&settings_path, r#"{ "welcomeShown": false }"#).unwrap();
+        assert!(!get_settings_in(dir.path()).unwrap().welcome_shown);
+        let mut s = get_settings_in(dir.path()).unwrap();
+        s.welcome_shown = true;
+        set_settings_in(dir.path(), &s).unwrap();
+        assert!(get_settings_in(dir.path()).unwrap().welcome_shown);
     }
 
     #[test]

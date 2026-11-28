@@ -328,7 +328,7 @@ function alignIcon(
   return svg;
 }
 
-const ACTION_LABELS: Record<TableAction, MessageKey> = {
+export const TABLE_ACTION_LABELS: Record<TableAction, MessageKey> = {
   rowAbove: "editor.table.rowAbove",
   rowBelow: "editor.table.rowBelow",
   colLeft: "editor.table.columnLeft",
@@ -342,6 +342,8 @@ const ACTION_LABELS: Record<TableAction, MessageKey> = {
   deleteCol: "editor.table.deleteColumn",
   deleteTable: "editor.table.deleteTable",
 };
+
+const ACTION_LABELS = TABLE_ACTION_LABELS;
 
 interface ButtonSpec {
   action: TableAction;
