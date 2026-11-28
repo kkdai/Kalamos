@@ -575,9 +575,17 @@ summary:focus-visible {
   gap: 24px 32px;
 }
 
-.pillars-grid + .pillars-grid--three {
+.pillars-grid + .pillars-grid {
   border-top: 0;
   padding-top: 32px;
+}
+
+.pillars-note {
+  margin: 20px auto 0;
+  max-width: var(--max-prose);
+  text-align: center;
+  font-size: 0.92rem;
+  color: var(--ink-secondary);
 }
 
 .pillar h3 {
@@ -676,6 +684,32 @@ summary:focus-visible {
   font-size: 0.88rem;
   color: var(--ink-secondary);
   line-height: 1.55;
+}
+
+.showcase-subheader {
+  max-width: var(--max-prose);
+  margin: clamp(48px, 7vw, 80px) auto clamp(24px, 3vw, 32px);
+  text-align: center;
+}
+
+.showcase-subheader h3 {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: clamp(1.3rem, 2.4vw, 1.6rem);
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--ink);
+}
+
+.showcase-subheader p {
+  margin: 12px auto 0;
+  font-size: 1rem;
+  color: var(--ink-secondary);
+  line-height: 1.75;
+}
+
+.shortcuts-grid + .showcase-media {
+  margin-top: 36px;
 }
 
 /* ==========================================================================

@@ -135,6 +135,24 @@
               <p>独自記法を一切含まない標準 GFM 形式で保存。原子的保存、1 秒自動保存、クラッシュリカバリで大切な下書きを守ります。</p>
             </div>
           </div>
+          <div class="pillars-grid">
+            <div class="pillar">
+              <h3>ローカルのバージョン履歴</h3>
+              <p>保存のたびに直前のバージョンを自動で保管。<strong>File &gt; Browse Version History…</strong> から行単位で差分を確認して現在のタブへ復元でき、<kbd>Cmd+Z</kbd> で元に戻せます。履歴はローカルにのみ保存されます。</p>
+            </div>
+            <div class="pillar">
+              <h3>外部変更の検出</h3>
+              <p>ほかのアプリや同期サービスが開いているファイルを変更すると自動で再読み込み。未保存の変更もある場合はバナーでどちらを残すか選べ、保存前にはディスクの内容を照合します。</p>
+            </div>
+            <div class="pillar">
+              <h3>リッチテキストとしてコピー</h3>
+              <p><kbd>Cmd+Opt+Shift+C</kbd> で選択範囲や文書全体をクリーンなリッチテキストに変換し、Gmail、Google Docs、Medium、Notion にそのまま貼り付け。数式と図は画像に変換されます。</p>
+            </div>
+            <div class="pillar">
+              <h3>キーボードショートカット一覧</h3>
+              <p><kbd>Cmd+Opt+/</kbd>（Windows は <kbd>Ctrl+Alt+/</kbd>）または <strong>Help &gt; Keyboard Shortcuts…</strong> で、すべてのショートカットをカテゴリ別に一覧・検索できます。</p>
+            </div>
+          </div>
           <div class="pillars-grid pillars-grid--three">
             <div class="pillar">
               <h3>YAML 文書情報プレビュー</h3>
@@ -149,6 +167,7 @@
               <p><kbd>Ctrl</kbd> を押しながらマウスホイールを回すだけで画面を滑らかに拡大・縮小。<strong>表示</strong>メニューの拡大・縮小・実際のサイズと倍率を共有します。</p>
             </div>
           </div>
+          <p class="pillars-note">起動も速くなりました。数式・ダイアグラム・エクスポートのモジュールを必要になったときに読み込むようにし、起動時に読み込むメインバンドルを約 970&nbsp;kB から約 390&nbsp;kB に削減しました。</p>
         </div>
       </section>
 
@@ -459,6 +478,125 @@
         </div>
       </section>
 
+      <!-- Showcase 8: Version History & External Changes -->
+      <section class="showcase" id="history">
+        <div class="container">
+          <div class="showcase-header">
+            <span class="eyebrow">バージョン履歴と外部変更</span>
+            <h2 class="section-title">保存するたびに、戻れる場所を残す</h2>
+            <p class="section-desc">Kalamos は保存の直前に、ディスク上の内容をローカルに保管します。<strong>File &gt; Browse Version History…</strong> でバージョンを選ぶと、現在の内容との差分を行単位で確認でき、ワンクリックで復元できます。</p>
+          </div>
+          <div class="showcase-media">
+            <div class="window-frame">
+              <div class="window-bar" aria-hidden="true">
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-title">release-notes.md — Kalamos</span>
+              </div>
+              <img
+                src="../assets/screenshots/version-history.png"
+                alt="左にバージョン一覧、右に選択したバージョンと現在の内容の行単位の差分を表示する Kalamos のバージョン履歴ウィンドウ"
+                width="1280"
+                height="800"
+                loading="lazy"
+              />
+            </div>
+          </div>
+          <div class="showcase-notes">
+            <div class="showcase-note">
+              <strong>元に戻せる復元</strong>
+              <span>復元は現在のタブに読み込むだけでディスクには書き込みません。Cmd+Z で元に戻せます。</span>
+            </div>
+            <div class="showcase-note">
+              <strong>容量は自動で整理</strong>
+              <span>自動保存では 5 分に 1 バージョンまで。既定はファイルごとに 50 バージョン・合計 200 MB で、環境設定で変更できます。</span>
+            </div>
+            <div class="showcase-note">
+              <strong>ローカルにだけ保存</strong>
+              <span>履歴はアプリデータフォルダの history/ に保存され、アップロードも同期もされません。</span>
+            </div>
+          </div>
+          <div class="showcase-subheader">
+            <h3>ほかのアプリが変更しても、気づかず上書きしない</h3>
+            <p>開いているファイルがほかのエディタや <code>git</code>、iCloud・Dropbox の同期で変更されたとき、未保存の変更がなければ自動で再読み込みし、競合があればバナーで判断を委ねます。</p>
+          </div>
+          <div class="showcase-media">
+            <div class="window-frame">
+              <div class="window-bar" aria-hidden="true">
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-title">article.md — Kalamos</span>
+              </div>
+              <img
+                src="../assets/screenshots/external-change.png"
+                alt="外部変更を検出したときにエディタ上部に表示される Kalamos の競合バナー。Keep My Version と Load Disk Version を選べる"
+                width="1200"
+                height="320"
+                loading="lazy"
+              />
+            </div>
+          </div>
+          <div class="showcase-notes">
+            <div class="showcase-note">
+              <strong>自動で再読み込み</strong>
+              <span>未保存の変更がなければ、カーソルとスクロール位置を保ったまま新しい内容を読み込みます。</span>
+            </div>
+            <div class="showcase-note">
+              <strong>競合はあなたが判断</strong>
+              <span>自分のバージョンを残すか、ディスクのバージョンを読み込むかを選べます。選ぶまで自動保存は一時停止します。</span>
+            </div>
+            <div class="showcase-note">
+              <strong>削除・名前変更の通知</strong>
+              <span>ファイルが外部で削除・名前変更されたら、別名で保存するか元の場所に作り直せます。</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Showcase 9: Copy as Rich Text -->
+      <section class="showcase showcase--tinted">
+        <div class="container">
+          <div class="showcase-header">
+            <span class="eyebrow">リッチテキストとしてコピー</span>
+            <h2 class="section-title">Markdown で書いて、どこにでもきれいに貼る</h2>
+            <p class="section-desc"><kbd>Cmd+Opt+Shift+C</kbd> または <strong>Edit &gt; Copy as Rich Text</strong> で、選択範囲や文書全体をコンパクトなリッチテキスト HTML とプレーンな Markdown としてコピー。Gmail、Google Docs、Medium、Notion に書式を直さず貼り付けられます。</p>
+          </div>
+          <div class="showcase-media">
+            <div class="window-frame">
+              <div class="window-bar" aria-hidden="true">
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-title">rich-text.md — Kalamos</span>
+              </div>
+              <img
+                src="../assets/screenshots/copy-rich-text.png"
+                alt="リッチテキストとしてコピーした後、ステータスバーにコピー完了が表示された Kalamos"
+                width="1200"
+                height="800"
+                loading="lazy"
+              />
+            </div>
+          </div>
+          <div class="showcase-notes">
+            <div class="showcase-note">
+              <strong>クリーンなセマンティック HTML</strong>
+              <span>見出し、リスト、表、コードブロックの構造を保ち、テーマのスタイルは持ち込みません。</span>
+            </div>
+            <div class="showcase-note">
+              <strong>数式と図は画像に</strong>
+              <span>MathJax の数式と Mermaid の図は高解像度 PNG に変換され、そのまま表示されます。</span>
+            </div>
+            <div class="showcase-note">
+              <strong>YAML は除外</strong>
+              <span>文書先頭の YAML front matter はコピーされません。</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- Shortcuts Summary -->
       <section class="showcase" id="shortcuts">
         <div class="container container--narrow">
@@ -466,6 +604,7 @@
             <span class="eyebrow">キーボードファースト</span>
             <h2 class="section-title">主要ショートカット一覧</h2>
             <p class="section-desc">ホームポジションから手を離さず、主要な操作をすべて完結できます。Windows では <code>Cmd</code> を <code>Ctrl</code>、<code>Opt</code> を <code>Alt</code> に読み替えてください（<code>Ctrl+Tab</code> と <code>Ctrl + ホイール</code> は両 OS 共通）。</p>
+            <p class="section-desc">すべてのショートカットは、<kbd>Cmd+Opt+/</kbd> または <strong>Help &gt; Keyboard Shortcuts…</strong> からカテゴリ別に一覧・検索できます。</p>
           </div>
 
           <div class="shortcuts-grid">
@@ -540,6 +679,31 @@
             <div class="shortcut-row">
               <span class="shortcut-label">マウスホイールで拡大・縮小</span>
               <span><kbd>Ctrl</kbd> + ホイール</span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">リッチテキストとしてコピー</span>
+              <kbd>Cmd+Opt+Shift+C</kbd>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">キーボードショートカット一覧</span>
+              <kbd>Cmd+Opt+/</kbd>
+            </div>
+          </div>
+          <div class="showcase-media">
+            <div class="window-frame">
+              <div class="window-bar" aria-hidden="true">
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-title">Kalamos</span>
+              </div>
+              <img
+                src="../assets/screenshots/shortcuts.png"
+                alt="カテゴリ別のショートカット一覧と検索欄を備えた Kalamos のキーボードショートカット一覧"
+                width="1280"
+                height="840"
+                loading="lazy"
+              />
             </div>
           </div>
         </div>

@@ -69,6 +69,10 @@
 - **Pandoc エクスポート**（`EX-02`、`Cmd+Opt+E`）：**DOCX**、**ODT**（OpenOffice / LibreOffice）、**LaTeX**、**MediaWiki**、**EPUB** への書き出しに対応（別途 Pandoc が必要）。`[TOC]` やローカル画像パス、`<img>` サイズ指定も自動変換します。
 - **Pandoc インポート**（`EX-03`、`Cmd+Opt+I`）：**DOCX**、**ODT**、**EPUB**、**LaTeX**、**HTML**、**MediaWiki** を `$...$` / `$$...$$` 数式や抽出メディア付きのクリーンな GFM Markdown として取り込めます（`--sandbox` のため Pandoc 2.15 以上が必要）。
 
+<p align="center">
+  <img src="site/assets/screenshots/copy-rich-text.png" alt="リッチテキストとしてコピーした後、ステータスバーにコピー完了が表示された Kalamos" width="760" />
+</p>
+
 ### ライティングモード
 - **Ataraxia フォーカスモード**（`WM-01`、`F8`）：現在の段落・リスト項目・選択範囲以外のブロックを穏やかにフェードアウトします。
 - **Stichos タイプライターモード**（`WM-02`、`F9`）：入力中もカーソル行を常に画面の垂直中央に保ちます。
@@ -81,6 +85,18 @@
   <img src="site/assets/screenshots/dark-theme-melan.png" alt="Kalamos Melan ダークテーマ" width="760" />
 </p>
 
+### バージョン履歴と外部変更の検出
+- **ローカルのバージョン履歴**（**File > Browse Version History…**）：保存のたびに、上書きされる直前のディスク上の内容をローカルに保管します。任意のバージョンと現在の内容を行単位で比較し、現在のタブへ復元できます（復元してもすぐにはディスクへ書き込まれず、`Cmd+Z` / `Ctrl+Z` で元に戻せます）。自動保存では同じファイルにつき 5 分に 1 バージョンまで保管します。既定ではファイルごとに 50 バージョン、合計 200 MB まで。**Preferences → General** でオン／オフ、上限の変更、全履歴の削除ができます。履歴はローカルのアプリデータフォルダ（`history/`）にのみ保存されます。詳細は [docs/version-history.md](docs/version-history.md)（繁体字中国語）を参照してください。
+- **外部変更の検出**：開いているすべてのファイルを監視します。未保存の変更がなければ、ほかのアプリによる変更をカーソルとスクロール位置を保ったまま自動で再読み込みします。未保存の変更がある場合は、編集を妨げないバナーで**Keep My Version**（自分のバージョンを残す）か **Load Disk Version**（ディスクのバージョンを読み込む）かを選べます。ファイルが外部で削除・名前変更された場合は**Save As…**（別名で保存）または **Recreate at Original Path**（元の場所に作り直す）を案内します。判断するまで自動保存は一時停止し、保存前には必ずディスクの内容を照合するため、外部の変更を気づかないうちに上書きすることはありません。詳細は [docs/external-changes.md](docs/external-changes.md)（繁体字中国語）を参照してください。
+
+<p align="center">
+  <img src="site/assets/screenshots/version-history.png" alt="左にバージョン一覧、右に選択したバージョンと現在の内容の行単位の差分を表示する Kalamos のバージョン履歴ウィンドウ" width="760" />
+</p>
+
+<p align="center">
+  <img src="site/assets/screenshots/external-change.png" alt="外部変更を検出したときに Kalamos が表示する競合バナー。「自分のバージョンを残す」と「ディスクのバージョンを読み込む」を選べる" width="760" />
+</p>
+
 ### クイックオープン・タブ・検索・ファイル管理
 - **クイックオープンと最近使ったファイル**（`Cmd+P` / `Ctrl+P`）：開いているフォルダ内の Markdown ファイルをあいまい検索し、一致文字をハイライト表示します（ファイル名・先頭・連続一致を優先）。入力欄が空のときはフォルダを問わず最近開いた最大 20 件を表示し、`Enter` でタブ規則に従って開くほか、`Cmd+Enter` / `Ctrl+Enter` で常に新しいタブで開けます。macOS・Windows のネイティブメニューにも「**ファイル > 最近使った項目を開く**」（履歴クリア付き）を備えています。
 - **複数ドキュメントのタブ管理**：1 つのウィンドウで複数ファイルを同時に編集可能（`Cmd+T` / `Ctrl+T` 新規タブ、`Cmd+W` / `Ctrl+W` タブを閉じる、`Ctrl+Tab` / `Ctrl+Shift+Tab` タブ切り替え、ドラッグで並び替え）。各タブが Undo 履歴・カーソル・スクロール位置を個別に保持し、ウィンドウ終了前に未保存の変更をまとめて確認します。
@@ -91,10 +107,17 @@
 - **画面ズーム**：`Ctrl` キーを押しながらマウスホイールを回すだけで画面を拡大・縮小でき（macOS・Windows 共通）、**表示 > 拡大 / 縮小 / 実際のサイズ**（`Cmd+Shift+=` / `-` / `0` または `Ctrl+Shift+=` / `-` / `0`）と倍率を共有します。
 - **サイドバー**（`NV-01`、`NV-02`）：`Cmd+Shift+L` / `Ctrl+Shift+L` で表示切り替え、`Cmd+Shift+O` / `Ctrl+Shift+O` でフォルダを開けます。**ファイルツリー**、**ファイル一覧**（抜粋付き）、**アウトライン**（`Cmd+Shift+1` / `Ctrl+Shift+1`）、**フォルダ検索**を切り替え可能。新規作成・リネーム・ゴミ箱移動および外部変更の自動監視（iCloud Drive / Dropbox フォルダ対応）を備えています。
 - **文字数・単語数カウント**（`NV-03`）：ステータスバーに読者視点の単語数（CJK 文字 + 英単語）、書記素文字数、行数、推定読了時間をリアルタイム表示。範囲選択中は選択部分の統計に切り替わります。
-- **安全な保存とクラッシュリカバリ**：一時ファイル経由の原子的リネーム保存、保存済みファイルの 1 秒デバウンス自動保存、無題ドラフトの 5 秒間隔リカバリスナップショットと次回起動時のワンクリック復元バナーを実装しています。
+- **安全な保存とクラッシュリカバリ**：一時ファイル経由の原子的リネーム保存（保存前にディスクの内容を照合し、外部の変更を上書きしない）、保存済みファイルの 1 秒デバウンス自動保存、無題ドラフトの 5 秒間隔リカバリスナップショットと次回起動時のワンクリック復元バナーを実装しています。
+- **キーボードショートカット一覧**（macOS `⌥⌘/`、Windows `Ctrl+Alt+/`、**Help > Keyboard Shortcuts…**）：すべてのショートカットをカテゴリ別に一覧でき、機能名やキーで検索できます。キー表記は使用中のプラットフォームに合わせて表示されます。
+- **ウェルカム文書**：新規インストール後の初回起動時に、Kalamos の機能を紹介するウェルカム文書を無題のタブで開きます（ディスクには保存されません。繁体字中国語と英語に対応）。**Help > Welcome Document** からいつでも開き直せます。
+- **起動の高速化**：数式（MathJax）、ダイアグラム（Mermaid など）、エクスポート関連のモジュールを初めて使うときに読み込むよう変更し、起動時に読み込むメインバンドルを約 970 kB から約 390 kB に削減しました。
 
 <p align="center">
   <img src="site/assets/screenshots/quick-open.png" alt="あいまい検索ハイライトと最近使ったファイルのバッジを表示する Kalamos の Cmd+P クイックオープン" width="760" />
+</p>
+
+<p align="center">
+  <img src="site/assets/screenshots/shortcuts.png" alt="カテゴリ別のショートカット一覧と検索欄を備えた Kalamos のキーボードショートカット一覧" width="760" />
 </p>
 
 ---
@@ -148,6 +171,9 @@
 | | PDF エクスポート（しおり付き） | `Cmd+Shift+E` | `Ctrl+Shift+E` |
 | | Pandoc エクスポート（DOCX/ODT/LaTeX/Wiki/EPUB） | `Cmd+Opt+E` | `Ctrl+Alt+E` |
 | | Pandoc インポート | `Cmd+Opt+I` | `Ctrl+Alt+I` |
+| **ヘルプ** | キーボードショートカット一覧 | `Cmd+Opt+/` | `Ctrl+Alt+/` |
+
+> **すべてのショートカット**：アプリ内で `Cmd+Opt+/`（Windows は `Ctrl+Alt+/`）を押すか、**Help > Keyboard Shortcuts…** を選ぶと、カテゴリ別に一覧・検索できます。
 
 > **クイックオープンパネル内の操作**：`↑` / `↓`（macOS では `Ctrl+N` / `Ctrl+P` も可）で選択移動、`Enter` で開く、`Cmd+Enter` / `Ctrl+Enter` で必ず新規タブで開く、`Esc` で閉じて元の編集位置へ戻ります。
 
@@ -260,6 +286,9 @@ npm run bench
 
 - 製品要件定義書：[docs/PRD.md](docs/PRD.md)
 - テーブルガイド：[docs/tables.md](docs/tables.md)
+- リッチテキストコピーガイド：[docs/rich-text-copy.md](docs/rich-text-copy.md)
+- ローカルのバージョン履歴ガイド：[docs/version-history.md](docs/version-history.md)
+- 外部変更の検出ガイド：[docs/external-changes.md](docs/external-changes.md)
 - カスタム CSS テーマガイド：[docs/themes.md](docs/themes.md)
 - 画像アップロード設定ガイド：[docs/image-upload.md](docs/image-upload.md)
 

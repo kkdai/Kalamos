@@ -157,6 +157,24 @@
               </p>
             </div>
           </div>
+          <div class="pillars-grid">
+            <div class="pillar">
+              <h3>Local Version History</h3>
+              <p>Every save keeps the previous version on your Mac or PC. Open <strong>File &gt; Browse Version History…</strong> to compare line by line and restore into the current tab, with <kbd>Cmd+Z</kbd> to undo. History never leaves your machine.</p>
+            </div>
+            <div class="pillar">
+              <h3>External Change Detection</h3>
+              <p>When another app or a sync service changes an open file, Kalamos reloads it for you. If you have unsaved edits too, a banner lets you choose which version to keep, and every save checks the disk first.</p>
+            </div>
+            <div class="pillar">
+              <h3>Copy as Rich Text</h3>
+              <p>Press <kbd>Cmd+Opt+Shift+C</kbd> to turn the selection or the whole document into clean rich text for Gmail, Google Docs, Medium, or Notion, with math and diagrams converted to images.</p>
+            </div>
+            <div class="pillar">
+              <h3>Keyboard Shortcuts Cheat Sheet</h3>
+              <p>Press <kbd>Cmd+Opt+/</kbd> (<kbd>Ctrl+Alt+/</kbd> on Windows) or choose <strong>Help &gt; Keyboard Shortcuts…</strong> to browse and search every shortcut by category.</p>
+            </div>
+          </div>
           <div class="pillars-grid pillars-grid--three">
             <div class="pillar">
               <h3>YAML Document Info Preview</h3>
@@ -180,6 +198,7 @@
               </p>
             </div>
           </div>
+          <p class="pillars-note">Startup is faster too: math, diagrams, and export modules now load only when needed, cutting the main bundle loaded at launch from about 970&nbsp;kB to about 390&nbsp;kB.</p>
         </div>
       </section>
 
@@ -542,6 +561,125 @@
         </div>
       </section>
 
+      <!-- Showcase 8: Version History & External Changes -->
+      <section class="showcase" id="history">
+        <div class="container">
+          <div class="showcase-header">
+            <span class="eyebrow">Version History &amp; External Changes</span>
+            <h2 class="section-title">Every save leaves a way back</h2>
+            <p class="section-desc">Before each save, Kalamos keeps the previous on-disk version locally. Pick a version from <strong>File &gt; Browse Version History…</strong> to see a line-by-line diff against your current text, then restore it in one click.</p>
+          </div>
+          <div class="showcase-media">
+            <div class="window-frame">
+              <div class="window-bar" aria-hidden="true">
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-title">release-notes.md — Kalamos</span>
+              </div>
+              <img
+                src="assets/screenshots/version-history.png"
+                alt="Kalamos Version History window with the version list on the left and a line-by-line diff against the current content on the right"
+                width="1280"
+                height="800"
+                loading="lazy"
+              />
+            </div>
+          </div>
+          <div class="showcase-notes">
+            <div class="showcase-note">
+              <strong>Restores you can undo</strong>
+              <span>Restoring only loads the version into the current tab, without touching the disk. Press Cmd+Z to go back.</span>
+            </div>
+            <div class="showcase-note">
+              <strong>Tidy by default</strong>
+              <span>Autosaves keep at most one version every 5 minutes. Each file keeps 50 versions within 200 MB in total, adjustable in Preferences.</span>
+            </div>
+            <div class="showcase-note">
+              <strong>Stays on your machine</strong>
+              <span>History lives in the app data folder under history/ and is never uploaded or synced.</span>
+            </div>
+          </div>
+          <div class="showcase-subheader">
+            <h3>Other apps can edit your file without being overwritten</h3>
+            <p>When another editor, <code>git</code>, or an iCloud or Dropbox sync changes an open file, Kalamos reloads it automatically if you have no unsaved edits, and shows a banner to let you decide when there is a conflict.</p>
+          </div>
+          <div class="showcase-media">
+            <div class="window-frame">
+              <div class="window-bar" aria-hidden="true">
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-title">article.md — Kalamos</span>
+              </div>
+              <img
+                src="assets/screenshots/external-change.png"
+                alt="Kalamos conflict banner above the editor after an external change, offering Keep My Version and Load Disk Version"
+                width="1200"
+                height="320"
+                loading="lazy"
+              />
+            </div>
+          </div>
+          <div class="showcase-notes">
+            <div class="showcase-note">
+              <strong>Automatic reload</strong>
+              <span>With no unsaved edits, the new content loads in place, keeping your cursor and scroll position.</span>
+            </div>
+            <div class="showcase-note">
+              <strong>You decide on conflicts</strong>
+              <span>Keep your version or load the disk version. Autosave pauses until you choose.</span>
+            </div>
+            <div class="showcase-note">
+              <strong>Deleted or renamed files</strong>
+              <span>If the file disappears, save it somewhere new or recreate it at the original path.</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Showcase 9: Copy as Rich Text -->
+      <section class="showcase showcase--tinted">
+        <div class="container">
+          <div class="showcase-header">
+            <span class="eyebrow">Copy as Rich Text</span>
+            <h2 class="section-title">Write in Markdown, paste anywhere</h2>
+            <p class="section-desc">Press <kbd>Cmd+Opt+Shift+C</kbd> or choose <strong>Edit &gt; Copy as Rich Text</strong> to copy the selection or whole document as compact rich-text HTML plus plain Markdown, ready for Gmail, Google Docs, Medium, and Notion without reformatting.</p>
+          </div>
+          <div class="showcase-media">
+            <div class="window-frame">
+              <div class="window-bar" aria-hidden="true">
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-title">rich-text.md — Kalamos</span>
+              </div>
+              <img
+                src="assets/screenshots/copy-rich-text.png"
+                alt="Kalamos after Copy as Rich Text, with the status bar confirming the copy"
+                width="1200"
+                height="800"
+                loading="lazy"
+              />
+            </div>
+          </div>
+          <div class="showcase-notes">
+            <div class="showcase-note">
+              <strong>Clean, semantic HTML</strong>
+              <span>Headings, lists, tables, and code blocks keep their structure without dragging along the whole theme.</span>
+            </div>
+            <div class="showcase-note">
+              <strong>Math and diagrams as images</strong>
+              <span>MathJax formulas and Mermaid diagrams become high-resolution PNGs that paste cleanly.</span>
+            </div>
+            <div class="showcase-note">
+              <strong>YAML left out</strong>
+              <span>Front matter at the top of the document is never copied.</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- Shortcuts Summary -->
       <section class="showcase" id="shortcuts">
         <div class="container container--narrow">
@@ -553,6 +691,7 @@
               <code>Ctrl</code> and <code>Opt</code> maps to <code>Alt</code> (<code>Ctrl+Tab</code> and
               <code>Ctrl + Wheel</code> are the same on both platforms).
             </p>
+            <p class="section-desc">Want the full list? Press <kbd>Cmd+Opt+/</kbd> or choose <strong>Help &gt; Keyboard Shortcuts…</strong> to browse and search every shortcut by category.</p>
           </div>
 
           <div class="shortcuts-grid">
@@ -627,6 +766,31 @@
             <div class="shortcut-row">
               <span class="shortcut-label">Zoom with Mouse Wheel</span>
               <span><kbd>Ctrl</kbd> + Wheel</span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">Copy as Rich Text</span>
+              <kbd>Cmd+Opt+Shift+C</kbd>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-label">Keyboard Shortcuts Cheat Sheet</span>
+              <kbd>Cmd+Opt+/</kbd>
+            </div>
+          </div>
+          <div class="showcase-media">
+            <div class="window-frame">
+              <div class="window-bar" aria-hidden="true">
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-dot"></span>
+                <span class="window-title">Kalamos</span>
+              </div>
+              <img
+                src="assets/screenshots/shortcuts.png"
+                alt="Kalamos keyboard shortcuts cheat sheet listing shortcuts by category with a search field"
+                width="1280"
+                height="840"
+                loading="lazy"
+              />
             </div>
           </div>
         </div>

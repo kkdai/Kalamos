@@ -69,6 +69,10 @@
 - **Pandoc 多格式匯出**（`EX-02`，`Cmd+Opt+E`）：支援匯出 **DOCX**、**ODT**（OpenOffice / LibreOffice）、**LaTeX**、**MediaWiki** 與 **EPUB**（需選用安裝 Pandoc），自動轉換 `[TOC]`、本機圖片路徑與 `<img>` 尺寸。
 - **Pandoc 匯入**（`EX-03`，`Cmd+Opt+I`）：可將 **DOCX**、**ODT**、**EPUB**、**LaTeX**、**HTML** 與 **MediaWiki** 匯入為乾淨的 GFM Markdown，保留 `$...$` / `$$...$$` 數學公式並提取內嵌媒體（需 Pandoc 2.15 以上以啟用 `--sandbox`）。
 
+<p align="center">
+  <img src="site/assets/screenshots/copy-rich-text.png" alt="Kalamos 複製為富文字後，狀態列顯示「已複製為富文字」" width="760" />
+</p>
+
 ### 寫作模式
 - **Ataraxia 專注模式**（`WM-01`，`F8`）：柔和淡化當前段落、清單項目或選取範圍以外的所有區塊。
 - **Stichos 打字機模式**（`WM-02`，`F9`）：打字與移動游標時始終讓當前行維持於畫面垂直中央。
@@ -81,6 +85,18 @@
   <img src="site/assets/screenshots/dark-theme-melan.png" alt="Kalamos Melan 深色主題畫面" width="760" />
 </p>
 
+### 版本歷史與外部修改
+- **本機版本歷史**（**檔案 > 瀏覽版本歷史…**）：每次存檔前自動在本機保留磁碟上的舊版本；可逐行比對所選版本與目前內容的差異，並將舊版本還原到目前分頁（不會直接寫入磁碟，可按 `Cmd+Z` / `Ctrl+Z` 復原）。自動存檔對同一檔案每 5 分鐘最多保留一版；預設每個檔案保留 50 版、總容量上限 200 MB，可在 **偏好設定 → 一般** 開關、調整上限或清除所有歷史。歷史只存在本機的應用程式資料目錄（`history/`）。詳見 [docs/version-history.md](docs/version-history.md)。
+- **外部修改偵測**：監看所有已開啟的檔案。沒有未儲存的變更時，外部修改會自動重新載入並保留游標與捲動位置；有未儲存的變更時，以不阻斷編輯的橫幅讓你選擇「保留我的版本」或「載入磁碟版本」；檔案在外部被刪除或改名時會提示「另存新檔」或「在原路徑重新建立」。發生衝突時自動儲存會暫停，存檔前也會比對磁碟內容，避免覆寫外部修改。詳見 [docs/external-changes.md](docs/external-changes.md)。
+
+<p align="center">
+  <img src="site/assets/screenshots/version-history.png" alt="Kalamos 版本歷史視窗，左側為版本列表，右側為所選版本與目前內容的逐行差異" width="760" />
+</p>
+
+<p align="center">
+  <img src="site/assets/screenshots/external-change.png" alt="Kalamos 偵測到外部修改時顯示的衝突橫幅，提供「保留我的版本」與「載入磁碟版本」" width="760" />
+</p>
+
 ### 快速開檔、多分頁、搜尋與檔案管理
 - **快速開檔與最近開啟**（`Cmd+P` / `Ctrl+P`）：模糊搜尋目前開啟資料夾內的 Markdown 檔並標亮命中字元（優先排序檔名、字首與連續命中）。輸入框為空時列出最多 20 筆最近開啟的檔案（不限資料夾）；按 `Enter` 依分頁規則開啟、`Cmd+Enter` / `Ctrl+Enter` 一律開在新分頁，原生選單列亦提供「**檔案 > 打開最近使用**」（含清除清單）。
 - **多文件分頁**：在同一視窗同時開啟多份文件（`Cmd+T` / `Ctrl+T` 開新分頁、`Cmd+W` / `Ctrl+W` 關閉分頁、`Ctrl+Tab` / `Ctrl+Shift+Tab` 切換分頁、支援拖曳排序），各分頁獨立保留復原紀錄、游標與捲動位置，關閉視窗或結束前會檢查所有未儲存變更。
@@ -91,10 +107,17 @@
 - **介面縮放**：按住 `Ctrl` 滾動滑鼠滾輪即可放大或縮小介面（macOS 與 Windows 皆適用），與「**檢視 > 放大／縮小／實際大小**」（`Cmd+Shift+=` / `-` / `0` 或 `Ctrl+Shift+=` / `-` / `0`）共用縮放比例。
 - **側欄導覽**（`NV-01`、`NV-02`）：`Cmd+Shift+L` / `Ctrl+Shift+L` 切換側欄、`Cmd+Shift+O` / `Ctrl+Shift+O` 開啟資料夾，內建**檔案樹**、**檔案列表**（含摘要）、**大綱**（`Cmd+Shift+1` / `Ctrl+Shift+1`）與**資料夾搜尋**；支援新增、重新命名與移至垃圾桶，並監聽外部檔案變更（相容 iCloud Drive 與 Dropbox 資料夾）。
 - **即時字數統計**（`NV-03`）：狀態列顯示讀者可見字數（CJK 字元 + 英文單字）、字元數、行數與預估閱讀時間，框選文字時即時切換為選取範圍統計。
-- **安全存檔與異常救回**：採用暫存檔原子更名寫入；已命名文件停止輸入 1 秒後自動存檔；未命名草稿每 5 秒寫入救回快照，異常關閉重開後可一鍵還原。
+- **安全存檔與異常救回**：採用暫存檔原子更名寫入，存檔前會比對磁碟內容避免覆寫外部修改；已命名文件停止輸入 1 秒後自動存檔；未命名草稿每 5 秒寫入救回快照，異常關閉重開後可一鍵還原。
+- **鍵盤快捷鍵速查表**（macOS `⌥⌘/`、Windows `Ctrl+Alt+/`，**說明 > 鍵盤快捷鍵…**）：依分類列出所有快捷鍵，並可輸入功能名稱或按鍵搜尋，按鍵標示會依平台顯示。
+- **歡迎文件**：全新安裝後第一次開啟時，會自動在未命名分頁載入一份示範 Kalamos 功能的歡迎文件（不會寫入磁碟，支援繁體中文與英文）；之後可隨時從 **說明 > 歡迎文件** 重新開啟。
+- **啟動更快**：數學公式（MathJax）、圖表（Mermaid 等）與匯出相關模組改為第一次用到時才載入，啟動時載入的主程式由約 970 kB 降至約 390 kB。
 
 <p align="center">
   <img src="site/assets/screenshots/quick-open.png" alt="Kalamos Cmd+P 快速開檔面板，顯示模糊搜尋字元標亮與最近開啟標籤" width="760" />
+</p>
+
+<p align="center">
+  <img src="site/assets/screenshots/shortcuts.png" alt="Kalamos 鍵盤快捷鍵速查表，依分類列出快捷鍵並提供搜尋欄" width="760" />
 </p>
 
 ---
@@ -148,6 +171,9 @@
 | | 匯出 PDF（含書籤） | `Cmd+Shift+E` | `Ctrl+Shift+E` |
 | | 透過 Pandoc 匯出（DOCX/ODT/LaTeX/Wiki/EPUB） | `Cmd+Opt+E` | `Ctrl+Alt+E` |
 | | 透過 Pandoc 匯入文件 | `Cmd+Opt+I` | `Ctrl+Alt+I` |
+| **說明** | 鍵盤快捷鍵速查表 | `Cmd+Opt+/` | `Ctrl+Alt+/` |
+
+> **完整快捷鍵清單**：在 App 內按 `Cmd+Opt+/`（Windows 為 `Ctrl+Alt+/`）或選擇 **說明 > 鍵盤快捷鍵…**，即可依分類瀏覽並搜尋所有快捷鍵。
 
 > **快速開檔面板內操作**：以 `↑` / `↓`（macOS 亦支援 `Ctrl+N` / `Ctrl+P`）移動選取、`Enter` 開啟、`Cmd+Enter` / `Ctrl+Enter` 一律開在新分頁、`Esc` 關閉並回到原本編輯位置。
 
@@ -260,6 +286,9 @@ npm run bench
 
 - 產品規格書：[docs/PRD.md](docs/PRD.md)
 - 表格操作說明：[docs/tables.md](docs/tables.md)
+- 複製為富文字說明：[docs/rich-text-copy.md](docs/rich-text-copy.md)
+- 本機版本歷史說明：[docs/version-history.md](docs/version-history.md)
+- 外部修改偵測說明：[docs/external-changes.md](docs/external-changes.md)
 - 自訂 CSS 主題指南：[docs/themes.md](docs/themes.md)
 - 圖床上傳設定說明：[docs/image-upload.md](docs/image-upload.md)
 
