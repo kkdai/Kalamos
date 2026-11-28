@@ -208,6 +208,12 @@ export interface Settings {
   contentWidth?: number;
   /** #104: recently opened / saved file paths (newest first, up to 20). */
   recentFiles?: string[];
+  /** #148: keep local version history snapshots on save (default on). */
+  historyEnabled?: boolean;
+  /** #148: maximum snapshots kept per file (default 50). */
+  historyMaxVersions?: number;
+  /** #148: maximum total local history size in MB across all files (default 200). */
+  historyMaxTotalMb?: number;
   /** #147: whether the first-launch welcome document has already been shown. */
   welcomeShown?: boolean;
 }
@@ -237,6 +243,9 @@ export const DEFAULT_SETTINGS: Settings = {
   fontSize: 17,
   contentWidth: 720,
   recentFiles: [],
+  historyEnabled: true,
+  historyMaxVersions: 50,
+  historyMaxTotalMb: 200,
   welcomeShown: true,
 };
 
@@ -496,6 +505,8 @@ export function resetMockState(): void {
   mockImageDataUris.clear();
   mockLastClipboardHtml = null;
   mockClipboardHtmlHandler = null;
+  mockHistory.clear();
+  mockHistoryThrottleMs = DEFAULT_MOCK_HISTORY_THROTTLE_MS;
   seedDemoFolder();
   seedDefaultCustomThemes();
 }
@@ -641,12 +652,21 @@ export async function statFileSnapshot(path: string): Promise<FileDiskState> {
   };
 }
 
+export interface SaveFileOptions {
+  isAutosave?: boolean;
+}
+
 export async function saveFile(
   path: string,
   content: string,
+  options?: SaveFileOptions,
 ): Promise<FileMeta> {
   if (isTauri()) {
-    const meta = await invoke<FileMeta>("save_file", { path, content });
+    const meta = await invoke<FileMeta>("save_file", {
+      path,
+      content,
+      isAutosave: Boolean(options?.isAutosave),
+    });
     return { ...meta, path: toSlashPath(meta.path) };
   }
   const defaultSave = async (): Promise<FileMeta> => {
@@ -661,6 +681,16 @@ export async function saveFile(
       );
     }
     const mtimeMs = nextMockTimestampMs();
+    const previous = mockFiles.get(norm);
+    if (previous) {
+      maybeSnapshotMockHistory(
+        norm,
+        previous.content,
+        content,
+        Boolean(options?.isAutosave),
+        mtimeMs,
+      );
+    }
     const size = new TextEncoder().encode(content).byteLength;
     registerAncestorDirs(norm, false);
     mockFiles.set(norm, { content, mtimeMs });
@@ -676,12 +706,14 @@ export async function saveFileChecked(
   path: string,
   content: string,
   expectedHash?: string | null,
+  options?: SaveFileOptions,
 ): Promise<SaveFileResult> {
   if (isTauri()) {
     const res = await invoke<SaveFileResult>("save_file_checked", {
       path,
       content,
       expectedHash: expectedHash ?? null,
+      isAutosave: Boolean(options?.isAutosave),
     });
     return { ...res, path: toSlashPath(res.path) };
   }
@@ -709,7 +741,7 @@ export async function saveFileChecked(
       };
     }
   }
-  const meta = await saveFile(path, content);
+  const meta = await saveFile(path, content, options);
   return {
     status: "saved",
     path: meta.path,
@@ -1425,6 +1457,11 @@ export async function setSettings(settings: Settings): Promise<null> {
     recentFiles: [
       ...(settings.recentFiles ?? DEFAULT_SETTINGS.recentFiles ?? []),
     ],
+    historyEnabled: settings.historyEnabled ?? DEFAULT_SETTINGS.historyEnabled,
+    historyMaxVersions:
+      settings.historyMaxVersions ?? DEFAULT_SETTINGS.historyMaxVersions,
+    historyMaxTotalMb:
+      settings.historyMaxTotalMb ?? DEFAULT_SETTINGS.historyMaxTotalMb,
     welcomeShown:
       settings.welcomeShown ??
       mockSettings.welcomeShown ??
@@ -2654,4 +2691,192 @@ export function setMockClipboardHtmlHandler(
   handler: MockClipboardHtmlHandler | null,
 ): void {
   mockClipboardHtmlHandler = handler;
+}
+
+// ---------------------------------------------------------------------------
+// #148: Local Version History
+// ---------------------------------------------------------------------------
+
+export interface HistoryVersion {
+  id: string;
+  savedAtMs: number;
+  size: number;
+}
+
+export interface HistoryStats {
+  totalBytes: number;
+  totalVersions: number;
+  fileCount: number;
+}
+
+interface MockHistoryRecord extends HistoryVersion {
+  content: string;
+}
+
+const DEFAULT_MOCK_HISTORY_THROTTLE_MS = 5 * 60 * 1000;
+const mockHistory = new Map<string, MockHistoryRecord[]>();
+let mockHistoryThrottleMs = DEFAULT_MOCK_HISTORY_THROTTLE_MS;
+
+function enforceMockHistoryLimits(): void {
+  const maxMb = Math.min(
+    2048,
+    Math.max(
+      10,
+      Math.round(
+        mockSettings.historyMaxTotalMb ??
+          DEFAULT_SETTINGS.historyMaxTotalMb ??
+          200,
+      ),
+    ),
+  );
+  const maxBytes = maxMb * 1024 * 1024;
+  let totalBytes = 0;
+  const all: Array<{ path: string; rec: MockHistoryRecord }> = [];
+  for (const [p, list] of mockHistory.entries()) {
+    for (const rec of list) {
+      totalBytes += rec.size;
+      all.push({ path: p, rec });
+    }
+  }
+  if (totalBytes <= maxBytes) return;
+  all.sort((a, b) => a.rec.savedAtMs - b.rec.savedAtMs);
+  for (const item of all) {
+    if (totalBytes <= maxBytes) break;
+    const list = mockHistory.get(item.path);
+    if (!list) continue;
+    const idx = list.findIndex((r) => r.id === item.rec.id);
+    if (idx >= 0) {
+      list.splice(idx, 1);
+      totalBytes = Math.max(0, totalBytes - item.rec.size);
+      if (list.length === 0) mockHistory.delete(item.path);
+    }
+  }
+}
+
+function maybeSnapshotMockHistory(
+  normPath: string,
+  oldContent: string,
+  newContent: string,
+  isAutosave: boolean,
+  nowMs: number,
+): void {
+  if (mockSettings.historyEnabled === false) return;
+  if (oldContent === newContent) return;
+  const list = mockHistory.get(normPath) ?? [];
+  const latest = list[0];
+  if (latest) {
+    if (latest.content === oldContent) return;
+    if (isAutosave && nowMs - latest.savedAtMs < mockHistoryThrottleMs) return;
+  }
+  const savedAtMs =
+    latest && nowMs <= latest.savedAtMs ? latest.savedAtMs + 1 : nowMs;
+  const size = new TextEncoder().encode(oldContent).byteLength;
+  const record: MockHistoryRecord = {
+    id: String(savedAtMs),
+    savedAtMs,
+    size,
+    content: oldContent,
+  };
+  const maxVersions = Math.min(
+    500,
+    Math.max(
+      1,
+      Math.round(
+        mockSettings.historyMaxVersions ??
+          DEFAULT_SETTINGS.historyMaxVersions ??
+          50,
+      ),
+    ),
+  );
+  const next = [record, ...list].slice(0, maxVersions);
+  mockHistory.set(normPath, next);
+  enforceMockHistoryLimits();
+}
+
+export async function listHistory(path: string): Promise<HistoryVersion[]> {
+  if (isTauri()) {
+    return invoke<HistoryVersion[]>("list_history", {
+      path: toNativePath(path),
+    });
+  }
+  if (!path || !path.trim()) {
+    throw createAppError("InvalidPath", "Path must not be empty");
+  }
+  const list = mockHistory.get(normalizePath(path)) ?? [];
+  return list.map(({ id, savedAtMs, size }) => ({ id, savedAtMs, size }));
+}
+
+export async function readHistoryVersion(
+  path: string,
+  versionId: string,
+): Promise<string> {
+  if (isTauri()) {
+    return invoke<string>("read_history_version", {
+      path: toNativePath(path),
+      versionId,
+    });
+  }
+  if (!path || !path.trim()) {
+    throw createAppError("InvalidPath", "Path must not be empty");
+  }
+  if (!versionId || !/^\d+$/.test(versionId)) {
+    throw createAppError("InvalidPath", `Invalid versionId: ${versionId}`);
+  }
+  const list = mockHistory.get(normalizePath(path)) ?? [];
+  const found = list.find((v) => v.id === versionId);
+  if (!found) {
+    throw createAppError("NotFound", `History version not found: ${versionId}`);
+  }
+  return found.content;
+}
+
+export async function getHistoryStats(): Promise<HistoryStats> {
+  if (isTauri()) {
+    return invoke<HistoryStats>("get_history_stats");
+  }
+  let totalBytes = 0;
+  let totalVersions = 0;
+  let fileCount = 0;
+  for (const list of mockHistory.values()) {
+    if (list.length === 0) continue;
+    fileCount += 1;
+    totalVersions += list.length;
+    for (const v of list) totalBytes += v.size;
+  }
+  return { totalBytes, totalVersions, fileCount };
+}
+
+export async function clearAllHistory(): Promise<void> {
+  if (isTauri()) {
+    await invoke<null>("clear_all_history");
+    return;
+  }
+  mockHistory.clear();
+}
+
+/** Test hook: directly seed a historical snapshot for `path` in non-Tauri environments. */
+export function seedMockHistoryVersion(
+  path: string,
+  content: string,
+  savedAtMs?: number,
+): HistoryVersion {
+  const norm = normalizePath(path);
+  const list = mockHistory.get(norm) ?? [];
+  const ts = savedAtMs ?? nextMockTimestampMs();
+  const size = new TextEncoder().encode(content).byteLength;
+  const record: MockHistoryRecord = {
+    id: String(ts),
+    savedAtMs: ts,
+    size,
+    content,
+  };
+  const next = [...list.filter((r) => r.id !== record.id), record].sort(
+    (a, b) => b.savedAtMs - a.savedAtMs,
+  );
+  mockHistory.set(norm, next);
+  return { id: record.id, savedAtMs: record.savedAtMs, size: record.size };
+}
+
+export function setMockHistoryThrottleMs(ms: number): void {
+  mockHistoryThrottleMs = Math.max(0, ms);
 }

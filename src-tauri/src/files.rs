@@ -368,7 +368,14 @@ pub fn save_file(
     file_watcher: tauri::State<'_, FileWatcherManager>,
     path: String,
     content: String,
+    is_autosave: Option<bool>,
 ) -> Result<FileMeta, AppError> {
+    crate::history::snapshot_before_save_for_app(
+        &app,
+        &path,
+        &content,
+        is_autosave.unwrap_or(false),
+    );
     let hash = sha256_hex(content.as_bytes());
     file_watcher.record_self_write(&path, &hash);
     let meta = save_file_impl(&path, &content)?;
@@ -383,8 +390,15 @@ pub fn save_file_checked(
     path: String,
     content: String,
     expected_hash: Option<String>,
+    is_autosave: Option<bool>,
 ) -> Result<SaveFileResult, AppError> {
     let result = save_file_checked_impl(&path, &content, expected_hash.as_deref(), |hash| {
+        crate::history::snapshot_before_save_for_app(
+            &app,
+            &path,
+            &content,
+            is_autosave.unwrap_or(false),
+        );
         file_watcher.record_self_write(&path, hash);
     })?;
     if matches!(result, SaveFileResult::Saved { .. }) {
@@ -578,5 +592,103 @@ mod tests {
         .expect("checked save missing");
         assert!(matches!(save_missing, SaveFileResult::Missing { .. }));
         assert!(!file_path.exists(), "checked save must not recreate deleted file");
+    }
+
+    #[test]
+    fn checked_save_snapshots_history_only_when_write_proceeds() {
+        use crate::history::{
+            list_history_in, read_history_version_in, snapshot_before_save_in, HistoryPolicy,
+        };
+
+        let app_data = tempdir().expect("app_data");
+        let work = tempdir().expect("work");
+        let file_path = work.path().join("checked-history.md");
+        let path_str = file_path.to_str().unwrap();
+        let policy = HistoryPolicy {
+            enabled: true,
+            max_versions: 50,
+            max_total_bytes: 200 * 1024 * 1024,
+            throttle_ms: 300_000,
+        };
+
+        let run_checked =
+            |content: &str, expected: Option<&str>, is_autosave: bool, ts: u64| {
+                save_file_checked_impl(path_str, content, expected, |_| {
+                    snapshot_before_save_in(
+                        app_data.path(),
+                        path_str,
+                        content,
+                        is_autosave,
+                        &policy,
+                        ts,
+                    )
+                    .expect("snapshot");
+                })
+                .expect("save_file_checked_impl")
+            };
+
+        // 1. Initial Save As (new file): Saved, no prior disk file -> 0 history snapshots.
+        let r1 = run_checked("# V1\n", None, false, 1_000);
+        let v1_hash = match r1 {
+            SaveFileResult::Saved { hash, .. } => hash,
+            other => panic!("expected Saved, got {other:?}"),
+        };
+        assert!(list_history_in(app_data.path(), path_str).unwrap().is_empty());
+
+        // 2. Checked manual save with matching hash: Saved, snapshots V1.
+        let r2 = run_checked("# V2\n", Some(&v1_hash), false, 2_000);
+        let v2_hash = match r2 {
+            SaveFileResult::Saved { hash, .. } => hash,
+            other => panic!("expected Saved, got {other:?}"),
+        };
+        let list = list_history_in(app_data.path(), path_str).unwrap();
+        assert_eq!(list.len(), 1);
+        assert_eq!(
+            read_history_version_in(app_data.path(), path_str, &list[0].id).unwrap(),
+            "# V1\n"
+        );
+
+        // 3. Checked autosave inside throttle window: Saved, throttled (still 1 snapshot).
+        let r3 = run_checked("# V3\n", Some(&v2_hash), true, 10_000);
+        let v3_hash = match r3 {
+            SaveFileResult::Saved { hash, .. } => hash,
+            other => panic!("expected Saved, got {other:?}"),
+        };
+        assert_eq!(list_history_in(app_data.path(), path_str).unwrap().len(), 1);
+
+        // 4. External modification -> checked save returns Conflict and MUST NOT snapshot.
+        fs::write(&file_path, "# External\n").expect("external edit");
+        let conflict = run_checked("# Local Stale\n", Some(&v3_hash), false, 20_000);
+        assert!(matches!(conflict, SaveFileResult::Conflict { .. }));
+        assert_eq!(
+            list_history_in(app_data.path(), path_str).unwrap().len(),
+            1,
+            "Conflict must not create a history snapshot"
+        );
+        assert_eq!(fs::read_to_string(&file_path).unwrap(), "# External\n");
+
+        // 5. Force overwrite / Save As over existing file (expected_hash = None) -> snapshots External.
+        let forced = run_checked("# Overwritten\n", None, false, 30_000);
+        let forced_hash = match forced {
+            SaveFileResult::Saved { hash, .. } => hash,
+            other => panic!("expected Saved, got {other:?}"),
+        };
+        let list = list_history_in(app_data.path(), path_str).unwrap();
+        assert_eq!(list.len(), 2);
+        assert_eq!(
+            read_history_version_in(app_data.path(), path_str, &list[0].id).unwrap(),
+            "# External\n"
+        );
+
+        // 6. Externally deleted file -> checked save returns Missing and MUST NOT snapshot.
+        fs::remove_file(&file_path).expect("remove file");
+        let missing = run_checked("# Should Not Write\n", Some(&forced_hash), false, 40_000);
+        assert!(matches!(missing, SaveFileResult::Missing { .. }));
+        assert!(!file_path.exists());
+        assert_eq!(
+            list_history_in(app_data.path(), path_str).unwrap().len(),
+            2,
+            "Missing must not create a history snapshot"
+        );
     }
 }

@@ -2,6 +2,7 @@ pub mod error;
 pub mod export;
 pub mod files;
 pub mod fsops;
+pub mod history;
 pub mod images;
 pub mod menu;
 pub mod open_with;
@@ -74,6 +75,10 @@ pub fn run() {
             recovery::write_recovery,
             recovery::list_recovery,
             recovery::clear_recovery,
+            history::list_history,
+            history::read_history_version,
+            history::get_history_stats,
+            history::clear_all_history,
             settings::get_settings,
             settings::set_settings,
             settings::get_active_ui_locale,
