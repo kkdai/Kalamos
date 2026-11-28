@@ -16,10 +16,7 @@ import {
   AUTO_PAIR_BRACKETS_MESSAGE,
   AUTO_PAIR_MARKDOWN_MESSAGE,
 } from "./editor/auto-pair";
-import {
-  collectUploadTargetsInRange,
-  uploadImagesInEditor,
-} from "./editor/image-upload";
+import type { UploadTarget } from "./editor/image-upload";
 import {
   imageExtFromMime,
   insertImageMarkdown,
@@ -54,37 +51,12 @@ import {
   openFind,
   revealRange,
 } from "./editor/search";
-import { openInsertTableDialog } from "./editor/table-insert-dialog";
 import { createWordCounter, type WordCounter } from "./editor/word-count-view";
 import {
   FOCUS_MODE_MESSAGE,
   TYPEWRITER_MODE_MESSAGE,
 } from "./editor/writing-modes";
-import { pickExportFormat } from "./export/format-picker";
-import { buildExportHtml } from "./export/html";
-import {
-  defaultExportPath,
-  ensureExportExtension,
-  exportedMessage,
-  exportingMessage,
-  formatInfo,
-  importedMessage,
-  importingMessage,
-  isImportablePath,
-  PANDOC_IMPORT_EXTENSIONS,
-  type PandocFormat,
-  pandocErrorMessage,
-  pandocMissingMessage,
-  prepareMarkdownForPandoc,
-} from "./export/pandoc";
-import {
-  defaultPdfPath,
-  documentTitle,
-  ensurePdfExtension,
-  exportedPdfMessage,
-  exportingPdfMessage,
-  pdfErrorMessage,
-} from "./export/pdf";
+import type { PandocFormat } from "./export/pandoc";
 import { DEFAULT_UI_LOCALE, getUiLocale, initUiLocale, t } from "./i18n";
 import {
   allowAssetDir,
@@ -1357,7 +1329,10 @@ export function createKalamosApp(
     "para.orderedList": onEditor(toggleOrderedList),
     "para.bulletList": onEditor(toggleBulletList),
     "para.taskList": onEditor(toggleTaskList),
-    "para.table": () => openInsertTableDialog(editor.view),
+    "para.table": () =>
+      import("./editor/table-insert-dialog").then((m) =>
+        m.openInsertTableDialog(editor.view),
+      ),
     "para.codeBlock": onEditor(insertCodeBlock),
     "para.mathBlock": onEditor(insertMathBlock),
     "para.quote": onEditor(toggleBlockquote),
@@ -1600,6 +1575,7 @@ export function createKalamosApp(
   async function isPandocAvailable(): Promise<boolean> {
     const status = await pandocStatus().catch(() => null);
     if (status?.available) return true;
+    const { pandocMissingMessage } = await import("./export/pandoc");
     setStatus(pandocMissingMessage(), true);
     return false;
   }
@@ -1614,28 +1590,32 @@ export function createKalamosApp(
     exportingPandoc = true;
     try {
       if (!(await isPandocAvailable())) return false;
-      const chosen = format ?? (await pickExportFormat());
+      const [pandoc, picker] = await Promise.all([
+        import("./export/pandoc"),
+        format ? Promise.resolve(null) : import("./export/format-picker"),
+      ]);
+      const chosen = format ?? (await picker!.pickExportFormat());
       if (!chosen) return false;
-      const info = formatInfo(chosen);
+      const info = pandoc.formatInfo(chosen);
       const docPath = active.path;
       let outPath: string | null;
       try {
         outPath =
           explicitPath ??
           (await pickSaveExportPath(
-            defaultExportPath(docPath, chosen),
+            pandoc.defaultExportPath(docPath, chosen),
             info.label,
             info.ext,
           ));
       } catch (err) {
-        setStatus(pandocErrorMessage("export", err), true);
+        setStatus(pandoc.pandocErrorMessage("export", err), true);
         return false;
       }
       if (!outPath) return false;
-      outPath = ensureExportExtension(outPath, chosen);
-      setStatus(exportingMessage(), false);
+      outPath = pandoc.ensureExportExtension(outPath, chosen);
+      setStatus(pandoc.exportingMessage(), false);
       try {
-        const prepared = prepareMarkdownForPandoc(
+        const prepared = pandoc.prepareMarkdownForPandoc(
           editor.getContent(),
           docPath,
           editor.getImageRootDir(),
@@ -1648,10 +1628,10 @@ export function createKalamosApp(
           imageRoot: prepared.imageRoot,
           toc: prepared.toc,
         });
-        setStatus(exportedMessage(chosen, meta.path), false);
+        setStatus(pandoc.exportedMessage(chosen, meta.path), false);
         return true;
       } catch (err) {
-        setStatus(pandocErrorMessage("export", err), true);
+        setStatus(pandoc.pandocErrorMessage("export", err), true);
         return false;
       }
     } finally {
@@ -1666,16 +1646,18 @@ export function createKalamosApp(
     importing = true;
     try {
       if (!(await isPandocAvailable())) return false;
+      const pandoc = await import("./export/pandoc");
       let source: string | null;
       try {
         source =
-          explicitPath ?? (await pickImportPath(PANDOC_IMPORT_EXTENSIONS));
+          explicitPath ??
+          (await pickImportPath(pandoc.PANDOC_IMPORT_EXTENSIONS));
       } catch (err) {
-        setStatus(pandocErrorMessage("import", err), true);
+        setStatus(pandoc.pandocErrorMessage("import", err), true);
         return false;
       }
       if (!source) return false;
-      setStatus(importingMessage(), false);
+      setStatus(pandoc.importingMessage(), false);
       let markdown: string;
       try {
         const result = await importPandoc(source);
@@ -1684,14 +1666,14 @@ export function createKalamosApp(
           await allowAssetDir(result.mediaDir).catch(() => null);
         }
       } catch (err) {
-        setStatus(pandocErrorMessage("import", err), true);
+        setStatus(pandoc.pandocErrorMessage("import", err), true);
         return false;
       }
       // #81 B: a new untitled tab (or the blank one).
       placeNewTab(
         makeTab(editor.createSession(markdown, { dirty: true }), null),
       );
-      setStatus(importedMessage(source), false);
+      setStatus(pandoc.importedMessage(source), false);
       return true;
     } finally {
       importing = false;
@@ -1783,6 +1765,9 @@ export function createKalamosApp(
       active.path === docPath
     ) {
       const insertedTo = anchor + (view.state.doc.length - lengthBefore);
+      const { collectUploadTargetsInRange } = await import(
+        "./editor/image-upload"
+      );
       await runImageUpload(
         collectUploadTargetsInRange(view.state, anchor, insertedTo),
       );
@@ -1806,13 +1791,14 @@ export function createKalamosApp(
 
   let uploadingImages = false;
 
-  async function runImageUpload(
-    targets?: Parameters<typeof uploadImagesInEditor>[0]["targets"],
-  ): Promise<boolean> {
+  async function runImageUpload(targets?: UploadTarget[]): Promise<boolean> {
     if (uploadingImages) return false;
     uploadingImages = true;
     try {
-      const settings = await refreshUploadSettings();
+      const [settings, { uploadImagesInEditor }] = await Promise.all([
+        refreshUploadSettings(),
+        import("./editor/image-upload"),
+      ]);
       const result = await uploadImagesInEditor({
         view: editor.view,
         uploader: settings.uploadCommand,
@@ -2018,30 +2004,34 @@ export function createKalamosApp(
     if (exportingPdf) return false;
     exportingPdf = true;
     try {
+      const [pdf, { buildExportHtml }] = await Promise.all([
+        import("./export/pdf"),
+        import("./export/html"),
+      ]);
       const docPath = active.path;
       let outPath: string | null = null;
       try {
         outPath =
-          explicitPath ?? (await pickSavePdfPath(defaultPdfPath(docPath)));
+          explicitPath ?? (await pickSavePdfPath(pdf.defaultPdfPath(docPath)));
       } catch (err) {
-        setStatus(pdfErrorMessage(err), true);
+        setStatus(pdf.pdfErrorMessage(err), true);
         return false;
       }
       if (!outPath) return false;
-      outPath = ensurePdfExtension(outPath);
-      setStatus(exportingPdfMessage(), false);
+      outPath = pdf.ensurePdfExtension(outPath);
+      setStatus(pdf.exportingPdfMessage(), false);
       try {
         const { html, headings } = await buildExportHtml(editor.getContent(), {
-          title: documentTitle(docPath),
+          title: pdf.documentTitle(docPath),
           docPath,
           mathAutoNumber: editor.isMathAutoNumber(),
           imageRootDir: editor.getImageRootDir(),
         });
         const meta = await exportPdf(html, outPath, headings);
-        setStatus(exportedPdfMessage(meta.path), false);
+        setStatus(pdf.exportedPdfMessage(meta.path), false);
         return true;
       } catch (err) {
-        setStatus(pdfErrorMessage(err), true);
+        setStatus(pdf.pdfErrorMessage(err), true);
         return false;
       }
     } finally {
@@ -2210,7 +2200,8 @@ export function createKalamosApp(
       for (const path of mdPaths) {
         await openPath(path, "tab");
       }
-      if (imagePaths.length === 0 && mdPaths.length === 0) {
+      if (imagePaths.length === 0 && mdPaths.length === 0 && paths.length > 0) {
+        const { isImportablePath } = await import("./export/pandoc");
         const importable = paths.find((p) => isImportablePath(p));
         if (importable) {
           await importDocument(importable);
