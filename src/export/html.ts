@@ -8,7 +8,6 @@
  * editor's MathJax engine. Every piece of document text is HTML-escaped; raw
  * HTML in the document is shown as text, never interpreted.
  */
-import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { ensureSyntaxTree, syntaxTree } from "@codemirror/language";
 import { EditorState } from "@codemirror/state";
 import type { SyntaxNode } from "@lezer/common";
@@ -38,6 +37,7 @@ import {
 } from "../editor/image-attrs";
 import { resolveImageRoot, resolveImageSrc } from "../editor/images";
 import { collectDocumentHeadings } from "../editor/lists";
+import { createMarkdownSupport } from "../editor/markdown-lang";
 import { ensureMathJaxLoaded, mathMarkdownExtension } from "../editor/math";
 import { t } from "../i18n";
 import { type DiagramFence, renderExportDiagrams } from "./diagrams";
@@ -847,10 +847,8 @@ export function createExportParseState(content: string): EditorState {
   return EditorState.create({
     doc: content,
     extensions: [
-      markdown({
-        base: markdownLanguage,
-        addKeymap: false,
-        completeHTMLTags: false,
+      createMarkdownSupport({
+        pasteURLAsLink: false,
         extensions: [
           mathMarkdownExtension,
           cjkEmphasisExtension,

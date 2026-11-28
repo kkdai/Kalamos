@@ -13,7 +13,6 @@ import {
   type DiagramKind,
   type DiagramRenderResult,
   diagramThemeFromColors,
-  renderDiagram,
 } from "../editor/diagrams";
 import { t } from "../i18n";
 
@@ -87,6 +86,8 @@ export function isStaticSvg(svg: string): boolean {
 export async function renderExportDiagrams(
   fences: readonly DiagramFence[],
 ): Promise<DiagramRenderResult[]> {
+  if (fences.length === 0) return [];
+  const { renderDiagram } = await import("../editor/diagram-engine");
   const results: DiagramRenderResult[] = [];
   for (const [i, fence] of fences.entries()) {
     const result = await renderDiagram(

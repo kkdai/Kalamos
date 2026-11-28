@@ -27,7 +27,6 @@ import type {
   Line,
   MarkdownConfig,
 } from "@lezer/markdown";
-import { t } from "../i18n";
 import { isSelectionTouchingRange } from "./live-preview";
 import { mapPosClamped } from "./positions";
 
@@ -157,7 +156,7 @@ export interface MathRenderResult {
   equationNumbers: number[];
 }
 
-interface MathJaxEngine {
+export interface MathJaxEngine {
   render: (
     tex: string,
     display: boolean,
@@ -223,27 +222,6 @@ export function clearMathRenderCache(): void {
   mathRenderCache.clear();
 }
 
-const NUMBERED_ENV_RE =
-  /^\\begin\{(equation|align|gather|multline|eqnarray|flalign)\}/;
-const ANY_BEGIN_ENV_RE = /^\\begin\{([a-zA-Z*]+)\}/;
-
-function prepareDisplayTexForAutoNumber(
-  trimmedTex: string,
-  autoNumber: boolean,
-): string {
-  if (!autoNumber) return trimmedTex;
-  if (NUMBERED_ENV_RE.test(trimmedTex)) {
-    return trimmedTex;
-  }
-  if (
-    ANY_BEGIN_ENV_RE.test(trimmedTex) ||
-    /\\(?:notag|nonumber|tag)\b/.test(trimmedTex)
-  ) {
-    return trimmedTex;
-  }
-  return `\\begin{equation}\n${trimmedTex}\n\\end{equation}`;
-}
-
 export async function ensureMathJaxLoaded(
   view?: EditorView,
 ): Promise<MathJaxEngine> {
@@ -254,157 +232,19 @@ export async function ensureMathJaxLoaded(
     return mathEngineInstance;
   }
   if (!mathEnginePromise) {
-    mathEnginePromise = (async () => {
-      const [
-        { mathjax },
-        { TeX },
-        { SVG },
-        { liteAdaptor },
-        { RegisterHTMLHandler },
-      ] = await Promise.all([
-        import("mathjax-full/js/mathjax.js"),
-        import("mathjax-full/js/input/tex.js"),
-        import("mathjax-full/js/output/svg.js"),
-        import("mathjax-full/js/adaptors/liteAdaptor.js"),
-        import("mathjax-full/js/handlers/html.js"),
-        import("mathjax-full/js/input/tex/base/BaseConfiguration.js"),
-        import("mathjax-full/js/input/tex/ams/AmsConfiguration.js"),
-        import("mathjax-full/js/input/tex/mhchem/MhchemConfiguration.js"),
-        import("mathjax-full/js/input/tex/bbox/BboxConfiguration.js"),
-        import(
-          "mathjax-full/js/input/tex/newcommand/NewcommandConfiguration.js"
-        ),
-      ]);
-
-      const adaptor = liteAdaptor();
-      RegisterHTMLHandler(adaptor);
-
-      let capturedError: string | null = null;
-      const packages = [...ALLOWED_TEX_PACKAGES];
-
-      const texNone = new TeX({
-        packages,
-        tags: "none",
-        formatError: (
-          jax: { formatError: (e: Error) => unknown },
-          err: Error,
-        ) => {
-          capturedError = err.message || t("editor.math.syntaxError");
-          return jax.formatError(err);
-        },
+    mathEnginePromise = import("./math-engine")
+      .then(({ createMathJaxEngine }) => {
+        const engine = createMathJaxEngine({
+          get: getCachedMathResult,
+          set: setCachedMathResult,
+        });
+        mathEngineInstance = engine;
+        return engine;
+      })
+      .catch((err) => {
+        mathEnginePromise = null;
+        throw err;
       });
-
-      const texAms = new TeX({
-        packages,
-        tags: "ams",
-        formatError: (
-          jax: { formatError: (e: Error) => unknown },
-          err: Error,
-        ) => {
-          capturedError = err.message || t("editor.math.syntaxError");
-          return jax.formatError(err);
-        },
-      });
-
-      const svg = new SVG({ fontCache: "none" });
-      const docNone = mathjax.document("", {
-        InputJax: texNone,
-        OutputJax: svg,
-      });
-      const docAms = mathjax.document("", { InputJax: texAms, OutputJax: svg });
-
-      function runConvert(
-        rawTex: string,
-        display: boolean,
-        useAms: boolean,
-        startEqNum: number,
-      ): { html: string; err: string | null; eqNums: number[] } {
-        capturedError = null;
-        const targetDoc = useAms ? docAms : docNone;
-        if (useAms) {
-          texAms.reset(Math.max(0, startEqNum - 1));
-        } else {
-          texNone.reset();
-        }
-        const node = targetDoc.convert(rawTex, { display });
-        const html: string = adaptor.outerHTML(node);
-
-        let err: string | null = capturedError;
-        if (!err) {
-          const merrorMatch = /data-mjx-error="([^"]+)"/.exec(html);
-          if (merrorMatch) {
-            err = merrorMatch[1];
-          }
-        }
-
-        const eqNums: number[] = [];
-        const tagRe = /id="mjx-eqn:(\d+)"/g;
-        for (const m of html.matchAll(tagRe)) {
-          const n = Number(m[1]);
-          if (!Number.isNaN(n) && !eqNums.includes(n)) {
-            eqNums.push(n);
-          }
-        }
-
-        return { html, err, eqNums };
-      }
-
-      const engine: MathJaxEngine = {
-        render(
-          tex: string,
-          display: boolean,
-          autoNumber: boolean,
-          startEquationNumber: number,
-        ): MathRenderResult {
-          const trimmed = tex.trim();
-          if (!trimmed) {
-            return {
-              svgHtml: "",
-              error: t("editor.math.empty"),
-              equationNumbers: [],
-            };
-          }
-
-          const useAms = display && autoNumber;
-          const cacheKey = useAms
-            ? `block:ams:${startEquationNumber}:${trimmed}`
-            : `${display ? "block" : "inline"}:none:${trimmed}`;
-
-          const cached = getCachedMathResult(cacheKey);
-          if (cached) {
-            return cached;
-          }
-
-          const effectiveTex = useAms
-            ? prepareDisplayTexForAutoNumber(trimmed, true)
-            : trimmed;
-
-          let conv = runConvert(
-            effectiveTex,
-            display,
-            useAms,
-            startEquationNumber,
-          );
-          if (conv.err && effectiveTex !== trimmed) {
-            conv = runConvert(trimmed, display, useAms, startEquationNumber);
-          }
-
-          const result: MathRenderResult = conv.err
-            ? { svgHtml: "", error: conv.err, equationNumbers: [] }
-            : {
-                svgHtml: conv.html,
-                error: null,
-                equationNumbers: conv.eqNums,
-              };
-
-          setCachedMathResult(cacheKey, result);
-          return result;
-        },
-      };
-
-      mathEngineInstance = engine;
-      return engine;
-    })();
   }
 
   const engine = await mathEnginePromise;
@@ -498,8 +338,11 @@ class InlineMathWidget extends WidgetType {
 
     const result = renderTeXSync(this.tex, false, false, 1);
     if (!result) {
+      span.classList.add("k-math-pending");
+      span.dataset.state = "pending";
       span.textContent = this.tex;
     } else if (result.error) {
+      span.dataset.state = "error";
       const errEl = document.createElement("span");
       errEl.className = "k-math-error";
       errEl.dataset.testid = "math-error";
@@ -507,6 +350,7 @@ class InlineMathWidget extends WidgetType {
       errEl.textContent = result.error;
       span.appendChild(errEl);
     } else {
+      span.dataset.state = "rendered";
       span.innerHTML = result.svgHtml;
     }
 
@@ -570,8 +414,11 @@ class BlockMathWidget extends WidgetType {
     }
 
     if (!result) {
+      container.classList.add("k-math-pending");
+      container.dataset.state = "pending";
       container.textContent = this.tex;
     } else if (result.error) {
+      container.dataset.state = "error";
       const errEl = document.createElement("span");
       errEl.className = "k-math-error";
       errEl.dataset.testid = "math-error";
@@ -579,6 +426,7 @@ class BlockMathWidget extends WidgetType {
       errEl.textContent = result.error;
       container.appendChild(errEl);
     } else {
+      container.dataset.state = "rendered";
       const contentWrap = document.createElement("div");
       contentWrap.className = "k-math-svg-wrap";
       contentWrap.innerHTML = result.svgHtml;

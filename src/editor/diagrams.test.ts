@@ -32,23 +32,25 @@ const mermaidMock = vi.hoisted(() => ({
 vi.mock("mermaid", () => ({ default: mermaidMock }));
 
 import {
-  buildDiagramDecorations,
   clearDiagramCache,
-  collectDiagramBlocks,
-  type DiagramTheme,
-  DiagramWidget,
-  diagramRefreshEffect,
-  diagramStateField,
   flowToMermaid,
   getCachedDiagram,
   getDiagramCacheSize,
   isDiagramEngineLoaded,
   MAX_DIAGRAM_CACHE_ENTRIES,
   mermaidConfig,
-  readDiagramTheme,
   renderDiagram,
-  resolveDiagramKind,
   sequenceToMermaid,
+} from "./diagram-engine";
+import {
+  buildDiagramDecorations,
+  collectDiagramBlocks,
+  type DiagramTheme,
+  DiagramWidget,
+  diagramRefreshEffect,
+  diagramStateField,
+  readDiagramTheme,
+  resolveDiagramKind,
   setDiagramThemeEffect,
 } from "./diagrams";
 import { createSourceModeController } from "./source-mode";

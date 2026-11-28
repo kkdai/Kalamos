@@ -78,3 +78,13 @@
   font-family: var(--k-font-mono);
   font-size: 0.85em;
 }
+
+.k-math-pending {
+  color: var(--k-text-muted);
+  font-family: var(--k-font-mono);
+  font-size: 0.9em;
+}
+
+.k-math-block.k-math-pending {
+  min-height: 2em;
+}

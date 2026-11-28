@@ -1,15 +1,5 @@
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { getCurrentWebview } from "@tauri-apps/api/webview";
-import { getCurrentWindow } from "@tauri-apps/api/window";
-import { writeHtml as writeClipboardHtmlPlugin } from "@tauri-apps/plugin-clipboard-manager";
-import {
-  ask as askDialog,
-  message as messageDialog,
-  open as openDialog,
-  save as saveDialog,
-} from "@tauri-apps/plugin-dialog";
-import { check as checkUpdater } from "@tauri-apps/plugin-updater";
 import { sha256Hex } from "./external-changes/content-hash";
 import {
   defaultUiLocaleForTag,
@@ -27,6 +17,12 @@ import {
   toNativePath,
   toSlashPath,
 } from "./platform";
+
+const loadTauriWindow = () => import("@tauri-apps/api/window");
+const loadTauriWebview = () => import("@tauri-apps/api/webview");
+const loadTauriDialog = () => import("@tauri-apps/plugin-dialog");
+const loadTauriUpdater = () => import("@tauri-apps/plugin-updater");
+const loadTauriClipboard = () => import("@tauri-apps/plugin-clipboard-manager");
 
 function normalizeTreeNode(node: TreeNode): TreeNode {
   return {
@@ -1503,7 +1499,8 @@ export async function readThemeCss(id: string): Promise<string> {
 
 export async function pickOpenFilePath(): Promise<string | null> {
   if (isTauri()) {
-    const selected = await openDialog({
+    const { open } = await loadTauriDialog();
+    const selected = await open({
       multiple: false,
       directory: false,
       filters: [{ name: "Markdown", extensions: [...MARKDOWN_EXT_LIST] }],
@@ -1518,7 +1515,8 @@ export async function pickOpenFilePath(): Promise<string | null> {
 
 export async function pickOpenFolderPath(): Promise<string | null> {
   if (isTauri()) {
-    const selected = await openDialog({
+    const { open } = await loadTauriDialog();
+    const selected = await open({
       multiple: false,
       directory: true,
     });
@@ -1537,7 +1535,8 @@ export async function pickSaveFilePath(
   defaultPath?: string | null,
 ): Promise<string | null> {
   if (isTauri()) {
-    const selected = await saveDialog({
+    const { save } = await loadTauriDialog();
+    const selected = await save({
       defaultPath: toNativePath(defaultPath) ?? undefined,
       filters: [{ name: "Markdown", extensions: ["md", "markdown"] }],
     });
@@ -1553,7 +1552,8 @@ export async function askDiscardChanges(
   message = t("dialog.discardUntitled"),
 ): Promise<boolean> {
   if (isTauri()) {
-    return askDialog(message, { title: "Kalamos", kind: "warning" });
+    const { ask } = await loadTauriDialog();
+    return ask(message, { title: "Kalamos", kind: "warning" });
   }
   if (mockAskDialogHandler) {
     return await mockAskDialogHandler(message);
@@ -1581,6 +1581,7 @@ export async function askSaveChanges(
   labels: SaveChangesLabels = saveChangesLabels(),
 ): Promise<SaveChangesChoice> {
   if (isTauri()) {
+    const { message: messageDialog } = await loadTauriDialog();
     const result = await messageDialog(message, {
       title: "Kalamos",
       kind: "warning",
@@ -1606,6 +1607,7 @@ export function getMockSaveChangesPrompts(): string[] {
 export async function setWindowTitle(title: string): Promise<void> {
   if (typeof document !== "undefined") document.title = title;
   if (isTauri()) {
+    const { getCurrentWindow } = await loadTauriWindow();
     await getCurrentWindow().setTitle(title);
     return;
   }
@@ -1637,6 +1639,7 @@ export async function onWindowCloseRequested(
   handler: WindowCloseHandler,
 ): Promise<() => void> {
   if (isTauri()) {
+    const { getCurrentWindow } = await loadTauriWindow();
     return getCurrentWindow().onCloseRequested(async (event) => {
       if ((await handler()) === false) event.preventDefault();
     });
@@ -1917,6 +1920,7 @@ export async function onFileDrop(
   listener: FileDropListener,
 ): Promise<() => void> {
   if (isTauri()) {
+    const { getCurrentWebview } = await loadTauriWebview();
     return getCurrentWebview().onDragDropEvent((event) => {
       if (event.payload.type !== "drop") return;
       const ratio =
@@ -2046,7 +2050,8 @@ export async function pickSavePdfPath(
   defaultPath: string,
 ): Promise<string | null> {
   if (isTauri()) {
-    const selected = await saveDialog({
+    const { save } = await loadTauriDialog();
+    const selected = await save({
       defaultPath: toNativePath(defaultPath),
       filters: [{ name: "PDF", extensions: ["pdf"] }],
     });
@@ -2255,7 +2260,8 @@ export async function pickSaveExportPath(
   ext: string,
 ): Promise<string | null> {
   if (isTauri()) {
-    const selected = await saveDialog({
+    const { save } = await loadTauriDialog();
+    const selected = await save({
       defaultPath: toNativePath(defaultPath),
       filters: [{ name: label, extensions: [ext] }],
     });
@@ -2270,7 +2276,8 @@ export async function pickImportPath(
   extensions: string[],
 ): Promise<string | null> {
   if (isTauri()) {
-    const selected = await openDialog({
+    const { open } = await loadTauriDialog();
+    const selected = await open({
       multiple: false,
       directory: false,
       filters: [{ name: t("dialog.importableFiles"), extensions }],
@@ -2437,6 +2444,7 @@ export function getMockMenuState(): MenuSyncState | null {
 /** 檢視 > 實際大小 / 放大 / 縮小. */
 export async function setWebviewZoom(factor: number): Promise<void> {
   if (isTauri()) {
+    const { getCurrentWebview } = await loadTauriWebview();
     await getCurrentWebview().setZoom(factor);
     return;
   }
@@ -2489,7 +2497,8 @@ let mockUpdateCheckCount = 0;
 
 export async function checkForUpdate(): Promise<AvailableUpdate | null> {
   if (isTauri()) {
-    const update = await checkUpdater();
+    const { check } = await loadTauriUpdater();
+    const update = await check();
     if (!update) return null;
     return {
       version: update.version,
@@ -2589,7 +2598,8 @@ export async function writeClipboardHtml(
   plainText: string,
 ): Promise<void> {
   if (isTauri()) {
-    await writeClipboardHtmlPlugin(html, plainText);
+    const { writeHtml } = await loadTauriClipboard();
+    await writeHtml(html, plainText);
     return;
   }
   const payload: ClipboardHtmlPayload = { html, plainText };

@@ -3,7 +3,6 @@ import "./tables.css";
 import "./images.css";
 
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
-import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { languages } from "@codemirror/language-data";
 import {
   Annotation,
@@ -45,6 +44,7 @@ import {
   type RelativeLinkHandler,
   relativeLinkHandlerFacet,
 } from "./live-preview";
+import { createMarkdownSupport } from "./markdown-lang";
 import { mathAutoNumberFacet, mathMarkdownExtension } from "./math";
 import { kalamosSearchExtension, kalamosSearchKeymap } from "./search";
 import { createSourceModeController } from "./source-mode";
@@ -305,12 +305,8 @@ export function createEditor(options: CreateEditorOptions): KalamosEditor {
       : []),
     history(),
     EditorView.lineWrapping,
-    markdown({
-      base: markdownLanguage,
+    createMarkdownSupport({
       codeLanguages: languages,
-      addKeymap: false,
-      // Only emoji completion (ED-08); no HTML tag suggestions for `<di…`.
-      completeHTMLTags: false,
       extensions: [
         mathMarkdownExtension,
         cjkEmphasisExtension,

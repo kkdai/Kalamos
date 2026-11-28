@@ -32,11 +32,8 @@ const mermaidMock = vi.hoisted(() => ({
 
 vi.mock("mermaid", () => ({ default: mermaidMock }));
 
-import {
-  clearDiagramCache,
-  readDiagramTheme,
-  renderDiagram,
-} from "../editor/diagrams";
+import { clearDiagramCache, renderDiagram } from "../editor/diagram-engine";
+import { readDiagramTheme } from "../editor/diagrams";
 import { isStaticSvg, PRINT_DIAGRAM_THEME, scopeSvgIds } from "./diagrams";
 import { buildExportHtml } from "./html";
 
